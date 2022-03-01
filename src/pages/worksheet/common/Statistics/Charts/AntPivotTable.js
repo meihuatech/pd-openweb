@@ -314,12 +314,12 @@ export default class extends Component {
       if (pivotTableUnilineShow) {
         return data;
       }
-
+      console.log('render', data)
       return (
         <div style={{ wordWrap: 'break-word', wordBreak: 'break-word' }}>{data}</div>
       );
     }
-
+    
     const linesChildren = linesData.map(item => {
       return {
         title: item.name,
@@ -330,7 +330,6 @@ export default class extends Component {
         render
       }
     });
-
     for(let i = columns.length - 1; i >= 0; i--) {
       const column = columns[i];
       const next = columns[i + 1];
@@ -352,7 +351,7 @@ export default class extends Component {
     const getTitle = (id, value) => {
       return valueMap[id] ? valueMap[id][value] : value;
     }
-
+    
     const getYaxisList = (index) => {
       const yaxisColumn = yaxisList.map((item, i) => {
         const { rename, controlName } = item;
@@ -364,7 +363,8 @@ export default class extends Component {
           className: displaySetup.showRowList && isViewOriginalData ? 'contentValue' : undefined,
           width: this.columnWidth,
           render: (txt) => {
-            if (name === 'Evol') {
+            // 对Evol列加标签显示处理
+            if (['Evol','Evol%','%'].includes(name)) {
               const tagClass = isNaN(txt) ? '' : Number(txt) > 0 ? 'green' : 'red'
               const valueView = isNaN(txt) ? txt : `${txt}%`
               return <span className={cx(['cell-tag',tagClass])}>{valueView}</span>
