@@ -55,6 +55,12 @@ const PivotTableContent = styled.div`
       color: #757575;
       font-weight: bold;
     }
+    thead > tr > th {
+      font-family: PingFangSC-Regular;
+      font-size: 12px;
+      color: #636363;
+      background-color: #F0F5F9;
+    }
   }
   .ant-table-container, table, tr>th, tr>td {
     border-color: #E0E0E0 !important;
@@ -72,6 +78,23 @@ const PivotTableContent = styled.div`
   th, td {
     min-width: 100px;
     text-align: left !important;
+
+    .cell-tag {
+      padding: 2px 10px;
+      display: inline-block;
+      min-width: 60px;
+      font-size: 12px;
+      color: #333333;
+      border-radius: 14px;
+      background-color: #DDDDDD;
+
+      &.red {
+        background-color: #E6A7A5;
+      }
+      &.green {
+        background-color: #BCD197;
+      }
+    }
   }
   .ant-table-cell-scrollbar {
     display: none;
@@ -340,6 +363,14 @@ export default class extends Component {
           colSpan: 1,
           className: displaySetup.showRowList && isViewOriginalData ? 'contentValue' : undefined,
           width: this.columnWidth,
+          render: (txt) => {
+            if (name === 'Evol') {
+              const tagClass = isNaN(txt) ? '' : Number(txt) > 0 ? 'green' : 'red'
+              const valueView = isNaN(txt) ? txt : `${txt}%`
+              return <span className={cx(['cell-tag',tagClass])}>{valueView}</span>
+            }
+            return txt
+          },
           onCell: (record) => {
             return {
               onClick: (event) => {
@@ -546,6 +577,8 @@ export default class extends Component {
     const dataSource = this.getDataSource(result, linesData);
     const scrollConfig = this.getScrollConfig();
 
+    console.log('Pivot table',result, linesData, dataSource)
+    console.log('controlName', controlName, controlContent)
     const tableColumns = [
       ...controlName,
       ...controlContent

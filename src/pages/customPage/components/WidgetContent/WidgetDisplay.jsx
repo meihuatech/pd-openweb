@@ -22,7 +22,6 @@ const WidgetContent = styled.div`
     overflow: initial !important;
   }
 `;
-
 const WidgetDisplay = forwardRef((props, $cardRef) => {
   const { layoutType, type, value, button, needUpdate, isFullscreen, scrollTop, editable, ids, projectId, name, ...rest } = props;
   const componentType = getEnumType(type);
