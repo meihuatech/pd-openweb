@@ -314,7 +314,7 @@ export default class extends Component {
       if (pivotTableUnilineShow) {
         return data;
       }
-      console.log('render', data)
+
       return (
         <div style={{ wordWrap: 'break-word', wordBreak: 'break-word' }}>{data}</div>
       );
@@ -365,8 +365,9 @@ export default class extends Component {
           render: (txt) => {
             // 对Evol列加标签显示处理
             if (['Evol','Evol%','%'].includes(name)) {
-              const tagClass = isNaN(txt) ? '' : Number(txt) > 0 ? 'green' : 'red'
-              const valueView = isNaN(txt) ? txt : `${txt}%`
+              const txtNum = Number(txt)
+              const tagClass = isNaN(txt) ? '' : txtNum > 0 ? 'green' : txtNum < 0 ? 'red' : ''
+              const valueView = isNaN(txt) ? txt : `${!txtNum ? txtNum : txt}%`
               return <span className={cx(['cell-tag',tagClass])}>{valueView}</span>
             }
             return txt
@@ -577,8 +578,6 @@ export default class extends Component {
     const dataSource = this.getDataSource(result, linesData);
     const scrollConfig = this.getScrollConfig();
 
-    console.log('Pivot table',result, linesData, dataSource)
-    console.log('controlName', controlName, controlContent)
     const tableColumns = [
       ...controlName,
       ...controlContent
