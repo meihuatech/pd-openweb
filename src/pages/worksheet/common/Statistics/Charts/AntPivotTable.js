@@ -55,6 +55,12 @@ const PivotTableContent = styled.div`
       color: #757575;
       font-weight: bold;
     }
+    thead > tr > th {
+      font-family: PingFangSC-Regular;
+      font-size: 12px;
+      color: #636363;
+      background-color: #F0F5F9;
+    }
   }
   .ant-table-container, table, tr>th, tr>td {
     border-color: #E0E0E0 !important;
@@ -72,6 +78,23 @@ const PivotTableContent = styled.div`
   th, td {
     min-width: 100px;
     text-align: left !important;
+
+    .cell-tag {
+      padding: 2px 10px;
+      display: inline-block;
+      min-width: 60px;
+      font-size: 12px;
+      color: #333333;
+      border-radius: 14px;
+      background-color: #DDDDDD;
+
+      &.red {
+        background-color: #E6A7A5;
+      }
+      &.green {
+        background-color: #BCD197;
+      }
+    }
   }
   .ant-table-cell-scrollbar {
     display: none;
@@ -296,7 +319,7 @@ export default class extends Component {
         <div style={{ wordWrap: 'break-word', wordBreak: 'break-word' }}>{data}</div>
       );
     }
-
+    
     const linesChildren = linesData.map(item => {
       return {
         title: item.name,
@@ -307,7 +330,6 @@ export default class extends Component {
         render
       }
     });
-
     for(let i = columns.length - 1; i >= 0; i--) {
       const column = columns[i];
       const next = columns[i + 1];
@@ -329,7 +351,7 @@ export default class extends Component {
     const getTitle = (id, value) => {
       return valueMap[id] ? valueMap[id][value] : value;
     }
-
+    
     const getYaxisList = (index) => {
       const yaxisColumn = yaxisList.map((item, i) => {
         const { rename, controlName } = item;
@@ -340,6 +362,16 @@ export default class extends Component {
           colSpan: 1,
           className: displaySetup.showRowList && isViewOriginalData ? 'contentValue' : undefined,
           width: this.columnWidth,
+          render: (txt) => {
+            // 对Evol列加标签显示处理
+            if (['Evol','Evol%','%'].includes(name)) {
+              const txtNum = Number(txt)
+              const tagClass = isNaN(txt) ? '' : txtNum > 0 ? 'green' : txtNum < 0 ? 'red' : ''
+              const valueView = isNaN(txt) ? txt : `${!txtNum ? txtNum : txt}%`
+              return <span className={cx(['cell-tag',tagClass])}>{valueView}</span>
+            }
+            return txt
+          },
           onCell: (record) => {
             return {
               onClick: (event) => {
