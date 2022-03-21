@@ -1,6 +1,6 @@
 {
   "name": "mingdao-web",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "scripts": {
     "start": "cross-env API_SERVER=https://lorealfinance.mohodata.com/wwwapi/ node --max-old-space-size=8192 ./node_modules/gulp/bin/gulp.js dev:main",
     "release": "cross-env NODE_ENV=production node --max-old-space-size=8192 ./node_modules/gulp/bin/gulp.js release",
