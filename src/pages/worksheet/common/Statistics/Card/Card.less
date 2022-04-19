@@ -147,3 +147,17 @@
     margin-right: 0 !important;
   }
 }
+
+
+
+.table-hide-second-head {
+  .ant-table-header {
+    .ant-table-thead {
+      & > tr {
+        &:nth-child(2) {
+          display: none;
+        }
+      }
+    }
+  }
+}
