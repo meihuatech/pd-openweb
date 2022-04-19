@@ -578,6 +578,12 @@ export default class extends Component {
     const dataSource = this.getDataSource(result, linesData);
     const scrollConfig = this.getScrollConfig();
 
+    // console.log('controlName', controlName[0])
+    // 判断隐藏表头第二行
+    const ctrlChild = (controlName[0] || {}).children || []
+    const ctrlTitle = (ctrlChild[0] || {}).title
+    const ctrlClassName = ['Division666','Companies666'].includes(ctrlTitle) ? 'table-hide-second-head' : ''
+
     const tableColumns = [
       ...controlName,
       ...controlContent
@@ -594,6 +600,7 @@ export default class extends Component {
       >
         <Table
           bordered
+          className={ctrlClassName}
           size="small"
           pagination={false}
           columns={tableColumns}
