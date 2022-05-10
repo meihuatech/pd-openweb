@@ -3,11 +3,13 @@ import styled from 'styled-components';
 import cx from 'classnames';
 import { formatrChartValue } from './common';
 import { timeParticleSizeDropdownData, areaParticleSizeDropdownData, isTimeControl, isAreaControl, isNumberControl } from 'src/pages/worksheet/common/Statistics/common';
-import { Table } from 'antd';
+import { Table, Tag } from 'antd';
 import errorBoundary from 'ming-ui/decorators/errorBoundary';
 import { browserIsMobile } from 'src/util';
 
 const isMobile = browserIsMobile();
+
+const fullYears = Array(100).fill(0).map((_, idx) => `${1970 + idx}`)
 
 const PivotTableContent = styled.div`
   &.contentYAuto {
@@ -231,11 +233,13 @@ const mergeLinesCell = (data, lines, valueMap) => {
 const getColumnTotal = (result, yaxisList, columns, showColumnTotal) => {
 }
 
+const isFullYear = (val) => fullYears.includes(val)
+
 @errorBoundary
 export default class extends Component {
   constructor(props) {
     super(props);
-    this.columnWidth = 130;
+    this.columnWidth = 90;
   }
   get result() {
     const { data, yaxisList } = this.props.reportData;
@@ -349,7 +353,9 @@ export default class extends Component {
     const dataList = [];
 
     const getTitle = (id, value) => {
-      return valueMap[id] ? valueMap[id][value] : value;
+      const resVal = valueMap[id] ? valueMap[id][value] : value
+      return isFullYear(resVal) ? <Tag color={'#F50'}>{resVal}</Tag> : resVal
+      // return valueMap[id] ? valueMap[id][value] : value;
     }
     
     const getYaxisList = (index) => {
@@ -578,7 +584,7 @@ export default class extends Component {
     const dataSource = this.getDataSource(result, linesData);
     const scrollConfig = this.getScrollConfig();
 
-    // console.log('controlName', controlName[0])
+    // console.log('controlContent', controlContent)
     // 判断隐藏表头第二行
     const ctrlChild = (controlName[0] || {}).children || []
     const ctrlTitle = (ctrlChild[0] || {}).title
