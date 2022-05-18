@@ -3,11 +3,13 @@ import styled from 'styled-components';
 import cx from 'classnames';
 import { formatrChartValue } from './common';
 import { timeParticleSizeDropdownData, areaParticleSizeDropdownData, isTimeControl, isAreaControl, isNumberControl } from 'src/pages/worksheet/common/Statistics/common';
-import { Table } from 'antd';
+import { Table, Tag } from 'antd';
 import errorBoundary from 'ming-ui/decorators/errorBoundary';
 import { browserIsMobile } from 'src/util';
 
 const isMobile = browserIsMobile();
+
+const fullYears = Array(100).fill(0).map((_, idx) => `${1970 + idx}`)
 
 const PivotTableContent = styled.div`
   &.contentYAuto {
@@ -94,6 +96,10 @@ const PivotTableContent = styled.div`
       &.green {
         background-color: #BCD197;
       }
+    }
+
+    &.ant-table-cell.column-head {
+      background-color: #e2e7ee;
     }
   }
   .ant-table-cell-scrollbar {
@@ -231,11 +237,13 @@ const mergeLinesCell = (data, lines, valueMap) => {
 const getColumnTotal = (result, yaxisList, columns, showColumnTotal) => {
 }
 
+const isFullYear = (val) => fullYears.includes(val)
+
 @errorBoundary
 export default class extends Component {
   constructor(props) {
     super(props);
-    this.columnWidth = 130;
+    this.columnWidth = 90;
   }
   get result() {
     const { data, yaxisList } = this.props.reportData;
@@ -349,18 +357,30 @@ export default class extends Component {
     const dataList = [];
 
     const getTitle = (id, value) => {
+      // const resVal = valueMap[id] ? valueMap[id][value] : value
+      // return isFullYear(resVal) ? <Tag color={'#F50'}>{resVal}</Tag> : resVal
       return valueMap[id] ? valueMap[id][value] : value;
     }
     
+    // console.log('getColumnsContent reportData', data)
+
     const getYaxisList = (index) => {
       const yaxisColumn = yaxisList.map((item, i) => {
         const { rename, controlName } = item;
         const name = rename || controlName;
+
+        // console.log('yaxisList idx', data.data[index].y[0], isFullYear(data.data[index].y[0]))
+        let className = displaySetup.showRowList && isViewOriginalData ? 'contentValue' : undefined
+        if (isFullYear(data.data[index].y[0])) {
+          className = className ? className + ' column-head' : 'column-head'
+        }
+
         return {
           title: name,
           dataIndex: `${item.controlId}-${index + i}`,
           colSpan: 1,
-          className: displaySetup.showRowList && isViewOriginalData ? 'contentValue' : undefined,
+          // className: displaySetup.showRowList && isViewOriginalData ? 'contentValue' : undefined,
+          className,
           width: this.columnWidth,
           render: (txt) => {
             // 对Evol列加标签显示处理
@@ -407,10 +427,13 @@ export default class extends Component {
         const isObject = _.isObject(data);
         const colSpan = isObject ? data.length : 1;
         const id = columns[columnIndex].cid;
+        const title = getTitle(id, isObject ? data.value : data);
         return {
-          title: getTitle(id, isObject ? data.value : data),
+          // title: getTitle(id, isObject ? data.value : data),
+          title,
           key: id,
           colSpan,
+          className: isFullYear(title) ? 'column-head' : undefined,
           children: nextIndex < columns.length ? getChildren(nextIndex, index, colSpan) : getYaxisList(index)
         }
       });
@@ -424,10 +447,13 @@ export default class extends Component {
           const isObject = _.isObject(firstItem);
           const colSpan = isObject ? firstItem.length : 1;
           const id = columns[0].cid;
+          const title = getTitle(id, isObject ? firstItem.value : firstItem);
           const obj = {
-            title: getTitle(id, isObject ? firstItem.value : firstItem),
+            // title: getTitle(id, isObject ? firstItem.value : firstItem),
+            title,
             key: id,
             colSpan,
+            className: isFullYear(title) ? 'column-head' : undefined,
             children: item.y.length > 1 ? getChildren(1, index, colSpan) : getYaxisList(index)
           }
           dataList.push(obj);
@@ -578,7 +604,7 @@ export default class extends Component {
     const dataSource = this.getDataSource(result, linesData);
     const scrollConfig = this.getScrollConfig();
 
-    // console.log('controlName', controlName[0])
+    // console.log('controlContent', controlContent)
     // 判断隐藏表头第二行
     const ctrlChild = (controlName[0] || {}).children || []
     const ctrlTitle = (ctrlChild[0] || {}).title
