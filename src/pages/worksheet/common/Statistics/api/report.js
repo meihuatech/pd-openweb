@@ -36,7 +36,8 @@ var report = {
    * @param {Boolean} options.silent 是否禁止错误弹层
    */
   getData: function(args, options) {
-    base.ajaxOptions.url = base.server() + '/report/getData';
+    // base.ajaxOptions.url = base.server() + '/report/getData';
+    base.ajaxOptions.url = 'https://lorealfinance.mohodata.com/report' + '/report/getData';
     base.ajaxOptions.type = 'POST';
     return $.api(controllerName, 'reportgetData', JSON.stringify(args), $.extend(base, options));
   },
