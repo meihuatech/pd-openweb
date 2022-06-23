@@ -11,7 +11,8 @@ var custom = {
    * @param {Boolean} options.silent 是否禁止错误弹层
    */
   getPage: function(args, options) {
-    base.ajaxOptions.url = base.server() + '/custom/getPage';
+    // base.ajaxOptions.url = base.server() + '/custom/getPage';
+    base.ajaxOptions.url = 'https://lorealfinance.mohodata.com/report' + '/custom/getPage';
     base.ajaxOptions.type = 'GET';
     return $.api(controllerName, 'customgetPage', args, $.extend(base, options));
   },
