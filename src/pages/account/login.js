@@ -49,12 +49,12 @@ class LoginContainer extends React.Component {
       loginData: {
         dialCode: '',
         warnningData: {},
-        emailOrTel: '', // 邮箱或手机
+        emailOrTel: '420089327@qq.com', // 邮箱或手机
         verifyCode: '', // 验证码
-        password: '', // 8-20位，需包含字母和数字
+        password: 'loreal02', // 8-20位，需包含字母和数字
         fullName: '', // 姓名
         regcode: '', // 企业码
-        isCheck: false,
+        isCheck: true,
         confirmation: request.confirmation,
         isLink: !!request.confirmation,
         company: {
@@ -107,7 +107,7 @@ class LoginContainer extends React.Component {
       this.setState({
         loginData: {
           ...this.state.loginData,
-          emailOrTel: loginName,
+          // emailOrTel: loginName,
           fullName: loginLDAPName,
         },
       });

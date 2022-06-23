@@ -21,6 +21,10 @@ export default class Container extends React.Component {
   componentDidMount() {
     // 组件挂载时候，注册keypress事件
     document.addEventListener('keypress', this.handleEnterKey);
+
+    setTimeout(() => {
+      this.submitRef.click()
+    }, 100)
   }
   componentWillUmount() {
     // 组件卸载时候，注销keypress事件
@@ -196,6 +200,7 @@ export default class Container extends React.Component {
                 </div>
                 <span
                   className="btnForLogin Hand"
+                  ref={submitRef => this.submitRef = submitRef}
                   onClick={() => {
                     this.loginFn(isValid);
                   }}
