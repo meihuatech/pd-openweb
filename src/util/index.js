@@ -78,6 +78,7 @@ export const getItem = key => {
     return JSON.parse(str);
   } catch (error) {
     console.log(error);
+    return null
   }
 };
 

@@ -5,7 +5,31 @@ import project from 'src/api/project';
 import { LoadDiv } from 'ming-ui';
 import DocumentTitle from 'react-document-title';
 import { getPssId, setPssId } from 'src/util/pssId';
+import { getItem } from 'src/util';
+
+// const checkSSOPage = () => {
+//   const pathname = location.pathname;
+//   const filterPath = ['/login', '/network', '/register', '/sso/callback'];
+//   const noSSO = filterPath.some(path => pathname.indexOf(path) >= 0);
+//   return noSSO;
+// }
+/**
+ * SSO 登录授权
+ */
+const checkSSOAndJump = () => {
+  const user = getItem('sso-microsoft-user');
+  if (!user) {
+    location.href = 'https://msadauth.mohodata.com';
+    return false;
+  }
+  return true;
+}
+
 function getGlobalMeta({ allownotlogin, transfertoken } = {}, cb = () => {}) {
+  if (!checkSSOAndJump()) {
+    return;
+  }
+
   const urlparams = qs.parse(unescape(unescape(window.location.search.slice(1))));
   let args = {};
   const urlObj = new URL(decodeURIComponent(location.href));
@@ -35,10 +59,12 @@ function getGlobalMeta({ allownotlogin, transfertoken } = {}, cb = () => {}) {
       cb();
       return;
     }
+    console.log("data['md.global'].Account",data['md.global'].Account)
     if (!data['md.global'].Account) {
       const host = location.host;
       const url = `?ReturnUrl=${encodeURIComponent(location.href)}`;
       location.href = `${window.subPath || ''}/network${url}`;
+      
       return;
     }
 

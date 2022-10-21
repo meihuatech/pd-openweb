@@ -49,9 +49,9 @@ class LoginContainer extends React.Component {
       loginData: {
         dialCode: '',
         warnningData: {},
-        emailOrTel: '420089327@qq.com', // 邮箱或手机
+        // emailOrTel: '420089327@qq.com', // 邮箱或手机
         verifyCode: '', // 验证码
-        password: 'loreal02', // 8-20位，需包含字母和数字
+        // password: 'loreal02', // 8-20位，需包含字母和数字
         fullName: '', // 姓名
         regcode: '', // 企业码
         isCheck: true,
@@ -113,6 +113,24 @@ class LoginContainer extends React.Component {
       });
     }
 
+    // 根据标记断定是否自动登录
+    const isLoginClear = localStorage.getItem('login-clear');
+    const newLoginData = {};
+    if (isLoginClear) {
+      newLoginData.emailOrTel = '';
+      newLoginData.password = '';
+    } else {
+      newLoginData.emailOrTel = '420089327@qq.com';
+      newLoginData.password = 'loreal02';
+    }
+    this.setState({
+      loginData: {
+        ...this.state.loginData,
+        ...newLoginData,
+      },
+    });
+    
+
     this.setState({ isNetwork: true });
     this.getProjectBaseInfo();
   }
@@ -124,6 +142,9 @@ class LoginContainer extends React.Component {
   loginCallback = (data, isMDLogin, callback, ignoreError) => {
     if (data.accountResult === ActionResult.accountSuccess) {
       setPssId(data.sessionId);
+
+      // 登录成功，删除自动登录清理标记
+      localStorage.removeItem('login-clear')
 
       if (request.ReturnUrl) {
         location.replace(getDataByFilterXSS(request.ReturnUrl));

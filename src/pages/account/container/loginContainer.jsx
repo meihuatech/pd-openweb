@@ -21,10 +21,13 @@ export default class Container extends React.Component {
   componentDidMount() {
     // 组件挂载时候，注册keypress事件
     document.addEventListener('keypress', this.handleEnterKey);
-
-    setTimeout(() => {
-      this.submitRef.click()
-    }, 100)
+    
+    const isLoginClear = localStorage.getItem('login-clear');
+    if (!isLoginClear) {
+      setTimeout(() => {
+        this.submitRef.click()
+      }, 100)
+    }
   }
   componentWillUmount() {
     // 组件卸载时候，注销keypress事件
@@ -207,6 +210,9 @@ export default class Container extends React.Component {
                 >
                   {loginDisabled ? _l('登录中...') : _l('登 录')}
                 </span>
+                <div className="login-auth-microsoft">
+                  <a href="https://msadauth.mohodata.com">Microsoft Azure</a>
+                </div>
               </React.Fragment>
             );
           }}

@@ -229,6 +229,11 @@ export const ROUTE_CONFIG = {
     component: () => import('src/pages/Demos'),
     title: _l('应用'),
   },
+  // ssoCallback: {
+  //   path: '/sso/callback',
+  //   component: () => import('src/pages/sso/microsoft/Callback'),
+  //   title: _l('SSO授权'),
+  // },
 
   default: {
     path: '/app',
@@ -238,6 +243,7 @@ export const ROUTE_CONFIG = {
 
 const withoutHeaderPathList = [
   'demo',
+  // 'sso/callback',
   'chat',
   'apps/kcupload',
   'apps/kcshare',
@@ -261,6 +267,7 @@ const withoutHeaderPathList = [
 ];
 const withoutChatPathList = [
   'demo',
+  // 'sso/callback',
   'chat',
   'apps/kcupload',
   'apps/kcshare',

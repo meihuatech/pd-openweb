@@ -16,7 +16,7 @@ import * as actions from 'src/pages/chat/redux/actions';
 import socketInit from '../socket';
 import './index.less';
 import { Dialog, Icon } from 'ming-ui';
-import { getAppFeaturesVisible } from 'src/util';
+import { getAppFeaturesVisible, getItem } from 'src/util';
 import privateGuide from 'src/api/privateGuide';
 import Trigger from 'rc-trigger';
 import weixinCode from 'src/pages/privateDeployment/images/weixin.png';
@@ -51,6 +51,7 @@ export default class App extends Component {
   }
 
   componentDidMount() {
+    
     const that = this;
     const isMDClient = window.navigator.userAgent.indexOf('MDClient') > -1;
     // 拦截 a 标签跳转
