@@ -98,6 +98,9 @@ const PivotTableContent = styled.div`
       &.green {
         background-color: #BCD197;
       }
+      &.blue {
+        background-color: #cbdbea;
+      }
     }
 
     &.ant-table-cell.column-head {
@@ -401,10 +404,20 @@ export default class extends Component {
           width: this.columnWidth,
           render: (txt) => {
             // 对Evol列加标签显示处理
-            if (['Evol','Evol%','%'].includes(name)) {
-              const txtNum = Number(txt)
-              const tagClass = isNaN(txt) ? '' : txtNum > 0 ? 'green' : txtNum < 0 ? 'red' : ''
-              const valueView = isNaN(txt) ? txt : `${!txtNum ? txtNum : txt}%`
+            if (['Evol','Evol%','%','Value'].includes(name)) {
+              const txtNum = parseFloat(txt)
+              // let tagClass = isNaN(txt) ? '' : txtNum > 0 ? 'green' : txtNum < 0 ? 'red' : ''
+              // let valueView = isNaN(txt) ? txt : `${!txtNum ? txtNum : txt}%`
+              let tagClass = ''
+              let valueView = isNaN(txtNum) ? txt : (!txtNum ? '--' : `${txt}%`)
+
+              if (name === 'Value') {
+                tagClass = isNaN(txtNum) ? '' : txtNum > 0 ? 'blue' : txtNum < 0 ? 'red' : ''
+              } else {
+                tagClass = isNaN(txtNum) ? '' : txtNum > 0 ? 'green' : txtNum < 0 ? 'red' : ''
+              }
+
+              
               return <span className={cx(['cell-tag',tagClass])}>{valueView}</span>
             }
             return txt
