@@ -1,15 +1,14 @@
 ﻿import { Schema, arrayOf, normalize } from 'normalizr';
 // ajax controllers
-import * as departmentController from 'src/api/department';
-import * as importUserController from 'src/api/importUser';
-import * as userController from 'src/api/user';
-import * as projectController from 'src/api/project';
-import * as jobController from 'src/api/job';
+import departmentController from 'src/api/department';
+import importUserController from 'src/api/importUser';
+import userController from 'src/api/user';
+import projectController from 'src/api/project';
 import * as REQUEST_ACTIONS from '../actions/entities';
 import * as CURRENT_ACTIONS from '../actions/current';
 import * as SEARCH_ACTIONS from '../actions/search';
-import * as JOB_ACTIONS from '../actions/jobs';
-import { projectId } from '../../config';
+import Config from '../../config';
+import _ from 'lodash';
 let promise = null;
 let prePromiseType = null;
 const promiseList = [
@@ -36,8 +35,6 @@ const getApiByRequestType = (type, { departmentId, isGetAll }) => {
     [CURRENT_ACTIONS.APPROVAL_LOAD]: projectController.getProjectUnauditedUserCount, //获取网络内待审批用户数量
     [SEARCH_ACTIONS.SEARCH_REQUEST]: departmentController.searchDeptAndUsers,
     // [REQUEST_ACTIONS.FULL_TREE_REQUEST]: departmentController.getOneDepartmentFullTree,
-    [JOB_ACTIONS.JOB_USER_REQUEST]: jobController.pagedJobAccounts, //根据职位id获取user
-    [JOB_ACTIONS.JOB_LIST_REQUEST]: jobController.getJobs, // 获取职位list
   };
   if (dict[type] === undefined) throw new Error('ajaxController method not found.');
   return dict[type];
@@ -121,7 +118,7 @@ export default store => next => action => {
   if (promise && promiseList.includes(requestType) && promiseList.includes(prePromiseType)) {
     promise.abort();
   }
-  promise = requestFunc(Object.assign({}, params, { projectId }));
+  promise = requestFunc(Object.assign({}, params, { projectId: Config.projectId }));
   prePromiseType = requestType;
   promise.then(
     response => {

@@ -7,8 +7,9 @@ import { getRequest } from 'src/util';
 import { Dropdown, LoadDiv } from 'ming-ui';
 import account from 'src/api/account';
 let request = getRequest();
-import { inputFocusFn, inputBlurFn, setCNFn } from '../util';
+import { inputFocusFn, inputBlurFn, setWarnningData } from '../util';
 import { encrypt } from 'src/util';
+import _ from 'lodash';
 
 export default class EditInfo extends React.Component {
   constructor(props) {
@@ -124,7 +125,7 @@ export default class EditInfo extends React.Component {
 
   // 提交名片信息
   submitUserCard = () => {
-    const { registerData = {}, setDataFn, changeStep, loginSuc } = this.props;
+    const { registerData = {}, onChangeData, changeStep, loginSuc } = this.props;
     const {
       fullName,
       password,
@@ -138,6 +139,7 @@ export default class EditInfo extends React.Component {
       verifyCode,
       dialCode,
       regcode,
+      email,
     } = registerData;
     if (this.validateUserCardRequiredField()) {
       this.setState({
@@ -175,6 +177,7 @@ export default class EditInfo extends React.Component {
         isApplyJoinOrInviteJoin = true;
         params.regFrom = window.localStorage.getItem('RegFrom');
         params.referrer = window.localStorage.getItem('Referrer');
+        params.email = email;
         if (isApplyJoin) {
           joinCompanyAction = RegisterController.applyJoinCompany;
           params.projectId = projectId;
@@ -238,7 +241,7 @@ export default class EditInfo extends React.Component {
         break;
       case 2:
         alert(_l('您的申请已提交，请等待管理员审批'), 1, 2000, function () {
-          location.href = '/app';
+          location.href = '/personal?type=enterprise';
         });
         break;
       case 3:
@@ -255,7 +258,7 @@ export default class EditInfo extends React.Component {
 
   // 名片字段验证
   validateUserCardRequiredField = () => {
-    const { registerData, setDataFn } = this.props;
+    const { registerData, onChangeData } = this.props;
     const { company = {} } = registerData;
     const {
       companyName = '',
@@ -275,26 +278,26 @@ export default class EditInfo extends React.Component {
     let isRight = true;
     let warnningData = [];
     if (isMustCompanyName && !companyName) {
-      warnningData.push({ tipDom: this.companyName, warnningText: _l('组织不能为空') });
+      warnningData.push({ tipDom: this.companyName, warnningText: _l('请填写组织') });
       isRight = false;
     }
     if (isMustDepartment && !departmentId) {
-      warnningData.push({ tipDom: this.departmentId, warnningText: _l('部门不能为空') });
+      warnningData.push({ tipDom: this.departmentId, warnningText: _l('请填写部门') });
       isRight = false;
     }
     if (isMustJob && !jobId) {
-      warnningData.push({ tipDom: this.jobId, warnningText: _l('职位不能为空') });
+      warnningData.push({ tipDom: this.jobId, warnningText: _l('请填写职位') });
       isRight = false;
     }
     if (isMustWorkSite && !workSiteId) {
-      warnningData.push({ tipDom: this.workSiteId, warnningText: _l('工作地点不能为空') });
+      warnningData.push({ tipDom: this.workSiteId, warnningText: _l('请填写工作地点') });
       isRight = false;
     }
     if (isMustJobNumber && !jobNumber) {
-      warnningData.push({ tipDom: this.jobNumber, warnningText: _l('工号不能为空') });
+      warnningData.push({ tipDom: this.jobNumber, warnningText: _l('请填写工号') });
       isRight = false;
     }
-    setDataFn({
+    onChangeData({
       ...registerData,
       warnningData,
     });
@@ -302,7 +305,7 @@ export default class EditInfo extends React.Component {
   };
 
   renderCon = () => {
-    const { registerData, setDataFn } = this.props;
+    const { registerData, onChangeData } = this.props;
     const { company = {}, userCard = [], warnningData } = registerData;
     const { loading, focusDiv } = this.state;
     const { isMustCompanyName, isMustWorkSite, isMustDepartment, isMustJobNumber, isMustJob } = userCard;
@@ -319,19 +322,20 @@ export default class EditInfo extends React.Component {
           {isMustCompanyName && (
             <div
               className={cx('mesDiv', {
-                ...setCNFn(warnningData, ['.companyName', this.companyName], focusDiv, companyName),
+                ...setWarnningData(warnningData, ['.companyName', this.companyName], focusDiv, companyName),
               })}
             >
               <input
                 type="text"
                 className="companyName"
+                maxLength={'60'}
                 autoComplete="off"
                 ref={companyName => (this.companyName = companyName)}
                 onBlur={this.inputOnBlur}
                 onFocus={this.inputOnFocus}
                 onChange={e => {
                   let data = _.filter(registerData.warnningData, it => it.tipDom !== this.companyName);
-                  setDataFn({
+                  onChangeData({
                     ...registerData,
                     warnningData: data,
                     company: {
@@ -369,7 +373,7 @@ export default class EditInfo extends React.Component {
           {isMustDepartment && (
             <div
               className={cx('mesDiv current', {
-                ...setCNFn(warnningData, [this.departmentId], focusDiv, departmentId),
+                ...setWarnningData(warnningData, [this.departmentId], focusDiv, departmentId),
               })}
             >
               <div ref={departmentId => (this.departmentId = departmentId)}>
@@ -380,7 +384,7 @@ export default class EditInfo extends React.Component {
                   onFocus={this.inputOnFocus}
                   onChange={value => {
                     let data = _.filter(registerData.warnningData, it => it.tipDom !== this.departmentId);
-                    setDataFn({
+                    onChangeData({
                       ...registerData,
                       warnningData: data,
                       company: {
@@ -409,7 +413,7 @@ export default class EditInfo extends React.Component {
           {isMustJob && (
             <div
               className={cx('mesDiv current', {
-                ...setCNFn(warnningData, [this.jobId], focusDiv, jobId),
+                ...setWarnningData(warnningData, [this.jobId], focusDiv, jobId),
               })}
             >
               <div ref={jobId => (this.jobId = jobId)}>
@@ -420,7 +424,7 @@ export default class EditInfo extends React.Component {
                   onFocus={this.inputOnFocus}
                   onChange={value => {
                     let data = _.filter(registerData.warnningData, it => it.tipDom !== this.jobId);
-                    setDataFn({
+                    onChangeData({
                       ...registerData,
                       warnningData: data,
                       company: {
@@ -449,7 +453,7 @@ export default class EditInfo extends React.Component {
           {isMustWorkSite && (
             <div
               className={cx('mesDiv current', {
-                ...setCNFn(warnningData, [this.workSiteId], focusDiv, workSiteId),
+                ...setWarnningData(warnningData, [this.workSiteId], focusDiv, workSiteId),
               })}
             >
               <div ref={workSiteId => (this.workSiteId = workSiteId)}>
@@ -460,7 +464,7 @@ export default class EditInfo extends React.Component {
                   onFocus={this.inputOnFocus}
                   onChange={value => {
                     let data = _.filter(registerData.warnningData, it => it.tipDom !== this.workSiteId);
-                    setDataFn({
+                    onChangeData({
                       ...registerData,
                       warnningData: data,
                       company: {
@@ -489,19 +493,20 @@ export default class EditInfo extends React.Component {
           {isMustJobNumber && (
             <div
               className={cx('mesDiv', {
-                ...setCNFn(warnningData, [this.jobNumber], focusDiv, jobNumber),
+                ...setWarnningData(warnningData, [this.jobNumber], focusDiv, jobNumber),
               })}
             >
               <input
                 type="text"
                 className="jobNumber"
+                maxLength={'60'}
                 autoComplete="off"
                 ref={jobNumber => (this.jobNumber = jobNumber)}
                 onBlur={this.inputOnBlur}
                 onFocus={this.inputOnFocus}
                 onChange={e => {
                   let data = _.filter(registerData.warnningData, it => it.tipDom !== this.jobNumber);
-                  setDataFn({
+                  onChangeData({
                     ...registerData,
                     warnningData: data,
                     company: {

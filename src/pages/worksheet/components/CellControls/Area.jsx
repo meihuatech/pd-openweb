@@ -10,6 +10,7 @@ import renderText from './renderText';
 import withClickAway from 'ming-ui/decorators/withClickAway';
 import createDecoratedComponent from 'ming-ui/decorators/createDecoratedComponent';
 import { browserIsMobile } from 'src/util';
+import _ from 'lodash';
 
 const ClickAwayable = createDecoratedComponent(withClickAway);
 
@@ -42,11 +43,23 @@ export default class Date extends React.Component {
   componentWillReceiveProps(nextProps) {
     if (nextProps.cell.value !== this.props.cell.value) {
       const value = _.isObject(nextProps.cell.value) ? nextProps.cell.value.text : nextProps.cell.value;
-      this.setState({ value });
+      this.setState({ value, ...(value === '{"code":"","name":""}' ? { tempValue: undefined } : {}) });
     }
   }
 
   editIcon = React.createRef();
+
+  @autobind
+  handleTableKeyDown(e) {
+    const { updateEditingStatus } = this.props;
+    switch (e.key) {
+      case 'Escape':
+        updateEditingStatus(false);
+        break;
+      default:
+        break;
+    }
+  }
 
   @autobind
   handleChange(array) {
@@ -77,11 +90,14 @@ export default class Date extends React.Component {
 
   @autobind
   handleExit() {
-    const { updateEditingStatus } = this.props;
+    const { tableFromModule, updateCell, updateEditingStatus } = this.props;
     const { value, tempValue } = this.state;
     if (value !== tempValue) {
+      updateCell({
+        value: tableFromModule === WORKSHEETTABLE_FROM_MODULE.SUBLIST ? tempValue : safeParse(tempValue).code,
+      });
       this.setState({
-        tempValue: value,
+        value: tempValue,
       });
     }
     updateEditingStatus(false);
@@ -101,17 +117,8 @@ export default class Date extends React.Component {
   }
 
   render() {
-    const {
-      className,
-      style,
-      needLineLimit,
-      cell,
-      popupContainer,
-      editable,
-      isediting,
-      updateEditingStatus,
-      onClick,
-    } = this.props;
+    const { className, style, needLineLimit, cell, popupContainer, editable, isediting, updateEditingStatus, onClick } =
+      this.props;
     const { value, tempValue } = this.state;
     const isMobile = browserIsMobile();
     const level = this.getAreaLevel(cell.type);
@@ -134,7 +141,7 @@ export default class Date extends React.Component {
         action={['click']}
         popup={editcontent}
         getPopupContainer={() => document.body}
-        popupClassName="filterTrigger cellControlAreaPopup"
+        popupClassName="filterTrigger cellControlAreaPopup cellNeedFocus"
         popupVisible={isediting}
         destroyPopupOnHide={!(navigator.userAgent.match(/[Ss]afari/) && !navigator.userAgent.match(/[Cc]hrome/))} // 不是 Safari
         popupAlign={{
@@ -143,7 +150,8 @@ export default class Date extends React.Component {
           overflow: {
             adjustY: true,
           },
-        }}>
+        }}
+      >
         <EditableCellCon
           onClick={onClick}
           className={cx(className, { canedit: editable })}
@@ -152,7 +160,8 @@ export default class Date extends React.Component {
           iconName="text_map"
           iconClassName="dateEditIcon"
           isediting={isediting}
-          onIconClick={() => updateEditingStatus(true)}>
+          onIconClick={() => updateEditingStatus(true)}
+        >
           {!!tempValue && (
             <div className={cx('worksheetCellPureString', { linelimit: needLineLimit, ellipsis: isMobile })}>
               {renderText({ ...cell, value: tempValue })}

@@ -58,8 +58,9 @@ const InfoWrap = styled.ul`
 `;
 
 export default function UserConfig({ globalSheetInfo, data, onChange }) {
-  const { noticeItem = 1, enumDefault2 } = data;
+  const { noticeItem, enumDefault2 } = data;
   const userRange = getAdvanceSetting(data, 'userrange') || [];
+  const userType = getAdvanceSetting(data, 'usertype');
   const [overlayVisible, setVisible] = useState(false);
   const handleClick = (item, e) => {
     const isExist = obj => userRange.some(user => isEqual(user, obj));
@@ -94,7 +95,7 @@ export default function UserConfig({ globalSheetInfo, data, onChange }) {
         onChange(handleAdvancedSettingChange(data, { userrange: JSON.stringify(nextValue) }));
       };
 
-      import('dialogSelectUser').then(() => {
+      import('src/components/dialogSelectUser/dialogSelectUser').then(() => {
         $({}).dialogSelectUser({
           showMoreInvite: false,
           SelectUserSettings: {
@@ -105,6 +106,7 @@ export default function UserConfig({ globalSheetInfo, data, onChange }) {
             filterOtherProject: true,
             projectId: globalSheetInfo.projectId,
             callback: handleUserChange,
+            showTabs: ['conactUser', 'department', 'subordinateUser'],
           },
         });
       });
@@ -154,7 +156,8 @@ export default function UserConfig({ globalSheetInfo, data, onChange }) {
                 onClick={e => {
                   e.stopPropagation();
                   handleRemove(item);
-                }}></i>
+                }}
+              ></i>
             </li>
           );
         })}
@@ -166,47 +169,56 @@ export default function UserConfig({ globalSheetInfo, data, onChange }) {
 
   return (
     <Fragment>
-      <div className="labelWrap">
-        <Checkbox
-          className="checkboxWrap"
-          onClick={checked => {
-            const nextData = checked
-              ? handleAdvancedSettingChange({ ...data, enumDefault2: Number(!checked) }, { userrange: '' })
-              : {
-                  enumDefault2: Number(!checked),
-                };
-            onChange(nextData);
-          }}
-          checked={enumDefault2 === 1}
-          text={_l('允许选择的人员')}
-          size="small"
-        />
-        <Tooltip placement="bottom" title={_l('使用部门作为范围时，允许选择的人员包含当前部门和所有子部门中的人员')}>
-          <Icon icon="help" />
-        </Tooltip>
-      </div>
-      {enumDefault2 === 1 && (
-        <Dropdown
-          trigger={['click']}
-          visible={overlayVisible}
-          onVisibleChange={setVisible}
-          overlay={
-            <DropdownContent>
-              {USER_RANGE.map(item => (
-                <div className="item" onClick={e => handleClick(item, e)}>
-                  {item.text}
-                </div>
-              ))}
-            </DropdownContent>
-          }>
-          <DropdownPlaceholder
-            style={{ padding: '4px 6px 4px 12px', marginBottom: '6px' }}
-            className={cx({ active: overlayVisible })}
-            color="#333">
-            {getUserDisplay()}
-            <i className="icon-arrow-down-border Gray_9e"></i>
-          </DropdownPlaceholder>
-        </Dropdown>
+      {userType !== 2 && (
+        <Fragment>
+          <div className="labelWrap">
+            <Checkbox
+              className="checkboxWrap"
+              onClick={checked => {
+                const nextData = checked
+                  ? handleAdvancedSettingChange({ ...data, enumDefault2: Number(!checked) }, { userrange: '' })
+                  : {
+                      enumDefault2: Number(!checked),
+                    };
+                onChange(nextData);
+              }}
+              checked={enumDefault2 === 1}
+              text={_l('允许选择的人员')}
+              size="small"
+            />
+            <Tooltip
+              placement="bottom"
+              title={_l('使用部门作为范围时，允许选择的人员包含当前部门和所有子部门中的人员')}
+            >
+              <Icon icon="help" />
+            </Tooltip>
+          </div>
+          {enumDefault2 === 1 && (
+            <Dropdown
+              trigger={['click']}
+              visible={overlayVisible}
+              onVisibleChange={setVisible}
+              overlay={
+                <DropdownContent>
+                  {USER_RANGE.map(item => (
+                    <div className="item" onClick={e => handleClick(item, e)}>
+                      {item.text}
+                    </div>
+                  ))}
+                </DropdownContent>
+              }
+            >
+              <DropdownPlaceholder
+                style={{ padding: '4px 6px 4px 12px', marginBottom: '6px' }}
+                className={cx({ active: overlayVisible })}
+                color="#333"
+              >
+                {getUserDisplay()}
+                <i className="icon-arrow-down-border Gray_9e"></i>
+              </DropdownPlaceholder>
+            </Dropdown>
+          )}
+        </Fragment>
       )}
       <div className="labelWrap">
         <Checkbox

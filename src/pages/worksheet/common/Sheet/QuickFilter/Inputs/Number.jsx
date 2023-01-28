@@ -5,6 +5,7 @@ import styled from 'styled-components';
 import { func, number, string } from 'prop-types';
 import { formatNumberFromInput } from 'src/util';
 import { FILTER_CONDITION_TYPE } from 'worksheet/common/WorkSheetFilter/enum';
+import _ from 'lodash';
 
 const Con = styled.div`
   display: flex;
@@ -34,6 +35,8 @@ const InputCon = styled(Input)`
 const RangeInputCon = styled.div`
   display: flex;
   width: 100%;
+  border: 1px solid #ddd;
+  border-radius: 4px;
   &:hover:not(:focus) {
     border-color: #ccc !important;
   }
@@ -47,6 +50,9 @@ const RangeInputCon = styled.div`
 
 const RangeInput = styled.div`
   flex: 1;
+  input {
+    border: none !important;
+  }
 `;
 
 const Splitter = styled.div`

@@ -6,48 +6,74 @@ import cx from 'classnames';
 import RegisterController from 'src/api/register';
 import Config from '../config';
 import { getRequest } from 'src/util';
-import { inputFocusFn, inputBlurFn, setCNFn } from '../util';
+import { inputFocusFn, inputBlurFn, setWarnningData } from '../util';
 import { setPssId } from 'src/util/pssId';
-import RegExp from 'src/util/expression';
-import { browserIsMobile } from 'src/util';
 import { getDataByFilterXSS } from '../util';
+import styled from 'styled-components';
+import fixedDataAjax from 'src/api/fixedData.js';
+import _ from 'lodash';
+const WrapCon = styled.div`
+  position: absolute;
+  top: 100%;
+  background: #fff;
+  z-index: 10;
+  width: 100%;
+  padding: 6px 0;
+  box-shadow: 0px 8px 16px rgb(0 0 0 / 24%);
+  border-radius: 2px;
+  overflow: auto;
+  max-height: 400px;
+  .cover {
+    position: fixed;
+    z-index: -1;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+  }
+  & > div.liBox {
+    padding: 6px 8px;
+    &:hover,
+    &.isCur {
+      background: #2196f3;
+      color: #fff;
+      .ThemeColor3 {
+        color: #fff !important;
+      }
+    }
+  }
+`;
+
+const scaleList = ['20人以下', '21-99人', '100-499人', '500-999人', '1000-9999人', '10000人以上'];
+const depList = ['总经办', '技术/IT/研发', '产品/设计', '销售/市场/运营', '人事/财务/行政', '资源/仓储/采购', '其他'];
+const rankList = ['总裁/总经理/CEO', '副总裁/副总经理/VP', '总监/主管/经理', '员工/专员/执行', '其他'];
 
 export default class Create extends React.Component {
   constructor(props) {
     super(props);
     this.state = {
-      dataArr: [
-        {
-          value: 1,
-          text: _l('10人以下'),
-        },
-        {
-          value: 2,
-          text: _l('10～50人'),
-        },
-        {
-          value: 3,
-          text: _l('51～100人'),
-        },
-        {
-          value: 4,
-          text: _l('101～250人'),
-        },
-        {
-          value: 5,
-          text: _l('251～500人'),
-        },
-        {
-          value: 6,
-          text: _l('501人及以上'),
-        },
-      ],
+      industryList: [],
       loading: false,
-      // warnningText: '',
-      // tipDom: "",
       warnningData: [],
       focusDiv: '',
+      companyList: [],
+      show: false,
+      tpCompanyId: -1,
     };
+  }
+
+  componentDidMount() {
+    setTimeout(() => {
+      if (this.companyName) {
+        $(this.companyName).focus();
+        $(this.companyName).bind('keydown', this.onInputBoxKeyDown);
+      }
+    }, 300);
+    fixedDataAjax.loadIndustry({}).then(res => {
+      this.setState({
+        industryList: res.industries || [],
+      });
+    });
   }
 
   componentWillReceiveProps(nextProps) {
@@ -61,25 +87,40 @@ export default class Create extends React.Component {
 
   // 提交企业网络信息
   submitCompanyInfo = () => {
-    if (this.validateCompanyInfoRequiredField()) {
+    this.validateCompanyInfoRequiredField().then(res => {
+      if (!res) {
+        return;
+      }
       this.setState({
         loading: true,
       });
-      const { registerData, setDataFn } = this.props;
-      const { company = {}, TPParams } = registerData;
+      const { registerData } = this.props;
+      let { company = {}, TPParams, email = '', emailOrTel = '' } = registerData;
+      email = emailOrTel && RegExp.isEmail(emailOrTel) ? emailOrTel : email;
+
       const {
         companyName,
-        job, // 加入网络使用
-        email, //邮箱
-        scaleId, //预计人数
+        tpCompanyId,
+        scaleId,
+        scale = '',
         code,
+        jobType,
+        departmentType,
+        industryId,
+        industry = '',
       } = company;
+
       RegisterController.createCompany({
         companyName: filterXSS(companyName),
-        job,
+        tpCompanyId: tpCompanyId,
+        jobType,
+        departmentType,
+        industryId,
+        industry,
         code: code,
         email: email,
         scaleId: scaleId,
+        scale,
         unionId: TPParams.unionId,
         state: TPParams.state,
         tpType: TPParams.tpType,
@@ -109,14 +150,11 @@ export default class Create extends React.Component {
             loading: false,
           });
         });
-    }
+    });
   };
 
   // 登录成功跳转
-  loginSuc = (encrypeAccount, encrypePassword, createProjectId) => {
-    const { registerData } = this.props;
-    const { inviteFromType } = registerData;
-    let isMobile = browserIsMobile();
+  loginSuc = () => {
     let request = getRequest();
     let returnUrl = getDataByFilterXSS(request.ReturnUrl || '');
 
@@ -144,43 +182,43 @@ export default class Create extends React.Component {
   };
 
   // 企业网络基本信息 字段验证
-  validateCompanyInfoRequiredField = () => {
+  validateCompanyInfoRequiredField = async () => {
     this.setState({
       warnningText: '',
       tipDom: null,
     });
-    const { registerData, setDataFn } = this.props;
+    const { registerData } = this.props;
     const { company = {} } = registerData;
-    const {
-      companyName,
-      job, // 加入网络使用
-      email, //邮箱
-      scaleId, //预计人数
-    } = company;
+    const { companyName, jobType, departmentType, scaleId, industryId } = company;
     // 企业网络名称
     let isRight = true;
     let warnningData = [];
-    if (!companyName) {
-      warnningData.push({ tipDom: this.companyName, warnningText: _l('组织名称不能为空') });
-      isRight = false;
+    if (!!companyName) {
+      await fixedDataAjax.checkSensitive({ content: companyName }).then(res => {
+        if (res) {
+          warnningData.push({ tipDom: this.companyName, warnningText: _l('输入内容包含敏感词，请重新填写') });
+          isRight = false;
+        }
+      });
     }
-    // 职位
-    if (!job) {
-      warnningData.push({ tipDom: this.job, warnningText: _l('职位不能为空') });
-      isRight = false;
-    }
-    // 邮箱
-    if (!email) {
-      warnningData.push({ tipDom: this.email, warnningText: _l('请填写邮箱') });
-      isRight = false;
-    }
-    if (!RegExp.isEmail(email)) {
-      warnningData.push({ tipDom: this.email, warnningText: _l('邮箱格式错误') });
+    // 行业
+    if (!industryId) {
+      warnningData.push({ tipDom: this.industry, warnningText: _l('请选择行业') });
       isRight = false;
     }
     // 公司规模
     if (!scaleId) {
-      warnningData.push({ tipDom: this.scaleId, warnningText: _l('请选择预计使用人数') });
+      warnningData.push({ tipDom: this.scaleId, warnningText: _l('请选择规模') });
+      isRight = false;
+    }
+    // 职位
+    if (!jobType) {
+      warnningData.push({ tipDom: this.rank, warnningText: _l('请选择您的职级') });
+      isRight = false;
+    }
+    // 您的职级
+    if (!departmentType) {
+      warnningData.push({ tipDom: this.department, warnningText: _l('请选择您的部门') });
       isRight = false;
     }
     this.setState({
@@ -189,40 +227,130 @@ export default class Create extends React.Component {
     if (warnningData.length > 0) {
       $(warnningData[0].tipDom).focus();
     }
+    if (!companyName) {
+      warnningData.push({ tipDom: this.companyName, warnningText: _l('请填写组织名称') });
+      isRight = false;
+    }
     return isRight;
   };
 
-  renderCon = () => {
-    const { changeStep, step, registerData, setDataFn } = this.props;
+  getByKeywords = searchKeyword => {
+    if (this.ajax) {
+      this.ajax.abort();
+    }
+
+    this.ajax = RegisterController.getCompanyInfo({
+      companynameKeyword: searchKeyword,
+    });
+    this.ajax.then(res => {
+      const ids = _.keys(res);
+      this.setState({
+        companyList: ids.map(o => {
+          return { name: res[o], id: o };
+        }),
+      });
+    });
+  };
+
+  onInputBoxKeyDown = e => {
+    let { companyList = [], tpCompanyI } = this.state;
+    if (companyList.length <= 0) {
+      this.setState({
+        tpCompanyI: -1,
+      });
+      return;
+    }
+    switch (e.keyCode) {
+      case 38: //up
+        if (tpCompanyI - 1 < 0) {
+          return this.setCompany(companyList.length - 1);
+        } else {
+          return this.setCompany(tpCompanyI - 1);
+        }
+
+      case 40: //KEY.DOWN:
+        if (tpCompanyI + 1 > companyList.length - 1) {
+          return this.setCompany(0);
+        } else {
+          return this.setCompany(tpCompanyI + 1);
+        }
+    }
+  };
+
+  setCompany = tpCompanyI => {
+    const { registerData, onChangeData } = this.props;
     const { company = {} } = registerData;
-    const { warnningText, tipDom, warnningData, focusDiv } = this.state;
-    const {
-      companyName,
-      job, // 加入网络使用
-      email,
-      scaleId,
-    } = company;
+    let { companyList = [] } = this.state;
+    let o = companyList[tpCompanyI];
+    onChangeData({
+      ...registerData,
+      company: {
+        ...company,
+        companyName: o.name,
+        tpCompanyId: o.id,
+      },
+    });
+    this.setState({
+      tpCompanyI,
+    });
+  };
+
+  requestDebounce = _.debounce(searchKeyword => {
+    this.getByKeywords(searchKeyword);
+  }, 500);
+
+  renderTxt = o => {
+    const { registerData } = this.props;
+    const { company = {} } = registerData;
+    const { companyName } = company;
+    let start = o.name.toLowerCase().indexOf(companyName.toLowerCase());
+    let l = companyName.length;
+    let str = o.name.split('');
+    let stmp = o.name;
+    if (start >= 0) {
+      let s = stmp.slice(start, start + l);
+      str.splice(start, l, <span class="ThemeColor3">{s}</span>);
+    }
+    return str;
+  };
+
+  renderCon = () => {
+    const { registerData, onChangeData } = this.props;
+    const { company = {} } = registerData;
+    const { warnningData, focusDiv, companyList, show, tpCompanyI, industryList = [] } = this.state;
+    const { companyName, jobType, industryId, scaleId, departmentType } = company;
 
     return (
       <React.Fragment>
         <div className="messageBox mTop5">
           <div
             className={cx('mesDiv', {
-              ...setCNFn(warnningData, [this.companyName, '.companyName'], focusDiv, companyName),
+              ...setWarnningData(warnningData, [this.companyName, '.companyName'], focusDiv, companyName),
             })}
           >
             <input
               type="text"
+              maxLength={'60'}
               className="companyName"
               autoComplete="off"
               ref={companyName => (this.companyName = companyName)}
-              onBlur={this.inputOnBlur}
-              onFocus={this.inputOnFocus}
+              onBlur={e => {
+                this.inputOnBlur(e);
+              }}
+              onFocus={e => {
+                this.setState({
+                  show: true,
+                });
+                this.inputOnFocus(e);
+              }}
               onChange={e => {
                 this.setState({
                   warnningData: _.filter(warnningData, it => it.tipDom !== this.companyName),
                 });
-                setDataFn({
+                if (e.target.value.length >= 2) {
+                  this.requestDebounce(e.target.value);
+                }
+                onChangeData({
                   ...registerData,
                   company: {
                     ...company,
@@ -232,6 +360,40 @@ export default class Create extends React.Component {
               }}
               value={companyName}
             />
+            {companyName && companyList.length > 0 && show && (
+              <WrapCon className="companyList">
+                <div
+                  className="cover"
+                  onClick={() => {
+                    this.setState({
+                      show: false,
+                    });
+                  }}
+                ></div>
+                {companyList.map((o, i) => {
+                  return (
+                    <div
+                      className={cx('liBox Hand', { isCur: tpCompanyI === i })}
+                      onClick={() => {
+                        onChangeData({
+                          ...registerData,
+                          company: {
+                            ...company,
+                            companyName: o.name,
+                            tpCompanyId: o.id,
+                          },
+                        });
+                        this.setState({
+                          companyList: [],
+                        });
+                      }}
+                    >
+                      {this.renderTxt(o)}
+                    </div>
+                  );
+                })}
+              </WrapCon>
+            )}
             <div
               className="title"
               onClick={e => {
@@ -256,126 +418,84 @@ export default class Create extends React.Component {
             )}
           </div>
           <div
-            className={cx('mesDiv', {
-              ...setCNFn(warnningData, [this.job, '.job'], focusDiv, job),
+            className={cx('mesDiv current', {
+              ...setWarnningData(warnningData, [this.industry, '.industry'], focusDiv, industryId),
             })}
           >
-            <input
-              type="text"
-              className="job"
-              autoComplete="off"
-              ref={job => (this.job = job)}
-              onBlur={this.inputOnBlur}
-              onFocus={this.inputOnFocus}
-              onChange={e => {
+            <Dropdown
+              showItemTitle
+              value={industryId || undefined}
+              ref={c => (this.industry = c)}
+              onChange={value => {
                 this.setState({
-                  warnningData: _.filter(warnningData, it => it.tipDom !== this.job),
+                  warnningData: _.filter(warnningData, it => it.tipDom !== this.industry),
                 });
-                setDataFn({
+                onChangeData({
                   ...registerData,
                   company: {
                     ...company,
-                    job: e.target.value,
+                    industryId: value,
+                    industry: (industryList.find(o => value === o.id) || {}).name,
                   },
                 });
               }}
-              value={job}
+              onBlur={this.inputOnBlur}
+              onFocus={this.inputOnFocus}
+              data={industryList.map(o => {
+                return { value: o.id, text: o.name };
+              })}
             />
             <div
               className="title"
               onClick={e => {
-                $(this.job).focus();
+                $(this.industry).focus();
               }}
             >
-              {_l('职位')}
+              {_l('行业')}
             </div>
-            {_.find(warnningData, it => it.tipDom === this.job || it.tipDom === '.job') && (
+            {_.find(warnningData, it => it.tipDom === this.industry || it.tipDom === '.industry') && (
               <div
                 className={cx('warnningTip', {
                   Hidden:
-                    (!!warnningData[0] && !_.includes([this.job, '.job'], warnningData[0].tipDom)) ||
+                    (!!warnningData[0] && !_.includes([this.industry, '.industry'], warnningData[0].tipDom)) ||
                     warnningData[0].tipDom !== focusDiv,
                 })}
               >
-                {_.find(warnningData, it => it.tipDom === this.job || it.tipDom === '.job').warnningText}
-              </div>
-            )}
-          </div>
-          <div
-            className={cx('mesDiv', {
-              ...setCNFn(warnningData, [this.email, '.email'], focusDiv, email),
-            })}
-          >
-            <input
-              type="text"
-              className="email"
-              autoComplete="off"
-              ref={email => (this.email = email)}
-              onBlur={this.inputOnBlur}
-              onFocus={this.inputOnFocus}
-              onChange={e => {
-                this.setState({
-                  warnningData: _.filter(warnningData, it => it.tipDom !== this.email),
-                });
-                setDataFn({
-                  ...registerData,
-                  company: {
-                    ...company,
-                    email: e.target.value,
-                  },
-                });
-              }}
-              value={email}
-            />
-            <div
-              className="title"
-              onClick={e => {
-                $(this.email).focus();
-              }}
-            >
-              {_l('邮箱')}
-            </div>
-            {_.find(warnningData, it => it.tipDom === this.email || it.tipDom === '.email') && (
-              <div
-                className={cx('warnningTip', {
-                  Hidden:
-                    (!!warnningData[0] && !_.includes([this.email, '.email'], warnningData[0].tipDom)) ||
-                    warnningData[0].tipDom !== focusDiv,
-                })}
-              >
-                {_.find(warnningData, it => it.tipDom === this.email || it.tipDom === '.email').warnningText}
+                {_.find(warnningData, it => it.tipDom === this.industry || it.tipDom === '.industry').warnningText}
               </div>
             )}
           </div>
           <div
             className={cx('mesDiv current', {
-              ...setCNFn(warnningData, [this.scaleId], focusDiv, scaleId),
+              ...setWarnningData(warnningData, [this.scaleId], focusDiv, scaleId),
               current: !!scaleId,
             })}
           >
-            <div ref={scaleId => (this.scaleId = scaleId)}>
-              <Dropdown
-                // placeholder={_l('预计使用人数')}
-                showItemTitle
-                value={scaleId || undefined}
-                onChange={value => {
-                  this.setState({
-                    warnningData: _.filter(warnningData, it => it.tipDom !== this.scaleId),
-                  });
-                  setDataFn({
-                    ...registerData,
-                    company: {
-                      ...company,
-                      scaleId: value,
-                    },
-                  });
-                }}
-                onBlur={this.inputOnBlur}
-                onFocus={this.inputOnFocus}
-                data={this.state.dataArr}
-              />
-            </div>
-            <div className="title">{_l('预计人数')}</div>
+            <Dropdown
+              showItemTitle
+              value={scaleId || undefined}
+              ref={c => (this.scaleId = c)}
+              onChange={value => {
+                this.setState({
+                  warnningData: _.filter(warnningData, it => it.tipDom !== this.scaleId),
+                });
+                onChangeData({
+                  ...registerData,
+                  company: {
+                    ...company,
+                    scaleId: value,
+                    scale: scaleList[value - 1],
+                  },
+                });
+              }}
+              onBlur={this.inputOnBlur}
+              onFocus={this.inputOnFocus}
+              data={scaleList.map((o, i) => {
+                return { value: i + 1, text: o };
+              })}
+            />
+
+            <div className="title">{_l('规模')}</div>
             {_.find(warnningData, it => it.tipDom === this.scaleId) && (
               <div
                 className={cx('warnningTip', {
@@ -388,13 +508,93 @@ export default class Create extends React.Component {
               </div>
             )}
           </div>
+          <div
+            className={cx('mesDiv current', {
+              ...setWarnningData(warnningData, [this.rank], focusDiv, jobType),
+            })}
+          >
+            <Dropdown
+              showItemTitle
+              ref={c => (this.rank = c)}
+              value={jobType ? rankList.findIndex(o => o === jobType) : undefined}
+              onChange={value => {
+                this.setState({
+                  warnningData: _.filter(warnningData, it => it.tipDom !== this.rank),
+                });
+                onChangeData({
+                  ...registerData,
+                  company: {
+                    ...company,
+                    jobType: rankList[value],
+                  },
+                });
+              }}
+              onBlur={this.inputOnBlur}
+              onFocus={this.inputOnFocus}
+              data={rankList.map((o, i) => {
+                return { value: i, text: o };
+              })}
+            />
+            <div className="title">{_l('您的职级')}</div>
+            {_.find(warnningData, it => it.tipDom === this.rank) && (
+              <div
+                className={cx('warnningTip', {
+                  Hidden:
+                    (!!warnningData[0] && !_.includes([this.rank], warnningData[0].tipDom)) ||
+                    warnningData[0].tipDom !== focusDiv,
+                })}
+              >
+                {_.find(warnningData, it => it.tipDom === this.rank).warnningText}
+              </div>
+            )}
+          </div>
+          <div
+            className={cx('mesDiv current', {
+              ...setWarnningData(warnningData, [this.department, '.department'], focusDiv, departmentType),
+            })}
+          >
+            <Dropdown
+              showItemTitle
+              ref={c => (this.department = c)}
+              value={departmentType ? depList.findIndex(o => o === departmentType) : undefined}
+              onChange={value => {
+                this.setState({
+                  warnningData: _.filter(warnningData, it => it.tipDom !== this.department),
+                });
+                onChangeData({
+                  ...registerData,
+                  company: {
+                    ...company,
+                    departmentType: depList[value],
+                  },
+                });
+              }}
+              onBlur={this.inputOnBlur}
+              onFocus={this.inputOnFocus}
+              data={depList.map((o, i) => {
+                return { value: i, text: o };
+              })}
+            />
+            <div className="title">{_l('您的部门')}</div>
+            {_.find(warnningData, it => it.tipDom === this.department || it.tipDom === '.department') && (
+              <div
+                className={cx('warnningTip', {
+                  Hidden:
+                    (!!warnningData[0] && !_.includes([this.department, '.department'], warnningData[0].tipDom)) ||
+                    warnningData[0].tipDom !== focusDiv,
+                })}
+              >
+                {_.find(warnningData, it => it.tipDom === this.department || it.tipDom === '.department').warnningText}
+              </div>
+            )}
+          </div>
         </div>
       </React.Fragment>
     );
   };
 
   render() {
-    const { changeStep, step, registerData, setDataFn } = this.props;
+    const { changeStep } = this.props;
     return (
       <React.Fragment>
         {this.state.loading && <div className="loadingLine"></div>}

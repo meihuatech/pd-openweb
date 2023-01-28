@@ -4,7 +4,9 @@ import styled from 'styled-components';
 import update from 'immutability-helper';
 import Dialog from 'rc-dialog';
 import 'rc-dialog/assets/index.css';
-import { Icon, Button } from 'ming-ui';
+import { v4 as uuidv4 } from 'uuid';
+import { Icon } from 'ming-ui';
+import { ConfigProvider, Button, Tooltip } from 'antd';
 import BtnGroupSetting from './btnGroupSetting';
 import BtnList from './btnList';
 import BtnSetting from './btnSetting';
@@ -12,7 +14,9 @@ import { useSetState } from 'react-use';
 import SideWrap from '../../SideWrap';
 import { Header, EditWidgetContent } from '../../../styled';
 import { DEFAULT_BUTTON_LIST } from './config';
+import { COLORS } from 'src/pages/AppHomepage/components/SelectIcon/config';
 import ButtonDisplay from './ButtonDisplay';
+import _ from 'lodash';
 
 const BtnWrap = styled.div`
   background-color: #eee;
@@ -52,9 +56,10 @@ export default function Btn(props) {
   const { button } = widget;
 
   const [btnSetting, setSetting] = useSetState(button);
-  const { buttonList, explain } = btnSetting;
+  const { buttonList, explain, config } = btnSetting;
 
   const [activeIndex, setIndex] = useState(0);
+  const [errorBtns, setErrorBtns] = useState([]);
 
   const [visible, setVisible] = useState(_.isEmpty(button));
 
@@ -63,7 +68,23 @@ export default function Btn(props) {
   };
 
   const addBtn = () => {
-    setSetting(update(btnSetting, { buttonList: { $push: [{ name: _l('我是按钮'), color: '#2196f3' }] } }));
+    const lastButton = buttonList[buttonList.length - 1] || {};
+    const colorIndex = COLORS.indexOf(lastButton.color);
+    const defaultColor = '#2196f3';
+    const color = colorIndex === -1 ? defaultColor : (COLORS[colorIndex + 1] || COLORS[0]);
+    const { btnType } = btnSetting.config || {};
+    const data = { name: _l('我是按钮'), color, id: uuidv4() };
+    if (btnType === 2) {
+      const icon = 'custom_actions';
+      const iconUrl = `${md.global.FileStoreConfig.pubHost}/customIcon/${icon}.svg`;
+      data.config = {
+        icon,
+        iconUrl,
+        isNewBtn: true
+      }
+    }
+    setIndex(buttonList.length);
+    setSetting(update(btnSetting, { buttonList: { $push: [data] } }));
   };
 
   const handleDel = () => {
@@ -74,8 +95,23 @@ export default function Btn(props) {
     setSetting(update(btnSetting, { buttonList: { $splice: [[activeIndex, 1]] } }));
     setIndex(Math.max(activeIndex - 1, 0));
   };
-  const onSortEnd = btnList => {
-    setSetting(update(btnSetting, { buttonList: { $set: btnList } }));
+  const handleSave = () => {
+    // 验证业务流程是否有必填项
+    const { buttonList } = btnSetting;
+    const emptyParamBtns = [];
+    buttonList.forEach((btn, index) => {
+      const { inputs } = btn.config || {};
+      const requiredInput = _.find(inputs, { required: true });
+      if (requiredInput && _.isEmpty(requiredInput.value)) {
+        emptyParamBtns.push(index);
+      }
+    });
+    if (emptyParamBtns.length) {
+      setErrorBtns(emptyParamBtns);
+      alert(_l('业务流程有必填参数，请完善'), 3);
+    } else {
+      onEdit({ button: btnSetting });
+    }
   };
 
   return visible ? (
@@ -85,6 +121,9 @@ export default function Btn(props) {
           key={i}
           className="defaultItem"
           onClick={() => {
+            item.buttonList.forEach((btn) => {
+              btn.id = uuidv4();
+            });
             setSetting(item);
             setVisible(false);
           }}>
@@ -94,19 +133,25 @@ export default function Btn(props) {
     </SideWrap>
   ) : (
     <Dialog
+      maskStyle={{ zIndex: 999 }}
+      wrapClassName="customPageButtonWrap"
       className="editWidgetDialogWrap"
       visible
       onClose={onClose}
-      closeIcon={<Icon icon="close ThemeHoverColor3" />}>
+      closeIcon={<Icon icon="close Font24 ThemeHoverColor3" />}
+    >
       <Header>
         <div className="typeName">{_l('按钮')}</div>
-        <Button
-          className="saveBtn"
-          onClick={() => {
-            onEdit({ button: btnSetting });
-          }}>
-          {_l('保存')}
-        </Button>
+        <div className="flexRow valignWrapper">
+          <ConfigProvider autoInsertSpaceInButton={false}>
+            <Button block className="save" shape="round" type="primary" onClick={handleSave}>
+              {_l('保存')}
+            </Button>
+          </ConfigProvider>
+          <Tooltip title={_l('关闭')} placement="bottom">
+            <Icon icon="close" className="Font24 pointer mLeft16 Gray_9e" onClick={onClose} />
+          </Tooltip>
+        </div>
       </Header>
       <EditWidgetContent>
         <BtnWrap>
@@ -115,7 +160,7 @@ export default function Btn(props) {
             <BtnList
               {...props}
               {...btnSetting}
-              onSortEnd={onSortEnd}
+              errorBtns={errorBtns}
               activeIndex={activeIndex}
               onClick={({ index }) => setIndex(index)}
             />
@@ -123,7 +168,9 @@ export default function Btn(props) {
           <BtnSetting
             {...props}
             explain={explain}
+            activeIndex={activeIndex}
             btnSetting={buttonList[activeIndex]}
+            btnConfig={config}
             setBtnSetting={setBtnSetting}
             setSetting={setSetting}
             onDel={handleDel}

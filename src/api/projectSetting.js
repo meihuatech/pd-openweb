@@ -1,4 +1,4 @@
-module.exports = {
+export default {
   /**
   * 获取企业标识
   * @param {Object} args 请求参数
@@ -12,7 +12,7 @@ module.exports = {
      return $.api('ProjectSetting', 'GetProjectIdentity', args, options);
    },
   /**
-  * 界面定制
+  * 界面定制（人事审批打印功能有调用这个接口，所以不能限制管理员权限）
   * @param {Object} args 请求参数
   * @param {string} args.projectId 网络id
   * @param {Object} options 配置参数
@@ -22,6 +22,30 @@ module.exports = {
    getSysColor: function (args, options = {}) {
      
      return $.api('ProjectSetting', 'GetSysColor', args, options);
+   },
+  /**
+  * 获取 是否允许申请后台组织管理员权限
+  * @param {Object} args 请求参数
+  * @param {string} args.projectId 网络id
+  * @param {Object} options 配置参数
+  * @param {Boolean} options.silent 是否禁止错误弹层
+  * @returns {Promise<Boolean, ErrorModel>}
+  **/
+   getAllowApplyManageRole: function (args, options = {}) {
+     
+     return $.api('ProjectSetting', 'GetAllowApplyManageRole', args, options);
+   },
+  /**
+  * 获取SSO相关配置
+  * @param {Object} args 请求参数
+  * @param {string} args.projectId 网络id
+  * @param {Object} options 配置参数
+  * @param {Boolean} options.silent 是否禁止错误弹层
+  * @returns {Promise<Boolean, ErrorModel>}
+  **/
+   getSsoSettings: function (args, options = {}) {
+     
+     return $.api('ProjectSetting', 'GetSsoSettings', args, options);
    },
   /**
   * 二级域名
@@ -96,7 +120,7 @@ module.exports = {
      return $.api('ProjectSetting', 'GetEnabledWatermark', args, options);
    },
   /**
-  * 获取 是否开启水印
+  * 获取 是否只允许管理员创建应用
   * @param {Object} args 请求参数
   * @param {string} args.projectId 网络id
   * @param {Object} options 配置参数
@@ -108,7 +132,7 @@ module.exports = {
      return $.api('ProjectSetting', 'GetOnlyManagerCreateApp', args, options);
    },
   /**
-  * 获取 是否只允许管理员创建应用
+  * 获取 是否自动订购工作流升级包
   * @param {Object} args 请求参数
   * @param {string} args.projectId 网络id
   * @param {Object} options 配置参数
@@ -338,6 +362,46 @@ module.exports = {
      return $.api('ProjectSetting', 'SetAutoPurchaseWorkflowExtPack', args, options);
    },
   /**
+  * 设置 是否允许申请后台组织管理员权限
+  * @param {Object} args 请求参数
+  * @param {string} args.projectId 网络id
+  * @param {boolean} args.allowApplyManageRole 是否允许申请管理员
+  * @param {Object} options 配置参数
+  * @param {Boolean} options.silent 是否禁止错误弹层
+  * @returns {Promise<Boolean, ErrorModel>}
+  **/
+   setAllowApplyManageRole: function (args, options = {}) {
+     
+     return $.api('ProjectSetting', 'SetAllowApplyManageRole', args, options);
+   },
+  /**
+  * 设置 是否开启SSO
+  * @param {Object} args 请求参数
+  * @param {string} args.projectId 网络id
+  * @param {boolean} args.isOpenSso 是否开启sso
+  * @param {Object} options 配置参数
+  * @param {Boolean} options.silent 是否禁止错误弹层
+  * @returns {Promise<Boolean, ErrorModel>}
+  **/
+   setSso: function (args, options = {}) {
+     
+     return $.api('ProjectSetting', 'SetSso', args, options);
+   },
+  /**
+  * 设置 SsoUrl
+  * @param {Object} args 请求参数
+  * @param {string} args.projectId 网络id
+  * @param {string} args.ssoWebUrl sso web url
+  * @param {string} args.ssoAppUrl sso app url
+  * @param {Object} options 配置参数
+  * @param {Boolean} options.silent 是否禁止错误弹层
+  * @returns {Promise<Boolean, ErrorModel>}
+  **/
+   setSsoUrl: function (args, options = {}) {
+     
+     return $.api('ProjectSetting', 'SetSsoUrl', args, options);
+   },
+  /**
   * 设置二级域名
   * @param {Object} args 请求参数
   * @param {string} args.projectId 网络id
@@ -449,6 +513,8 @@ MD.Enum.ProjectSetting.UserFillDepartmentEnabled
   * @param {string} args.departmentAttr 注册时需要填写部门
   * @param {string} args.jobAttr LDAP 用户职位
   * @param {string} args.workphoneAttr LDAP 用户工作电话
+  * @param {integer} args.searchRange 账户搜索范围
+  * @param {object} args.dnGroup DN/组
   * @param {Object} options 配置参数
   * @param {Boolean} options.silent 是否禁止错误弹层
   * @returns {Promise<Boolean, ErrorModel>}
@@ -469,5 +535,78 @@ MD.Enum.ProjectSetting.UserFillDepartmentEnabled
    updateLdapState: function (args, options = {}) {
      
      return $.api('ProjectSetting', 'UpdateLdapState', args, options);
+   },
+  /**
+  * 开启api网络代理
+  * @param {Object} args 请求参数
+  * @param {string} args.projectId 组织id
+  * @param {boolean} args.state api网络代理开启状态
+  * @param {Object} options 配置参数
+  * @param {Boolean} options.silent 是否禁止错误弹层
+  * @returns {Promise<Boolean, ErrorModel>}
+  **/
+   setApiProxyState: function (args, options = {}) {
+     
+     return $.api('ProjectSetting', 'SetApiProxyState', args, options);
+   },
+  /**
+  * 获取api网络代理设置开启状态
+  * @param {Object} args 请求参数
+  * @param {string} args.projectId 组织id
+  * @param {Object} options 配置参数
+  * @param {Boolean} options.silent 是否禁止错误弹层
+  * @returns {Promise<Boolean, ErrorModel>}
+  **/
+   getApiProxyState: function (args, options = {}) {
+     
+     return $.api('ProjectSetting', 'GetApiProxyState', args, options);
+   },
+  /**
+  * 获取api网络代理配置信息
+  * @param {Object} args 请求参数
+  * @param {string} args.projectId 组织id
+  * @param {Object} options 配置参数
+  * @param {Boolean} options.silent 是否禁止错误弹层
+  * @returns {Promise<Boolean, ErrorModel>}
+  **/
+   getApiProxySettings: function (args, options = {}) {
+     
+     return $.api('ProjectSetting', 'GetApiProxySettings', args, options);
+   },
+  /**
+  * 保存api网络代理配置
+  * @param {Object} args 请求参数
+  * @param {string} args.projectId 组织id
+  * @param {integer} args.type 0-all 1-http 2-https
+  * @param {string} args.ip 服务器地址
+  * @param {integer} args.port 端口
+  * @param {boolean} args.openIdentityValidate 开启身份验证
+  * @param {string} args.userName 用户名
+  * @param {string} args.password 密码
+  * @param {Object} options 配置参数
+  * @param {Boolean} options.silent 是否禁止错误弹层
+  * @returns {Promise<Boolean, ErrorModel>}
+  **/
+   editApiProxySettings: function (args, options = {}) {
+     
+     return $.api('ProjectSetting', 'EditApiProxySettings', args, options);
+   },
+  /**
+  * &lt;br&gt; ProcessType = 10 &gt;  RemoveProjectUserMemoryCache : 移除 （整网络）网络成员 内存缓存 
+&lt;br&gt; ProcessType = 11 &gt; ResetProjectUserMemoryCache : 重置 （整网络）网络成员 内存缓存 
+&lt;br&gt; ProcessType = 13 &gt; ResetAccountsProjectUserMemoryCache : 重置 网络成员 内存缓存 中 指定成员的 缓存数据！（需传递 AccountIds） 
+&lt;br&gt; ProcessType = 20 &gt; RemovePersonalContactsMemoryCache : 移除 个人联系人内存缓存（可指定 AccountIds，否则 为 全网络）（注：无 重置操作 选项） 
+&lt;br&gt; ProcessType = 30 &gt; RemoveAccountsMemoryCache : 移除 Account 缓存（独立的 缓存信息，好友、外协中使用）（与网络无关）（必须指定 AccountIds） 
+  * @param {Object} args 请求参数
+  * @param {} args.processType
+  * @param {string} args.projectId
+  * @param {array} args.accountIds
+  * @param {Object} options 配置参数
+  * @param {Boolean} options.silent 是否禁止错误弹层
+  * @returns {Promise<Boolean, ErrorModel>}
+  **/
+   projectClearCache: function (args, options = {}) {
+     
+     return $.api('ProjectSetting', 'ProjectClearCache', args, options);
    },
 };

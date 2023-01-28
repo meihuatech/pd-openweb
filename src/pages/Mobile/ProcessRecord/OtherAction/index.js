@@ -1,39 +1,53 @@
 import React, { Component, Fragment } from 'react';
 import cx from 'classnames';
 import { List, Flex, Modal, TextareaItem } from 'antd-mobile';
-import { Icon } from 'ming-ui';
+import { Icon, Signature } from 'ming-ui';
 import { ACTION_TO_TEXT } from 'src/pages/workflow/components/ExecDialog/config';
-import Signature from 'src/components/newCustomFields/widgets/Signature';
 import './index.less';
+import _ from 'lodash';
 
 export default class extends Component {
   constructor(props) {
     super(props);
-    const { backFlowNodes } = props.instance;
+    const { action, instance } = this.props;
+    const backFlowNodes = (instance || {}).backFlowNodes || [];
+    const { isCallBack } = (instance || {}).flowNode || {};
+    let backFlowNode = '';
+
+    if (props.action === 'overrule' && isCallBack && backFlowNodes.length) {
+      backFlowNode = backFlowNodes[0].id;
+    }
+
     this.state = {
       backFlowNodesVisible: false,
-      backFlowNodes: [{ name: _l('不退回'), id: '' }].concat(backFlowNodes),
-      backFlowNode: '',
+      backFlowNodes,
+      backFlowNode,
       content: '',
-      signature: '',
     };
   }
-  handleAction = () => {
+  handleAction = (backFlowNode = '') => {
     const { action, selectedUser, instance } = this.props;
-    const { content, backFlowNode, signature } = this.state;
+    const { content } = this.state;
     const { auth } = (instance || {}).flowNode || {};
 
     const passContent = action === 'pass' && _.includes(auth.passTypeList, 100);
     const passSignature = action === 'pass' && _.includes(auth.passTypeList, 1);
     const overruleContent = action === 'overrule' && _.includes(auth.overruleTypeList, 100);
     const overruleSignature = action === 'overrule' && _.includes(auth.overruleTypeList, 1);
+    const forwardAccountId = _.isArray(selectedUser) ? selectedUser.map(user => user.accountId).join(',') : selectedUser.accountId
 
-    if (((passContent || overruleContent) && !content.trim()) || ((passSignature || overruleSignature) && !signature)) {
+    if (((passContent || overruleContent) && !content.trim()) || ((passSignature || overruleSignature) && this.signature.checkContentIsEmpty())) {
       alert(_l('请填写完整内容', 2));
       return;
     }
 
-    this.props.onAction(action, content, selectedUser.accountId, backFlowNode, signature ? JSON.parse(signature) : undefined);
+    if (this.signature) {
+      this.signature.saveSignature(signature => {
+        this.props.onAction(action, content, forwardAccountId, backFlowNode, signature);
+      });
+    } else {
+      this.props.onAction(action, content, forwardAccountId, backFlowNode, undefined);
+    }
   }
   renderBackFlowNodes() {
     const { backFlowNode, backFlowNodes } = this.state;
@@ -46,7 +60,6 @@ export default class extends Component {
               onClick={() => {
                 this.setState({
                   backFlowNodesVisible: false,
-                  backFlowNode: '',
                 });
               }}
             >
@@ -88,21 +101,21 @@ export default class extends Component {
     );
   }
   renderInfo() {
-    const { backFlowNodes, backFlowNode, signature } = this.state;
+    const { backFlowNodes, backFlowNode } = this.state;
     const { action, selectedUser, instance } = this.props;
     const currentAction = ACTION_TO_TEXT[action];
-    const { isCallBack, auth } = (instance || {}).flowNode || {};
-    const passSignature = action === 'pass' && _.includes(auth.passTypeList, 1);
-    const overruleSignature = action === 'overrule' && _.includes(auth.overruleTypeList, 1);
+    const { isCallBack } = (instance || {}).flowNode || {};
 
-    if (isCallBack && action === 'overrule') {
+    if (isCallBack && action === 'overrule' && backFlowNodes.length) {
+      const node = backFlowNodes.filter(item => item.id === backFlowNode)[0];
+      const { name } = node ? node : {};
       return (
         <List>
           <List.Item>
             <Flex>
-              <span className="flex Gray">{_l('退回并重新进行审批')}</span>
+              <span className="flex Gray">{_l('退回到')}</span>
               <div className="Gray_75" onClick={() => { this.setState({ backFlowNodesVisible: true }) }}>
-                <span>{backFlowNodes.filter(item => item.id === backFlowNode)[0].name}</span>
+                <span>{name}</span>
                 <Icon icon="navigate_next" className="Font22"/>
               </div>
             </Flex>
@@ -148,41 +161,103 @@ export default class extends Component {
         </List>
       );
     }
+  }
+  renderSignature() {
+    const { action, instance } = this.props;
+    const { auth } = (instance || {}).flowNode || {};
+    const passSignature = action === 'pass' && _.includes(auth.passTypeList, 1);
+    const overruleSignature = action === 'overrule' && _.includes(auth.overruleTypeList, 1);
+
     if (passSignature || overruleSignature) {
       return (
-        <Flex className="am-textarea-item">
-          <Signature value={signature} onChange={signature => this.setState({ signature })} />
-        </Flex>
+        <Fragment>
+          <div className="title Gray_75 flexRow valignWrapper">
+            {(passSignature || overruleSignature) && (
+              <div className="bold mRight3" style={{ color: '#f44336' }}>
+                *
+              </div>
+            )}
+            {_l('签名')}
+          </div>
+          <Flex className="am-textarea-item">
+            <Signature
+              ref={signature => {
+                this.signature = signature;
+              }}
+            />
+          </Flex>
+        </Fragment>
       );
     }
   }
   renderContent() {
-    const { action, onHide } = this.props;
-    const { content } = this.state;
+    const { action, onHide, instance } = this.props;
+    const { content, backFlowNode, backFlowNodes } = this.state;
     const currentAction = ACTION_TO_TEXT[action];
+    const { auth, isCallBack } = (instance || {}).flowNode || {};
+    const isOverruleBack = action === 'overrule' && isCallBack && backFlowNodes.length;
+    const passContent = action === 'pass' && _.includes(auth.passTypeList, 100);
+    const overruleContent = action === 'overrule' && _.includes(auth.overruleTypeList, 100);
     return (
       <Fragment>
-        <TextareaItem
-          className="flex"
-          placeholder={currentAction.placeholder}
-          labelNumber={5}
-          value={content}
-          onChange={content => {
-            this.setState({
-              content,
-            });
-          }}
-        />
+        <div className="flex flexColumn">
+          <div className="title Gray_75 flexRow valignWrapper">
+            {(passContent || overruleContent) && (
+              <div className="bold mRight3" style={{ color: '#f44336' }}>
+                *
+              </div>
+            )}
+            {_l('审批意见')}
+          </div>
+          <TextareaItem
+            className="flex"
+            placeholder={currentAction.placeholder}
+            labelNumber={5}
+            value={content}
+            onChange={content => {
+              this.setState({
+                content,
+              });
+            }}
+          />
+        </div>
+        {this.renderSignature()}
         {this.renderInfo()}
         <div className="flexRow actionBtnWrapper">
-          <div className="flex actionBtn" onClick={onHide}>{_l('取消')}</div>
-          <div className="flex actionBtn ok" onClick={this.handleAction}>{currentAction.okText}</div>
+          {isOverruleBack ? (
+            <Fragment>
+              <div
+                className="flex actionBtn overrule"
+                onClick={() => {
+                  this.handleAction();
+                }}
+              >
+                {_l('直接否决')}
+              </div>
+              <div
+                className="flex actionBtn ok"
+                onClick={() => { this.handleAction(backFlowNode) }}
+              >
+                {_l('否决并退回')}
+              </div>
+            </Fragment>
+          ) : (
+            <Fragment>
+              <div className="flex actionBtn" onClick={onHide}>{_l('取消')}</div>
+              <div
+                className="flex actionBtn ok"
+                onClick={() => { this.handleAction(backFlowNode) }}
+              >
+                {currentAction.okText}
+              </div>
+            </Fragment>
+          )}
         </div>
       </Fragment>
     );
   }
   render() {
-    const { backFlowNodesVisible, signature } = this.state;
+    const { backFlowNodesVisible } = this.state;
     const { visible, onHide } = this.props;
     return (
       <Modal
@@ -191,7 +266,7 @@ export default class extends Component {
         onClose={onHide}
         animationType="slide-up"
       >
-        <div className={cx('otherActionWrapper flexColumn', { signatureWrapper: signature })}>
+        <div className="otherActionWrapper flexColumn">
           {backFlowNodesVisible ? this.renderBackFlowNodes() : this.renderContent()}
         </div>
       </Modal>

@@ -199,6 +199,9 @@
   .conditionItem {
     margin: 12px 0 0;
     font-size: 13px;
+    .errorName {
+      color: #f44336;
+    }
 
     .conditionItemHeader {
       position: relative;
@@ -569,6 +572,9 @@
       input {
         font-size: 12px !important;
       }
+      &.ant-picker-range {
+        padding: 0 8px;
+      }
     }
     .ming.Dropdown {
       width: 100%;
@@ -602,6 +608,36 @@
       display: inline-block;
       padding: 0 8px;
     }
+
+    .customAntPicker {
+      border: none;
+      box-shadow: none;
+    }
+  }
+  .dateRangeInputCon {
+    border: 1px solid #ccc;
+    box-sizing: border-box;
+    height: 36px;
+    border-radius: 3px;
+    font-size: 12px;
+    background: #fff;
+    .ant-picker {
+      margin: 4px 0;
+      border: none;
+      box-shadow: none;
+      input {
+        font-size: 12px !important;
+      }
+    }
+    .ant-picker-range {
+      width: 100%;
+    }
+  }
+}
+
+.filterDateRangeInputPopup {
+  .ant-picker-time-panel-column {
+    width: 64px;
   }
 }
 
@@ -708,7 +744,7 @@
     opacity: 0;
     float: left;
     padding: 0;
-    margin: 0 -8px !important;
+    margin-top: -16px;
     * {
       height: 1px !important;
       min-height: 1px !important;

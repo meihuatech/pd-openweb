@@ -1,8 +1,9 @@
 import React, { Component, Fragment } from 'react';
 import { ScrollView, LoadDiv, Dropdown } from 'ming-ui';
 import flowNode from '../../../api/flowNode';
-import { DetailHeader, DetailFooter, SelectNodeObject } from '../components';
+import { DetailHeader, DetailFooter, SelectNodeObject, CustomTextarea } from '../components';
 import cx from 'classnames';
+import _ from 'lodash';
 
 export default class File extends Component {
   constructor(props) {
@@ -58,7 +59,7 @@ export default class File extends Component {
    */
   onSave = () => {
     const { data, saveRequest } = this.state;
-    const { name, selectNodeId, appId } = data;
+    const { name, selectNodeId, appId, fileName } = data;
 
     if (!selectNodeId) {
       alert(_l('必须先选择一个对象'), 2);
@@ -67,6 +68,11 @@ export default class File extends Component {
 
     if (!appId) {
       alert(_l('Word打印模板必选'), 2);
+      return;
+    }
+
+    if (fileName && /[/:*?"<>|]/.test(fileName)) {
+      alert(_l('非法文件名'), 2);
       return;
     }
 
@@ -82,6 +88,7 @@ export default class File extends Component {
         name: name.trim(),
         selectNodeId,
         appId,
+        fileName,
       })
       .then(result => {
         this.props.updateNodeData(result);
@@ -125,7 +132,6 @@ export default class File extends Component {
 
         <div className="mTop20 bold">{_l('Word打印模板')}</div>
         <Dropdown
-          className="flowDropdown mTop10"
           className={cx('flowDropdown mTop10', { 'errorBorder errorBG': data.appId && !selectAppItem })}
           data={appList}
           value={data.appId}
@@ -141,6 +147,21 @@ export default class File extends Component {
           noData={_l('暂无Word打印模板')}
           onChange={appId => this.updateSource({ appId })}
         />
+
+        <div className="mTop20 bold">{_l('文件名')}</div>
+        <div className="Gray_75 mTop5">
+          {_l('系统默认使用记录标题作为文件名，自定义名称时不得包含英文字符/:*?"<>|')}
+        </div>
+        <CustomTextarea
+          processId={this.props.processId}
+          selectNodeId={this.props.selectNodeId}
+          type={2}
+          height={0}
+          content={data.fileName}
+          formulaMap={data.formulaMap}
+          onChange={(err, value, obj) => this.updateSource({ fileName: value })}
+          updateSource={this.updateSource}
+        />
       </Fragment>
     );
   }
@@ -155,10 +176,10 @@ export default class File extends Component {
     return (
       <Fragment>
         <DetailHeader
-          data={{ ...data, selectNodeType: this.props.selectNodeType }}
+          {...this.props}
+          data={{ ...data }}
           icon="icon-print"
           bg="BGBlueAsh"
-          closeDetail={this.props.closeDetail}
           updateSource={this.updateSource}
         />
         <div className="flex mTop20">
@@ -166,11 +187,7 @@ export default class File extends Component {
             <div className="workflowDetailBox">{this.renderContent()}</div>
           </ScrollView>
         </div>
-        <DetailFooter
-          isCorrect={!!data.selectNodeId && !!data.appId}
-          onSave={this.onSave}
-          closeDetail={this.props.closeDetail}
-        />
+        <DetailFooter {...this.props} isCorrect={!!data.selectNodeId && !!data.appId} onSave={this.onSave} />
       </Fragment>
     );
   }

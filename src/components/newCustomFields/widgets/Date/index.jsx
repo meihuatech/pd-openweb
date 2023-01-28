@@ -1,17 +1,19 @@
 import PropTypes from 'prop-types';
-import React, { Component } from 'react';
-import { Icon } from 'ming-ui';
+import React, { Component, Fragment } from 'react';
+import { Icon, MobileDatePicker } from 'ming-ui';
 import cx from 'classnames';
 import { DatePicker as PCDatePicker } from 'antd';
-import { DatePicker as MobileDatePicker } from 'antd-mobile';
 import { FROM } from '../../tools/config';
 import zh_CN from 'antd/es/date-picker/locale/zh_CN';
 import zh_TW from 'antd/es/date-picker/locale/zh_TW';
 import en_US from 'antd/es/date-picker/locale/en_US';
+import ja_JP from 'antd/es/date-picker/locale/ja_JP';
 import { getDynamicValue } from '../../tools/DataFormat';
 import { compareWithTime } from '../../tools/utils';
 import { browserIsMobile } from 'src/util';
+import { getDatePickerConfigs, getShowFormat } from 'src/pages/widgetConfig/util/setting.js';
 import moment from 'moment';
+import _ from 'lodash';
 
 export default class Widgets extends Component {
   static propTypes = {
@@ -34,13 +36,25 @@ export default class Widgets extends Component {
 
   state = {
     isFocus: false,
+    originValue: '',
+    dateProps: getDatePickerConfigs(this.props),
+    showMobileDatePicker: false,
   };
+
+  componentWillReceiveProps(nextProps) {
+    if ((nextProps.advancedSetting || {}).showtype !== (this.props.advancedSetting || {}).showtype) {
+      this.setState({ dateProps: getDatePickerConfigs(nextProps) });
+    }
+  }
 
   onChange = value => {
     const { type } = this.props;
+    const { dateProps = {} } = this.state;
 
     if (value) {
-      value = moment(value).format(type === 15 ? 'YYYY-MM-DD' : 'YYYY-MM-DD HH:mm');
+      value = moment(moment(value).format(dateProps.formatMode)).format(
+        type === 15 ? 'YYYY-MM-DD' : 'YYYY-MM-DD HH:mm:ss',
+      );
     }
 
     this.props.onChange(value);
@@ -60,10 +74,12 @@ export default class Widgets extends Component {
       masterData,
       onBlur,
     } = this.props;
+    const { originValue, dateProps = {} } = this.state;
     let { value } = this.props;
     if (/^\d+$/.test(String(value)) && String(value).length < 5) {
       value = '';
     }
+    const showformat = getShowFormat(this.props);
     const allowweek = advancedSetting.allowweek || '1234567';
     const allowtime = advancedSetting.allowtime || '00:00-24:00';
     const timeinterval = advancedSetting.timeinterval || '1';
@@ -89,21 +105,30 @@ export default class Widgets extends Component {
     }
 
     if (browserIsMobile()) {
+      let mobileMode =
+        dateProps.formatMode === 'YYYY-MM-DD HH'
+          ? 'hour'
+          : dateProps.formatMode === 'YYYY-MM-DD HH:mm'
+          ? 'minite'
+          : 'second';
+      let precision =
+        dateProps.mode === 'year' || dateProps.mode === 'month' || dateProps.mode === 'date'
+          ? dateProps.mode
+          : mobileMode;
       return (
-        <MobileDatePicker
-          className="customDatePicker"
-          minDate={minDate ? new Date(moment(minDate)) : new Date(1900, 1, 1, 0, 0, 0)}
-          maxDate={maxDate ? new Date(moment(maxDate)) : new Date(2100, 12, 31, 23, 59, 59)}
-          mode={type === 15 ? 'date' : 'datetime'}
-          minuteStep={parseInt(timeinterval)}
-          value={value ? new Date(moment(value)) : ''}
-          disabled={disabled}
-          title={controlName}
-          onOk={this.onChange}
-        >
-          <div className={cx('customFormControlBox customFormButton flexRow', { controlDisabled: disabled })}>
+        <Fragment>
+          <div
+            className={cx('customFormControlBox customFormButton flexRow', { controlDisabled: disabled })}
+            onClick={
+              disabled
+                ? () => {}
+                : () => {
+                    this.setState({ showMobileDatePicker: true });
+                  }
+            }
+          >
             <span className={cx('flex mRight20 ellipsis', { Gray_bd: !value })}>
-              {value ? moment(value).format(type === 15 ? 'YYYY-MM-DD' : 'YYYY-MM-DD HH:mm') : _l('请选择日期')}
+              {value ? moment(value).format(showformat) : _l('请选择日期')}
             </span>
             {!disabled && (
               <Icon
@@ -112,7 +137,26 @@ export default class Widgets extends Component {
               />
             )}
           </div>
-        </MobileDatePicker>
+          {this.state.showMobileDatePicker && (
+            <MobileDatePicker
+              customHeader={controlName}
+              isOpen={this.state.showMobileDatePicker}
+              precision={precision}
+              value={value ? new Date(moment(value)) : new Date()}
+              min={minDate ? new Date(moment(minDate)) : new Date(1900, 1, 1, 0, 0, 0)}
+              max={maxDate ? new Date(moment(maxDate)) : new Date(2100, 12, 31, 23, 59, 59)}
+              disabled={disabled}
+              onSelect={date => {
+                this.onChange(date);
+                this.setState({ showMobileDatePicker: false });
+              }}
+              onCancel={() => {
+                this.setState({ showMobileDatePicker: false });
+                this.onChange(null);
+              }}
+            ></MobileDatePicker>
+          )}
+        </Fragment>
       );
     }
 
@@ -127,12 +171,13 @@ export default class Widgets extends Component {
     return (
       <PCDatePicker
         className={cx('w100 customAntPicker customFormControlBox', { controlDisabled: disabled })}
-        locale={lang === 'en' ? en_US : lang === 'zh-Hant' ? zh_TW : zh_CN}
+        locale={lang === 'en' ? en_US : lang === 'ja' ? ja_JP : lang === 'zh-Hant' ? zh_TW : zh_CN}
         disabled={disabled}
         value={value ? moment(value) : ''}
+        picker={dateProps.mode === 'datetime' ? 'date' : dateProps.mode}
         showTime={showTime || false}
-        format={type === 16 ? 'YYYY-MM-DD HH:mm' : 'YYYY-MM-DD'}
-        placeholder={this.state.isFocus ? (type === 16 ? 'YYYY-MM-DD HH:mm' : 'YYYY-MM-DD') : _l('请选择日期')}
+        format={showformat}
+        placeholder={this.state.isFocus ? dateProps.formatMode : _l('请选择日期')}
         suffixIcon={
           !disabled ? (
             <Icon
@@ -232,13 +277,12 @@ export default class Widgets extends Component {
             }, 200);
           }
         }}
-        onFocus={() => this.setState({ isFocus: true })}
+        onFocus={e => this.setState({ isFocus: true, originValue: e.target.value.trim() })}
         onBlur={() => {
           this.setState({ isFocus: false });
-          onBlur();
+          onBlur(originValue);
         }}
         onChange={this.onChange}
-        onOk={this.onChange}
         {...compProps}
       />
     );

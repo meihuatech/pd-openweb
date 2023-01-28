@@ -3,8 +3,9 @@ import React, { Component, Fragment } from 'react';
 import './index.less';
 import flowNode from '../../../../api/flowNode';
 import ActionFields from '../ActionFields';
-import { CONTROLS_NAME } from '../../../enum';
+import { CONTROLS_NAME, APP_TYPE } from '../../../enum';
 import { MenuItem } from 'ming-ui';
+import _ from 'lodash';
 
 export default class SelectOtherFields extends Component {
   static propTypes = {
@@ -15,6 +16,7 @@ export default class SelectOtherFields extends Component {
     processId: PropTypes.string,
     selectNodeId: PropTypes.string,
     sourceAppId: PropTypes.string,
+    isIntegration: PropTypes.bool,
     conditionId: PropTypes.string,
     dataSource: PropTypes.string,
     handleFieldClick: PropTypes.func,
@@ -31,6 +33,7 @@ export default class SelectOtherFields extends Component {
     isFilter: false,
     sourceAppId: '',
     sourceNodeId: '',
+    isIntegration: false,
     showClear: false,
   };
 
@@ -51,18 +54,31 @@ export default class SelectOtherFields extends Component {
    * 获取更多控件的值
    */
   getFlowNodeAppDtos() {
-    const { isFilter, processId, selectNodeId, sourceAppId, item, sourceNodeId, conditionId, dataSource } = this.props;
-
-    flowNode[isFilter ? 'getFlowAppDtos' : 'getFlowNodeAppDtos']({
+    const {
+      isFilter,
       processId,
-      nodeId: selectNodeId,
+      selectNodeId,
       sourceAppId,
-      type: item.type,
-      enumDefault: item.enumDefault,
-      selectNodeId: sourceNodeId,
+      item,
+      sourceNodeId,
       conditionId,
       dataSource,
-    }).then(result => {
+      isIntegration,
+    } = this.props;
+
+    flowNode[isFilter ? 'getFlowAppDtos' : 'getFlowNodeAppDtos'](
+      {
+        processId,
+        nodeId: selectNodeId,
+        sourceAppId,
+        type: item.type,
+        enumDefault: item.enumDefault,
+        selectNodeId: sourceNodeId,
+        conditionId,
+        dataSource,
+      },
+      { isIntegration },
+    ).then(result => {
       const fieldsData = result.map(obj => {
         return {
           text: obj.nodeName,
@@ -78,7 +94,10 @@ export default class SelectOtherFields extends Component {
               type: o.type,
               value: o.controlId,
               field: CONTROLS_NAME[o.type],
-              text: o.controlName,
+              text:
+                obj.appType === APP_TYPE.WEBHOOK
+                  ? `[${o.enumDefault === 0 ? 'Body' : 'Header'}] ${o.controlName}`
+                  : o.controlName,
             };
           }),
         };

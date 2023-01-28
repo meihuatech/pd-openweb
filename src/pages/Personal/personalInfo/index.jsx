@@ -1,39 +1,25 @@
 import React, { Fragment } from 'react';
-import DialogLayer from 'mdDialog';
+import DialogLayer from 'src/components/mdDialog/dialog';
 import ReactDom from 'react-dom';
-import UserLevel from './modules/UserLevel';
 import AvatorInfo from './modules/AvatorInfo';
-import CosLog from './modules/CosLog';
-import PointList from './modules/PointList';
 import EditDetail from './modules/EditDetail';
 import EditInfo from './modules/EditInfo';
 import AddOrEditItem from './modules/AddOrEditItem';
-import ViewEmblem from './modules/ViewEmblem';
-import SendEmblem from './modules/SendEmblem';
 import { Tooltip, LoadDiv } from 'ming-ui';
 import { Progress } from 'antd';
 import account from 'src/api/account';
 import './index.less';
-import Trigger from 'rc-trigger';
-import cx from 'classnames';
 import { formatFileSize } from 'src/util';
-
+import fixedDataAjax from 'src/api/fixedData.js';
+import cx from 'classnames';
+import _ from 'lodash';
 const detailList = [
   { label: _l('生日'), key: 'birthdate', filter: 'transFromDate' },
   { label: _l('性别'), key: 'gender', filter: 'transFormGender' },
   { label: _l('职位'), key: 'profession' },
 ];
 
-const infoList = [
-  { label: _l('邮箱'), key: 'email' },
-  { label: _l('手机'), key: 'mobilePhone' },
-];
-
-const {
-  personal: {
-    personalInfo: { personalEmblem },
-  },
-} = window.private;
+const infoList = [{ label: _l('邮箱'), key: 'email' }, { label: _l('手机'), key: 'mobilePhone' }];
 
 export default class PersonalInfo extends React.Component {
   constructor(props) {
@@ -42,7 +28,6 @@ export default class PersonalInfo extends React.Component {
       accountInfo: {}, //头部图像
       baseDetail: {}, //详细资料
       concatInfo: {}, //联系信息
-      accountMedal: [], //徽章
       educationList: [],
       workList: [],
       dataPlan: 0,
@@ -51,6 +36,7 @@ export default class PersonalInfo extends React.Component {
       loading: false,
       operateMenuVisible: false,
       editFullName: false, //编辑姓名
+      isErr: false,
     };
   }
 
@@ -64,7 +50,6 @@ export default class PersonalInfo extends React.Component {
       (user, concatInfo, education, work) => {
         this.setState({
           accountInfo: user.accountInfo,
-          accountMedal: user.accountMedal,
           dataPlan: user.dataPlan,
           dataUsage: user.dataUsage,
           percent: user.dataUsage ? (user.dataUsage / user.dataPlan) * 100 : 0,
@@ -138,7 +123,7 @@ export default class PersonalInfo extends React.Component {
                 <span className="accountTag">{_l('付费版')}</span>
                 <span className="Gray_9e mLeft10 mRight5">{_l('剩余 %0 天', accountInfo.expireDays)}</span>
                 <Tooltip popupPlacement="top" text={<span>{_l('到期时间：根据您所在组织最晚到期时间为准。')}</span>}>
-                  <span className="icon-novice-circle Font15 Gray_bd mLeft2 Hand"></span>
+                  <span className="icon-novice-circle Font15 Gray_bd mLeft2 Hand" />
                 </Tooltip>
               </Fragment>
             )}
@@ -157,7 +142,7 @@ export default class PersonalInfo extends React.Component {
           return this.detailItem(item, 'baseDetail');
         })}
         <div>
-          <span className="itemLabel"></span>
+          <span className="itemLabel" />
           <button
             type="button"
             className="ming Button Button--link ThemeColor3 Hover_49"
@@ -207,7 +192,7 @@ export default class PersonalInfo extends React.Component {
           return this.detailItem(item, 'concatInfo');
         })}
         <div>
-          <span className="itemLabel"></span>
+          <span className="itemLabel" />
           <button
             type="button"
             className="ming Button Button--link ThemeColor3 Hover_49"
@@ -280,11 +265,11 @@ export default class PersonalInfo extends React.Component {
           <div className="Gray_9e itemDate">{_l('%0 至 %1', item.startDate, item.endDate)}</div>
           <div className="itemOption">
             <span className="ThemeColor3 Hover_49 mRight24" onClick={() => this.handleAddOrEditItem(type, item)}>
-              <span className="mLeft6 icon-edit_17"></span>
+              <span className="mLeft6 icon-edit_17" />
               <span>{_l('编辑')}</span>
             </span>
             <span className="ThemeColor3 Hover_49 mRight24" onClick={() => this.handleDeleteItem(type, item.autoId)}>
-              <span className="mLeft6 icon-delete_12"></span>
+              <span className="mLeft6 icon-delete_12" />
               <span>{_l('删除')}</span>
             </span>
           </div>
@@ -356,182 +341,6 @@ export default class PersonalInfo extends React.Component {
     }
   }
 
-  //我的徽章
-  renderEmblem() {
-    const { accountMedal = [], operateMenuVisible } = this.state;
-    const optionList = () => (
-      <div className="optionListBadges">
-        <div
-          className="optionListItem"
-          onClick={() => {
-            this.handleViewEmblem();
-            this.setState({ operateMenuVisible: false });
-          }}
-        >
-          {_l('我的所有徽章')}
-        </div>
-        <div
-          className="optionListItem"
-          onClick={() => {
-            this.handleSendEmblem();
-            this.setState({ operateMenuVisible: false });
-          }}
-        >
-          {_l('赠送徽章')}
-        </div>
-      </div>
-    );
-    return (
-      <div className="myAcquireBadges">
-        {accountMedal.map(item => {
-          return (
-            <Tooltip popupPlacement="top" text={<span>{item.medalName}</span>}>
-              <div className="badgeItem Hand">
-                <img src={item.smallPath} />
-                <div className="myBadgeCount">
-                  <span>{item.count}</span>
-                </div>
-              </div>
-            </Tooltip>
-          );
-        })}
-        <Trigger
-          popupVisible={operateMenuVisible}
-          action={['click']}
-          popupAlign={{
-            points: ['tl', 'bl'],
-          }}
-          popup={optionList()}
-          onPopupVisibleChange={visible => this.setState({ operateMenuVisible: visible })}
-        >
-          <div className="moreBadges Hand mTop10 mLeft8">
-            <span className="icon-more_horiz Font18 Gray LineHeight28 Hover_49"></span>
-          </div>
-        </Trigger>
-      </div>
-    );
-  }
-
-  //查看徽章
-  handleViewEmblem() {
-    const { accountMedal = [] } = this.state;
-    const options = {
-      container: {
-        content: '',
-        yesText: null,
-        noText: null,
-        header: _l('我的徽章'),
-        noFn: () => {
-          if (
-            this.viewEmblemRef.state.showIds.sort().join('') !==
-            accountMedal
-              .map(x => x.medalId)
-              .sort()
-              .join('')
-          ) {
-            this.getUserInfo().then(user => {
-              this.setState({
-                accountMedal: user.accountMedal,
-              });
-            });
-          }
-        },
-      },
-      dialogBoxID: 'viewEmblemDialogId',
-      width: '960px',
-    };
-    ReactDom.render(
-      <DialogLayer {...options}>
-        <ViewEmblem ref={con => (this.viewEmblemRef = con)} />
-      </DialogLayer>,
-      document.createElement('div'),
-    );
-  }
-
-  //赠送徽章
-  handleSendEmblem() {
-    const options = {
-      container: {
-        content: '',
-        yesText: null,
-        noText: null,
-        header: _l('我要赠送徽章'),
-      },
-      dialogBoxID: 'sendEmblemDialogId',
-      width: '770px',
-    };
-    ReactDom.render(
-      <DialogLayer {...options}>
-        <SendEmblem
-          closeDialog={() => {
-            $('#sendEmblemDialogId_container,#sendEmblemDialogId_mask').remove();
-          }}
-        />
-      </DialogLayer>,
-      document.createElement('div'),
-    );
-  }
-
-  //查看等级
-  handleLevel() {
-    const options = {
-      container: {
-        content: '',
-        yesText: null,
-        noText: null,
-        header: _l('级别'),
-      },
-      dialogBoxID: 'levelDialogId',
-      width: '320px',
-    };
-    ReactDom.render(
-      <DialogLayer {...options}>
-        <UserLevel />
-      </DialogLayer>,
-      document.createElement('div'),
-    );
-  }
-
-  //查看积分
-  handleCosLog() {
-    const options = {
-      container: {
-        content: '',
-        yesText: null,
-        noText: null,
-        header: null,
-      },
-      dialogBoxID: 'coslogDialogId',
-      width: '750px',
-    };
-    ReactDom.render(
-      <DialogLayer {...options}>
-        <CosLog />
-      </DialogLayer>,
-      document.createElement('div'),
-    );
-  }
-
-  //查看积分提醒
-  handlePoint() {
-    const options = {
-      container: {
-        content: '',
-        yesText: null,
-        noText: null,
-        header: null,
-      },
-      dialogBoxID: 'pointDialogId',
-      width: '850px',
-    };
-    ReactDom.render(
-      <DialogLayer {...options}>
-        <PointList />
-      </DialogLayer>,
-      document.createElement('div'),
-    );
-  }
-
   //上传头像
   handleUploadImg() {
     const options = {
@@ -543,7 +352,6 @@ export default class PersonalInfo extends React.Component {
       },
       dialogBoxID: 'uploadAvatorDialogId',
       width: '460px',
-      height: '365px',
     };
     ReactDom.render(
       <DialogLayer {...options}>
@@ -565,20 +373,33 @@ export default class PersonalInfo extends React.Component {
 
   //修改姓名
   setFullName() {
-    account
-      .editAccountBasicInfo(this.state.baseDetail)
-      .then(data => {
-        if (data) {
-          this.setState({ editFullName: false });
-        } else {
-          this.setState({ editFullName: false });
-        }
-      })
-      .fail();
+    const { fullname } = this.state.baseDetail;
+    fixedDataAjax.checkSensitive({ content: fullname }).then(res => {
+      if (res) {
+        this.setState({
+          isErr: true,
+        });
+        return alert(_l('输入内容包含敏感词，请重新填写'), 3);
+      } else {
+        this.setState({
+          isErr: false,
+        });
+        account
+          .editAccountBasicInfo(this.state.baseDetail)
+          .then(data => {
+            if (data) {
+              this.setState({ editFullName: false });
+            } else {
+              this.setState({ editFullName: false });
+            }
+          })
+          .fail();
+      }
+    });
   }
 
   render() {
-    const { accountInfo, loading, educationList, workList, baseDetail, editFullName } = this.state;
+    const { accountInfo, loading, educationList, workList, baseDetail, editFullName, isErr } = this.state;
     if (loading) {
       return <LoadDiv />;
     }
@@ -589,14 +410,14 @@ export default class PersonalInfo extends React.Component {
             <div className="userImage" onClick={this.handleUploadImg.bind(this)}>
               <img src={accountInfo.avatarBig} alt="" />
               <div className="hoverAvatar">
-                <span className="Font20 icon-upload_pictures"></span>
+                <span className="Font20 icon-upload_pictures" />
               </div>
             </div>
             <div className="userInfoRight mLeft25">
               <div className="Gray Font17 overflow_ellipsis LineHeight32">
                 {editFullName ? (
                   <input
-                    className="editfullNameInput"
+                    className={cx('editfullNameInput', { isErr })}
                     autofocus="autofocus"
                     value={baseDetail.fullname}
                     onChange={e => this.setState({ baseDetail: { ...baseDetail, fullname: e.target.value } })}
@@ -618,41 +439,18 @@ export default class PersonalInfo extends React.Component {
                             $('.editfullNameInput').focus();
                           })
                         }
-                      ></span>
+                      />
                     </Tooltip>
                   </span>
                 )}
               </div>
               <div className="mTop10 Gray">
                 <label>
-                  {_l('等级：')}
-                  <span className="mLeft5 ThemeColor3 Hand Hover_49" onClick={this.handleLevel.bind(this)}>
-                    {accountInfo.grade}
-                  </span>
-                </label>
-                <label className="mLeft32">
-                  {_l('积分：')}
-                  <span className="mLeft5 mRight5 ThemeColor3 Hand Hover_49" onClick={this.handleCosLog.bind(this)}>
-                    {accountInfo.mark}
-                  </span>
-                  <Tooltip popupPlacement="top" text={<span>{_l('等级积分只增不减，可用积分有增有减')}</span>}>
-                    <span
-                      className="icon-novice-circle Gray_bd Hand Font15"
-                      onClick={this.handlePoint.bind(this)}
-                    ></span>
-                  </Tooltip>
-                </label>
-                <label className="mLeft32">
                   {_l('使用：')}
                   <span className="mLeft5 ThemeColor3">{_l('%0 天', accountInfo.loginDays)}</span>
                 </label>
               </div>
             </div>
-          </div>
-          {/** 徽章 */}
-          <div className={cx('personalEmblem', { Hidden: personalEmblem })}>
-            <div className="Gray">{_l('我的徽章')}</div>
-            {this.renderEmblem()}
           </div>
         </div>
         {/** 账户信息

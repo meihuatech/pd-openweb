@@ -4,6 +4,8 @@ import GunterView from 'src/pages/worksheet/views/GunterView';
 import ViewErrorPage from '../components/ViewErrorPage';
 import { SYS } from 'src/pages/widgetConfig/config/widget';
 import { getAdvanceSetting } from 'src/util';
+import { isIllegal } from 'src/pages/worksheet/views/CalendarView/util';
+import _ from 'lodash';
 
 class MobileGunterView extends Component {
   constructor(props) {
@@ -21,7 +23,14 @@ class MobileGunterView extends Component {
     const isDelete = begindate && !timeControlsIds.includes(begindate);
     const isDeleteEnd = enddate && !timeControlsIds.includes(enddate);
 
-    if (isDelete || !begindate || !enddate || isDeleteEnd) {
+    if (
+      isDelete ||
+      !begindate ||
+      !enddate ||
+      isDeleteEnd ||
+      isIllegal(controls.find(item => item.controlId === begindate) || {}) ||
+      isIllegal(controls.find(item => item.controlId === enddate) || {})
+    ) {
       return (
         <ViewErrorPage
           icon="gantt"
@@ -32,7 +41,7 @@ class MobileGunterView extends Component {
     }
 
     return (
-      <GunterView {...this.props} />
+      <GunterView {...this.props} layoutType="mobile" />
     );
   }
 }

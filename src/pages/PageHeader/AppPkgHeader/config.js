@@ -1,5 +1,3 @@
-const { app: {appInfo} } = window.private
-
 export const ADD_GROUP_ID = '@ADD/GROUP';
 
 export const APP_GROUP_CONFIG = [
@@ -21,13 +19,6 @@ export const APP_GROUP_CONFIG = [
   },
 ];
 
-const appFixed = {
-  type: 'editAppFixStatus',
-  icon: 'setting',
-  getText: (status) => status ? _l('更新维护状态') : _l('设为维护状态'),
-  action: 'editAppFixStatusVisible',
-}
-
 export const APP_CONFIG = {
   0: [],
   //  {
@@ -40,7 +31,7 @@ export const APP_CONFIG = {
   50: [
     {
       type: 'ding',
-      icon: 'dingding',
+      icon: 'feishu',
       text: _l('添加到钉钉'),
       action: 'goDingCourse',
     },
@@ -50,13 +41,13 @@ export const APP_CONFIG = {
       text: _l('添加到企业微信'),
       action: 'goWeixinCourse',
     },
-  //  {
-  //     type: 'quit',
-  //     icon: 'exit',
-  //     text: _l('退出应用'),
-  //     action: 'quitAppConfirmVisible',
-  //   },
-    ],
+    //  {
+    //     type: 'quit',
+    //     icon: 'exit',
+    //     text: _l('退出应用'),
+    //     action: 'quitAppConfirmVisible',
+    //   },
+  ],
   // ADMIN
   100: [
     {
@@ -71,30 +62,42 @@ export const APP_CONFIG = {
       text: _l('编辑应用说明'),
       action: 'editAppIntroVisible',
     },
-    appFixed,
-    { type: 'copy', icon: 'content-copy', text: _l('复制应用'), action: 'copyAppVisible' },
-    { type: 'export', icon: 'cloud_download', text: _l('导出应用'), action: 'exportAppVisible' },
+    {
+      type: 'appAnalytics',
+      icon: 'poll',
+      text: _l('使用分析'),
+      action: 'appAnalyticsVisible',
+      featureId: 17,
+    },
     { type: 'optionList', icon: 'dropdown', action: 'optionListVisible', text: _l('选项集') },
     { type: 'editAppNavStyle', icon: 'mobile_phone', action: 'mobileNavVisible', text: _l('设置移动端导航') },
+    { type: 'appItemTrash', icon: 'knowledge-recycle', text: _l('应用项回收站'), featureId: 16 },
+    {
+      type: 'appManageMenu',
+      icon: 'custom_widgets',
+      text: _l('管理应用'),
+      subMenuList: [
+        { type: 'copy', icon: 'content-copy', text: _l('复制应用'), action: 'copyAppVisible' },
+        { type: 'export', icon: 'cloud_download', text: _l('导出应用'), action: 'exportAppVisible', featureId: 2 },
+        // { type: 'importAppUpgrade', icon: 'cloud_upload', text: _l('导入应用升级') },
+        { type: 'createBackup', icon: 'knowledgeMessage', text: _l('创建应用备份'), action: 'createBackupVisisble', featureId: 1 },
+        { type: 'restore', icon: 'turnLeft', text: _l('从备份文件还原'), action: 'manageBackupFilesVisible', featureId: 1 },
+      ],
+    },
+    {
+      type: 'publishSettings',
+      icon: 'send',
+      text: _l('发布设置'),
+      action: 'publishSettings',
+    },
     {
       type: 'worksheetapi',
       icon: 'worksheet_API',
       text: _l('API开发文档'),
       action: 'goWorksheetapi',
+      featureId: 21,
     },
-    {
-      type: 'ding',
-      icon: 'dingding',
-      text: _l('添加到钉钉'),
-      action: 'goDingCourse',
-    },
-    {
-      type: 'weixin',
-      icon: 'enterprise_wechat',
-      text: _l('添加到企业微信'),
-      action: 'goWeixinCourse',
-    },
-  ].filter(item => !appInfo[item.type]),
+  ],
   // OWNER
   200: [
     {
@@ -109,37 +112,49 @@ export const APP_CONFIG = {
       text: _l('编辑应用说明'),
       action: 'editAppIntroVisible',
     },
-    appFixed,
-    { type: 'copy', icon: 'content-copy', text: _l('复制应用'), action: 'copyAppVisible' },
-    { type: 'export', icon: 'cloud_download', text: _l('导出应用'), action: 'exportAppVisible' },
+    {
+      type: 'appAnalytics',
+      icon: 'poll',
+      text: _l('使用分析'),
+      action: 'appAnalyticsVisible',
+      featureId: 17,
+    },
     { type: 'optionList', icon: 'dropdown', action: 'optionListVisible', text: _l('选项集') },
     { type: 'editAppNavStyle', icon: 'mobile_phone', action: 'mobileNavVisible', text: _l('设置移动端导航') },
+    { type: 'appItemTrash', icon: 'knowledge-recycle', text: _l('应用项回收站'), featureId: 16 },
+    {
+      type: 'appManageMenu',
+      icon: 'custom_widgets',
+      text: _l('管理应用'),
+      subMenuList: [
+        { type: 'copy', icon: 'content-copy', text: _l('复制应用'), action: 'copyAppVisible' },
+        { type: 'export', icon: 'cloud_download', text: _l('导出应用'), action: 'exportAppVisible', featureId: 2 },
+        // { type: 'importAppUpgrade', icon: 'cloud_upload', text: _l('导入应用升级') },
+        { type: 'createBackup', icon: 'knowledgeMessage', text: _l('创建应用备份'), action: 'createBackupVisisble', featureId: 1 },
+        { type: 'restore', icon: 'turnLeft', text: _l('从备份文件还原'), action: 'manageBackupFilesVisible', featureId: 1 },
+        {
+          type: 'del',
+          icon: 'delete2',
+          text: _l('删除应用'),
+          action: 'delAppConfirmVisible',
+          className: 'delApp',
+        },
+      ],
+    },
+    {
+      type: 'publishSettings',
+      icon: 'send',
+      text: _l('发布设置'),
+      action: 'publishSettings',
+    },
     {
       type: 'worksheetapi',
       icon: 'worksheet_API',
       text: _l('API开发文档'),
       action: 'goWorksheetapi',
+      featureId: 21,
     },
-    {
-      type: 'ding',
-      icon: 'dingding',
-      text: _l('添加到钉钉'),
-      action: 'goDingCourse',
-    },
-    {
-      type: 'weixin',
-      icon: 'enterprise_wechat',
-      text: _l('添加到企业微信'),
-      action: 'goWeixinCourse',
-    },
-    {
-      type: 'del',
-      icon: 'delete2',
-      text: _l('删除应用'),
-      action: 'delAppConfirmVisible',
-      className: 'delApp',
-    },
-  ].filter(item => !appInfo[item.type]),
+  ],
   300: [
     {
       type: 'modify',
@@ -153,30 +168,42 @@ export const APP_CONFIG = {
       text: _l('编辑应用说明'),
       action: 'editAppIntroVisible',
     },
-    appFixed,
-    { type: 'copy', icon: 'content-copy', text: _l('复制应用'), action: 'copyAppVisible' },
-    { type: 'export', icon: 'cloud_download', text: _l('导出应用'), action: 'exportAppVisible' },
+    {
+      type: 'appAnalytics',
+      icon: 'poll',
+      text: _l('使用分析'),
+      action: 'appAnalyticsVisible',
+      featureId: 17,
+    },
     { type: 'optionList', icon: 'dropdown', action: 'optionListVisible', text: _l('选项集') },
     { type: 'editAppNavStyle', icon: 'mobile_phone', action: 'mobileNavVisible', text: _l('设置移动端导航') },
+    { type: 'appItemTrash', icon: 'knowledge-recycle', text: _l('应用项回收站'), featureId: 16 },
+    {
+      type: 'appManageMenu',
+      icon: 'custom_widgets',
+      text: _l('管理应用'),
+      subMenuList: [
+        { type: 'copy', icon: 'content-copy', text: _l('复制应用'), action: 'copyAppVisible' },
+        { type: 'export', icon: 'cloud_download', text: _l('导出应用'), action: 'exportAppVisible', featureId: 2 },
+        // { type: 'importAppUpgrade', icon: 'cloud_upload', text: _l('导入应用升级') },
+        { type: 'createBackup', icon: 'knowledgeMessage', text: _l('创建应用备份'), action: 'createBackupVisisble', featureId: 1 },
+        { type: 'restore', icon: 'turnLeft', text: _l('从备份文件还原'), action: 'manageBackupFilesVisible', featureId: 1 },
+      ],
+    },
+    {
+      type: 'publishSettings',
+      icon: 'send',
+      text: _l('发布设置'),
+      action: 'publishSettings',
+    },
     {
       type: 'worksheetapi',
       icon: 'worksheet_API',
       text: _l('API开发文档'),
       action: 'goWorksheetapi',
+      featureId: 21,
     },
-    {
-      type: 'ding',
-      icon: 'dingding',
-      text: _l('添加到钉钉'),
-      action: 'goDingCourse',
-    },
-    {
-      type: 'weixin',
-      icon: 'enterprise_wechat',
-      text: _l('添加到企业微信'),
-      action: 'goWeixinCourse',
-    },
-  ].filter(item => !appInfo[item.type]),
+  ],
 };
 
 export const DEFAULT_CREATE = '@DEFAULT/CREATE';

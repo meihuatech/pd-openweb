@@ -3,9 +3,9 @@ import PropTypes from 'prop-types';
 import { SOURCE_TYPE } from '../../constants';
 import ToolTip from 'ming-ui/components/Tooltip';
 import LoadDiv from 'ming-ui/components/LoadDiv';
-
-const DiscussionController = require('src/api/discussion');
-const PostController = require('src/api/post');
+import DiscussionController from 'src/api/discussion';
+import PostController from 'src/api/post';
+import _ from 'lodash';
 
 export default class ReplyTo extends React.Component {
   static propTypes = {
@@ -20,6 +20,7 @@ export default class ReplyTo extends React.Component {
     this.state = {
       binded: false,
       replayMsg: null,
+      loading: false
     };
   }
 
@@ -34,15 +35,16 @@ export default class ReplyTo extends React.Component {
   }
 
   fetchReplyMsg() {
-    if (this.state.replayMsg) return false;
+    if (this.state.replayMsg || this.state.loading) return false;
     const { sourceType, sourceId, replyId } = this.props;
     const callback = msg => {
       this.setState({
         replayMsg: msg,
+        loading: false
       });
     };
+    this.setState({ loading: true });
     if (sourceType === SOURCE_TYPE.POST) {
-
       this.ajax = PostController.getReplyMessage({
         commentID: replyId,
         postID: sourceId,

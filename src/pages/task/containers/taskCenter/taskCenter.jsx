@@ -13,10 +13,10 @@ import {
   clearFolderSettings,
 } from '../../redux/actions';
 import config from '../../config/config';
-import 'dialogSelectUser';
-import 'mdBusinessCard';
-import 'tooltip';
-import 'createTask';
+import 'src/components/dialogSelectUser/dialogSelectUser';
+import 'src/components/mdBusinessCard/mdBusinessCard';
+import 'src/components/tooltip/tooltip';
+import 'src/components/createTask/createTask';
 import { checkTaskSubTask, afterUpdateTaskCharge, afterUpdateTaskStar, afterUpdateTaskStatus, joinProjectPrompt } from '../../utils/taskComm';
 import TaskToolbar from '../taskToolbar/taskToolbar';
 import Subordinate from '../subordinate/subordinate';
@@ -29,6 +29,7 @@ import TaskTree from '../taskTree/taskTree';
 import FolderDetail from '../folderDetail/folderDetail';
 import ajaxRequest from 'src/api/taskCenter';
 import ErrorState from 'src/components/errorPage/errorState';
+import _ from 'lodash';
 
 class TaskCenter extends Component {
   constructor(props) {
@@ -376,7 +377,7 @@ class TaskCenter extends Component {
       <div className="taskMainBox flexRow borderContainer">
         {hideNavigation ? null : (
           <Fragment>
-            <div className="fixedContainer ThemeBG leftNavHairGlass" />
+            <div className="Fixed ThemeBG leftNavHairGlass" />
             <TaskNavigation />
           </Fragment>
         )}

@@ -6,12 +6,18 @@ import { getAdvanceSetting, handleAdvancedSettingChange } from '../../../util/se
 import TelConfig from './TelConfig';
 import UserConfig from './UserConfig';
 import DateConfig from './DateConfig';
+import TimeConfig from './TimeConfig';
+import ScoreConfig from './ScoreConfig';
+import DropConfig from './DropConfig';
+import _ from 'lodash';
 
 const TYPE_TO_COMP = {
   3: TelConfig,
   15: DateConfig,
   16: DateConfig,
   26: UserConfig,
+  28: ScoreConfig,
+  46: TimeConfig,
 };
 
 const CASCADER_CONFIG = [
@@ -31,37 +37,26 @@ const CASCADER_CONFIG = [
 ];
 
 export default function WidgetConfig(props) {
-  const { from, data, onChange } = props;
-  const { type, enumDefault, advancedSetting = {} } = data;
-  const { allowadd, showxy, showtype, checktype } = getAdvanceSetting(data);
+  const { data, onChange } = props;
+  const { type, enumDefault, advancedSetting = {}, strDefault } = data;
+  const { showxy, showtype, analysislink, uselast } = getAdvanceSetting(data);
 
   const getConfig = () => {
-    if (type === 6) {
+    if (type === 2 || type === 32) {
       return (
         <div className="labelWrap">
           <Checkbox
             size="small"
-            checked={enumDefault !== 1}
-            onClick={checked => onChange({ enumDefault: checked ? 1 : 0 })}
-            text={_l('显示千分位')}
-          />
-        </div>
-      );
-    }
-    if (type === 11 || (type === 10 && checktype === '1')) {
-      return (
-        <div className="labelWrap">
-          <Checkbox
-            size="small"
-            checked={allowadd === '1'}
-            onClick={checked => onChange(handleAdvancedSettingChange(data, { allowadd: checked ? '0' : '1' }))}>
-            <span>{_l('允许用户增加选项')}</span>
-            <Tooltip placement={'bottom'} title={_l('勾选后，用户填写时可输入不在备选项中的内容，并添加至选项列表')}>
-              <i className="icon-help tipsIcon Gray_9e Font16 pointer"></i>
-            </Tooltip>
+            checked={analysislink === '1'}
+            onClick={checked => onChange(handleAdvancedSettingChange(data, { analysislink: checked ? '0' : '1' }))}
+          >
+            <span>{_l('解析链接')}</span>
           </Checkbox>
         </div>
       );
+    }
+    if (_.includes([9, 10, 11], type)) {
+      return <DropConfig {...props} />;
     }
     if (type === 40) {
       return (
@@ -77,6 +72,7 @@ export default function WidgetConfig(props) {
           <div className="labelWrap">
             <Checkbox
               checked={showxy === '1'}
+              disabled={(strDefault || '00')[0] === '1'}
               size={'small'}
               text={_l('显示经纬度')}
               onClick={checked => {
@@ -93,7 +89,8 @@ export default function WidgetConfig(props) {
           <Checkbox
             size="small"
             checked={String(advancedSetting[key]) === '1'}
-            onClick={checked => onChange(handleAdvancedSettingChange(data, { [key]: +!checked }))}>
+            onClick={checked => onChange(handleAdvancedSettingChange(data, { [key]: +!checked }))}
+          >
             <span>{text}</span>
             {tip && (
               <Tooltip placement="topLeft" title={tip} arrowPointAtCenter>
@@ -103,6 +100,19 @@ export default function WidgetConfig(props) {
           </Checkbox>
         </div>
       ));
+    }
+    if (type === 42) {
+      return (
+        <div className="labelWrap">
+          <Checkbox
+            size="small"
+            checked={uselast === '1'}
+            onClick={checked => onChange(handleAdvancedSettingChange(data, { uselast: String(+!checked) }))}
+          >
+            <span>{_l('允许使用上次的签名')}</span>
+          </Checkbox>
+        </div>
+      );
     }
 
     const Comp = TYPE_TO_COMP[type];

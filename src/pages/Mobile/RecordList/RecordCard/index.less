@@ -2,17 +2,19 @@
   display: flex;
   margin-bottom: 10px;
   background-color: #fff;
-  border: 1px solid #f0f0f0;
+  border: 1px solid #fff;
   border-radius: 3px;
   box-shadow: 0px 1px 3px rgba(0, 0, 0, 0.16);
   position: relative;
 
+  .descBoxInfo {
+    display: none;
+  }
   &.coverRight {
     flex-direction: row-reverse;
     .fill,
     .full {
-      border-left: 1px solid #eaeaea;
-      border-right: none;
+      background-color: #fcfcfc;
     }
   }
   &.batchOptStyle {
@@ -50,7 +52,6 @@
     }
     &.fill,
     &.full {
-      border-right: 1px solid #eaeaea;
       .withoutImg {
         width: 100%;
         height: 100%;
@@ -65,13 +66,12 @@
     &.appshowtype1.fill {
       width: 40%;
     }
-    .icon {
-      color: #d0d0d0;
-      transform: rotateZ(45deg);
+    .withoutImg > img{
+      width: 36px;
     }
   }
   .recordCardContent {
-    padding: 5px 12px;
+    padding: 10px 12px;
     width: 0;
     overflow: hidden;
 
@@ -82,14 +82,17 @@
       display: flex;
       align-items: center;
       .controlWrapper {
-        width: 33%;
+        width: calc(~'33% - 8px');
         display: flex;
         flex-direction: column;
       }
+      .controlWrapper:nth-child(2) {
+        margin: 0 12px;
+      }
       .controlContent {
         height: 30px;
-        display: flex;
-        align-items: center;
+        // display: flex;
+        // align-items: center;
       }
       .cellAttachments .cellAttachment {
         margin-bottom: 0;
@@ -102,7 +105,7 @@
         overflow: hidden;
       }
       .controlWrapper {
-        margin-bottom: 5px;
+        margin-bottom: 7px;
         display: flex;
         flex-direction: row;
         align-items: center;
@@ -125,7 +128,6 @@
   }
 
   .controlContent {
-    white-space: nowrap;
     .editableCellCon {
       overflow: hidden;
       text-overflow: ellipsis;
@@ -135,6 +137,15 @@
     .linelimit {
       display: inherit !important;
     }
+  }
+  .abstract .editableCellCon {
+    white-space: initial;
+    word-break: break-all;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    /* autoprefixer: off */
+    -webkit-box-orient: vertical;
+    /* autoprefixer: on */
   }
   .emptyTag {
     border-radius: 3px;

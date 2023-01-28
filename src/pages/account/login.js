@@ -5,6 +5,7 @@ import Container from './container/loginContainer';
 import './login.less';
 import projectController from 'src/api/project';
 import loginController from 'src/api/login';
+import workWeiXinController from 'src/api/workWeiXin';
 import { getRequest } from 'src/util';
 import { setPssId } from 'src/util/pssId';
 import { LoadDiv } from 'ming-ui';
@@ -43,7 +44,7 @@ class LoginContainer extends React.Component {
       text: '',
       logo: '',
       step: 0,
-      scanUrl: '',
+      intergrationScanEnabled: false,
       projectId: request.projectId,
       linkInvite: '',
       loginData: {
@@ -69,6 +70,7 @@ class LoginContainer extends React.Component {
         },
       },
       isFrequentLoginError: false, // 是否需要验证登录
+      homeImage: ''
     };
   }
 
@@ -83,15 +85,14 @@ class LoginContainer extends React.Component {
       location.href = browserIsMobile() ? `/mobile` : `/app`;
       return;
     }
-    const {
-      accountId = '',
-      encryptPassword = '',
-      account = '',
-      projectId = '',
-      loginType = 0,
-    } = JSON.parse(window.localStorage.getItem('LoginCheckList') || '{}');
+    const { accountId = '', encryptPassword = '', account = '', projectId = '', loginType = 0 } = JSON.parse(
+      window.localStorage.getItem('LoginCheckList') || '{}',
+    );
     if (request.unionId || !accountId || !encryptPassword || (loginType === 1 && (!projectId || !account))) {
-      this.setState({ loading: false });
+      if (location.href.indexOf('network') < 0) {
+        //network =>getProjectBaseInfo 获取信息后 更新loading
+        this.setState({ loading: false });
+      }
     } else {
       let param = { loginType, accountId, encryptPassword };
       if (loginType === 1) {
@@ -115,6 +116,7 @@ class LoginContainer extends React.Component {
 
     this.setState({ isNetwork: true });
     this.getProjectBaseInfo();
+    this.ssoLogin(request.ReturnUrl);
   }
 
   componentWillUnmount() {
@@ -122,9 +124,19 @@ class LoginContainer extends React.Component {
   }
 
   loginCallback = (data, isMDLogin, callback, ignoreError) => {
+    if ([ActionResult.accountSuccess, ActionResult.needTwofactorVerifyCode].includes(data.accountResult)) {
+    }
+    if (data.accountResult === ActionResult.needTwofactorVerifyCode) {
+      //开启了两步验证
+      if (request.ReturnUrl) {
+        location.href = `/twofactor.htm?state=${data.state}&ReturnUrl=${encodeURIComponent(request.ReturnUrl)}`;
+      } else {
+        location.href = `/twofactor.htm?state=${data.state}`;
+      }
+      return;
+    }
     if (data.accountResult === ActionResult.accountSuccess) {
       setPssId(data.sessionId);
-
       if (request.ReturnUrl) {
         location.replace(getDataByFilterXSS(request.ReturnUrl));
       } else {
@@ -171,31 +183,28 @@ class LoginContainer extends React.Component {
         projectId: request.projectId || '',
       })
       .then(data => {
-        if (!data) {
+        if (!data || !data.companyName) {
           location.replace('/privateImageInstall.htm');
         } else {
-          const isMobile = browserIsMobile();
-          if (data.intergrationScanEnabled && !isMobile) {
-            this.getWorkWeiXinCorpInfoByApp(data.projectId);
-          }
           this.setState(
             {
               logo: data.logo,
               openLDAP: data.openLDAP,
               canLDAP: data.openLDAP,
+              isOpenSso: data.isOpenSso,
+              ssoWebUrl: data.ssoWebUrl,
+              ssoAppUrl: data.ssoAppUrl,
               projectId: data.projectId,
               text: data.companyName,
               logo: data.logo,
-              loading: false,
-              linkInvite: '/linkInvite.htm?projectId=' + data.projectId,
+              linkInvite: data.projectId ? '/linkInvite.htm?projectId=' + data.projectId : '',
+              homeImage: data.homeImage,
+              intergrationScanEnabled: data.intergrationScanEnabled,
               hideRegister: data.hideRegister,
+              loading: false
             },
             () => {
               document.title = data.companyName;
-              $('.loginContainerCon').css({
-                'background-image': 'url(' + data.homeImage + ')',
-                'background-size': 'cover',
-              });
               if (callback) {
                 callback();
               }
@@ -205,7 +214,50 @@ class LoginContainer extends React.Component {
       });
   };
 
-  getWorkWeiXinCorpInfoByApp = projectId => {
+  // 在集成环境移动端如果 ReturnUrl 包含 appId，去 sso 页面登录
+  ssoLogin = (returnUrl = '') => {
+    const isMobile = browserIsMobile();
+    const userAgent = window.navigator.userAgent.toLowerCase();
+    const isApp =
+      userAgent.includes('dingtalk') ||
+      userAgent.includes('wxwork') ||
+      userAgent.includes('huawei-anyoffice') ||
+      userAgent.includes('feishu');
+    if (isMobile && returnUrl.includes('mobile') && isApp) {
+      const { pathname } = new URL(returnUrl);
+      const [mobile, page, appId] = pathname.split('/').filter(_ => _);
+      if (appId) {
+        workWeiXinController
+          .getIntergrationInfo({
+            appId,
+          })
+          .then(data => {
+            const { item1, item2 } = data;
+            const url = encodeURIComponent(pathname);
+            // 钉钉
+            if (item1 === 1) {
+              const url = encodeURIComponent(pathname.replace(/^\//, ''));
+              location.href = `/sso/sso?t=2&p=${item2}&ret=${url}`;
+            }
+            // 企业微信
+            if (item1 === 3) {
+              location.href = `/auth/workwx?p=${item2}&url=${url}`;
+            }
+            // welink
+            if (item1 === 4) {
+              location.href = `/auth/welink?p=${item2}&url=${url}`;
+            }
+            // 飞书
+            if (item1 === 6) {
+              location.href = `/auth/feishu?p=${item2}&url=${url}`;
+            }
+          });
+      }
+    }
+  };
+
+  getWorkWeiXinCorpInfoByApp = () => {
+    const { projectId } = this.state;
     loginController
       .getWorkWeiXinCorpInfoByApp({
         projectId,
@@ -214,15 +266,20 @@ class LoginContainer extends React.Component {
         const { corpId, state, agentId, scanUrl } = result;
         const redirect_uri = encodeURIComponent(`${location.origin}/auth/workwx`);
         const url = `${scanUrl}/wwopen/sso/qrConnect?appid=${corpId}&agentid=${agentId}&redirect_uri=${redirect_uri}&state=${state}`;
-        this.setState({
-          scanUrl: url,
-        });
+        location.href = url;
       });
   };
 
   changeStep = step => {
     this.setState({
       step,
+    });
+  };
+
+  changeOpenLDAP = () => {
+    this.setState({
+      openLDAP: !this.state.openLDAP,
+      loginData: { ...this.state.loginData, password: '', isCheck: false },
     });
   };
 
@@ -235,7 +292,8 @@ class LoginContainer extends React.Component {
       openLDAP: this.state.openLDAP,
       loginData: this.state.loginData,
       isFrequentLoginError: this.state.isFrequentLoginError,
-      setDataFn: (data, callback) => {
+      canLDAP: this.state.canLDAP,
+      onChangeData: (data, callback) => {
         this.setState(
           {
             loginData: {
@@ -254,41 +312,55 @@ class LoginContainer extends React.Component {
     };
     switch (this.state.step) {
       case 0:
-        return <Container {...pram} />;
+        return <Container {...pram} changeOpenLDAP={this.changeOpenLDAP} />;
     }
   };
 
   renderFooter = () => {
-    let { linkInvite, isNetwork, openLDAP, canLDAP, hideRegister, intergrationScanEnabled, scanUrl } = this.state;
+    let { linkInvite, isNetwork, openLDAP, canLDAP, intergrationScanEnabled, isOpenSso, ssoWebUrl, ssoAppUrl, hideRegister } =
+      this.state;
     const isBindAccount = !!request.unionId;
+    const isMobile = browserIsMobile();
+    const scanLoginEnabled = intergrationScanEnabled && !isMobile;
+
     return (
       <React.Fragment>
         {!isBindAccount && (
           <React.Fragment>
             <div className="tpLogin TxtCenter">
-              {(!isNetwork || canLDAP || !_.isEmpty(scanUrl)) && <div className="title">{_l('或')}</div>}
-              {!_.isEmpty(scanUrl) && (
-                <div className="mBottom20">
-                  <a href={scanUrl} title={_l('企业微信登录')}>
-                    <i className="workWeixinIcon hvr-pop"></i>
+              {(!isNetwork || canLDAP || scanLoginEnabled || isOpenSso) && <div className="title">{_l('或')}</div>}
+              <div className="mBottom20">
+                {scanLoginEnabled && (
+                  <a title={_l('企业微信登录')} onClick={this.getWorkWeiXinCorpInfoByApp}>
+                    <i className="workWeixinIcon hvr-pop" />
                   </a>
-                </div>
+                )}
+                {isOpenSso && (
+                  <a href={isMobile ? ssoAppUrl : ssoWebUrl} title={_l('sso登录')}>
+                    <i className="ssoIcon hvr-pop" />
+                  </a>
+                )}
+              </div>
+              {!isNetwork && (
+                <React.Fragment>
+                  {!isMobile && (
+                    <a href="//tp.mingdao.com/weixin/authRequest" title={_l('微信登录')}>
+                      <i className="weixinIcon hvr-pop" />
+                    </a>
+                  )}
+                  <a href="//tp.mingdao.com/qq/authRequest" title={_l('个人QQ登录')}>
+                    <i className="personalQQIcon hvr-pop" />
+                  </a>
+                  {/* {!isMobile && (
+                    <a href="//liteapi.mingdao.com/workwx/authRequest" title={_l('企业微信登录')}>
+                      <i className="workWeixinIcon hvr-pop"></i>
+                    </a>
+                  )} */}
+                </React.Fragment>
               )}
-              {canLDAP && (
-                <span
-                  className="changeLoginType Hand Font14 Gray_75"
-                  onClick={() => {
-                    this.setState({
-                      openLDAP: !openLDAP,
-                    });
-                  }}
-                >
-                  {!openLDAP ? _l('切换LDAP登录') : _l('切换系统账户登录')}
-                </span>
-              )}
-              <div className="Clear"></div>
+              <div className="Clear" />
             </div>
-            <div className={cx({ line: !hideRegister, mTop80: !canLDAP })}></div>
+            <span className={cx('line', { mTop80: !canLDAP })} />
           </React.Fragment>
         )}
         {!hideRegister && (
@@ -317,14 +389,16 @@ class LoginContainer extends React.Component {
     );
   };
 
-  showLangChang = () => {
-    $('.showLangChangeBottom').removeClass('Hidden');
-  };
-
   render() {
     if (this.state.loading) {
       return <LoadDiv className="" style={{ margin: '50px auto' }} />;
     } else {
+      this.state.homeImage &&
+        this.state.isNetwork &&
+        $('.loginContainerCon').css({
+          'background-image': 'url(' + this.state.homeImage + ')',
+          'background-size': 'cover',
+        });
       return (
         <div className="loginBox">
           <div className="loginContainer">
@@ -334,9 +408,13 @@ class LoginContainer extends React.Component {
             </div>
             {this.renderCon()}
             {this.renderFooter()}
-            {this.showLangChang()}
           </div>
           <ChangeLang />
+          {md.global.Config.IsPlatformLocal && md.global.Config.IsCobranding && (
+            <div className={cx('powered w100 flexRow valignWrapper Font12', this.state.homeImage ? 'White' : 'Gray_9e', { linearGradientBg: this.state.homeImage })}>
+              <span className="pointer info mTop10" onClick={() => window.open('https://www.mingdao.com')}>{_l('基于明道云应用平台内核')}</span>
+            </div>
+          )}
         </div>
       );
     }

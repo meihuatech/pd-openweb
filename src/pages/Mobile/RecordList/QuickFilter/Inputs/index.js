@@ -5,9 +5,16 @@ import Number from './Number';
 import RelateRecord from './RelateRecord';
 import Options from './Options';
 import DateTime from './DateTime';
+import Time from './Time';
 import CheckboxComp from './CheckboxComp';
-import _ from 'lodash';
+import Users from './Users';
+import Departments from './Departments';
+import Areas from './Areas';
+import Cascader from './Cascader';
+import OrgRole from './OrgRole';
 import { shape } from 'prop-types';
+import { formatFilterValuesToServer } from 'worksheet/common/Sheet/QuickFilter';
+import _ from 'lodash';
 
 export function conditionAdapter(condition) {
   if (
@@ -21,22 +28,21 @@ export function conditionAdapter(condition) {
   ) {
     condition.filterType = 1;
   }
+  if (condition.dataType === WIDGETS_TO_API_TYPE_ENUM.RELATE_SHEET && condition.filterType === 2) {
+    condition.filterType = 24;
+  }
   delete condition.control;
   return condition;
 }
 
-export const formatQuickFilter = (filter) => {
+export const formatQuickFilter = filter => {
   return filter.map(c => {
-    let result = { ...c };
-    if (c.values) {
-      result.values = result.values.filter(_.identity);
-    }
-    if (c.dataType === 29) {
-      result.values = result.values.map(v => v.rowid);
-    }
-    return result;
+    return {
+      ...c,
+      values: formatFilterValuesToServer(c.dataType, c.values),
+    };
   });
-}
+};
 
 const Comps = {};
 
@@ -73,6 +79,34 @@ export const DateTimeTypes = [
 ];
 mapToComp(DateTimeTypes, DateTime);
 
+export const TimeTypes = [
+  WIDGETS_TO_API_TYPE_ENUM.TIME, //  时间
+];
+mapToComp(TimeTypes, Time);
+
+export const UsersTypes = [
+  WIDGETS_TO_API_TYPE_ENUM.USER_PICKER, // 成员
+];
+mapToComp(UsersTypes, Users);
+
+export const DepartmentsTypes = [
+  WIDGETS_TO_API_TYPE_ENUM.DEPARTMENT, // 部门
+];
+mapToComp(DepartmentsTypes, Departments);
+
+export const AreasTypes = [
+  WIDGETS_TO_API_TYPE_ENUM.AREA_PROVINCE, // 地区 省
+  WIDGETS_TO_API_TYPE_ENUM.AREA_CITY, // 地区 省-市
+  WIDGETS_TO_API_TYPE_ENUM.AREA_COUNTY, // 地区 省-市-县
+];
+mapToComp(AreasTypes, Areas);
+
+export const CascaderComp = [WIDGETS_TO_API_TYPE_ENUM.CASCADER];
+mapToComp(CascaderComp, Cascader);
+
+export const OrgRoleTypes = [WIDGETS_TO_API_TYPE_ENUM.ORG_ROLE];
+mapToComp(OrgRoleTypes, OrgRole);
+
 export function validate(condition) {
   let dataType = condition.dataType;
   if (
@@ -90,6 +124,13 @@ export function validate(condition) {
         WIDGETS_TO_API_TYPE_ENUM.FLAT_MENU, // 单选
         WIDGETS_TO_API_TYPE_ENUM.MULTI_SELECT, // 多选
         WIDGETS_TO_API_TYPE_ENUM.DROP_DOWN, // 下拉
+        WIDGETS_TO_API_TYPE_ENUM.USER_PICKER, // 成员
+        WIDGETS_TO_API_TYPE_ENUM.DEPARTMENT, // 部门
+        WIDGETS_TO_API_TYPE_ENUM.AREA_PROVINCE, // 地区 省
+        WIDGETS_TO_API_TYPE_ENUM.AREA_CITY, // 地区 省-市
+        WIDGETS_TO_API_TYPE_ENUM.AREA_COUNTY, // 地区 省-市-县
+        WIDGETS_TO_API_TYPE_ENUM.CASCADER, // 级联选择
+        WIDGETS_TO_API_TYPE_ENUM.ORG_ROLE, // 组织角色
       ],
       dataType,
     )
@@ -126,6 +167,7 @@ export function validate(condition) {
       [
         WIDGETS_TO_API_TYPE_ENUM.DATE, // 日期
         WIDGETS_TO_API_TYPE_ENUM.DATE_TIME, // 日期时间
+        WIDGETS_TO_API_TYPE_ENUM.TIME, // 时间
       ],
       dataType,
     )
@@ -138,6 +180,9 @@ export function validate(condition) {
 }
 
 export default function Input(props) {
+  const { advancedSetting = {} } = props;
+  const { allowitem } = advancedSetting;
+  const isMultiple = String(allowitem) === '2';
   let { type } = props.control;
   if (type === WIDGETS_TO_API_TYPE_ENUM.SHEET_FIELD && props.control) {
     type = props.control.sourceControlType;
@@ -146,7 +191,7 @@ export default function Input(props) {
     type = props.control.enumDefault2 || 6;
   }
   const Condition = Comps[type];
-  return Condition ? <Condition {...props} /> : <span />;
+  return Condition ? <Condition {...props} isMultiple={isMultiple} /> : <span />;
 }
 
 Input.propTypes = {

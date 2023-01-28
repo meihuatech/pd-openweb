@@ -1,6 +1,6 @@
 import React, { Component } from 'react';
 import { Dialog } from 'ming-ui';
-import uuid from 'uuid';
+import { v4 as uuidv4 } from 'uuid';
 import ChildTable from 'worksheet/components/ChildTable';
 import { handleAdvancedSettingChange } from 'src/pages/widgetConfig/util/setting';
 import './style.less';
@@ -12,7 +12,7 @@ export default class CustomDefaultValue extends Component {
     const defaultValue = (dynamicValue[0] || {}).staticValue;
     const rows = defaultValue ? JSON.parse(defaultValue) : [];
     const rowData = rows.map(item => {
-      const tempRowId = `temp-${uuid.v4()}`;
+      const tempRowId = `temp-${uuidv4()}`;
       return { ...item, rowid: tempRowId, allowedit: true, addTime: new Date().getTime() };
     });
     this.state = {
@@ -58,6 +58,7 @@ export default class CustomDefaultValue extends Component {
       >
         <div style={{ minHeight: 74, margin: '10px 0 12px' }}>
           <ChildTable
+            initRowIsCreate={false}
             from={0}
             control={{
               ...data,

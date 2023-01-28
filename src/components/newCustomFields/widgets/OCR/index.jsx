@@ -2,6 +2,7 @@ import PropTypes from 'prop-types';
 import React, { Component, Fragment } from 'react';
 import { Icon, QiniuUpload } from 'ming-ui';
 import ajax from 'src/api/worksheet';
+import _ from 'lodash';
 
 export default class Widgets extends Component {
   static propTypes = {
@@ -73,7 +74,7 @@ export default class Widgets extends Component {
 
     return (
       <QiniuUpload
-        className="customFormControlBox customFormControlOCR ThemeColor3"
+        className="customFormControlBox customFormControlOCR"
         ref={file => {
           this.file = file;
         }}
@@ -96,7 +97,7 @@ export default class Widgets extends Component {
           </span>
         ) : (
           <Fragment>
-            <Icon icon={TYPES[enumDefault].icon} className="Font20 mRight5" />
+            <Icon icon={TYPES[enumDefault].icon} className="Font20 mRight5 Gray_9e" />
             <span style={{ fontWeight: 500 }}>{TYPES[enumDefault].text}</span>
           </Fragment>
         )}

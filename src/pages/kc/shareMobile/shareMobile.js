@@ -1,13 +1,17 @@
 import './css/mobileShare.less';
-import doT from 'dot';
-var qs = require('query-string');
-import { addToken, formatFileSize, getClassNameByExt } from 'src/util';
-var mobileShareTpl = doT.template(require('./tpl/mobileShare.htm'));
-var { ATTACHMENT_TYPE } = require('src/components/shareAttachment/enum');
-var shareajax = require('src/api/share');
-var { getPreviewLink } = require('src/api/chat');
-var { getWeiXinConfig } = require('src/api/weixin');
-var attachmentAjax = require('src/api/attachment');
+import doT from '@mdfe/dot';
+import qs from 'query-string';
+import { downloadFile, formatFileSize, getClassNameByExt } from 'src/util';
+import mobileShareHtml from './tpl/mobileShare.htm';
+var mobileShareTpl = doT.template(mobileShareHtml);
+import { ATTACHMENT_TYPE } from 'src/components/shareAttachment/enum';
+import saveToKnowledge from 'src/components/saveToKnowledge/saveToKnowledge';
+import shareajax from 'src/api/share';
+import chatAjax from 'src/api/chat';
+import weixinAjax from 'src/api/weixin';
+import attachmentAjax from 'src/api/attachment';
+import kcAjax from 'src/api/kc';
+import moment from 'moment';
 
 var RENDER_BY_SERVICE_TYPE = ['doc', 'docx', 'ppt', 'pptx', 'xls', 'xlsx', 'txt', 'pdf'];
 
@@ -227,7 +231,7 @@ MobileSharePreview.prototype = {
           (MSP.attachmentType === ATTACHMENT_TYPE.KC && MSP.options.shareFolderId
             ? '&shareFolderId=' + MSP.options.shareFolderId
             : '');
-        window.open(addToken(url, !window.isDingTalk));
+        window.open(downloadFile(url));
       }
     });
     if (MSP.$filePreview[0] && RENDER_BY_SERVICE_TYPE.indexOf(MSP.file.ext) > -1) {
@@ -278,7 +282,7 @@ MobileSharePreview.prototype = {
           : file.downloadUrl
         : file.viewUrl;
     } else if (attachmentType === ATTACHMENT_TYPE.QINIU) {
-      const fetchPromise = getPreviewLink({
+      const fetchPromise = chatAjax.getPreviewLink({
         id: Math.random().toString(16).slice(2),
         path: file.qiniuPath,
       });
@@ -311,36 +315,34 @@ MobileSharePreview.prototype = {
   },
   saveToKnowledge: function () {
     var MSP = this;
-    require(['src/components/saveToKnowledge/saveToKnowledge'], saveToKnowledge => {
-      var sourceData = {};
-      var kcPath = {
-        type: 1,
-        node: {
-          id: null,
-          name: _l('我的文件'),
-        },
-      };
-      var attachmentType = MSP.attachmentType;
-      if (attachmentType === ATTACHMENT_TYPE.COMMON) {
-        sourceData.fileID = MSP.file.fileID;
-      } else if (attachmentType === ATTACHMENT_TYPE.KC) {
-        sourceData.nodeId = MSP.file.id;
-      } else if (attachmentType === ATTACHMENT_TYPE.QINIU) {
-        sourceData.name = MSP.file.name + (MSP.file.ext ? '.' + MSP.file.ext : '');
-        sourceData.filePath = MSP.file.qiniuPath;
-      }
-      sourceData.isShareFolder = !!MSP.options.shareFolderId;
-      saveToKnowledge(attachmentType, sourceData, {
-        createShare: false,
+    var sourceData = {};
+    var kcPath = {
+      type: 1,
+      node: {
+        id: null,
+        name: _l('我的文件'),
+      },
+    };
+    var attachmentType = MSP.attachmentType;
+    if (attachmentType === ATTACHMENT_TYPE.COMMON) {
+      sourceData.fileID = MSP.file.fileID;
+    } else if (attachmentType === ATTACHMENT_TYPE.KC) {
+      sourceData.nodeId = MSP.file.id;
+    } else if (attachmentType === ATTACHMENT_TYPE.QINIU) {
+      sourceData.name = MSP.file.name + (MSP.file.ext ? '.' + MSP.file.ext : '');
+      sourceData.filePath = MSP.file.qiniuPath;
+    }
+    sourceData.isShareFolder = !!MSP.options.shareFolderId;
+    saveToKnowledge(attachmentType, sourceData, {
+      createShare: false,
+    })
+      .save(kcPath)
+      .then(function () {
+        MSP.alert(_l('已存入 知识“我的文件” 中'));
       })
-        .save(kcPath)
-        .then(function () {
-          MSP.alert(_l('已存入 知识“我的文件” 中'));
-        })
-        .fail(function () {
-          MSP.alert(_l('保存失败'));
-        });
-    });
+      .fail(function () {
+        MSP.alert(_l('保存失败'));
+      });
   },
   renderImage: function () {
     var MSP = this;
@@ -399,7 +401,7 @@ MobileSharePreview.prototype = {
   },
   loadWeiXinShare: function () {
     var MSP = this;
-    getWeiXinConfig({
+    weixinAjax.getWeiXinConfig({
       url: encodeURI(location.href),
     }).then(function (data) {
       if (data.code === 1) {
@@ -435,4 +437,5 @@ MobileSharePreview.prototype = {
 };
 
 md.global.Config.disableKf5 = true;
-module.exports = MobileSharePreview;
+
+export default MobileSharePreview;

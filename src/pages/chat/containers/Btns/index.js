@@ -1,7 +1,6 @@
 import React, { Component } from 'react';
 import { connect } from 'react-redux';
 import cx from 'classnames';
-import { emitter } from 'worksheet/util';
 import config from '../../utils/config';
 import * as actions from '../../redux/actions';
 import * as socket from '../../utils/socket';
@@ -12,6 +11,7 @@ import './index.less';
 import { createDiscussion } from '../../utils/group';
 import AddressBook from '../../lib/addressBook';
 import Tooltip from 'ming-ui/components/Tooltip';
+import CreateGroup from 'src/components/group/create/creatGroup';
 
 class Btns extends Component {
   constructor(props) {
@@ -107,10 +107,8 @@ class Btns extends Component {
     this.handleMenuChange();
   }
   handleCreateGroup() {
-    require(['src/components/group/create/creatGroup'], CreateGroup => {
-      CreateGroup.createInit({
-        callback(group) {},
-      });
+    CreateGroup.createInit({
+      callback(group) {},
     });
     this.handleMenuChange();
   }
@@ -286,7 +284,7 @@ class Btns extends Component {
           offset={visible ? [isEn ? -20 : -10, 1] : [1, 1]}
         >
           <div className={cx('ChatList-btn sidebar-btn', { dark: dark })} onClick={this.handleOpenChatList.bind(this)}>
-            <i className={`${visible ? 'ThemeColor3' : ''} ${visible ? 'icon-chat_retract' : 'icon-chat_open'}`} />
+            <i className={`${visible ? 'ThemeColor3' : ''} ${visible ? 'icon-menu_right' : 'icon-menu_left'}`} />
           </div>
         </Tooltip>
       </div>
@@ -330,9 +328,7 @@ class Btns extends Component {
               this.setState({ searchVisible: false });
             }}
           />
-        ) : (
-          undefined
-        )}
+        ) : undefined}
         {this.renderAddressBook()}
         <Trigger
           popupVisible={menuVisible}

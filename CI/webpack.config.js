@@ -1,45 +1,14 @@
-var path = require('path');
+const path = require('path');
 const WebpackBar = require('webpackbar');
 const TerserJSPlugin = require('terser-webpack-plugin');
-var CaseSensitivePathsPlugin = require('case-sensitive-paths-webpack-plugin');
+const CaseSensitivePathsPlugin = require('case-sensitive-paths-webpack-plugin');
 const AssetsPlugin = require('assets-webpack-plugin');
 const MiniCssExtractPlugin = require('mini-css-extract-plugin');
 const CssMinimizerPlugin = require('css-minimizer-webpack-plugin');
 const InjectPlugin = require('webpack-inject-plugin').default;
 const config = require('./webpack.common.config');
 const isProduction = process.env.NODE_ENV === 'production';
-
-function pathJoin(basedir, pathstr) {
-  if (typeof pathstr === 'string') {
-    return path.join(basedir, pathstr);
-  } else if (typeof pathstr === 'object' && typeof pathstr.length !== 'undefined') {
-    return pathstr.map(p => pathJoin(basedir, p));
-  } else {
-    const result = {};
-    Object.keys(pathstr).forEach(key => {
-      result[key] = pathJoin(basedir, pathstr[key]);
-    });
-    return result;
-  }
-}
-
-const POSTCSS_LOADER = {
-  loader: 'postcss-loader',
-};
-
-const generateCssLoader = (isModule = false) => [
-  {
-    loader: 'css-loader',
-    options: isModule ? { module: true, localIdentName: '[local]___[hash:base64:5]' } : undefined,
-  },
-  POSTCSS_LOADER,
-];
-
-const CSS_LOADERS = generateCssLoader();
-
-const SCRIPT_VENDORS = config.entry.vendors.map(p => path.resolve(__dirname, '../', p + '.js'));
-const SCRIPT_LOADER_BASE = [{ loader: 'script-loader' }];
-const VENDORS_LOADERS = SCRIPT_LOADER_BASE;
+const MomentLocalesPlugin = require('moment-locales-webpack-plugin');
 
 module.exports = {
   entry: config.entry,
@@ -54,6 +23,9 @@ module.exports = {
     }),
     new InjectPlugin(function() {
       return `__webpack_public_path__ = window.__webpack_public_path__;`;
+    }),
+    new MomentLocalesPlugin({
+      localesToKeep: ['es-us', 'zh-cn', 'zh-tw', 'ja'],
     }),
   ].concat(
     isProduction
@@ -70,11 +42,11 @@ module.exports = {
       new TerserJSPlugin({
         terserOptions: {
           safari10: true,
-          compress: {
-            drop_console: true,
+          format: {
+            comments: false,
           },
         },
-        extractComments: 'all',
+        extractComments: false,
       }),
       new CssMinimizerPlugin(),
     ],
@@ -89,7 +61,8 @@ module.exports = {
         },
         nodemodules: {
           name: 'nodemodules',
-          test: /[\\/]node_modules[\\/]/,
+          minChunks: isProduction ? 2 : 1,
+          test: /[\\/]node_modules[\\/](?!handsontable|hot-formula-parser)/,
         },
         default: false,
       },
@@ -100,19 +73,11 @@ module.exports = {
       ? [
           {
             test: /\.css$/,
-            use: [MiniCssExtractPlugin.loader].concat(CSS_LOADERS),
+            use: [MiniCssExtractPlugin.loader].concat([{ loader: 'css-loader' }]),
           },
           {
             test: /\.less$/,
-            oneOf: [
-              {
-                resourceQuery: /^\?module$/,
-                use: [MiniCssExtractPlugin.loader].concat(config.generateLessLoader(true)),
-              },
-              {
-                use: [MiniCssExtractPlugin.loader].concat(config.generateLessLoader()),
-              },
-            ],
+            use: [MiniCssExtractPlugin.loader].concat([{ loader: 'css-loader' }, { loader: 'less-loader' }]),
           },
           {
             test: /\.(woff2)(\?[^?]*)?$/,
@@ -158,30 +123,14 @@ module.exports = {
           },
           {
             test: /\.css$/,
-            use: [
-              {
-                loader: 'style-loader',
-              },
-              {
-                loader: 'css-loader',
-                options: { sourceMap: true },
-              },
-              {
-                loader: 'postcss-loader',
-                options: { sourceMap: true },
-              },
-            ],
+            use: [{ loader: 'style-loader' }, { loader: 'css-loader', options: { sourceMap: true } }],
           },
           {
             test: /\.less$/,
-            oneOf: [
-              {
-                resourceQuery: /^\?module$/,
-                use: config.generateLessLoader(true),
-              },
-              {
-                use: config.generateLessLoader(),
-              },
+            use: [
+              { loader: 'style-loader' },
+              { loader: 'css-loader', options: { sourceMap: true } },
+              { loader: 'less-loader', options: { sourceMap: true } },
             ],
           },
           {
@@ -192,11 +141,6 @@ module.exports = {
         ]
     ).concat([
       {
-        test: /\.js$/,
-        include: pathJoin(path.join(__dirname, '../'), SCRIPT_VENDORS),
-        use: VENDORS_LOADERS,
-      },
-      {
         test: /\.jsx?$/,
         exclude: [/node_modules|seajs/],
         use: ['thread-loader', 'cache-loader', 'babel-loader'],
@@ -204,10 +148,6 @@ module.exports = {
       {
         test: /\.html?$/,
         use: 'raw-loader',
-      },
-      {
-        test: /\.tpl$/,
-        use: ['@mdfe/dot-loader'],
       },
     ]),
   },
@@ -220,5 +160,6 @@ module.exports = {
     chunkFilename: isProduction ? '[name].[chunkhash].chunk.js' : '[name].dev.js',
     path: path.join(__dirname, '../build/dist/pack'),
     sourceMapFilename: isProduction ? '[name].[contenthash].js.map' : '[name].js.map',
+    pathinfo: false,
   },
 };

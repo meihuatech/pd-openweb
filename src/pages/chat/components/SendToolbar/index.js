@@ -6,10 +6,10 @@ import * as utils from '../../utils';
 import * as ajax from '../../utils/ajax';
 import * as socket from '../../utils/socket';
 import Constant from '../../utils/constant';
-import fileConfirm from 'fileConfirm';
+import fileConfirm from '../fileConfirm/fileConfirm';
 import Trigger from 'rc-trigger';
 import GroupController from 'src/api/group';
-import { sendCardToChat } from 'src/api/chat';
+import chatAjax from 'src/api/chat';
 import _ from 'lodash';
 import '../../lib/mentionInput/js/mentionInput';
 import { isVideo, setCaretPosition, getToken } from 'src/util';
@@ -23,9 +23,6 @@ const recurShowFileConfirm = (up, files, i, length, cb) => {
   }
   const file = files[i];
 
-  if (file && file.getNative().isFromClipBoard) {
-    file.name = '剪切板贴图.png';
-  }
   fileConfirm(file, {
     yesFn() {
       if (i < length) {
@@ -330,7 +327,7 @@ export default class SendToolbar extends Component {
       message: '',
       [session.isGroup ? 'toGroupId' : 'toAccountId']: session.id,
     };
-    sendCardToChat(params)
+    chatAjax.sendCardToChat(params)
       .then(reuslt => {
         alert(_l('发送成功'));
       })

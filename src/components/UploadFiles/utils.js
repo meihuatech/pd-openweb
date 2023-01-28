@@ -1,11 +1,9 @@
 import kcCtrl from 'src/api/kc';
-import qiniuCtrl from 'src/api/qiniu';
-import { Dialog } from 'ming-ui';
-import { navigateTo } from 'src/router/navigateTo';
 import React from 'react';
 import 'src/pages/PageHeader/components/NetState/index.less';
 import { formatFileSize } from 'src/util';
-const {dialog: {netState: {buyBtn}}} = window.private;
+import { index as dialog } from 'src/components/mdDialog/dialog';
+import _ from 'lodash';
 
 export const QiniuUpload = {
   Tokens: {
@@ -242,71 +240,15 @@ export const findIndex = (res, id) => {
 };
 
 export const checkAccountUploadLimit = (size, params = {}) => {
-  return kcCtrl.getUsage(params).then(function (usage) {
+  return kcCtrl.getUsage(params).then(function(usage) {
     return usage.used + size < usage.total;
   });
 };
 
-const VERSION = {
-  // 免费
-  0: '免费版',
-  // 正式版
-  1: {
-    0: '单应用版',
-    1: '标准版',
-    2: '专业版',
-    3: '旗舰版',
-  },
-  // 试用
-  2: '专业版',
-};
-
-const VERSION_STORAGE = {
-  // 免费
-  0: '2',
-  // 正式版
-  1: {
-    0: '25',
-    1: '50',
-    2: '150',
-    3: '300',
-  },
-  // 试用
-  2: '150',
-};
-
-export const openNetStateDialog = projectId => {
-  const { version = {}, licenseType } = _.find(md.global.Account.projects, item => item.projectId === projectId) || {};
-
-  const displayObj = key => {
-    const data = key === 'version' ? VERSION : VERSION_STORAGE;
-    return licenseType === 1 ? data[licenseType][version.versionId] : data[licenseType];
-  };
-  Dialog.confirm({
-    className: 'upgradeVersionDialogBtn',
-    title: '',
-    description: (
-      <div className="netStateWrap">
-        <div className="imgWrap" />
-        <div className="hint">{_l('您的当年应用附件上传量已到最大值')}</div>
-        <div className="explain">{_l('%0每年最多 %1G，请升级以继续', displayObj('version'), displayObj)}</div>
-      </div>
-    ),
-    noFooter: buyBtn,
-    okText: licenseType ? _l('购买上传量扩展包') : _l('立即购买'),
-    onOk: () =>
-      licenseType
-        ? navigateTo(`/admin/expansionservice/${projectId}/storage`)
-        : navigateTo(`/upgrade/choose?projectId=${projectId}`),
-    removeCancelBtn: true,
-  });
-};
-
 export const openMdDialog = () => {
-  require(['mdDialog'], function (mdDialog) {
-    mdDialog.index({
-      container: {
-        content: `<div id="uploadStorageOverDialog">
+  dialog({
+    container: {
+      content: `<div id="uploadStorageOverDialog">
                     <div class="mTop20 mLeft30">
                       <div class="uploadStorageOverLogo Left"></div>
                       <div class="uploadStorageOverTxt Left">您已经没有足够的流量来上传该附件！</div>
@@ -316,11 +258,10 @@ export const openMdDialog = () => {
                       <a href="/personal?type=enterprise" class="uploadStorageOverBtn btnBootstrap btnBootstrap-primary btnBootstrap-small">升级至专业版</a>
                     </div>
                   </div>`,
-        width: 450,
-        yesText: false,
-        noText: false,
-      },
-    });
+      width: 450,
+      yesText: false,
+      noText: false,
+    },
   });
 };
 

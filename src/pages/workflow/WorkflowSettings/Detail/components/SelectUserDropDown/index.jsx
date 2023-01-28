@@ -1,14 +1,15 @@
 import React, { Component, Fragment } from 'react';
 import cx from 'classnames';
 import './index.less';
-import 'dialogSelectUser';
-import DialogSelectDept from 'dialogSelectDept';
+import 'src/components/dialogSelectUser/dialogSelectUser';
+import DialogSelectDept from 'src/components/dialogSelectDept';
 import { MenuItem } from 'ming-ui';
 import ActionFields from '../ActionFields';
 import SelectUsersFromApp from '../../../../components/SelectUsersFromApp';
 import { USER_TYPE, CONTROLS_NAME } from '../../../enum';
 import flowNode from '../../../../api/flowNode';
-import DialogSelectJob from 'src/components/DialogSelectJob';
+import { selectJob } from 'src/components/DialogSelectJob';
+import { selectOrgRole } from 'src/components/DialogSelectOrgRole';
 
 export default class SelectUserDropDown extends Component {
   constructor(props) {
@@ -20,11 +21,11 @@ export default class SelectUserDropDown extends Component {
   }
 
   componentWillReceiveProps(nextProps, nextState) {
-    if (
-      nextProps.visible &&
-      (nextProps.nodeId !== this.props.nodeId || !this.state.fieldsData.length) &&
-      !this.props.disabledNodeRole
-    ) {
+    if (nextProps.nodeId !== this.props.nodeId) {
+      this.setState({ fieldsData: [] });
+    }
+
+    if (nextProps.visible && !this.state.fieldsData.length && !this.props.disabledNodeRole) {
       this.getUserAppDtos(nextProps);
     }
   }
@@ -33,8 +34,8 @@ export default class SelectUserDropDown extends Component {
    * 获取节点人员数据
    */
   getUserAppDtos(props) {
-    const { processId, nodeId, specialType } = props;
-    flowNode.getUserAppDtos({ processId, nodeId, type: specialType }).then(result => {
+    const { processId, nodeId, specialType, schedule } = props;
+    flowNode.getUserAppDtos({ processId, nodeId, type: specialType, schedule }).then(result => {
       const fieldsData = result.map(obj => {
         return {
           ...obj,
@@ -66,44 +67,41 @@ export default class SelectUserDropDown extends Component {
 
     return (
       <ul className="flowDetailUserList">
+        {(specialType === 3 || specialType === 5) && (
+          <div className="explainHeader flexRow">
+            <i className={cx('Gray_9e', specialType === 3 ? 'icon-download_client' : 'icon-mailbox')} />
+            <input
+              type="text"
+              className="w100 Gray"
+              autoFocus
+              placeholder={specialType === 3 ? _l('输入手机号码') : _l('输入邮箱地址')}
+              onClick={evt => evt.stopPropagation()}
+              onKeyDown={this.addTelAndEmail}
+            />
+          </div>
+        )}
+
         {onlyNodeRole ? null : (
           <Fragment>
-            {(specialType === 3 || specialType === 5) && (
-              <div className="explainHeader flexRow">
-                <i className={cx('Gray_9e', specialType === 3 ? 'icon-download_client' : 'icon-mailbox')} />
-                <input
-                  type="text"
-                  className="w100"
-                  autoFocus
-                  placeholder={specialType === 3 ? _l('输入手机号码') : _l('输入邮箱地址')}
-                  onClick={evt => evt.stopPropagation()}
-                  onKeyDown={this.addTelAndEmail}
-                />
-              </div>
-            )}
-            <MenuItem icon={<i className="icon-workflow_contacts" />} onClick={this.addMembers}>
-              {_l('从通讯录中选择')}
+            <MenuItem icon={<i className="icon-account_circle" />} onClick={this.addMembers}>
+              {_l('通讯录')}
             </MenuItem>
-            <MenuItem icon={<i className="icon-invite_members" />} onClick={this.addDepartment}>
+            <MenuItem icon={<i className="icon-department" />} onClick={this.addDepartment}>
               {_l('部门')}
+            </MenuItem>
+            <MenuItem icon={<i className="icon-user" />} onClick={this.addOrgRole}>
+              {_l('组织角色')}
             </MenuItem>
             <MenuItem icon={<i className="icon-limit-principal" />} onClick={this.addJob}>
               {_l('职位')}
             </MenuItem>
             <MenuItem
-              icon={<i className="icon-workflow_role" />}
+              icon={<i className="icon-group-members" />}
               onClick={() => this.setState({ showSelectAppUserDialog: true })}
             >
-              {_l('使用应用下角色')}
+              {_l('应用角色')}
             </MenuItem>
           </Fragment>
-        )}
-
-        {!disabledNodeRole && (
-          <div className={cx('explainText', { explainTextClearStyle: onlyNodeRole })}>
-            <i className="icon-workflow_new Gray_9e" />
-            {_l('使用流程节点对象下的人员')}
-          </div>
         )}
       </ul>
     );
@@ -219,6 +217,22 @@ export default class SelectUserDropDown extends Component {
   };
 
   /**
+   * 添加组织角色
+   */
+  addOrgRole = e => {
+    const { companyId, unique, onClose } = this.props;
+
+    e.stopPropagation();
+
+    selectOrgRole({
+      projectId: companyId,
+      unique,
+      onSave: this.selectRole,
+      onClose,
+    });
+  };
+
+  /**
    * 添加职位
    */
   addJob = evt => {
@@ -228,7 +242,7 @@ export default class SelectUserDropDown extends Component {
     evt.stopPropagation();
     onClose();
 
-    new DialogSelectJob({
+    selectJob({
       projectId: companyId,
       unique,
       onSave: jobs => {
@@ -280,6 +294,31 @@ export default class SelectUserDropDown extends Component {
     onClose();
     updateSource({ accounts: unique ? members : accounts.concat(members) });
     this.setState({ showSelectAppUserDialog: false });
+  };
+
+  /**
+   * 添加组织角色
+   */
+  selectRole = roles => {
+    const accounts = _.cloneDeep(this.props.accounts);
+    const { unique, updateSource, onClose } = this.props;
+    const ids = accounts.map(dept => dept.entityId);
+
+    roles = roles
+      .filter(o => ids.indexOf(o.organizeId) === -1)
+      .map(o => {
+        return {
+          type: USER_TYPE.ORGANIZE_ROLE,
+          entityId: o.organizeId,
+          entityName: o.organizeName,
+          roleId: '',
+          roleName: '',
+          avatar: '',
+        };
+      });
+
+    onClose();
+    updateSource({ accounts: unique ? roles : accounts.concat(roles) });
   };
 
   /**
@@ -345,6 +384,7 @@ export default class SelectUserDropDown extends Component {
       <ActionFields
         header={this.header()}
         className="actionFields"
+        openSearch
         noItemTips={_l('没有可用的字段')}
         condition={fieldsData}
         handleFieldClick={this.handleFieldClick}

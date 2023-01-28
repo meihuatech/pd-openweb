@@ -1,5 +1,10 @@
 import './voteUpdater.css';
-var doT = require('dot');
+import doT from '@mdfe/dot';
+import 'src/components/uploadAttachment/uploadAttachment';
+import 'src/components/mdDatePicker/mdDatePicker';
+import _ from 'lodash';
+import moment from 'moment';
+
 {
   // 获得某月的天数
   function getMonthDays(myMonth) {
@@ -78,38 +83,36 @@ var doT = require('dot');
       </div>',
     )({ index: index, idPrefix: idPrefix });
     var $divVoteUpload = $('#' + idPrefix + 'divVoteUpload' + index).html(picContainerHtml);
-    require(['uploadAttachment'], function () {
-      $('#' + idPrefix + 'hidVotePicUpload' + index).uploadAttachment({
-        filterTitle: '图片',
-        filterExtensions: 'gif,png,jpg,jpeg,bmp',
-        pluploadID: '#' + idPrefix + 'VotePicUpload' + index,
-        newPluploadID: '#re_' + idPrefix + 'VotePicUpload' + index,
-        folder: 'VoteDoc',
-        multiSelection: false,
-        onlyOne: true,
-        filesAdded: function () {
-          $divVoteUpload.find('.votePicContainer' + index).show();
-        },
-        callback: function (attachments, totalSize) {
-          var $votePicContainer = $divVoteUpload.find('.votePicContainer' + index);
-          if (attachments.length > 0) {
-            var attachment = attachments[0];
-            $votePicContainer.find('.votePicDesc').show();
-            $votePicContainer
-              .find('.votePicName')
-              .html(attachment.originalFileName + attachment.fileExt)
-              .attr('title', attachment.originalFileName + attachment.fileExt)
-              .show();
-            var fullFilePath = attachment.serverName + attachment.filePath + attachment.fileName + attachment.fileExt;
-            $votePicContainer.find('img:first').attr('file', fullFilePath).attr('thumbnail', fullFilePath);
-            $votePicContainer.find('img:first').attr('src', `${attachment.url}&imageView2/1/w/219/h/153`);
-            $('#' + idPrefix + 'VotePicUpload' + index).hide();
-          } else {
-            $('#' + idPrefix + 'VotePicUpload' + index).show();
-            $votePicContainer.hide();
-          }
-        },
-      });
+    $('#' + idPrefix + 'hidVotePicUpload' + index).uploadAttachment({
+      filterTitle: '图片',
+      filterExtensions: 'gif,png,jpg,jpeg,bmp',
+      pluploadID: '#' + idPrefix + 'VotePicUpload' + index,
+      newPluploadID: '#re_' + idPrefix + 'VotePicUpload' + index,
+      folder: 'VoteDoc',
+      multiSelection: false,
+      onlyOne: true,
+      filesAdded: function () {
+        $divVoteUpload.find('.votePicContainer' + index).show();
+      },
+      callback: function (attachments, totalSize) {
+        var $votePicContainer = $divVoteUpload.find('.votePicContainer' + index);
+        if (attachments.length > 0) {
+          var attachment = attachments[0];
+          $votePicContainer.find('.votePicDesc').show();
+          $votePicContainer
+            .find('.votePicName')
+            .html(attachment.originalFileName + attachment.fileExt)
+            .attr('title', attachment.originalFileName + attachment.fileExt)
+            .show();
+          var fullFilePath = attachment.serverName + attachment.filePath + attachment.fileName + attachment.fileExt;
+          $votePicContainer.find('img:first').attr('file', fullFilePath).attr('thumbnail', fullFilePath);
+          $votePicContainer.find('img:first').attr('src', `${attachment.url}&imageView2/1/w/219/h/153`);
+          $('#' + idPrefix + 'VotePicUpload' + index).hide();
+        } else {
+          $('#' + idPrefix + 'VotePicUpload' + index).show();
+          $votePicContainer.hide();
+        }
+      },
     });
   };
 
@@ -314,72 +317,35 @@ var doT = require('dot');
               }),
             );
           });
-        require(['@mdfe/duedatepicker'], function () {
-          $el
-            .find('.voteLastTime')
-            .val(thisTomorrowEnd)
-            .duedatepicker({
-              appendTo: '.voteUpdaterOperate',
-              posX: 200,
-              posY: 217,
-              positionAbsolute: true,
-              presetRanges: [
-                {
-                  text: _l('明天'),
-                  dateStart: thisTomorrowStart,
-                  dateEnd: thisTomorrowEnd,
-                },
-                {
-                  text: _l('本周五'),
-                  dateStart: thisWeekStart,
-                  dateEnd: thisWeekEnd,
-                },
-                {
-                  text: _l('本月底'),
-                  dateStart: thisMonthStart,
-                  dateEnd: thisMonthEnd,
-                },
-                {
-                  text: _l('一周后'),
-                  dateStart: oneWeekStart,
-                  dateEnd: oneWeekEnd,
-                },
-                {
-                  text: _l('一月后'),
-                  dateStart: oneMonthStart,
-                  dateEnd: oneMonthEnd,
-                },
-              ],
-              presets: {
-                specificDate: _l('自定义'),
-              },
-              nextLinkText: _l('上个月'),
-              prevLinkText: _l('下个月'),
-              doneButtonText: _l('确认'),
-              rangeSplitter: 'no',
-              dateFormat: 'yy-mm-dd',
-              datepickerOptions: { minDate: new Date().getHours() + 1 >= 24 ? thisTomorrowEnd : new Date() },
-              onChange: function () {
-                var voteLastTime = $el.find('.voteLastTime').val();
-                voteLastTime = new Date(voteLastTime);
-                var today = new Date(new Date().getTime() - (new Date().getTime() % 86400000));
-                if (today - voteLastTime === 0) {
-                  var hour = new Date().getHours();
-                  $el
-                    .find('.voteLastHour')
-                    .find('option')
-                    .each(function (hourOptionIndex, option) {
-                      var disabled = parseInt($(option).val(), 10) <= hour;
-                      if (disabled) $(option).hide();
-                      $(option).prop('disabled', disabled);
-                    })
-                    .end()
-                    .val(hour + 1 >= 24 ? 0 : hour + 1);
-                } else {
-                  $el.find('.voteLastHour option').prop('disabled', false).show();
-                }
-              },
-            });
+        $el.find('.voteLastTime').val(thisTomorrowEnd);
+        $el.find('.voteLastTime').mdDatePicker({
+          selectDate: moment(thisTomorrowEnd),
+          dialogStyle: {
+            offsetLeft: 0,
+            offsetTop: 24,
+          },
+          isShowClear: false,
+          zIndex: 1002,
+          onChange: function (dateText) {
+            var voteLastTime = dateText;
+            voteLastTime = new Date(voteLastTime);
+            var today = new Date(new Date().getTime() - (new Date().getTime() % 86400000));
+            if (today - voteLastTime === 0) {
+              var hour = new Date().getHours();
+              $el
+                .find('.voteLastHour')
+                .find('option')
+                .each(function (hourOptionIndex, option) {
+                  var disabled = parseInt($(option).val(), 10) <= hour;
+                  if (disabled) $(option).hide();
+                  $(option).prop('disabled', disabled);
+                })
+                .end()
+                .val(hour + 1 >= 24 ? 0 : hour + 1);
+            } else {
+              $el.find('.voteLastHour option').prop('disabled', false).show();
+            }
+          },
         });
       });
     },

@@ -4,7 +4,9 @@ import { autobind } from 'core-decorators';
 import cx from 'classnames';
 import EditableCellCon from '../EditableCellCon';
 import renderText from './renderText';
+import { isKeyBoardInputChar } from 'worksheet/util';
 import CascaderDropdown from 'src/components/newCustomFields/widgets/Cascader';
+import _ from 'lodash';
 
 export default class Cascader extends React.Component {
   static propTypes = {
@@ -34,6 +36,22 @@ export default class Cascader extends React.Component {
   cell = React.createRef();
 
   @autobind
+  handleTableKeyDown(e) {
+    const { tableId, recordId, cell, isediting, updateCell, updateEditingStatus } = this.props;
+    switch (e.key) {
+      default:
+        (() => {
+          if (isediting || !e.key || !isKeyBoardInputChar(e.key)) {
+            return;
+          }
+          updateEditingStatus(true, () => {});
+          e.stopPropagation();
+          e.preventDefault();
+        })();
+    }
+  }
+
+  @autobind
   handleChange(value) {
     this.value = value;
     this.setState({
@@ -47,21 +65,12 @@ export default class Cascader extends React.Component {
   }
 
   render() {
-    const {
-      from,
-      className,
-      style,
-      error,
-      cell,
-      editable,
-      isediting,
-      updateEditingStatus,
-      updateCell,
-      onClick,
-    } = this.props;
+    const { from, className, style, error, cell, editable, isediting, updateEditingStatus, updateCell, onClick } =
+      this.props;
     const { value } = this.state;
     return (
       <EditableCellCon
+        conRef={this.con}
         onClick={onClick}
         className={cx(className, 'cellControlCascader', { canedit: editable })}
         style={style}
@@ -73,26 +82,28 @@ export default class Cascader extends React.Component {
       >
         {!isediting && <div className="cellread linelimit">{value && renderText({ ...cell, value })}</div>}
         {isediting && (
-          <CascaderDropdown
-            value={value}
-            from={from}
-            visible={isediting}
-            disabled={!editable}
-            onChange={this.handleChange}
-            dataSource={cell.dataSource}
-            viewId={cell.viewId}
-            advancedSetting={cell.advancedSetting}
-            onPopupVisibleChange={visible => {
-              if (!visible) {
-                if (!_.isUndefined(this.value)) {
-                  updateCell({
-                    value: this.value,
-                  });
+          <div onClick={e => e.stopPropagation()}>
+            <CascaderDropdown
+              value={value}
+              from={from}
+              visible={isediting}
+              disabled={!editable}
+              onChange={this.handleChange}
+              dataSource={cell.dataSource}
+              viewId={cell.viewId}
+              advancedSetting={cell.advancedSetting}
+              onPopupVisibleChange={visible => {
+                if (!visible) {
+                  if (!_.isUndefined(this.value)) {
+                    updateCell({
+                      value: this.value,
+                    });
+                  }
+                  updateEditingStatus(false);
                 }
-                updateEditingStatus(false);
-              }
-            }}
-          />
+              }}
+            />
+          </div>
         )}
       </EditableCellCon>
     );

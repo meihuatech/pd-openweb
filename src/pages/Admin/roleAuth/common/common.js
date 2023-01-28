@@ -1,5 +1,6 @@
-﻿var RoleAuthCommon = {};
-var RoleController = require('src/api/role');
+import _ from 'lodash';
+﻿import RoleController from 'src/api/role';
+var RoleAuthCommon = {};
 
 RoleAuthCommon.checkIsSuperAdmin = function(projectId) {
   return RoleController.isSuperAdmin(
@@ -68,4 +69,4 @@ RoleAuthCommon.formatRoleAuth = function(role, removeRoleModule = true) {
   }
 };
 
-module.exports = RoleAuthCommon;
+export default RoleAuthCommon;

@@ -1,6 +1,6 @@
 import moment from 'moment';
-import { getAccessToken } from 'src/api/plus';
-import { checkFieldUnique } from 'src/api/worksheet';
+import plusAjax from 'src/api/plus';
+import worksheetAjax from 'src/api/worksheet';
 import { ACCOUNT_FIELD } from './constants/';
 
 export const setLicense = (license) => {
@@ -20,7 +20,7 @@ export const setLicense = (license) => {
       [projectId]: license,
     };
   }
-  window.localStorage.setItem('plus_dossier_license', JSON.stringify(dossierLicense));
+  safeLocalStorageSetItem('plus_dossier_license', JSON.stringify(dossierLicense));
 };
 
 export const getLicense = () => {
@@ -46,7 +46,7 @@ export const getJobCategoryTxt = (jobCategory) => {
       return _l('兼职');
     case '4':
       return _l('实习');
-    default :
+    default:
       return jobCategory;
   }
 };
@@ -121,11 +121,11 @@ export const scrollEnd = fn => (e) => {
 
 export const changeProject = projectId =>
   new Promise((resolve, reject) => {
-    getAccessToken({ projectId })
+    plusAjax.getAccessToken({ projectId })
       .then((data) => {
         if (data.accessToken && data.projectId) {
-          window.localStorage.setItem('plus_accessToken', data.accessToken);
-          window.localStorage.setItem('plus_projectId', data.projectId);
+          safeLocalStorageSetItem('plus_accessToken', data.accessToken);
+          safeLocalStorageSetItem('plus_projectId', data.projectId);
           resolve(data);
         } else {
           reject();
@@ -175,7 +175,7 @@ export function tofix(value) {
 }
 
 export function checkControlUnique(worksheetId, controlId, controlType, controlValue) {
-  return checkFieldUnique({
+  return worksheetAjax.checkFieldUnique({
     worksheetId,
     controlId,
     controlType,

@@ -1,4 +1,4 @@
-module.exports = {
+export default {
   /**
   * 创建部门（Admin）
   * @param {Object} args 请求参数
@@ -140,7 +140,7 @@ module.exports = {
      return $.api('Department', 'GetOneDepartmentFullTree', args, options);
    },
   /**
-  * 网络管理 - 按关键词搜索部门，同时搜索部门下的用户，通用邀请层使用（Admin）
+  * 网络管理 - 按关键词搜索部门（仅搜部门），通用邀请层使用（Admin）
   * @param {Object} args 请求参数
   * @param {string} args.projectId 网络id
   * @param {string} args.keywords 关键词
@@ -197,6 +197,22 @@ module.exports = {
    searchProjectDepartment: function (args, options = {}) {
      
      return $.api('Department', 'SearchProjectDepartment', args, options);
+   },
+  /**
+  * 导入部门
+  * @param {Object} args 请求参数
+  * @param {string} args.projectId 网络id
+  * @param {string} args.fileName 文件名
+  * @param {string} args.ticket 验证码返票据
+  * @param {string} args.randStr 票据随机字符串
+  * @param {} args.captchaType 验证码类型（默认腾讯云）
+  * @param {Object} options 配置参数
+  * @param {Boolean} options.silent 是否禁止错误弹层
+  * @returns {Promise<Boolean, ErrorModel>}
+  **/
+   importDepartmentList: function (args, options = {}) {
+     
+     return $.api('Department', 'ImportDepartmentList', args, options);
    },
   /**
   * 网络管理 - 分页获取部门成员简要信息
@@ -266,6 +282,9 @@ module.exports = {
   * 获取部门列表（平铺）
   * @param {Object} args 请求参数
   * @param {string} args.projectId 网络id
+  * @param {integer} args.pageIndex
+  * @param {integer} args.pageSize
+  * @param {string} args.kewword
   * @param {Object} options 配置参数
   * @param {Boolean} options.silent 是否禁止错误弹层
   * @returns {Promise<Boolean, ErrorModel>}
@@ -273,6 +292,30 @@ module.exports = {
    getProjectDepartments: function (args, options = {}) {
      
      return $.api('Department', 'GetProjectDepartments', args, options);
+   },
+  /**
+  * 根据部门Id 获取完整的部门路径
+  * @param {Object} args 请求参数
+  * @param {Object} options 配置参数
+  * @param {Boolean} options.silent 是否禁止错误弹层
+  * @returns {Promise<Boolean, ErrorModel>}
+  **/
+   getDepartmentFullNameById: function (args, options = {}) {
+     options.ajaxOptions = Object.assign({}, options.ajaxOptions, { type: 'GET' }); 
+     return $.api('Department', 'GetDepartmentFullNameById', args, options);
+   },
+  /**
+  * 根据部门Ids 获取完整的部门路径
+  * @param {Object} args 请求参数
+  * @param {string} args.projectId 网络id
+  * @param {array} args.departmentIds 部门id
+  * @param {Object} options 配置参数
+  * @param {Boolean} options.silent 是否禁止错误弹层
+  * @returns {Promise<Boolean, ErrorModel>}
+  **/
+   getDepartmentFullNameByIds: function (args, options = {}) {
+     
+     return $.api('Department', 'GetDepartmentFullNameByIds', args, options);
    },
   /**
   * 根据部门父Id获取子部门,departmentId为null表示父部门是网络
@@ -299,6 +342,7 @@ module.exports = {
   * @param {} args.sortField 排序字段
   * @param {} args.sortType 排序类型
   * @param {string} args.keywords 关键词
+  * @param {boolean} args.onlyMyJoin 是否仅看自己的部门
   * @param {Object} options 配置参数
   * @param {Boolean} options.silent 是否禁止错误弹层
   * @returns {Promise<Boolean, ErrorModel>}
@@ -323,6 +367,9 @@ module.exports = {
   * 获取 部门所有下级（树结构，可取全网络）
   * @param {Object} args 请求参数
   * @param {string} args.projectId 网络id
+  * @param {string} args.parentId
+  * @param {string} args.keyword 关键字搜索
+  * @param {boolean} args.onlyMyJoin 仅看我加入的部门
   * @param {integer} args.pageIndex
   * @param {integer} args.pageSize
   * @param {Object} options 配置参数
@@ -334,7 +381,24 @@ module.exports = {
      return $.api('Department', 'PagedDepartmentTrees', args, options);
    },
   /**
-  * 按关键词搜索部门，同时搜索部门下的用户，通用邀请层使用
+  * 获取 部门所有下级（树结构，可取全网络）
+  * @param {Object} args 请求参数
+  * @param {string} args.projectId 网络id
+  * @param {string} args.parentId
+  * @param {string} args.keyword 关键字搜索
+  * @param {boolean} args.onlyMyJoin 仅看我加入的部门
+  * @param {integer} args.pageIndex
+  * @param {integer} args.pageSize
+  * @param {Object} options 配置参数
+  * @param {Boolean} options.silent 是否禁止错误弹层
+  * @returns {Promise<Boolean, ErrorModel>}
+  **/
+   pagedProjectDepartmentTrees: function (args, options = {}) {
+     
+     return $.api('Department', 'PagedProjectDepartmentTrees', args, options);
+   },
+  /**
+  * 按关键词搜索部门（仅搜部门），通用邀请层使用
   * @param {Object} args 请求参数
   * @param {string} args.projectId 网络id
   * @param {string} args.keywords 关键词

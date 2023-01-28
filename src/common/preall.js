@@ -1,22 +1,29 @@
 import React from 'react';
-var qs = require('query-string');
+import qs from 'query-string';
 import global from 'src/api/global';
 import project from 'src/api/project';
+import redirect from './redirect';
 import { LoadDiv } from 'ming-ui';
-import DocumentTitle from 'react-document-title';
 import { getPssId, setPssId } from 'src/util/pssId';
+import _ from 'lodash';
+import moment from 'moment';
+
 function getGlobalMeta({ allownotlogin, transfertoken } = {}, cb = () => {}) {
   const urlparams = qs.parse(unescape(unescape(window.location.search.slice(1))));
   let args = {};
   const urlObj = new URL(decodeURIComponent(location.href));
   if (/^#publicapp/.test(urlObj.hash)) {
     window.isPublicApp = true;
-    window.publicAppAuthorization = urlObj.hash.slice(10);
+    window.publicAppAuthorization = urlObj.hash.slice(10).replace('#isPrivateBuild', '');
   }
   if (transfertoken && urlparams.token) {
     args.token = urlparams.token;
   }
+  if (urlparams.access_token) {
+    window.access_token = urlparams.access_token;
+  }
   parseShareId();
+  clearLocalStorage(); // 清除 AMap 和 体积大于200k的 localStorage
   global.getGlobalMeta(args).then(data => {
     if (allownotlogin || window.isPublicApp) {
       window.config = data.config;
@@ -42,21 +49,9 @@ function getGlobalMeta({ allownotlogin, transfertoken } = {}, cb = () => {}) {
       return;
     }
 
-    const ua = window.navigator.userAgent.toLowerCase();
-    if (
-      ua.match(/MicroMessenger/i) == 'micromessenger' &&
-      (((window.subPath || location.href.indexOf('theportal.cn') > -1) && !data['md.global'].Account.isPortal) ||
-        (!window.subPath && location.href.indexOf('theportal.cn') === -1 && data['md.global'].Account.isPortal))
-    ) {
-      location.href = `${
-        data['md.global'].Account.isPortal ? '' : window.subPath
-      }/logout?ReturnUrl=${encodeURIComponent(location.href)}`;
-      return;
-    }
-
     window.config = data.config;
     window.md.global = data['md.global'];
-    window.md.global.Config.ServiceTel = '010-53153053';
+    window.md.global.Config.ServiceTel = '400-665-6655';
     let SysSettings = _.get(window.md.global, ['SysSettings']);
     if (!SysSettings) {
       window.md.global.SysSettings = _.get(md.staticglobal, ['SysSettings']);
@@ -67,24 +62,15 @@ function getGlobalMeta({ allownotlogin, transfertoken } = {}, cb = () => {}) {
       md.global.Config.ForbidSuites = md.global.SysSettings.forbidSuites.split('|').map(item => Number(item));
     }
 
-    setTimeout(() => {
-      fetch('/docpreview/fonts/213');
-      fetch('/docpreview/fonts/196');
-      fetch('/docpreview/fonts/036');
-
-      fetch('/docpreview/fonts/082');
-      fetch('/docpreview/fonts/054');
-      fetch('/docpreview/fonts/210');
-      fetch('/docpreview/fonts/212');
-      fetch('/docpreview/fonts/229');
-    }, 10000);
-
     const lang = getCookie('i18n_langtag') || getNavigatorLang();
     if (lang) {
       moment.locale(getMomentLocale(lang));
     }
 
     setPssId(getPssId());
+    if (redirect(location.pathname)) {
+      return;
+    }
     cb();
   });
 }
@@ -108,15 +94,14 @@ const wrapComponent = function(Comp, { allownotlogin, hideloading, transfertoken
     render() {
       const { loading } = this.state;
 
-      if (navigator.userAgent.toLowerCase().indexOf('mobile') > -1 && navigator.userAgent.toLowerCase().indexOf('dingtalk') > -1) {
+      if (
+        navigator.userAgent.toLowerCase().indexOf('mobile') > -1 &&
+        navigator.userAgent.toLowerCase().indexOf('dingtalk') > -1
+      ) {
         document.title = _l('应用');
       }
 
-      return loading ? (
-        !hideloading && <LoadDiv size="big" className="pre" />
-      ) : (
-        <Comp {...this.props} />
-      );
+      return loading ? !hideloading && <LoadDiv size="big" className="pre" /> : <Comp {...this.props} />;
     }
   }
 
@@ -128,6 +113,8 @@ function getMomentLocale(lang) {
     return 'en';
   } else if (lang === 'zh-Hant') {
     return 'zh-tw';
+  } else if (lang === 'ja') {
+    return 'ja';
   } else {
     return 'zh-cn';
   }
@@ -140,24 +127,6 @@ export default function(Comp, { allownotlogin, preloadcb, hideloading, transfert
     return wrapComponent(Comp, { allownotlogin, hideloading, transfertoken });
   }
 }
-
-(function(arr) {
-  arr.forEach(function(item) {
-    item.prepend =
-      item.prepend ||
-      function() {
-        var argArr = Array.prototype.slice.call(arguments),
-          docFrag = document.createDocumentFragment();
-
-        argArr.forEach(function(argItem) {
-          var isNode = argItem instanceof Node;
-          docFrag.appendChild(isNode ? argItem : document.createTextNode(String(argItem)));
-        });
-
-        this.insertBefore(docFrag, this.firstChild);
-      };
-  });
-})([Element.prototype, Document.prototype, DocumentFragment.prototype]);
 
 /** 存储分发类入口 状态 和 分享id */
 function parseShareId() {
@@ -178,4 +147,30 @@ function parseShareId() {
     window.shareState.isUpdateRecordShare = true;
     window.shareState.shareId = (location.pathname.match(/.*\/recordshare\/(\w{24})/) || '')[1];
   }
+  if (/\/form/.test(location.pathname)) {
+    window.shareState.isPublicQuery = true;
+    window.shareState.shareId = (location.pathname.match(/.*\/form\/(\w{32})/) || '')[1];
+  }
+  if (/\/public\/view/.test(location.pathname)) {
+    window.shareState.isPublicView = true;
+    window.shareState.shareId = (location.pathname.match(/.*\/public\/view\/(\w{24})/) || '')[1];
+  }
+  if (/\/public\/record/.test(location.pathname)) {
+    window.shareState.isPublicRecord = true;
+    window.shareState.shareId = (location.pathname.match(/.*\/public\/record\/(\w{24})/) || '')[1];
+  }
+  if (/\/public\/workflow/.test(location.pathname)) {
+    window.shareState.shareId = (location.pathname.match(/.*\/public\/workflow\/(\w{24})/) || '')[1];
+  }
+}
+
+function clearLocalStorage() {
+  try {
+    Object.keys(localStorage)
+      .map(key => ({ key, size: Math.floor(new Blob([localStorage[key]]).size / 1024) }))
+      .filter(item => item.size > 200 || item.key.startsWith('_AMap_'))
+      .forEach(item => {
+        localStorage.removeItem(item.key);
+      });
+  } catch (err) {}
 }

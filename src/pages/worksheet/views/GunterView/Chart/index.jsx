@@ -11,9 +11,9 @@ import TimeDot from './components/TimeDot';
 import SpeedCreateTime from './components/SpeedCreateTime';
 import IScroll from 'worksheet/views/GunterView/components/Iscroll';
 import Skeleton from 'src/router/Application/Skeleton';
-import { browserIsMobile } from 'src/util';
 import * as actions from 'worksheet/redux/actions/gunterview';
 import './index.less';
+import _ from 'lodash';
 
 const isGunterExport = location.href.includes('gunterExport');
 
@@ -30,9 +30,9 @@ export default class GunterChart extends Component {
       loading: false,
     };
     this.$ref = createRef(null);
-    this.isMobile = browserIsMobile();
   }
   componentDidMount() {
+    const { isMobile } = this.props;
     const isIPad = navigator.userAgent.toLocaleLowerCase().includes('ipad');
     const scroll = new IScroll(this.$ref.current, {
       scrollX: true,
@@ -43,7 +43,7 @@ export default class GunterChart extends Component {
       mouseWheel: true,
       bounce: false,
       momentum: false,
-      disablePointer: isIPad ? false : !this.isMobile,
+      disablePointer: isIPad ? false : !isMobile,
       interactiveScrollbars: true,
       probeType: 2,
     });
@@ -89,6 +89,8 @@ export default class GunterChart extends Component {
         chartScroll.scrollTo(isGunterExport ? 0 : chartScroll.maxScrollX / 2, chartScroll.y);
         chartScroll._execEvent('scroll');
       }, 0);
+      this.headerEl = null;
+      this.timeDotWrapperEl = null;
     }
     if (nextProps.gunterView.groupingVisible !== this.props.gunterView.groupingVisible) {
       const { chartScroll } = nextProps.gunterView;
@@ -101,7 +103,7 @@ export default class GunterChart extends Component {
     if (chartScroll) {
       chartScroll.off('scroll', this.handleScroll);
       chartScroll.off('scroll', this.linkageScroll);
-      chartScroll.destroy();
+      chartScroll.destroy && chartScroll.destroy();
     }
   }
   setScrollValue = value => {
@@ -163,10 +165,15 @@ export default class GunterChart extends Component {
       });
     }
 
-    const header = document.querySelector('.gunterChartHeader .headerScroll');
-    const timeDotWrapper = document.querySelector('.gunterChart .timeDotWrapper');
-    header && (header.style.transform = `translateX(${chartScroll.x}px)`);
-    timeDotWrapper && (timeDotWrapper.style.transform = `translateY(${chartScroll.y}px)`);
+    const { viewId } = this.props.base;
+    if (!this.headerEl) {
+      this.headerEl = document.querySelector(`.gunterView-${viewId} .gunterChartHeader .headerScroll`);
+    }
+    if (!this.timeDotWrapperEl) {
+      this.timeDotWrapperEl = document.querySelector(`.gunterView-${viewId} .gunterChart .timeDotWrapper`);
+    }
+    this.headerEl && (this.headerEl.style.transform = `translateX(${chartScroll.x}px)`);
+    this.timeDotWrapperEl && (this.timeDotWrapperEl.style.transform = `translateY(${chartScroll.y}px)`);
   }
   linkageScroll = () => {
     const { groupingScroll, chartScroll } = this.props.gunterView;
@@ -220,7 +227,8 @@ export default class GunterChart extends Component {
     );
   }
   render() {
-    const { loading, grouping, groupingVisible, chartScroll, groupingScroll } = this.props.gunterView;
+    const { base, gunterView, isMobile } = this.props;
+    const { loading, grouping, groupingVisible, chartScroll, groupingScroll } = gunterView;
     return (
       <div className="gunterChart flexColumn flex">
         <Header />
@@ -234,20 +242,20 @@ export default class GunterChart extends Component {
           {!loading && (
             <Fragment>
               <TimeDot />
-              <ToolBar />
+              <ToolBar isMobile={isMobile} />
             </Fragment>
           )}
-          {!this.isMobile && (
+          {!isMobile && (
             <div
               className={cx('gunterDivider valignWrapper pointer', { hideGrouping: !groupingVisible })}
               onClick={this.handleUpdateGroupingVisible}
               onMouseOver={() => {
                 if (!groupingVisible) return;
-                document.querySelector('.gunterDirectory').style.borderColor = '#2196f3';
+                document.querySelector(`.gunterView-${base.viewId} .gunterDirectory`).style.borderColor = '#2196f3';
               }}
               onMouseOut={() => {
                 if (!groupingVisible) return;
-                document.querySelector('.gunterDirectory').style.borderColor = null;
+                document.querySelector(`.gunterView-${base.viewId} .gunterDirectory`).style.borderColor = null;
               }}
             >
               <Icon className="Gray_bd" icon="a-arrowback" />

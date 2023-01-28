@@ -1,15 +1,65 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { CKEditor } from '@ckeditor/ckeditor5-react';
-import MDEditor from '@mdfe/ckeditor5-custom-build';
+import { CKEditor } from '@mdfe/ckeditor5-react';
 import styled from 'styled-components';
 import { getToken } from 'src/util';
 import './less/RichText.less';
 import cx from 'classnames';
 import '@mdfe/ckeditor5-custom-build/build/translations/zh.js';
 import '@mdfe/ckeditor5-custom-build/build/translations/en.js';
+import filterXSS from 'xss';
+import { whiteList } from 'xss/lib/default';
+import _ from 'lodash';
+
+let whiteListClone = Object.assign({}, whiteList, {
+  img: ['src'],
+  div: ['lang', 'dir', 'role', 'aria-labelledby'],
+  table: [],
+  tbody: [],
+  td: [],
+  tfoot: [],
+  th: [],
+  thead: [],
+  tr: [],
+  figure: [],
+  label: [],
+  input: [],
+  button: [],
+});
+let newWhiteList = {};
+for (let key in whiteListClone) {
+  newWhiteList[key] = [
+    ...new Set([
+      'id',
+      'class',
+      'style',
+      'contenteditable',
+      'alt',
+      'title',
+      'width',
+      'height',
+      'border',
+      'align',
+      'valign',
+      'rowspan',
+      'colspan',
+      'disabled',
+      'type',
+      'checked',
+      'tabindex',
+      ...whiteListClone[key],
+    ]),
+  ];
+}
 const Wrapper = styled.div(
   ({ minHeight, maxWidth, maxHeight, dropdownPanelPosition = {} }) => `
   .ck {
+    &.ckByHtml {
+      .ck-content table td, .ck-content table th {
+        min-width: 2em;
+        padding: 0.4em;
+        border: 1px solid #bfbfbf;
+      }
+    }
     .ck-sticky-panel {
       display: none;
     }
@@ -48,6 +98,8 @@ const Wrapper = styled.div(
       .ck.ck-dropdown .ck-dropdown__panel.ck-dropdown__panel_se{
         left: ${dropdownPanelPosition.left ? dropdownPanelPosition.left : 'initial'} ;
         right:  ${dropdownPanelPosition.right ? dropdownPanelPosition.right : '0'};
+        max-height: 200px ;
+        overflow: auto;
       }
     }
     .ck-content {
@@ -58,11 +110,21 @@ const Wrapper = styled.div(
       background: #f7f7f7 !important;
       border-radius: 3px !important;
       box-shadow: none !important;
+      padding: 0 7.8px;
+      > :first-child {
+        margin-top: 11.7px;
+      }
+      > :last-child {
+        margin-bottom: 11.7px;
+      }
       &.ck-focused {
         background: #fff !important;
         border: 1px solid #2196f3 !important;
       }
     }
+  }
+  &.clickInit {
+    cursor: text;
   }
   &.disabled {
     .ck-content {
@@ -117,18 +179,6 @@ const Wrapper = styled.div(
       border: 0 !important;
       background: none !important;
       padding: 0 !important;
-    }
-  }
-  &.fieldEditorRemark {
-    .ck .ck-content {
-      min-height: ${minHeight || 90}px ;
-      max-height: 500px !important;
-      background: none !important;
-      border: 1px solid #dddddd!important;
-      border-radius: 2px!important;
-      &:hover{
-        border: 1px solid #2196f3!important;
-      }
     }
   }
 `,
@@ -250,52 +300,76 @@ export default ({
   maxHeight,
   dropdownPanelPosition,
   toolbarList,
+  isRemark,
+  clickInit = false,
+  autoFocus = false,
 }) => {
+  const [MDEditor, setComponent] = useState(null);
   const editorDiv = useRef();
   let editorDom = useRef();
-  useEffect(() => {
-    if (!disabled && editorDom && editorDom.current && editorDom.current.editor) {
-      editorDom.current.editor.plugins.get('FileRepository').createUploadAdapter = loader => {
-        return new MyUploadAdapter(loader);
-      };
-    }
-  }, [disabled]);
-  if (disabled && !data) {
-    return (
-      <Wrapper
-        className={cx('editorNull', { Hand: !!onClickNull })}
-        onClick={() => {
-          onClickNull && onClickNull();
-        }}
-      >
-        {placeholder}
-      </Wrapper>
-    );
-  }
   const lang = () => {
     const lang = getCookie('i18n_langtag') || getNavigatorLang();
     if (lang === 'zh-Hant') {
       return 'zh';
+    } else if (lang === 'ja') {
+      return 'ja';
     } else if (lang !== 'en') {
       return 'zh-cn';
     } else {
       return 'en';
     }
   };
-  return (
-    <Wrapper
-      className={cx(className, { disabled, showTool })}
-      minHeight={minHeight}
-      maxWidth={maxWidth}
-      maxHeight={maxHeight}
-      dropdownPanelPosition={dropdownPanelPosition}
-      ref={editorDiv}
-      onClick={() => {
-        onClickNull && disabled && onClickNull();
-      }}
-    >
+
+  function initEditor() {
+    import('@mdfe/ckeditor5-custom-build').then(component => {
+      setComponent(component);
+      setTimeout(() => {
+        if (!disabled && editorDom && editorDom.current && editorDom.current.editor) {
+          editorDom.current.editor.plugins.get('FileRepository').createUploadAdapter = loader => {
+            return new MyUploadAdapter(loader);
+          };
+          if (clickInit || autoFocus) {
+            editorDom.current.editor.focus();
+          }
+        }
+      }, 20);
+    });
+  }
+
+  useEffect(() => {
+    if (disabled) {
+      $(editorDiv.current).find('a').attr('target', '_blank'); // 只读的情况下，a标签新开页处理
+    } else if (!MDEditor && !clickInit) {
+      initEditor();
+    }
+  }, [disabled]);
+
+  let content;
+  if (disabled || !MDEditor) {
+    content = (
+      <div className="ck ck-reset ck-editor ck-rounded-corners ckByHtml" role="application" dir="ltr" lang="zh-cn">
+        <div className="ck ck-editor__main" role="presentation">
+          <div
+            className="ck-blurred ck ck-content ck-editor__editable ck-rounded-corners ck-editor__editable_inline ck-read-only"
+            lang="zh-cn"
+            dir="ltr"
+            role="textbox"
+            contenteditable="false"
+            dangerouslySetInnerHTML={{
+              __html: filterXSS(data || placeholder, {
+                stripIgnoreTag: true,
+                whiteList: newWhiteList,
+                css: false,
+              }),
+            }}
+          />
+        </div>
+      </div>
+    );
+  } else if (MDEditor) {
+    content = (
       <CKEditor
-        editor={MDEditor}
+        editor={MDEditor.default}
         id={id}
         config={{
           language: lang(),
@@ -337,7 +411,6 @@ export default ({
                   'link',
                   'code',
                   'imageUpload',
-                  'mediaEmbed',
                   'insertTable',
                   'codeBlock',
                   '|',
@@ -401,6 +474,11 @@ export default ({
           fontFamily: {
             options: [
               'default',
+              '宋体, STFangsong, SimSun',
+              '黑体, STHeiti,  SimHei',
+              '微软雅黑,  Microsoft YaHei',
+              '楷体, STKaiti, STKaiti',
+              '仿宋, STFangsong, FangSong_GB2312',
               'Arial, Helvetica, sans-serif',
               'Courier New, Courier, monospace',
               'Georgia, serif',
@@ -434,9 +512,6 @@ export default ({
         data={data}
         ref={editorDom}
         onReady={editor => {
-          if (!!disabled) {
-            return;
-          }
           if (editor && editor.plugins) {
             editor.plugins.get('FileRepository').createUploadAdapter = loader => {
               return new MyUploadAdapter(loader);
@@ -444,9 +519,6 @@ export default ({
           }
         }}
         onChange={(event, editor) => {
-          if (!!disabled) {
-            return;
-          }
           const data = editor.getData();
           changeSetting && changeSetting(true);
           if (onActualSave) {
@@ -454,23 +526,46 @@ export default ({
           }
         }}
         onBlur={(event, editor) => {
-          if (!!disabled) {
-            return;
-          }
           if (onSave) {
             const data = editor.getData();
             onSave(data);
           }
         }}
         onFocus={(event, editor) => {
-          if (!!disabled) {
-            return;
-          }
           setTimeout(() => {
-            !showTool && !disabled && $(editorDiv.current).find('.ck-sticky-panel').show();
+            !showTool && $(editorDiv.current).find('.ck-sticky-panel').show();
           }, 300);
         }}
       />
+    );
+  }
+  return (
+    <Wrapper
+      className={cx(className, {
+        clickInit,
+        disabled,
+        showTool,
+        editorNull: disabled && !data,
+        Hand: !!onClickNull,
+        remarkControl: isRemark,
+      })}
+      minHeight={minHeight}
+      maxWidth={maxWidth}
+      maxHeight={maxHeight}
+      dropdownPanelPosition={dropdownPanelPosition}
+      ref={editorDiv}
+      onClick={() => {
+        if (disabled && _.isFunction(onClickNull)) {
+          onClickNull();
+        }
+        if (!disabled && !MDEditor && clickInit) {
+          if (!disabled && !MDEditor) {
+            initEditor();
+          }
+        }
+      }}
+    >
+      {content}
     </Wrapper>
   );
 };

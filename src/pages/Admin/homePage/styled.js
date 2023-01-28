@@ -26,6 +26,9 @@ export const HomePageWrap = styled.div`
   }
   .userInfoWrap {
     .content {
+      ul {
+        height: 110px !important;
+      }
       ul li {
         padding-top: 10px !important;
       }
@@ -108,6 +111,9 @@ export const HomePageWrap = styled.div`
       color: #9e9e9e;
       font-size: 12px;
       cursor: pointer;
+      .Hover_21:hover {
+        color: #2196f3 !important;
+      }
     }
     .limitUser {
       font-size: 13px;
@@ -128,11 +134,21 @@ export const HomePageWrap = styled.div`
         text-align: center;
         height: 100%;
         padding-top: 20px;
-        margin-right: 5%;
+        margin-right: 10px;
         &:last-child {
           margin-right: 0;
         }
         &:hover {
+          border-radius: 15px;
+          background-color: #f5f5f5;
+        }
+        &.useAnalysis:hover {
+          background-color: #fff;
+        }
+        &.useAnalysisHover {
+          cursor: pointer;
+        }
+        &.useAnalysisHover:hover {
           border-radius: 15px;
           background-color: #f5f5f5;
         }
@@ -146,12 +162,13 @@ export const HomePageWrap = styled.div`
   }
 
   .purchaseUser,
-  .recharge {
+  .recharge,
+  .inviteUser {
     position: absolute;
     right: 24px;
     bottom: 16px;
     padding: 0 24px;
-    line-height: 28px;
+    line-height: 32px;
     transition: background-color 0.25s;
     background: rgba(18, 148, 247, 0.1);
     font-weight: 600;
@@ -159,8 +176,37 @@ export const HomePageWrap = styled.div`
       background: rgba(18, 148, 247, 0.2);
     }
     color: rgba(18, 148, 247);
-    border-radius: 14px;
+    border-radius: 24px;
     cursor: pointer;
+  }
+  .inviteUser {
+    left: 65px;
+    right: unset;
+    background-color: rgb(76, 175, 80, 0.1);
+    color: #4caf50;
+  }
+  .inviteUser:hover {
+    background-color: #c8e6c9;
+  }
+
+  .inviteUserWrap {
+    position: absolute;
+    bottom: 16px;
+    width: calc(100% - 48px);
+    .inviteUserBox {
+      width: 25%;
+      .inviteUser {
+        position: unset;
+        background-color: rgb(76, 175, 80, 0.1);
+        color: #4caf50;
+        margin: 0 auto;
+        display: inline-block;
+        white-space: nowrap;
+      }
+      .inviteUser:hover {
+        background-color: #c8e6c9;
+      }
+    }
   }
   .financeInfo {
     .content {

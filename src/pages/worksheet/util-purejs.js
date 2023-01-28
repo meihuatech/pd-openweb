@@ -1,4 +1,5 @@
 import dayjs from 'dayjs';
+import _ from 'lodash';
 
 /**
  *  日期公式计算
@@ -7,6 +8,9 @@ import dayjs from 'dayjs';
 export function calcDate(date, expression) {
   if (!date) {
     return { error: true };
+  }
+  if (!/^[+-]/.test(expression)) {
+    expression = '+' + expression;
   }
   try {
     let result = dayjs(date);
@@ -17,7 +21,7 @@ export function calcDate(date, expression) {
       const number = Number(match[2]);
       const unit = match[4];
       if (/^[+-]$/.test(operator) && number && typeof number === 'number' && /^[YQMwdhms]$/.test(unit)) {
-        result = result[operator === '+' ? 'add' : 'subtract'](Math.round(number), unit);
+        result = result[operator === '+' ? 'add' : 'subtract'](Math.round(number), unit.replace(/Y/, 'y'));
       }
       match = regexp.exec(expression);
     }
@@ -76,11 +80,21 @@ export function formatControlValue(cell) {
         if (!_.isArray(parsedData)) {
           parsedData = [parsedData];
         }
-        return parsedData.filter(user => !!user).map(user => user.fullname);
+        return parsedData.filter(user => !!user).map(user => (typeof user === 'string' ? user : user.fullname));
       case 27: // GROUP_PICKER 部门
-        return JSON.parse(cell.value).map((department, index) =>
-          department.departmentName ? department.departmentName : _l('该部门已删除'),
-        );
+        return JSON.parse(cell.value).map((department, index) => {
+          if (typeof department === 'string') {
+            return department;
+          }
+          return department.departmentName ? department.departmentName : _l('该部门已删除');
+        });
+      case 48: // ORG_ROLE 组织角色
+        return JSON.parse(cell.value).map((organization, index) => {
+          if (typeof organization === 'string') {
+            return organization;
+          }
+          return organization.organizeName ? organization.organizeName : _l('该组织已删除');
+        });
       case 36: // SWITCH 检查框
         return value === '1' || value === 1;
       case 14: // ATTACHMENT 附件
@@ -131,5 +145,12 @@ export function getSelectedOptions(options, value) {
   try {
     selectedKeys = JSON.parse(value);
   } catch (err) {}
-  return options.filter(option => selectedKeys.indexOf(option.key) > -1);
+  return options.filter(option =>
+    _.find(selectedKeys, s => {
+      if (s.indexOf('other') > -1 || s.indexOf('add_') > -1) {
+        return s.indexOf(option.key) > -1;
+      }
+      return s === option.key;
+    }),
+  );
 }

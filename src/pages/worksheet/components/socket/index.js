@@ -8,6 +8,7 @@ import './index.less';
 import workflowHistory from './workflowHistory';
 import { FLOW_FAIL_REASON } from 'src/pages/workflow/WorkflowSettings/History/config';
 import process from 'src/pages/workflow/api/process';
+import _ from 'lodash';
 
 const STATUS = {
   0: { id: 'closed', text: _l('流程未启用'), theme: 'error', icon: 'Import-failure' },
@@ -64,7 +65,7 @@ const NoticeHeader = ({ storeId, type, finished, total, title, status = 1, execu
       <Notice>
         {!isPending && (
           <div className={cx('iconWrap')}>
-            {finished === total ? <i className={'icon icon-Import-success'}></i> : <LoadDiv size="small" />}
+            {finished === total ? <i className={'icon icon-Import-success'} /> : <LoadDiv size="small" />}
           </div>
         )}
         <div className="statusText">
@@ -83,7 +84,7 @@ const NoticeHeader = ({ storeId, type, finished, total, title, status = 1, execu
     <Notice>
       {!isPending && (
         <div className={cx('iconWrap', { rotate: id === 'pending' && !isOperate })}>
-          <i className={`icon icon-${isOperate ? 'interrupt_button' : icon} ${id}`}></i>
+          <i className={`icon icon-${isOperate ? 'interrupt_button' : icon} ${id}`} />
         </div>
       )}
 
@@ -148,14 +149,21 @@ export default function initWorksheetSocket() {
 
   if (!socket) return;
   socket.on('workflow', data => {
-    const { status, type, worksheetId, rowId, storeId, total, finished, title, executeType } = data;
+    const { status, type, worksheetId, rowId, storeId, total, finished, title, executeType, close } = data;
+
     if (status === 2 || (type === 4 && status === 1)) {
-      emitter.emit('RELOAD_RECORDINFO', {
+      emitter.emit('RELOAD_RECORD_INFO', {
         worksheetId,
         recordId: rowId.indexOf('_') > 0 ? (rowId.match(/(.+?)_/) || '')[1] : rowId,
         closeWhenNotViewData: true,
       });
     }
+
+    if (close) {
+      notification.close('workflow');
+      return;
+    }
+
     if (storeId) {
       if (total === finished && !complete[storeId]) {
         complete[storeId] = data;
@@ -179,7 +187,7 @@ export default function initWorksheetSocket() {
       notification.open({
         content: <NotificationContent className="workflowNoticeContentWrap" {...props} />,
         key: `batchUpdateWorkflowNotice${storeId}`,
-        duration: null,
+        duration: 5,
         maxCount: 3,
       });
     } else {

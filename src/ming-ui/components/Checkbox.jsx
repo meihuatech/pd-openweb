@@ -67,6 +67,10 @@ class Checkbox extends React.Component {
      * 类名
      */
     className: PropTypes.string,
+    /**
+     * 样式风格
+     */
+    styleType: PropTypes.oneOf(['light', 'default']),
   };
 
   static defaultProps = {
@@ -113,7 +117,18 @@ class Checkbox extends React.Component {
   }
 
   render() {
-    const { text, children, disabled, className, size, indeterminate, clearselected, title, style } = this.props;
+    const {
+      text,
+      children,
+      disabled,
+      className,
+      size,
+      indeterminate,
+      clearselected,
+      title,
+      style,
+      styleType = '',
+    } = this.props;
     let icon = null;
     if (!indeterminate && this.state.checked) {
       icon = <Icon icon="ok" />;
@@ -127,13 +142,14 @@ class Checkbox extends React.Component {
         checked={this.state.checked}
         className={cx(
           disabled ? 'Checkbox--disabled' : '',
+          styleType === 'light' ? 'Checkbox--light' : '',
           'ming Checkbox overflow_ellipsis',
           {
             checked: !indeterminate && this.state.checked,
             indeterminate,
             clearselected,
           },
-          className
+          className,
         )}
         onClick={event => {
           event.nativeEvent.stopImmediatePropagation();
@@ -142,7 +158,7 @@ class Checkbox extends React.Component {
         title={title}
       >
         <span className={cx(SIZE_LIST.indexOf(size) >= 0 ? 'Checkbox-box--' + size : '', 'Checkbox-box')}>{icon}</span>
-        {text}
+        <span className="Font13">{text}</span>
         {children}
       </label>
     );

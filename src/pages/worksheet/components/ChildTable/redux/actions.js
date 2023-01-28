@@ -1,6 +1,5 @@
-import { getControlValueSortType } from 'worksheet/util';
-import { getRowRelationRows } from 'src/api/worksheet';
-import { renderCellText } from 'worksheet/components/CellControls';
+import { handleSortRows } from 'worksheet/util';
+import worksheetAjax from 'src/api/worksheet';
 
 const PAGE_SIZE = 200;
 
@@ -43,11 +42,10 @@ export const loadRows = ({
   controlId,
   pageIndex = 1,
   getWorksheet,
+  from,
   callback = () => {},
 }) => {
-  const isRecordShare = /\/worksheetshare/.test(location.pathname);
   const isPrintShare = /\/printshare/.test(location.pathname);
-  const isUpdateRecordShare = /\/recordshare/.test(location.pathname);
   const isPublicQuery = /\/public\/query/.test(location.pathname);
   return (dispatch, getState) => {
     const args = {
@@ -57,9 +55,14 @@ export const loadRows = ({
       getWorksheet,
       pageIndex,
       pageSize: PAGE_SIZE,
+      getType: from === 21 ? from : undefined,
     };
-    if (isRecordShare) {
-      args.shareId = (location.pathname.match(/.*\/worksheetshare\/(\w{24})/) || '')[1];
+    const isShare =
+      /\/public\/record/.test(location.pathname) ||
+      /\/public\/view/.test(location.pathname) ||
+      /\/public\/workflow/.test(location.pathname);
+    if (isShare) {
+      args.shareId = (location.href.match(/\/public\/(record|view|workflow)\/(\w{24})/) || '')[2];
     }
     if (isPrintShare) {
       args.shareId = (location.pathname.match(/.*\/printshare\/(\w{24})/) || '')[1];
@@ -67,11 +70,8 @@ export const loadRows = ({
     if (isPublicQuery) {
       args.shareId = (location.pathname.match(/.*\/public\/query\/(\w{24})/) || '')[1];
     }
-    if (isUpdateRecordShare) {
-      args.linkId = (location.pathname.match(/.*\/recordshare\/(\w{24})/) || '')[1];
-    }
-    getRowRelationRows(args).then(res => {
-      const rows = res.data.map((row, i) => ({ ...row, allowedit: true, addTime: i }));
+    worksheetAjax.getRowRelationRows(args).then(res => {
+      const rows = (res.data || []).map((row, i) => ({ ...row, allowedit: true, addTime: i }));
       dispatch({ type: 'LOAD_ROWS', rows });
       dispatch(initRows(rows));
       if (isCustomButtonFillRecord && rows.length) {
@@ -87,22 +87,6 @@ export const addRows = rows => ({ type: 'ADD_ROWS', rows });
 export const sortRows = ({ control, isAsc }) => {
   return (dispatch, getState) => {
     const { rows } = getState();
-    const controlValueType = getControlValueSortType(control);
-    if (_.isUndefined(isAsc)) {
-      dispatch({
-        type: 'INIT_ROWS',
-        rows: _.sortBy(rows, 'addTime'),
-      });
-      return;
-    }
-    let newRows = _.sortBy(rows, row =>
-      controlValueType === 'NUMBER'
-        ? parseFloat(row[control.controlId])
-        : renderCellText({ ...control, value: row[control.controlId] }),
-    );
-    if (!isAsc) {
-      newRows = newRows.reverse();
-    }
-    dispatch({ type: 'INIT_ROWS', rows: newRows });
+    dispatch({ type: 'INIT_ROWS', rows: handleSortRows(rows, control, isAsc) });
   };
 };

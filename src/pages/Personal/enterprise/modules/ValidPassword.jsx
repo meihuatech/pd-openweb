@@ -1,9 +1,12 @@
 import React, { Component } from 'react';
 import account from 'src/api/account';
+import { Dialog } from 'ming-ui';
 import { encrypt } from 'src/util';
 import captcha from 'src/components/captcha';
+import { navigateTo } from 'router/navigateTo';
 import cx from 'classnames';
 import './index.less';
+import _ from 'lodash';
 
 export default class ValidPassWord extends Component {
   constructor() {
@@ -36,6 +39,17 @@ export default class ValidPassWord extends Component {
                 if (result === 2) {
                   alert(_l('密码错误'), 3);
                   $('inputBox').val('').focus();
+                } else if (result === 4) {
+                  // 需要 注销网络 [即 他是最后一个成员 也是 最后的 管理员]
+                  Dialog.confirm({
+                    title: <spam className="Font15 Bold">{_l('您是组织【%0】超级管理员', companyName)}</spam>,
+                    description: <span className="Font13 Gray">{_l('请先注销组织或交接后方可注销。')}</span>,
+                    okText: _l('前往注销'),
+                    showCancel: false,
+                    onOk: () => {
+                      navigateTo('/admin/sysinfo/' + projectId);
+                    },
+                  });
                 } else {
                   // result
                   // 1 success
@@ -71,6 +85,7 @@ export default class ValidPassWord extends Component {
             type="password"
             className="inputBox"
             value={password}
+            autocomplete="new-password"
             placeholder={_l('请输入登录密码')}
             onChange={e => {
               this.setState({ password: e.target.value });

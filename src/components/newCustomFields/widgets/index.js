@@ -27,6 +27,10 @@ import Cascader from './Cascader';
 import OCR from './OCR';
 import Subtotal from './Subtotal';
 import Embed from './Embed';
+import Time from './Time';
+import BarCode from './BarCode';
+import OrgRole from './OrgRole';
+import Search from './Search';
 
 export default {
   RADIO: Radio,
@@ -58,4 +62,8 @@ export default {
   OCR: OCR,
   SUBTOTAL: Subtotal,
   Embed: Embed,
+  Time: Time,
+  BarCode: BarCode,
+  OrgRole: OrgRole,
+  Search: Search,
 };

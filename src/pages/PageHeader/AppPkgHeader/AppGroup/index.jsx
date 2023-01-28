@@ -16,6 +16,7 @@ import { DEFAULT_CREATE, ADVANCE_AUTHORITY } from '../config';
 import { updateAppGroup } from '../../redux/action';
 import './index.less';
 import { getAppFeaturesVisible } from 'src/util';
+import _ from 'lodash';
 
 const mapStateToProps = () => ({});
 const mapDispatchToProps = dispatch => ({
@@ -68,15 +69,29 @@ export default class extends Component {
   handledAppItemId = '';
 
   getData = () => {
-    const { appId } = this.ids;
+    let { appId } = this.ids;
+    if (md.global.Account.isPortal) {
+      appId = md.global.Account.appId;
+    }
     if (!appId) return;
     api.getAppInfo({ appId }).then(({ appRoleType, isLock, appSectionDetail: data = [] }) => {
+      const isCharge = isHaveCharge(appRoleType, isLock);
+      data = isCharge
+        ? data
+        : data
+            .map(item => {
+              return {
+                ...item,
+                workSheetInfo: item.workSheetInfo.filter(o => o.status === 1 && !o.navigateHide),
+              };
+            })
+            .filter(o => o.workSheetInfo && o.workSheetInfo.length > 0);
       this.props.updateAppGroup(data);
-      window[`app_${appId}_is_charge`] = isHaveCharge(appRoleType, isLock);
+      window[`app_${appId}_is_charge`] = isCharge;
       this.setState({ appRoleType, data }, () => {
         setTimeout(() => {
           this.ensurePointerVisible();
-        }, 0);
+        }, 500);
       });
     });
   };
@@ -125,11 +140,7 @@ export default class extends Component {
     const { appId } = this.ids;
     const { data } = this.state;
     const sortedAppGroupIds = data.map(({ appSectionId }) => appSectionId);
-    api.updateAppSectionSort({ appId, appSectionIds: sortedAppGroupIds }).then(res => {
-      if (res) {
-        this.updateAppGroup(data);
-      }
-    });
+    api.updateAppSectionSort({ appId, appSectionIds: sortedAppGroupIds });
   };
 
   // 确认滚动指示器状态

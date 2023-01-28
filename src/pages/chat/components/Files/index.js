@@ -6,6 +6,8 @@ import * as ajax from '../../utils/ajax';
 import Constant from '../../utils/constant';
 import LoadDiv from 'ming-ui/components/LoadDiv';
 import { getClassNameByExt } from 'src/util';
+import previewAttachments from 'src/components/previewAttachments/previewAttachments';
+import moment from 'moment';
 
 export const splitFiles = list => {
   const ranges = {};
@@ -60,16 +62,14 @@ export class FileItem extends Component {
         previewAttachmentType: 'QINIU',
       },
     ];
-    require(['previewAttachments'], previewAttachments => {
-      previewAttachments(
-        {
-          attachments: res,
-          callFrom: 'chat',
-          hideFunctions: ['editFileName'],
-        },
-        {},
-      );
-    });
+    previewAttachments(
+      {
+        attachments: res,
+        callFrom: 'chat',
+        hideFunctions: ['editFileName'],
+      },
+      {},
+    );
   }
   renderFile() {
     const { item } = this.props;

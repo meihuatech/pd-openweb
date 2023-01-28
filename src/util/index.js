@@ -1,3 +1,4 @@
+import EventEmitter from 'events';
 import JSEncrypt from 'jsencrypt';
 import React from 'react';
 import update from 'immutability-helper';
@@ -7,8 +8,24 @@ import 'src/pages/PageHeader/components/NetState/index.less';
 import { LIGHT_COLOR, PUBLIC_KEY, APPLICATION_ICON } from './enum';
 import { getPssId } from 'src/util/pssId';
 import qs from 'query-string';
-import { getUploadToken, getFileUploadToken } from 'src/api/qiniu';
-const {dialog: {netState: {buyBtn}}} = window.private;
+import qiniuAjax from 'src/api/qiniu';
+import projectAjax from 'src/api/project';
+
+export const emitter = new EventEmitter();
+
+export function getProject(projectId) {
+  if (projectId === 'external' && browserIsMobile()) {
+    return { projectId, companyName: _l('外部协作') };
+  }
+  const projects = md.global.Account.projects;
+  if (projectId) {
+    const project = _.find(projects, { projectId });
+    if (project) {
+      return project;
+    }
+  }
+  return projects[0];
+}
 
 // 判断选项颜色是否为浅色系
 export const isLightColor = (color = '') => _.includes(LIGHT_COLOR, color.toUpperCase());
@@ -69,7 +86,7 @@ export const exportAll = r => {
 
 export const setItem = (key, value) => {
   if (!key || !value) return;
-  localStorage.setItem(key, JSON.stringify(value));
+  safeLocalStorageSetItem(key, JSON.stringify(value));
 };
 
 export const getItem = key => {
@@ -79,22 +96,6 @@ export const getItem = key => {
   } catch (error) {
     console.log(error);
   }
-};
-
-export const upgradeVersionDialog = options => {
-  Dialog.confirm({
-    className: 'upgradeVersionDialogBtn',
-    title: '',
-    description: (
-      <div className="netStateWrap">
-        <div className="imgWrap" />
-        <div className="hint">{options.hint || _l('当前版本无法使用此功能')}</div>
-        <div className="explain">{options.explainText || _l('请升级至付费版解锁开启')}</div>
-      </div>
-    ),
-    noFooter: buyBtn,
-    removeCancelBtn: true,
-  });
 };
 
 export const formatNumberFromInput = value => {
@@ -296,6 +297,16 @@ export const isUrlRequest = url => {
   return false;
 };
 
+export const downloadFile = url => {
+  if (window.isDingTalk) {
+    const [path, search] = decodeURIComponent(url).split('?');
+    const { validation } = qs.parse(search);
+    return addToken(url, validation ? true : false);
+  } else {
+    return addToken(url);
+  }
+};
+
 /**
  * 下载地址和包含 md.global.Config.AjaxApiUrl 的 url 添加 token
  * @param {string} url
@@ -325,8 +336,16 @@ export const browserIsMobile = () => {
   const bIsAndroid = sUserAgent.match(/android/i) == 'android';
   const bIsCE = sUserAgent.match(/windows ce/i) == 'windows ce';
   const bIsWM = sUserAgent.match(/windows mobile/i) == 'windows mobile';
+  const bIsApp = sUserAgent.match(/mingdao application/i) == 'mingdao application';
+  const value = bIsIphoneOs || bIsMidp || bIsUc7 || bIsUc || bIsAndroid || bIsCE || bIsWM || bIsApp;
 
-  return bIsIphoneOs || bIsMidp || bIsUc7 || bIsUc || bIsAndroid || bIsCE || bIsWM;
+  if (sUserAgent.includes('dingtalk')) {
+    // 钉钉设备针对侧边栏打开判断为 mobile 环境
+    const { pc_slide = '' } = getRequest();
+    return pc_slide.includes('true') ? true : value;
+  } else {
+    return value;
+  }
 };
 
 /**
@@ -475,7 +494,7 @@ export const htmlEncodeReg = str => {
   const encodeHTMLRules = { '&': '&#38;', '<': '&lt;', '>': '&gt;', '"': '&#34;', "'": '&#39;', '/': '&#47;' };
   const matchHTML = /&(?!#?\w+;)|<|>|"|'|\//g;
   return str
-    ? str.toString().replace(matchHTML, function(m) {
+    ? str.toString().replace(matchHTML, function (m) {
         return encodeHTMLRules[m] || m;
       })
     : '';
@@ -501,7 +520,7 @@ export const htmlDecodeReg = str => {
   };
   const matchHTML = /&#(38|60|62|34|39|47);|&(amp|lt|gt|quot);/g;
   return str
-    ? str.toString().replace(matchHTML, function(m) {
+    ? str.toString().replace(matchHTML, function (m) {
         return decodeHTMLRules[m] || m;
       })
     : '';
@@ -560,9 +579,9 @@ export function createElementFromHtml(html) {
  */
 export const getToken = (files, type = 0) => {
   if (!md.global.Account.accountId) {
-    return getFileUploadToken({ files });
+    return qiniuAjax.getFileUploadToken({ files });
   } else {
-    return getUploadToken({ files, type });
+    return qiniuAjax.getUploadToken({ files, type });
   }
 };
 
@@ -619,3 +638,285 @@ export const getAppFeaturesPath = () => {
     .filter(o => o)
     .join('&');
 };
+
+/**
+ * 说明：javascript的乘法结果会有误差，在两个浮点数相乘的时候会比较明显。这个函数返回较为精确的乘法结果。
+ * 调用：accMul(arg1,arg2)
+ * 返回值：arg1乘以arg2的精确结果
+ */
+export function accMul(arg1, arg2) {
+  let m = 0,
+    s1 = arg1.toString(),
+    s2 = arg2.toString();
+  try {
+    m += s1.split('.')[1].length;
+  } catch (e) {}
+  try {
+    m += s2.split('.')[1].length;
+  } catch (e) {}
+  return (Number(s1.replace('.', '')) * Number(s2.replace('.', ''))) / Math.pow(10, m);
+}
+
+/**
+ * 说明：javascript的除法结果会有误差，在两个浮点数相除的时候会比较明显。这个函数返回较为精确的除法结果。
+ * 调用：accDiv(arg1,arg2)
+ * 返回值：arg1除以arg2的精确结果
+ */
+export function accDiv(arg1, arg2) {
+  let t1 = 0,
+    t2 = 0,
+    r1,
+    r2;
+  try {
+    t1 = arg1.toString().split('.')[1].length;
+  } catch (e) {}
+  try {
+    t2 = arg2.toString().split('.')[1].length;
+  } catch (e) {}
+  r1 = Number(arg1.toString().replace('.', ''));
+  r2 = Number(arg2.toString().replace('.', ''));
+  const res = (r1 / r2) * Math.pow(10, t2 - t1);
+  if (res.toString().replace(/\d+\./, '').length > 9) {
+    return parseFloat(res.toFixed(9));
+  }
+  return res;
+}
+
+/**
+ * 说明：javascript的加法结果会有误差，在两个浮点数相加的时候会比较明显。这个函数返回较为精确的加法结果。
+ * 调用：accAdd(arg1,arg2)
+ * 返回值：arg1加上arg2的精确结果
+ */
+export function accAdd(arg1, arg2) {
+  let r1, r2, m;
+  try {
+    r1 = arg1.toString().split('.')[1].length;
+  } catch (e) {
+    r1 = 0;
+  }
+  try {
+    r2 = arg2.toString().split('.')[1].length;
+  } catch (e) {
+    r2 = 0;
+  }
+  m = Math.pow(10, Math.max(r1, r2));
+  return (arg1 * m + arg2 * m) / m;
+}
+
+/**
+ * 说明：javascript的减法结果会有误差，在两个浮点数相加的时候会比较明显。这个函数返回较为精确的减法结果。
+ * 调用：accSub(arg1,arg2)
+ * 返回值：arg1减上arg2的精确结果
+ */
+export function accSub(arg1, arg2) {
+  return accAdd(arg1, -arg2);
+}
+
+/**
+ * 根据背景色判断文字颜色
+ */
+export function getColorCountByBg(backgroundColor) {
+  const RgbValue =
+    'rgb(' +
+    parseInt('0x' + backgroundColor.slice(1, 3)) +
+    ',' +
+    parseInt('0x' + backgroundColor.slice(3, 5)) +
+    ',' +
+    parseInt('0x' + backgroundColor.slice(5, 7)) +
+    ')';
+  const RgbValueArry = RgbValue.replace('rgb(', '').replace(')', '').split(',');
+  return RgbValueArry[0] * 0.299 + RgbValueArry[1] * 0.587 + RgbValueArry[2] * 0.114;
+}
+
+export function replaceNotNumber(value) {
+  return value
+    .replace(/[^-\d.]/g, '')
+    .replace(/^\./g, '')
+    .replace(/^-/, '$#$')
+    .replace(/-/g, '')
+    .replace('$#$', '-')
+    .replace(/^-\./, '-')
+    .replace('.', '$#$')
+    .replace(/\./g, '')
+    .replace('$#$', '.');
+}
+
+/**
+ * 调用 app 内的方式
+ */
+export function mdAppResponse(param) {
+  const ua = navigator.userAgent;
+  const isIOS = !!ua.match(/\(i[^;]+;( U;)? CPU.+Mac OS X/);
+  return new Promise((resolve, reject) => {
+    // 注册监听
+    window.MD_APP_RESPONSE = base64 => {
+      const decodedData = window.atob(base64);
+      resolve(JSON.parse(decodeURIComponent(escape(decodedData))));
+    };
+    // 触发监听的回调函数
+    const string = JSON.stringify(param);
+    const base64 = window.btoa(string);
+    if (isIOS) {
+      window.webkit.messageHandlers.MD_APP_REQUEST.postMessage(base64);
+    } else {
+      window.Android.MD_APP_REQUEST(base64);
+    }
+  });
+}
+
+/**
+ * 获取路由参数
+ */
+export const parseSearchParams = searchParamsString => {
+  return searchParamsString.split('?').reduce((searchParams, curKV) => {
+    const [k, v] = curKV.split('=').map(decodeURIComponent);
+    searchParams[k] = v;
+
+    return searchParams;
+  }, {});
+};
+
+/**
+ * 升级版本dialog
+ */
+export const upgradeVersionDialog = options => {
+  const hint = options.hint || _l('当前版本无法使用此功能');
+  const explainText = options.explainText || _l('请升级至专业版或旗舰版解锁开启');
+  const versionType = options.versionType ? options.versionType : undefined;
+
+  if (options.dialogType === 'content') {
+    return (
+      <div>
+        <div className="netStateWrap">
+          <div className="imgWrap" />
+          <div className="hint">{hint}</div>
+          {(!md.global.Config.IsLocal || !md.global.Account.isPortal || options.explainText) && (
+            <div className="explain">{explainText}</div>
+          )}
+        </div>
+      </div>
+    );
+  }
+  Dialog.confirm({
+    className: options.className ? options.className : 'upgradeVersionDialogBtn',
+    title: '',
+    description: (
+      <div className="netStateWrap">
+        <div className="imgWrap" />
+        <div className="hint">{hint}</div>
+        {(!md.global.Config.IsLocal || !md.global.Account.isPortal || options.explainText) && (
+          <div className="explain">{explainText}</div>
+        )}
+      </div>
+    ),
+    noFooter: true,
+  });
+};
+
+/**
+ * 获取网络信息
+ */
+const getSyncLicenseInfo = projectId => {
+  const { projects = [], externalProjects = [] } = md.global.Account;
+  let projectInfo = _.find(projects.concat(externalProjects), o => o.projectId === projectId) || {};
+
+  if (_.isEmpty(projectInfo)) {
+    projectAjax.getProjectLicenseInfo({ projectId }, { ajaxOptions: { async: false } }).then(res => {
+      projectInfo = { ...res, projectId };
+      md.global.Account.externalProjects = (md.global.Account.externalProjects || []).concat(projectInfo);
+    });
+  }
+
+  return projectInfo;
+};
+
+/**
+ *  获取功能状态 1: 正常 2: 升级
+ */
+export function getFeatureStatus(projectId, featureId) {
+  if (!/^[A-Za-z0-9]{8}-[A-Za-z0-9]{4}-[A-Za-z0-9]{4}-[A-Za-z0-9]{4}-[A-Za-z0-9]{12}$/.test(projectId)) return;
+
+  const { Versions = [] } = md.global || {};
+  const { version = { versionIdV2: '-1' } } = getSyncLicenseInfo(projectId);
+  const versionInfo = _.find(Versions || [], item => item.VersionIdV2 === version.versionIdV2) || {};
+
+  return (_.find(versionInfo.Products || [], item => item.ProductType === featureId) || {}).Type;
+}
+
+/**
+ * 功能埋点授权显示升级版本内容dialogType： dialog弹层（默认） content 页面
+ */
+export function buriedUpgradeVersionDialog(projectId, featureId, dialogType) {
+  const { Versions = [] } = md.global || {};
+  const { licenseType } = getSyncLicenseInfo(projectId);
+  let upgradeName, versionType;
+
+  if (!md.global.Config.IsLocal) {
+    const getFeatureType = versionIdV2 => {
+      const versionInfo = _.find(Versions || [], item => item.VersionIdV2 === versionIdV2) || {};
+      return {
+        versionName: versionInfo.Name,
+        versionType: versionInfo.VersionIdV2,
+        type: (_.find(versionInfo.Products || [], item => item.ProductType === featureId) || {}).Type,
+      };
+    };
+    upgradeName = [getFeatureType('1'), getFeatureType('2'), getFeatureType('3')].filter(item => item.type === '1')[0]
+      .versionName;
+    versionType = [getFeatureType('1'), getFeatureType('2'), getFeatureType('3')].filter(item => item.type === '1')[0]
+      .versionType;
+  }
+
+  if (dialogType === 'content') {
+    return upgradeVersionDialog({
+      projectId,
+      isFree: licenseType === 0 || licenseType === 2,
+      explainText:
+        md.global.Config.IsLocal || md.global.Account.isPortal
+          ? _l('请升级版本')
+          : _l('请升级至%0解锁开启', upgradeName),
+      dialogType,
+      versionType,
+    });
+  } else {
+    upgradeVersionDialog({
+      projectId,
+      isFree: licenseType === 0 || licenseType === 2,
+      explainText:
+        md.global.Config.IsLocal || md.global.Account.isPortal
+          ? _l('请升级版本')
+          : _l('请升级至%0解锁开启', upgradeName),
+      versionType,
+    });
+  }
+}
+
+export function toFixed(num, dot = 0) {
+  if (_.isObject(num) || _.isNaN(Number(num))) {
+    console.error(num, '不是数字');
+    return '';
+  }
+  if (dot === 0) {
+    return String(Math.round(num));
+  }
+  if (dot < 0 || dot > 20) {
+    return String(num);
+  }
+  const strOfNum = String(num);
+  if (!/\./.test(strOfNum)) {
+    return strOfNum + '.' + ''.padEnd(dot, '0');
+  }
+  const decimal = (strOfNum.match(/\.(\d+)/)[1] || '').length;
+  if (decimal === dot) {
+    return strOfNum;
+  } else if (decimal < dot) {
+    return strOfNum + ''.padEnd(dot - decimal, '0');
+  } else {
+    const isNegative = num < 0;
+    if (isNegative) {
+      num = Math.abs(num);
+    }
+    let data = String(Math.round(num * Math.pow(10, dot)));
+    data = data.padStart(dot, '0');
+    return (isNegative ? '-' : '') + Math.floor(data / Math.pow(10, dot)) + '.' + data.slice(-1 * dot);
+  }
+}

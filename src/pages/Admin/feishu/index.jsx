@@ -7,8 +7,13 @@ import { Tabs, Popover, Radio, Input } from 'antd';
 import Ajax from 'src/api/workWeiXin';
 import Config from '../config';
 import Dialog from 'ming-ui/components/Dialog';
-import { navigateTo } from 'src/router/navigateTo';
+import IntegrationSetPssword from '../components/IntegrationSetPssword';
+import UpgradeVersion from '../components/UpgradeVersion';
+import { getFeatureStatus } from 'src/util';
 import './style.less';
+import _ from 'lodash';
+
+const FEATURE_ID = 12;
 
 export default class FeiShu extends React.Component {
   constructor(props) {
@@ -32,6 +37,8 @@ export default class FeiShu extends React.Component {
       failed: false,
       failedStr: '',
       canSyncBtn: false,
+      isSetPassword: false,
+      passwordError: false,
     };
   }
 
@@ -45,7 +52,7 @@ export default class FeiShu extends React.Component {
         res = {
           appId: '',
           appSecret: '',
-          status: 1,
+          status: '',
         };
       }
       if (res) {
@@ -59,6 +66,7 @@ export default class FeiShu extends React.Component {
           AppSecretFormat: this.formatStr(res.appSecret),
           show1: !(res.appId && res.appSecret && res.status != 2),
           show2: !(res.appId && res.appSecret && res.status != 2),
+          status: res.status,
         });
       }
     });
@@ -170,7 +178,7 @@ export default class FeiShu extends React.Component {
                 value={!this.state[`isShow${strId}`] ? this.state[`${strId}Format`] : this.state[strId]}
               />
               <Icon
-                icon={!this.state[`isShow${strId}`] ? 'circulated' : 'public-folder-hidden'}
+                icon={!this.state[`isShow${strId}`] ? 'circulated' : 'visibility_off'}
                 className="Gray_9e Font18 isShowIcon"
                 onClick={() => {
                   this.setState({
@@ -417,41 +425,51 @@ export default class FeiShu extends React.Component {
     );
   };
 
-  // 免费版显示付费升级
-  renderUpgrade = () => {
-    return (
-      <div className="upgradePage flexColumn">
-        <div className="netStateWrap">
-          <div className="imgWrap" />
-          <div className="hint">{_l('当前版本无法使用此功能')}</div>
-          <div className="explain">{_l('请升级到标准版本或以上版本')}</div>
-        </div>
-        {/*<Button
-          type="primary"
-          className="payUpgradeBtn"
-          onClick={() => {
-            navigateTo(`/upgrade/choose?projectId=${Config.projectId}`);
-          }}
-        >
-          {_l('立即购买')}
-        </Button>*/}
-      </div>
-    );
+  // 获取初始密码值
+  getInitialPassword = () => {
+    Ajax.getIntergrationAccountInitializeInfo({
+      projectId: Config.projectId,
+    }).then(res => {
+      this.setState({ password: res, isSetPassword: !!res });
+    });
   };
 
+  changeTab = key => {
+    if (key === 'other') {
+      this.getInitialPassword();
+    }
+  };
   render() {
-    if (Config.project.licenseType === 0) {
-      return this.renderUpgrade();
+    const featureType = getFeatureStatus(Config.projectId, FEATURE_ID);
+    if (featureType === '2') {
+      return <UpgradeVersion projectId={Config.projectId} featureId={FEATURE_ID} />;
     }
     if (this.state.pageLoading) {
       return <LoadDiv className="mTop80" />;
     }
     return (
       <div className="feishuMainContent">
-        <Tabs defaultActiveKey="base">
-          <Tabs.TabPane tab={_l('基础')} key="base">
+        <Tabs
+          defaultActiveKey="base"
+          onChange={this.changeTab}
+          className={cx({ tabStyle: !(this.state.status === 1 && !this.state.isCloseDing) })}
+        >
+          <Tabs.TabPane tab={_l('飞书集成')} key="base">
             {this.stepRender()}
           </Tabs.TabPane>
+          {md.global.Config.IsLocal && this.state.status === 1 && !this.state.isCloseDing && (
+            <Tabs.TabPane tab={_l('其他')} key="other">
+              <IntegrationSetPssword
+                password={this.state.password}
+                isSetPassword={this.state.isSetPassword}
+                disabled={
+                  (this.state.canEditInfo && !this.state.isHasInfo) ||
+                  this.state.isCloseDing ||
+                  this.state.showSyncDiaLog
+                }
+              />
+            </Tabs.TabPane>
+          )}
         </Tabs>
         {this.state.showSyncDiaLog && this.renderSyncDiaLog()}
       </div>

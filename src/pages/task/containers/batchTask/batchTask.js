@@ -1,9 +1,9 @@
 ﻿import './css/batchTask.less';
-import 'quickSelectUser';
-import 'selectize';
-import 'mdDialog';
-import 'mdAutocomplete';
-import doT from 'dot';
+import 'src/components/quickSelectUser/quickSelectUser';
+import '@mdfe/selectize';
+import 'src/components/mdDialog/dialog';
+import mdAutocomplete from 'src/components/mdAutocomplete/mdAutocomplete';
+import doT from '@mdfe/dot';
 import config from '../../config/config';
 import batchTaskTpl from './tpl/batchTask.html';
 import { htmlEncodeReg } from 'src/util';
@@ -12,6 +12,9 @@ import Store from 'redux/configureStore';
 import { errorMessage, checkIsProject, taskStatusDialog } from '../../utils/utils';
 import { afterDeleteTask, afterUpdateTaskDate } from '../../utils/taskComm';
 import tagController from 'src/api/tag';
+import 'src/components/dialogSelectUser/dialogSelectUser';
+import _ from 'lodash';
+import moment from 'moment';
 
 const BatchTask = {};
 
@@ -107,30 +110,28 @@ BatchTask.initEvent = function () {
   // 修改任务负责人
   $batchTask.on('click', '.batchCharge', function () {
     const $this = $(this);
-    require(['dialogSelectUser'], dialogSelectUser => {
-      let size = 0;
-      let projectId = $('.selectTask:first').attr('data-projectid');
-      $.map($('.selectTask'), (_this, i) => {
-        if ($(_this).attr('data-projectid') === projectId) {
-          size++;
-        }
-      });
-      projectId = size === $('.selectTask').length ? projectId : '';
-      $this.dialogSelectUser({
-        sourceId: Store.getState().task.taskConfig.folderId,
-        fromType: 2,
-        showMoreInvite: false,
-        SelectUserSettings: {
-          projectId: checkIsProject(projectId) ? projectId : '',
-          unique: true,
-          callback(users) {
-            // 成员权限
-            BatchTask.loadBatchData(2);
-            // 修改
-            BatchTask.taskAuth('updateCharge', _l('批量更改主负责人'), users[0]);
-          },
+    let size = 0;
+    let projectId = $('.selectTask:first').attr('data-projectid');
+    $.map($('.selectTask'), (_this, i) => {
+      if ($(_this).attr('data-projectid') === projectId) {
+        size++;
+      }
+    });
+    projectId = size === $('.selectTask').length ? projectId : '';
+    $this.dialogSelectUser({
+      sourceId: Store.getState().task.taskConfig.folderId,
+      fromType: 2,
+      showMoreInvite: false,
+      SelectUserSettings: {
+        projectId: checkIsProject(projectId) ? projectId : '',
+        unique: true,
+        callback(users) {
+          // 成员权限
+          BatchTask.loadBatchData(2);
+          // 修改
+          BatchTask.taskAuth('updateCharge', _l('批量更改主负责人'), users[0]);
         },
-      });
+      },
     });
   });
 
@@ -374,7 +375,8 @@ BatchTask.bindDialog = function () {
     );
 
   // 无法 委托 每次生成的时候绑定
-  $('#batchTaskFolder').mdAutocomplete({
+  mdAutocomplete({
+    element: 'batchTaskFolder',
     appendTo: '.autoBatchFolder',
     clearBtn: false,
     focusIsSerach: true,

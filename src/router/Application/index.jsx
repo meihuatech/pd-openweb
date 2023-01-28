@@ -2,6 +2,7 @@ import React, { Component } from 'react';
 import { Switch } from 'react-router-dom';
 import genRouteComponent from '../genRouteComponent';
 import ROUTE_CONFIG from './config';
+import PORTAL_ROUTE_CONFIG from './portalConfig';
 import ajaxRequest from 'src/api/homeApp';
 import { LoadDiv } from 'ming-ui';
 import UnusualContent from './UnusualContent';
@@ -10,11 +11,9 @@ import { getIds } from '../../pages/PageHeader/util';
 import { connect } from 'react-redux';
 import { setAppStatus } from '../../pages/PageHeader/redux/action';
 import { ADVANCE_AUTHORITY } from 'src/pages/PageHeader/AppPkgHeader/config';
+import _ from 'lodash';
 
-@connect(
-  state => ({ appPkg: state.appPkg }),
-  dispatch => ({ setAppStatus: status => dispatch(setAppStatus(status)) })
-)
+@connect(state => ({ appPkg: state.appPkg }), dispatch => ({ setAppStatus: status => dispatch(setAppStatus(status)) }))
 export default class Application extends Component {
   constructor(props) {
     super(props);
@@ -25,8 +24,10 @@ export default class Application extends Component {
   }
 
   componentDidMount() {
-    const { appId, worksheetId } = this.props.match.params;
-
+    let { appId, worksheetId } = this.props.match.params;
+    if (md.global.Account.isPortal) {
+      appId = md.global.Account.appId;
+    }
     if (appId) {
       this.checkApp(appId);
     }
@@ -47,6 +48,9 @@ export default class Application extends Component {
    * 检测应用有效性
    */
   checkApp(appId) {
+    if (md.global.Account.isPortal) {
+      appId = md.global.Account.appId;
+    }
     ajaxRequest
       .checkApp({ appId }, { silent: true })
       .then(status => {
@@ -81,19 +85,22 @@ export default class Application extends Component {
     let { status } = this.state;
     const {
       location: { pathname },
-      appPkg
+      appPkg,
     } = this.props;
-    const { appId } = getIds(this.props);
-    const { permissionType, fixed } = appPkg;
+    let { appId } = getIds(this.props);
+    if (md.global.Account.isPortal) {
+      appId = md.global.Account.appId;
+    }
+    const { permissionType, fixed, pcDisplay } = appPkg;
     const isAuthorityApp = permissionType >= ADVANCE_AUTHORITY;
     if (status === 0) {
       return <LoadDiv />;
     }
-    if (fixed && !isAuthorityApp) {
-      return <FixedContent appPkg={appPkg} />
+    if ((pcDisplay || fixed) && !isAuthorityApp) {
+      return <FixedContent appPkg={appPkg} isNoPublish={pcDisplay} />;
     }
     if (_.includes([1], status) || (status === 5 && _.includes(pathname, 'role'))) {
-      return <Switch>{this.genRouteComponent(ROUTE_CONFIG)}</Switch>;
+      return <Switch>{this.genRouteComponent(md.global.Account.isPortal ? PORTAL_ROUTE_CONFIG : ROUTE_CONFIG)}</Switch>;
     }
     return <UnusualContent status={status} appId={appId} />;
   }

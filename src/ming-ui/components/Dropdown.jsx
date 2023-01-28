@@ -9,6 +9,7 @@ import Icon from './Icon';
 import Trigger from 'rc-trigger';
 import formControl from 'ming-ui/decorators/formControl';
 import './less/Dropdown.less';
+import _ from 'lodash';
 
 const builtinPlacements = {
   left: {
@@ -63,6 +64,7 @@ class Dropdown extends Component {
      * Menu的样式名
      */
     menuClass: PropTypes.string,
+    currentItemClass: PropTypes.object,
     /**
      * 表单item名字
      */
@@ -179,11 +181,13 @@ class Dropdown extends Component {
      * render title
      */
     renderTitle: PropTypes.func,
-    AppendToBody: PropTypes.bool,
+    isAppendToBody: PropTypes.bool,
     selectClose: PropTypes.bool,
     openSearch: PropTypes.bool,
     cancelAble: PropTypes.bool, //可取消的
     renderError: PropTypes.func, // 错误结果显示
+    disabledClickElement: PropTypes.string, // 禁止点击的元素（id、class）
+    renderItem: PropTypes.func,
   };
   /* eslint-enable */
   static defaultProps = {
@@ -194,6 +198,7 @@ class Dropdown extends Component {
     selectClose: true,
     openSearch: false,
     onVisibleChange: () => {},
+    disabledClickElement: '',
   };
 
   constructor(props) {
@@ -221,6 +226,9 @@ class Dropdown extends Component {
         value: nextProps.value,
       });
       this.props.$formDataChange(nextProps.value);
+    }
+    if (_.isBoolean(nextProps.popupVisible)) {
+      this.setState({ showMenu: nextProps.popupVisible });
     }
   }
   /* eslint-disable */
@@ -307,7 +315,7 @@ class Dropdown extends Component {
   }
 
   renderListItem(data) {
-    const { showItemTitle } = this.props;
+    const { showItemTitle, currentItemClass, value, renderItem } = this.props;
 
     return data.map((item, index) => {
       if (_.isArray(item)) {
@@ -332,6 +340,7 @@ class Dropdown extends Component {
             ) : (
               <MenuItem
                 {...item}
+                className={cx(item.className, value === item.value && currentItemClass ? currentItemClass : '')}
                 data-value={item.value}
                 icon={
                   item.iconName || item.icon ? <Icon icon={item.iconName || item.icon} hint={item.iconHint} /> : null
@@ -344,7 +353,7 @@ class Dropdown extends Component {
                 }}
                 title={showItemTitle && item.text}
               >
-                <div className="itemText">{item.text}</div>
+                {renderItem ? renderItem(item) : <div className="itemText">{item.text}</div>}
               </MenuItem>
             )}
           </Fragment>
@@ -362,7 +371,8 @@ class Dropdown extends Component {
 
   displayMenu = () => {
     const { showMenu, keywords } = this.state;
-    const { data, maxHeight, menuStyle, menuClass, noData, children, isAppendToBody, openSearch } = this.props;
+    const { data, maxHeight, menuStyle, menuClass, noData, children, isAppendToBody, openSearch, searchNull } =
+      this.props;
 
     const searchData = [];
 
@@ -427,7 +437,7 @@ class Dropdown extends Component {
           this.renderListItem(searchData)
         ) : (
           <MenuItem disabled>
-            <div>{keywords ? _l('暂无搜索结果') : noData}</div>
+            <div>{keywords ? (searchNull ? searchNull() : _l('暂无搜索结果')) : noData}</div>
           </MenuItem>
         )}
         {children}
@@ -437,8 +447,8 @@ class Dropdown extends Component {
 
   displayPointer = () => {
     const { value } = this.state;
-    const { placeholder, data, cancelAble } = this.props;
-    const selectedData = _.find(data, item => item.value === value);
+    const { dropIcon, placeholder, data, cancelAble, disabledClickElement } = this.props;
+    const selectedData = _.find(_.flatten(data), item => item.value === value);
     return (
       <div
         className={cx('Dropdown--input', { 'Dropdown--border': !!this.props.border }, { active: this.state.showMenu })}
@@ -447,7 +457,11 @@ class Dropdown extends Component {
         }}
         onClick={event => {
           event.stopPropagation();
-          this.handleClick();
+          if (disabledClickElement) {
+            !$(event.target).closest(disabledClickElement).length && this.handleClick();
+          } else {
+            this.handleClick();
+          }
         }}
       >
         {value != undefined ? ( // eslint-disable-line eqeqeq
@@ -470,10 +484,10 @@ class Dropdown extends Component {
           <span className="Dropdown--placeholder Gray_bd ellipsis InlineBlock">{placeholder}</span>
         )}
         {cancelAble && value != undefined ? (
-          <span className="actionIcon Hand mLeft8">
+          <Fragment>
             <Icon
               icon="cancel1"
-              className="Gray_9e clearIcon"
+              className="Gray_9e mLeft8 clearIcon"
               onClick={e => {
                 e.stopPropagation();
                 if (value != undefined) {
@@ -493,10 +507,10 @@ class Dropdown extends Component {
                 }
               }}
             />
-            <Icon icon="arrow-down-border" className="Gray_9e dropArrow" />
-          </span>
+            <Icon icon={dropIcon || 'arrow-down-border'} className="Gray_9e mLeft8 dropArrow" />
+          </Fragment>
         ) : (
-          <Icon icon="arrow-down-border" className="mLeft8 Gray_9e" />
+          <Icon icon={dropIcon || 'arrow-down-border'} className="mLeft8 Gray_9e" />
         )}
       </div>
     );
@@ -515,6 +529,7 @@ class Dropdown extends Component {
             popupVisible={this.state.showMenu}
             popupAlign={{
               points: ['tl', 'bl'],
+              offset: [0, 1],
               overflow: {
                 adjustX: true,
                 adjustY: true,

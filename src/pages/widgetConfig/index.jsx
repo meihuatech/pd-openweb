@@ -1,7 +1,7 @@
 import React, { Fragment, useState, useRef, useEffect } from 'react';
 import { useSetState, useTitle } from 'react-use';
-import { getWorksheetControls, saveWorksheetControls, getQueryBySheetId } from 'src/api/worksheet';
-import { getPortalEnableState } from 'src/api/externalPortal';
+import worksheetAjax from 'src/api/worksheet';
+import externalPortalAjax from 'src/api/externalPortal';
 import update from 'immutability-helper';
 import styled from 'styled-components';
 import { Dialog } from 'ming-ui';
@@ -12,7 +12,7 @@ import Header from './Header';
 import Content from './content';
 import { getCurrentRowSize, getPathById } from './util/widgets';
 import { formatControlsData, getMsgByCode } from './util/data';
-import { getUrlPara, genWidgetsByControls, genControlsByWidgets, returnMasterPage } from './util';
+import { getUrlPara, genWidgetsByControls, genControlsByWidgets, returnMasterPage, formatSearchConfigs } from './util';
 import Components from './widgetSetting/components';
 import './index.less';
 import { WHOLE_SIZE } from './config/Drag';
@@ -125,8 +125,8 @@ export default function Container(props) {
 
   const getQueryConfigs = (hasSearchQuery = false) => {
     if (hasSearchQuery) {
-      getQueryBySheetId({ worksheetId: sourceId }).then(res => {
-        setQueryConfigs(res);
+      worksheetAjax.getQueryBySheetId({ worksheetId: sourceId }).then(res => {
+        setQueryConfigs(formatSearchConfigs(res));
       });
     }
   };
@@ -134,7 +134,7 @@ export default function Container(props) {
   useEffect(() => {
     getQueryConfigs(globalInfo && globalInfo.isWorksheetQuery);
     if (globalInfo && globalInfo.appId) {
-      getPortalEnableState({ appId: globalInfo.appId }).then(res => {
+      externalPortalAjax.getPortalEnableState({ appId: globalInfo.appId }).then(res => {
         setEnableState(res.isEnable);
       });
     }
@@ -143,7 +143,7 @@ export default function Container(props) {
   useEffect(() => {
     window.subListSheetConfig = {};
     setLoading({ getLoading: true });
-    getWorksheetControls({
+    worksheetAjax.getWorksheetControls({
       worksheetId: sourceId,
     })
       .then(({ code, data }) => {
@@ -158,8 +158,8 @@ export default function Container(props) {
             if (savedWidgets.version === version) {
               Dialog.confirm({
                 title: _l('发现有未保存的更改，是否需要恢复 ？'),
-                okText: _l('是，恢复变更'),
-                cancelText: _l('否，放弃恢复'),
+                okText: _l('恢复'),
+                cancelText: _l('取消'),
                 cancelType: 'ghost',
                 onOk: () => {
                   initData(savedWidgets);
@@ -192,7 +192,7 @@ export default function Container(props) {
     let activeWidgetPath = getPathById(widgets, (activeWidget || {}).controlId);
 
     setLoading({ saveLoading: true });
-    saveWorksheetControls({
+    worksheetAjax.saveWorksheetControls({
       version,
       sourceId,
       controls: formatControlsData(controls),
@@ -207,7 +207,7 @@ export default function Container(props) {
         setWidgets(nextWidgets);
         $originControls.current = flattenControls;
         setInfo({ version });
-        setStatus({ saved: true, saveIndex: status.saveIndex + 1 });
+        setStatus({ saved: true, saveIndex: status.saveIndex + 1, modify: false });
 
         localStorage.removeItem(`worksheetConfig-${sourceId}`);
 
@@ -275,7 +275,7 @@ export default function Container(props) {
     allControls: genControlsByWidgets(widgets),
     enableState,
     // 全局表信息
-    globalSheetInfo: pick(globalInfo, ['appId', 'projectId', 'worksheetId', 'name', 'groupId']),
+    globalSheetInfo: pick(globalInfo, ['appId', 'projectId', 'worksheetId', 'name', 'groupId', 'roleType']),
   };
 
   const cancelSubmit = ({ redirectfn, desp } = {}) => {

@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { arrayOf, number, string, func, shape, bool } from 'prop-types';
 import styled from 'styled-components';
 import Trigger from 'rc-trigger';
 import { Menu } from 'ming-ui';
 import autoSize from 'ming-ui/decorators/autoSize';
 import CustomButtons from 'worksheet/common/recordInfo/RecordForm/CustomButtons';
+import _ from 'lodash';
 
 const Con = styled.div`
   display: flex;
@@ -45,9 +46,10 @@ function getButtonWidth({ icon, name }) {
   const div = document.createElement('div');
   div.style.visibility = 'hidden';
   div.style.display = 'inline-block';
-  div.innerHTML = `<div style="display: inline-block; margin: 0 12px;">${
-    icon ? `<span class="icon icon-${icon}" style="margin: 0 2px;font-size: 18px;"></span>` : ''
-  }<span  style="font-size: 13px;">${name}</span></div>`;
+  div.innerHTML = `<div style="display: inline-block; margin: 0 12px; white-space: nowrap;">
+    <span class="icon icon-${icon || 'custom_actions'}" style="margin: 0 2px;font-size: 18px;"></span>
+    <span  style="font-size: 13px;">${name}</span>
+  </div>`;
   document.body.appendChild(div);
   result = div.clientWidth;
   document.body.removeChild(div);
@@ -56,9 +58,11 @@ function getButtonWidth({ icon, name }) {
 
 function Buttons(props) {
   const {
+    count,
     width,
     appId,
     viewId,
+    recordId,
     projectId,
     worksheetId,
     selectedRows,
@@ -68,6 +72,7 @@ function Buttons(props) {
     handleUpdateWorksheetRow,
     onUpdateRow,
   } = props;
+  const [popupVisible, setPopupVisible] = useState(false);
   const sumWidth = _.sum(buttons.map(getButtonWidth));
   let buttonShowNum = 1;
   if (sumWidth < width) {
@@ -86,8 +91,10 @@ function Buttons(props) {
   }
   const buttonsProps = {
     isFromBatchEdit: true,
+    count,
     appId,
     viewId,
+    recordId,
     projectId,
     worksheetId,
     selectedRows,
@@ -98,9 +105,16 @@ function Buttons(props) {
   };
   return (
     <Con>
-      <CustomButtons isBatchOperate type="iconText" {...buttonsProps} buttons={buttons.slice(0, buttonShowNum)} />
+      <CustomButtons
+        hideDisabled
+        isBatchOperate
+        type="iconText"
+        {...buttonsProps}
+        buttons={buttons.slice(0, buttonShowNum)}
+      />
       {buttonShowNum < buttons.length && (
         <Trigger
+          popupVisible={popupVisible}
           zIndex={1000}
           action={['click']}
           popupAlign={{
@@ -110,9 +124,37 @@ function Buttons(props) {
             },
           }}
           destroyPopupOnHide
+          onPopupVisibleChange={() => setPopupVisible(true)}
           popup={
-            <Menu style={{ position: 'relative' }}>
-              <CustomButtons isBatchOperate type="menu" icon {...buttonsProps} buttons={buttons.slice(buttonShowNum)} />
+            <Menu
+              style={{ position: 'relative' }}
+              onClickAway={() => setPopupVisible(false)}
+              onClickAwayExceptions={[
+                '.mdModalWrap',
+                '.mdDialog',
+                '.mui-dialog-container',
+                '.dropdownTrigger',
+                '.addFilterPopup',
+                '.filterControlOptionsList',
+                '.mui-datetimepicker',
+                '.mui-datetimerangepicker',
+                '.selectUserBox',
+                '.CityPicker',
+                '.worksheetFilterOperateList',
+                '.ant-select-dropdown',
+                '.ant-picker-dropdown',
+                '.rc-trigger-popup',
+                '#dialogSelectDept_container',
+              ]}
+            >
+              <CustomButtons
+                hideDisabled
+                isBatchOperate
+                type="menu"
+                icon
+                {...buttonsProps}
+                buttons={buttons.slice(buttonShowNum)}
+              />
             </Menu>
           }
         >
@@ -128,10 +170,12 @@ function Buttons(props) {
 
 Buttons.propTypes = {
   width: number,
+  count: number,
   appId: string,
   viewId: string,
   projectId: string,
   worksheetId: string,
+  recordId: string,
   selectedRows: arrayOf(shape({})),
   isAll: bool,
   buttons: arrayOf(shape({})),

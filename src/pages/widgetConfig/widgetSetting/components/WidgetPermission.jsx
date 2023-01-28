@@ -5,6 +5,7 @@ import Icon from 'src/components/Icon';
 import { NOT_NEED_SET_READONLY_CONTROL } from '../../config';
 import { updateConfig } from '../../util/setting';
 import { SettingItem } from '../../styled';
+import _ from 'lodash';
 
 export default ({ from, data, info, onChange }) => {
   let { fieldPermission = '111', type } = data || {};
@@ -15,7 +16,7 @@ export default ({ from, data, info, onChange }) => {
       <div className="settingItemTitle">
         <span>{_l('字段属性')}</span>
       </div>
-      {!_.includes(NOT_NEED_SET_READONLY_CONTROL, type) && (
+      {((type === 43 && editable === '0') || !_.includes(NOT_NEED_SET_READONLY_CONTROL, type)) && (
         <div className="labelWrap">
           <Checkbox
             className="customWidgetCheckbox"
@@ -67,7 +68,6 @@ export default ({ from, data, info, onChange }) => {
       </div>
 
       {from !== 'subList' && (
-
         <div className="labelWrap">
           <Checkbox
             className="customWidgetCheckbox"

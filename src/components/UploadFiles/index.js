@@ -2,7 +2,7 @@ import PropTypes from 'prop-types';
 import React, { Component } from 'react';
 import cx from 'classnames';
 import './index.less';
-import previewAttachments from 'previewAttachments';
+import previewAttachments from 'src/components/previewAttachments/previewAttachments';
 import FileComponent from './File';
 import * as ajax from 'src/pages/kc/common/AttachmentsPreview/ajax';
 import {
@@ -16,12 +16,17 @@ import {
   checkAccountUploadLimit,
   openMdDialog,
   findIsId,
-  openNetStateDialog,
   checkFileAvailable,
 } from './utils';
 import { FROM } from 'src/components/newCustomFields/tools/config';
-import { formatFileSize, getToken } from 'src/util';
-import plupload from 'plupload';
+import { formatFileSize, getToken, upgradeVersionDialog } from 'src/util';
+import selectNode from 'src/components/kc/folderSelectDialog/folderSelectDialog';
+import { openControlAttachmentInNewTab } from 'worksheet/controllers/record';
+import RecordInfoContext from 'worksheet/common/recordInfo/RecordInfoContext';
+import plupload from '@mdfe/jquery-plupload';
+import { navigateTo } from 'src/router/navigateTo';
+import addLinkFile from 'src/components/addLinkFile/addLinkFile';
+import _ from 'lodash';
 
 export const errorCode = {
   40001: _l('鉴权失败'),
@@ -34,6 +39,7 @@ export const errorCode = {
 }
 
 export default class UploadFiles extends Component {
+  static contextType = RecordInfoContext;
   static propTypes = {
     /**
      * 不限制上传的量
@@ -59,6 +65,10 @@ export default class UploadFiles extends Component {
      * 文件的最大宽度
      */
     maxWidth: PropTypes.number,
+    /**
+     * 文件的高度
+     */
+    height: PropTypes.number,
     /**
      * 是否能上传
      */
@@ -129,6 +139,7 @@ export default class UploadFiles extends Component {
     canAddLink: false,
     minWidth: 140,
     maxWidth: 200,
+    height: 118,
     isUpload: true,
     showAttInfo: true,
     isInitCall: false,
@@ -200,12 +211,28 @@ export default class UploadFiles extends Component {
     }
   }
 
+  handleOpenControlAttachmentInNewTab(fileID) {
+    const { controlId } = this.props;
+    const recordBaseInfo = _.get(this, 'context.recordBaseInfo');
+    if (!recordBaseInfo) {
+      return;
+    }
+    openControlAttachmentInNewTab(
+      _.assign(_.pick(recordBaseInfo, ['appId', 'recordId', 'viewId', 'worksheetId']), {
+        controlId,
+        fileId: fileID,
+      }),
+    );
+  }
+
   initPlupload() {
     const _this = this;
     let { maxTotalSize } = this.state;
     const { nativeFile } = this;
     let { noTotal, dropPasteElement, from, projectId, advancedSetting } = this.props;
-    const isPublic = from === FROM.PUBLIC || from === FROM.WORKFLOW;
+    const isPublic = from === FROM.PUBLIC || from === FROM.WORKFLOW || window.isPublicWorksheet;
+
+    const { licenseType } = _.find(md.global.Account.projects, item => item.projectId === projectId) || {};
 
     $(nativeFile).plupload({
       drop_element: dropPasteElement,
@@ -244,6 +271,42 @@ export default class UploadFiles extends Component {
             return false;
           }
 
+
+          //判断应用上传量是否达到上限
+          if (projectId && !window.isPublicApp && !window.isPublicWorksheet) {
+            const params = { projectId, fromType: 9 };
+            checkAccountUploadLimit(filesSize, params).then(available => {
+              if (!available) {
+                upgradeVersionDialog({
+                  projectId,
+                  isFree: licenseType === 0,
+                  hint: _l('应用附件上传量已到最大值'),
+                  okText: _l('购买上传量扩展包'),
+                  onOk: () => navigateTo(`/admin/expansionservice/${projectId}/storage`),
+                });
+                // 这里是异步的，等这个 available 值拿到后 files 可能已经上传完毕渲染完了，也可能正在上传，这个时候需要把 temporaryData 里面的文件（本次上传的文件）清除掉
+                _this.setState({
+                  temporaryData: _this.state.temporaryData.filter(item => !findIsId(item.fileID || item.id, files)),
+                });
+                _this.onRemoveAll(uploader);
+                return false;
+              }
+            });
+          } else if (!isPublic && !noTotal && !window.isPublicApp) {
+            // 判断个人上传流量是否达到上限
+            checkAccountUploadLimit(filesSize).then(available => {
+              if (!available) {
+                openMdDialog();
+                // 这里是异步的，等这个 available 值拿到后 files 可能已经上传完毕渲染完了，也可能正在上传，这个时候需要把 temporaryData 里面的文件（本次上传的文件）清除掉
+                _this.setState({
+                  temporaryData: _this.state.temporaryData.filter(item => !findIsId(item.fileID || item.id, files)),
+                });
+                _this.onRemoveAll(uploader);
+                return false;
+              }
+            });
+          }
+
           // 判断上传文件的格式
           if (isValid(files)) {
             alert(_l('含有不支持格式的文件'), 3);
@@ -264,7 +327,10 @@ export default class UploadFiles extends Component {
           } else if (currentFileLength > 20) {
             alert(_l('附件数量超过限制，一次上传不得超过20个附件'), 3);
             const num = currentFileLength - 20;
-            files.splice(files.length - num, num);
+            files.splice(files.length - num, num).map(file => {
+              uploader.removeFile({ id: file.id });
+            });
+
           }
 
           const tokenFiles = [];
@@ -341,7 +407,8 @@ export default class UploadFiles extends Component {
           // 上传完成，取消进度条
           const newTemporaryData = _this.state.temporaryData.map(item => {
             if (file.id == item.id && 'progress' in item) {
-              item = formatResponseData(file, decodeURIComponent(response.response));
+              item = formatResponseData(file, response.response);
+              item.originalFileName = decodeURIComponent(item.originalFileName);
               delete item.progress;
               delete item.base;
             }
@@ -371,7 +438,11 @@ export default class UploadFiles extends Component {
               }
             } catch (error) { }
           }
-          alert(_l('上传失败'), 2);
+          if (error.code === window.plupload.FILE_SIZE_ERROR) {
+            alert(_l('单个文件大小超过%0mb，无法支持上传', maxTotalSize), 2);
+          } else {
+            alert(_l('上传失败，请稍后再试。'), 2);
+          }
         },
       },
     });
@@ -384,61 +455,59 @@ export default class UploadFiles extends Component {
     });
   }
   onOpenFolderSelectDialog() {
-    require(['src/components/kc/folderSelectDialog/folderSelectDialog'], selectNode => {
-      selectNode({
-        isFolderNode: 2,
-      }).then(result => {
-        let { kcAttachmentData, temporaryData, originCount } = this.state;
-        let { advancedSetting } = this.props;
-        let newKcAttachmentData = result.node.map(node => {
-          // 在添加之前，找出重复的文件
-          if (kcAttachmentData.filter(n => n.refId == node.id).length) {
-            alert(_l('已引用该文件'), 3);
-            return false;
-          }
-
-          return {
-            isUpload: true,
-            fileID: node.id,
-            refId: node.id,
-            originalFileName: node.name,
-            fileExt: node.ext ? '.' + node.ext : '',
-            fileSize: node.size,
-            allowDown: node.isDownloadable,
-            viewUrl: File.isPicture('.' + node.ext) ? node.viewUrl : null,
-            node,
-          };
-        });
-
-        // 可能会有重复的文件，用 false 表示的，这里需要过滤一下
-        newKcAttachmentData = kcAttachmentData.concat(newKcAttachmentData.filter(n => n));
-        let isAvailable = true;
-        // 附件配置控制（包含数量、单个文件大小、类型）
-        if (advancedSetting) {
-          isAvailable = checkFileAvailable(advancedSetting, newKcAttachmentData, temporaryData.length + originCount);
-        }
-        if (!isAvailable) return;
-
-        // 最多只能上传20个知识文件
-        if (newKcAttachmentData.length > 20) {
-          alert(_l('附件数量超过限制，一次上传不得超过20个附件'), 3);
+    selectNode({
+      isFolderNode: 2,
+    }).then(result => {
+      let { kcAttachmentData, temporaryData, originCount } = this.state;
+      let { advancedSetting } = this.props;
+      let newKcAttachmentData = result.node.map(node => {
+        // 在添加之前，找出重复的文件
+        if (kcAttachmentData.filter(n => n.refId == node.id).length) {
+          alert(_l('已引用该文件'), 3);
           return false;
         }
 
-        this.setState(
-          {
-            kcAttachmentData: newKcAttachmentData,
-          },
-          () => {
-            this.props.onKcAttachmentDataUpdate(newKcAttachmentData);
-            if (this._uploading) return;
-            // 必须等待 onKcAttachmentDataUpdate 把调用方当前的 state 更改后才能执行 onUploadComplete
-            setTimeout(() => {
-              this.props.onUploadComplete(true);
-            }, 0);
-          },
-        );
+        return {
+          isUpload: true,
+          fileID: node.id,
+          refId: node.id,
+          originalFileName: node.name,
+          fileExt: node.ext ? '.' + node.ext : '',
+          fileSize: node.size,
+          allowDown: node.isDownloadable,
+          viewUrl: File.isPicture('.' + node.ext) ? node.viewUrl : null,
+          node,
+        };
       });
+
+      // 可能会有重复的文件，用 false 表示的，这里需要过滤一下
+      newKcAttachmentData = kcAttachmentData.concat(newKcAttachmentData.filter(n => n));
+      let isAvailable = true;
+      // 附件配置控制（包含数量、单个文件大小、类型）
+      if (advancedSetting) {
+        isAvailable = checkFileAvailable(advancedSetting, newKcAttachmentData, temporaryData.length + originCount);
+      }
+      if (!isAvailable) return;
+
+      // 最多只能上传20个知识文件
+      if (newKcAttachmentData.length > 20) {
+        alert(_l('附件数量超过限制，一次上传不得超过20个附件'), 3);
+        return false;
+      }
+
+      this.setState(
+        {
+          kcAttachmentData: newKcAttachmentData,
+        },
+        () => {
+          this.props.onKcAttachmentDataUpdate(newKcAttachmentData);
+          if (this._uploading) return;
+          // 必须等待 onKcAttachmentDataUpdate 把调用方当前的 state 更改后才能执行 onUploadComplete
+          setTimeout(() => {
+            this.props.onUploadComplete(true);
+          }, 0);
+        },
+      );
     });
   }
   removeUploadingFile(id) {
@@ -458,33 +527,32 @@ export default class UploadFiles extends Component {
   }
   openLinkDialog(item) {
     const _this = this;
-    require(['src/components/addLinkFile/addLinkFile'], addLinkFile => {
-      const hanele = new addLinkFile({
-        showTitleTip: false,
-        callback: link => {
-          const { linkName, linkContent } = link;
-          const { temporaryData } = this.state;
-          if (
-            temporaryData.filter(attachment => attachment.fileExt === '.url' && attachment.originLinkUrl).length >= 20
-          ) {
-            alert(_l('附件数量超过限制，一次上传不得超过20个附件'), 3);
-            return;
-          }
-          const newTemporaryData = temporaryData.concat({
-            fileID: Math.random().toString(),
-            fileExt: '.url',
-            originalFileName: linkName,
-            oldOriginalFileName: linkName,
-            originLinkUrl: linkContent,
-            allowDown: true,
-          });
-          _this.setState({
-            temporaryData: newTemporaryData,
-          });
-          _this.props.onTemporaryDataUpdate(newTemporaryData);
-          _this.props.onUploadComplete(true);
-        },
-      });
+
+    new addLinkFile({
+      showTitleTip: false,
+      callback: link => {
+        const { linkName, linkContent } = link;
+        const { temporaryData } = this.state;
+        if (
+          temporaryData.filter(attachment => attachment.fileExt === '.url' && attachment.originLinkUrl).length >= 20
+        ) {
+          alert(_l('附件数量超过限制，一次上传不得超过20个附件'), 3);
+          return;
+        }
+        const newTemporaryData = temporaryData.concat({
+          fileID: Math.random().toString(),
+          fileExt: '.url',
+          originalFileName: linkName,
+          oldOriginalFileName: linkName,
+          originLinkUrl: linkContent,
+          allowDown: true,
+        });
+        _this.setState({
+          temporaryData: newTemporaryData,
+        });
+        _this.props.onTemporaryDataUpdate(newTemporaryData);
+        _this.props.onUploadComplete(true);
+      },
     });
   }
   onDeleteMDFile(attachment, event) {
@@ -615,6 +683,7 @@ export default class UploadFiles extends Component {
             }
           }
         },
+        openControlAttachmentInNewTab: this.props.controlId && this.handleOpenControlAttachmentInNewTab.bind(this),
       },
     );
   }
@@ -634,48 +703,63 @@ export default class UploadFiles extends Component {
 
     if (mdIndex >= 0) {
       let hideFunctions = ['editFileName'];
-      previewAttachments({
-        attachments: mdData.map(item => item.twice),
-        index: mdIndex,
-        callFrom: 'player',
-        hideFunctions: hideFunctions,
-      });
+      previewAttachments(
+        {
+          attachments: mdData.map(item => item.twice),
+          index: mdIndex,
+          callFrom: 'player',
+          hideFunctions: hideFunctions,
+        },
+        {
+          openControlAttachmentInNewTab: this.props.controlId && this.handleOpenControlAttachmentInNewTab.bind(this),
+        },
+      );
     } else if (quIndex >= 0) {
       let hideFunctions = ['editFileName'];
-      previewAttachments({
-        attachments: quData.map(item => {
-          const twice = item.twice || {};
-          const result = {
-            name: `${item.originalFileName || '未命名'}${item.fileExt}`,
-            path: item.previewUrl
-              ? `${item.previewUrl}`
-              : item.url
-              ? `${item.url}&imageView2/1/w/200/h/140`
-              : `${item.serverName}${item.key}`,
-            previewAttachmentType: 'QINIU',
-            size: item.fileSize,
-            fileid: item.fileID,
-          };
-          if (item.fileExt === '.url') {
-            result.linkUrl = item.originLinkUrl;
-          }
-          return result;
-        }),
-        index: quIndex,
-        callFrom: 'chat',
-        hideFunctions: hideFunctions,
-      });
+      previewAttachments(
+        {
+          attachments: quData.map(item => {
+            const twice = item.twice || {};
+            const result = {
+              name: `${item.originalFileName || '未命名'}${item.fileExt}`,
+              path: item.previewUrl
+                ? `${item.previewUrl}`
+                : item.url
+                ? `${item.url}&imageView2/1/w/200/h/140`
+                : `${item.serverName}${item.key}`,
+              previewAttachmentType: 'QINIU',
+              size: item.fileSize,
+              fileid: item.fileID,
+            };
+            if (item.fileExt === '.url') {
+              result.linkUrl = item.originLinkUrl;
+            }
+            return result;
+          }),
+          index: quIndex,
+          callFrom: 'chat',
+          hideFunctions: hideFunctions,
+        },
+        {
+          openControlAttachmentInNewTab: this.props.controlId && this.handleOpenControlAttachmentInNewTab.bind(this),
+        },
+      );
     }
   }
   onKcPreview(id, index) {
     const { kcAttachmentData } = this.state;
     let res = kcAttachmentData.filter(item => item.node);
-    previewAttachments({
-      attachments: res.map(item => item.node),
-      index: findIndex(res, id),
-      callFrom: 'kc',
-      hideFunctions: ['editFileName'],
-    });
+    previewAttachments(
+      {
+        attachments: res.map(item => item.node),
+        index: findIndex(res, id),
+        callFrom: 'kc',
+        hideFunctions: ['editFileName'],
+      },
+      {
+        openControlAttachmentInNewTab: this.props.controlId && this.handleOpenControlAttachmentInNewTab.bind(this),
+      },
+    );
   }
   onKcTwicePreview(id, index, event) {
     let { kcAttachmentData } = this.state;
@@ -684,17 +768,28 @@ export default class UploadFiles extends Component {
 
     if (preview[0].updater) {
       // 知识中心
-      previewAttachments({
-        attachments: preview,
-        index: findIndex(attachments, id),
-        callFrom: 'kc',
-      });
+      previewAttachments(
+        {
+          attachments: preview,
+          index: findIndex(attachments, id),
+          callFrom: 'kc',
+        },
+        {
+          openControlAttachmentInNewTab: this.props.controlId && this.handleOpenControlAttachmentInNewTab.bind(this),
+        },
+      );
     } else {
-      previewAttachments({
-        attachments: preview,
-        index: findIndex(attachments, id),
-        callFrom: 'player',
-      });
+      // 明道云
+      previewAttachments(
+        {
+          attachments: preview,
+          index: findIndex(attachments, id),
+          callFrom: 'player',
+        },
+        {
+          openControlAttachmentInNewTab: this.props.controlId && this.handleOpenControlAttachmentInNewTab.bind(this),
+        },
+      );
     }
   }
   onReplaceAttachment(newAttachment) {
@@ -711,7 +806,7 @@ export default class UploadFiles extends Component {
     }
   }
   render() {
-    let { isUpload, arrowLeft, minWidth, maxWidth, canAddLink } = this.props;
+    let { controlId, isUpload, arrowLeft, minWidth, maxWidth, height, canAddLink, from } = this.props;
     let { temporaryData, kcAttachmentData, attachmentData } = this.state;
     let { totalSize, currentPrograss } = getAttachmentTotalSize(temporaryData);
     let length = temporaryData.length + kcAttachmentData.length + attachmentData.length;
@@ -719,6 +814,7 @@ export default class UploadFiles extends Component {
     let style = {
       minWidth: minWidth,
       maxWidth: maxWidth,
+      height,
     };
     let { hideDownload = false } = this.props;
     return (
@@ -743,7 +839,7 @@ export default class UploadFiles extends Component {
                 <i className="icon icon-knowledge-upload Gray_9e Font19" />
                 <span>{_l('本地')}</span>
               </div>
-              {!md.global.Account.isPortal && !md.global.SysSettings.forbidSuites.includes('4') && (
+              {!md.global.Account.isPortal && from !== FROM.DRAFT && !md.global.SysSettings.forbidSuites.includes('4') && (
                 <div className="flexRow valignWrapper" onClick={this.onOpenFolderSelectDialog.bind(this)}>
                   <i className="icon icon-folder Gray_9e Font18" />
                   <span>{_l('知识')}</span>
@@ -787,6 +883,9 @@ export default class UploadFiles extends Component {
               onReplaceAttachment={this.onReplaceAttachment.bind(this)}
               onPreview={this.onMDPreview.bind(this)}
               isDeleteFile={this.props.isDeleteFile}
+              {...(controlId
+                ? { handleOpenControlAttachmentInNewTab: () => this.handleOpenControlAttachmentInNewTab(item.fileID) }
+                : {})}
             />
           ))}
           {temporaryData.map((item, index) => (
@@ -801,6 +900,9 @@ export default class UploadFiles extends Component {
               onDeleteFile={this.onDeleteFile.bind(this)}
               removeUploadingFile={this.removeUploadingFile.bind(this)}
               onPreview={this.onPreview.bind(this)}
+              {...(controlId
+                ? { handleOpenControlAttachmentInNewTab: () => this.handleOpenControlAttachmentInNewTab(item.fileID) }
+                : {})}
             />
           ))}
           {kcAttachmentData.map((item, index) => (
@@ -815,6 +917,9 @@ export default class UploadFiles extends Component {
               onDeleteKcFile={this.onDeleteKcFile.bind(this)}
               onPreview={this.onKcPreview.bind(this)}
               onKcTwicePreview={this.onKcTwicePreview.bind(this)}
+              {...(controlId
+                ? { handleOpenControlAttachmentInNewTab: () => this.handleOpenControlAttachmentInNewTab(item.fileID) }
+                : {})}
             />
           ))}
           {emptys.map((item, index) => (

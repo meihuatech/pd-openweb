@@ -1,7 +1,7 @@
 import '../css/mentionsInput.css';
 import { getRequest, htmlEncodeReg, setCaretPosition, getCaretPosition } from 'src/util';
+import _ from 'lodash';
 const Request = getRequest();
-const _ = require('lodash');
 
 (function ($) {
   // Handler for propertychange events only

@@ -3,23 +3,29 @@ import styled from 'styled-components';
 import { Dropdown, Icon, Checkbox } from 'ming-ui';
 import DropdownWrapper from 'worksheet/components/DropdownWrapper';
 import { getIconByType } from 'src/pages/widgetConfig/util';
+import { FILTER_CONDITION_TYPE } from 'src/pages/worksheet/common/WorkSheetFilter/enum';
 import {
-  TEXT,
-  NUMBER,
-  SHOW,
-  TIME,
-  OPTIONS,
-  SHOW_RELATE,
+  MULTI_SELECT_FILTER_TYPE,
+  TEXT_FILTER_TYPE,
+  NUMBER_FILTER_TYPE,
+  RELA_FILTER_TYPE,
+  GROUP_FILTER_TYPE,
+  DIRECTION_TYPE,
+  DATE_RANGE,
+  OPTIONS_ALLOWITEM,
+  SHOW_RELATE_TYPE,
+  APP_ALLOWSCAN,
   ADVANCEDSETTING_KEYS,
-  APPSCAN,
   FASTFILTER_CONDITION_TYPE,
   getSetDefault,
+  getControlFormatType,
 } from './util';
 import withClickAway from 'ming-ui/decorators/withClickAway';
 import { Radio } from 'antd';
 import AddCondition from 'src/pages/worksheet/common/WorkSheetFilter/components/AddCondition';
 import cx from 'classnames';
 import errorBoundary from 'ming-ui/decorators/errorBoundary';
+import _ from 'lodash';
 
 const Wrap = styled.div`
   width: 400px;
@@ -76,6 +82,9 @@ const Wrap = styled.div`
         font-size: 13px;
         font-size: 13px;
       }
+      .ant-radio-input {
+        display: none !important;
+      }
       .active {
         .inputBox {
           border: 1px solid #2196f3;
@@ -111,7 +120,7 @@ const Wrap = styled.div`
         background: #ffffff;
         // border: 1px solid #dddddd;
         border-radius: 4px;
-        margin: 8px 0;
+        margin-top: 8px;
         box-sizing: border-box;
         & > div {
           flex: 1;
@@ -189,6 +198,7 @@ function Edit(params) {
   let [fastFilters, setData] = useState();
   let [control, setControl] = useState();
   let [fastFilterDataControls, setDatas] = useState();
+  let [dataControls, setDataControls] = useState({});
   let boxConT = useRef(null);
   let [advancedSetting, setAdvancedSetting] = useState();
   let [dataType, setDataType] = useState();
@@ -201,26 +211,27 @@ function Edit(params) {
         ...o,
         isErr: !o,
         controlName: c.controlName,
-        type: c.type,
+        type: getControlFormatType(c),
         sourceControl: c.sourceControl,
       };
     });
     setDatas(controlsFilter);
     let dd = worksheetControls.find(item => item.controlId === activeFastFilterId) || {};
+    setDataControls(dd);
     let controlNew = controlsFilter.find(o => o.controlId === activeFastFilterId);
     if (!controlNew) {
       controlNew = {
         ...getSetDefault(dd),
         isErr: !dd.controlName,
         controlName: dd.controlName,
-        type: dd.type,
+        type: getControlFormatType(dd),
         sourceControl: dd.sourceControl,
       };
     }
     setControl(controlNew);
     let advancedSetting = controlNew.advancedSetting || {};
     setAdvancedSetting(advancedSetting);
-    setDataType([30, 37].includes(controlNew.type) ? (controlNew.sourceControl || {}).type : controlNew.type);
+    setDataType(controlNew.type);
   }, [activeFastFilterId, view.fastFilters]);
   if (!control) {
     return '';
@@ -277,9 +288,9 @@ function Edit(params) {
         <div className="title">{data.txt}</div>
         <Radio.Group
           onChange={e => {
-            // 单选只支持下拉
+            // 单选只支持下拉 筛选方式默认等于
             if (data.key === 'allowitem' && e.target.value === 1) {
-              updateViewSet({ [data.key]: e.target.value, direction: 2 });
+              updateViewSet({ [data.key]: e.target.value, direction: 2, filterType: FILTER_CONDITION_TYPE.EQ });
             } else {
               updateViewSet({ [data.key]: e.target.value });
             }
@@ -314,7 +325,7 @@ function Edit(params) {
 
   const renderListItem = data => {
     let daterange = getDaterange();
-    let isAllRange = daterange.length >= TIME.default.length;
+    let isAllRange = daterange.length >= DATE_RANGE.default.length;
     return data.map((item, index) => {
       if (_.isArray(item)) {
         return (
@@ -333,7 +344,7 @@ function Edit(params) {
               onClick={() => {
                 let newValue = daterange;
                 if (item.value === 'all') {
-                  newValue = !isAllRange ? TIME.default : [];
+                  newValue = !isAllRange ? DATE_RANGE.default : [];
                 } else {
                   if (newValue.includes(item.value)) {
                     newValue = newValue.filter(o => o !== item.value);
@@ -341,7 +352,7 @@ function Edit(params) {
                     newValue = newValue.concat(item.value);
                   }
                 }
-                updateViewSet({ [TIME.key]: JSON.stringify(newValue) });
+                updateViewSet({ [DATE_RANGE.key]: JSON.stringify(newValue) });
               }}
             />
           </React.Fragment>
@@ -351,11 +362,23 @@ function Edit(params) {
   };
   const renderTimeType = () => {
     let daterange = getDaterange();
-    let isAllRange = daterange.length >= TIME.default.length;
+    let isAllRange = daterange.length >= DATE_RANGE.default.length;
+    let dateRanges = DATE_RANGE.types;
+    const activeControl = worksheetControls.find(item => item.controlId === control.controlId);
+    const showType = _.get(activeControl, 'advancedSetting.showtype');
+    if (_.includes(['4', '5'], showType)) {
+      dateRanges = dateRanges
+        .map(options =>
+          options.filter(o =>
+            _.includes(showType === '5' ? [15, 16, 17, 18] : [7, 8, 9, 12, 13, 14, 15, 16, 17, 18], o.value),
+          ),
+        )
+        .filter(options => options.length);
+    }
     return (
       <React.Fragment>
-        <div className="title">{TIME.txt}</div>
-        <DropdownWrapper className="w100 dropTimeWrap" downElement={<div>{renderListItem(TIME.types)}</div>}>
+        <div className="title">{DATE_RANGE.txt}</div>
+        <DropdownWrapper className="w100 dropTimeWrap" downElement={<div>{renderListItem(dateRanges)}</div>}>
           <div className="Dropdown--input Dropdown--border mTop6">
             <div className="inputBox">
               <div className={cx('itemText', { Gray_bd: daterange.length <= 0 })}>
@@ -408,7 +431,7 @@ function Edit(params) {
           columns={worksheetControls.filter(
             o =>
               (FASTFILTER_CONDITION_TYPE.includes(o.type) ||
-                (o.type === 30 && FASTFILTER_CONDITION_TYPE.includes((o.sourceControl || {}).type))) &&
+                (o.type === 30 && FASTFILTER_CONDITION_TYPE.includes(getControlFormatType(o)))) &&
               !fastFilters.map(o => o.controlId).includes(o.controlId),
           )}
           onAdd={data => {
@@ -443,13 +466,35 @@ function Edit(params) {
             );
           }}
         />
-        {TEXT.keys.includes(dataType) && renderDrop(TEXT)}
-        {NUMBER.keys.includes(dataType) && renderDrop(NUMBER)}
-        {OPTIONS.keys.includes(dataType) && renderShowType(OPTIONS)}
-        {SHOW.keys.includes(dataType) && renderShowType(SHOW)}
-        {SHOW_RELATE.keys.includes(dataType) && renderShowType(SHOW_RELATE)}
-        {TIME.keys.includes(dataType) && renderTimeType()}
-        {APPSCAN.keys.includes(dataType) && renderAppScan()}
+        {[TEXT_FILTER_TYPE, RELA_FILTER_TYPE, GROUP_FILTER_TYPE, NUMBER_FILTER_TYPE].map(o => {
+          if (o.keys.includes(dataType)) {
+            return renderDrop(o);
+          }
+        })}
+        {[OPTIONS_ALLOWITEM].map(o => {
+          if (o.keys.includes(dataType)) {
+            return renderShowType(o);
+          }
+        })}
+        {[MULTI_SELECT_FILTER_TYPE].map(o => {
+          //多选类型字段 且 允许选择数量为多选 =>支持设置筛选方式  多选 => 人员、部门、组织角色enumDefault：1; 关联字段enumDefault: 2 ;多选字段
+          if (
+            o.keys.includes(dataType) &&
+            (([26, 27, 48].includes(dataType) && dataControls.enumDefault === 1) ||
+              (dataType === 29 && dataControls.enumDefault === 2) ||
+              dataType === 10) &&
+            Number(advancedSetting.allowitem) === 2
+          ) {
+            return renderDrop(o);
+          }
+        })}
+        {[DIRECTION_TYPE, SHOW_RELATE_TYPE].map(o => {
+          if (o.keys.includes(dataType)) {
+            return renderShowType(o);
+          }
+        })}
+        {DATE_RANGE.keys.includes(dataType) && renderTimeType()}
+        {APP_ALLOWSCAN.keys.includes(dataType) && renderAppScan()}
       </div>
     </React.Fragment>
   );

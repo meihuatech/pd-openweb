@@ -1,8 +1,9 @@
-import React, { Component } from 'react';
+import React, { Component, Fragment } from 'react';
 import { func, oneOf } from 'prop-types';
 import { Motion, spring } from 'react-motion';
 import color from 'color';
 import cx from 'classnames';
+import DocumentTitle from 'react-document-title';
 import { Icon, Menu, MenuItem } from 'ming-ui';
 import { connect } from 'react-redux';
 import RcDialog from 'rc-dialog';
@@ -15,12 +16,13 @@ import Trigger from 'rc-trigger';
 import SvgIcon from 'src/components/SvgIcon';
 import { changeAppColor, syncAppDetail } from 'src/pages/PageHeader/redux/action';
 import api from 'api/homeApp';
-import { Drawer } from 'antd';
+import { Drawer, Modal } from 'antd';
 import HomepageIcon from '../../components/HomepageIcon';
 import IndexSide from '../../components/IndexSide';
 import CommonUserHandle from '../../components/CommonUserHandle';
 import { APP_CONFIG, ADVANCE_AUTHORITY } from '../config';
 import ExportApp from 'src/pages/Admin/appManagement/modules/ExportApp';
+import AppItemTrash from 'src/pages/worksheet/common/Trash/AppItemTrash';
 import { getIds, compareProps, getItem, setItem, isCanEdit } from '../../util';
 import EditAppIntro from './EditIntro';
 import AppGroup from '../AppGroup';
@@ -28,7 +30,12 @@ import AllOptionList from './AllOptionList';
 import AppNavStyle from './AppNavStyle';
 import AppFixStatus from './AppFixStatus';
 import './index.less';
-import { upgradeVersionDialog, getAppFeaturesVisible } from 'src/util';
+import { getAppFeaturesVisible, getFeatureStatus, buriedUpgradeVersionDialog } from 'src/util';
+import EditPublishSetDialog from './EditpublishSet';
+import CreateAppBackupDialog from './appBackupRestore/CreateAppBackupDialog';
+import ManageBackupFilesDialog from './appBackupRestore/ManageBackupFilesDialog';
+import AppAnalytics from 'src/pages/Admin/useAnalytics/components/AppAnalytics';
+import _ from 'lodash';
 
 const mapStateToProps = ({ sheet, sheetList, appPkg: { appStatus } }) => ({ sheet, sheetList, appStatus });
 const mapDispatchToProps = dispatch => ({
@@ -37,10 +44,7 @@ const mapDispatchToProps = dispatch => ({
 });
 
 let mousePosition = { x: 139, y: 23 };
-@connect(
-  mapStateToProps,
-  mapDispatchToProps,
-)
+@connect(mapStateToProps, mapDispatchToProps)
 export default class AppInfo extends Component {
   static propTypes = {
     appStatus: oneOf([0, 1, 2, 3, 4, 5]),
@@ -62,6 +66,7 @@ export default class AppInfo extends Component {
       appConfigVisible: false,
       modifyAppIconAndNameVisible: false,
       editAppIntroVisible: false,
+      isEditing: false,
       editAppFixStatusVisible: false,
       exportAppVisible: false,
       isShowAppIntroFirst: !_.includes(openedApps, appId),
@@ -70,6 +75,11 @@ export default class AppInfo extends Component {
       copyAppVisible: false,
       data: {},
       hasChange: false,
+      showEditPublishSetDialog: false,
+      createBackupVisisble: false,
+      manageBackupFilesVisible: false,
+      noUseBackupRestore: false,
+      appAnalyticsVisible: false,
     };
   }
 
@@ -87,6 +97,13 @@ export default class AppInfo extends Component {
     this.ids = getIds(nextProps);
     if (compareProps(nextProps.match.params, this.props.match.params, ['appId'])) {
       this.getData();
+    }
+    if (!_.isEqual(this.props.location.search, nextProps.location.search)) {
+      this.getData();
+    } else if (nextProps.location.search === '?backup') {
+      this.setState({
+        manageBackupFilesVisible: true,
+      });
     }
   }
 
@@ -112,8 +129,23 @@ export default class AppInfo extends Component {
           'fixRemark',
           'fixAccount',
           'permissionType',
+          'appDisplay',
+          'webMobileDisplay',
+          'pcDisplay',
         ]),
       );
+      const { tb } = getAppFeaturesVisible();
+      const isNormalApp = _.includes([1, 5], data.appStatus);
+      if (location.href.indexOf('backup') > -1 && isNormalApp && isCanEdit(data.permissionType, data.isLock) && tb) {
+        if (this.state.manageBackupFilesVisible) {
+          this.setState({ manageBackupFilesKey: Date.now() });
+        } else {
+          this.setState({
+            manageBackupFilesVisible: true,
+          });
+        }
+      }
+
       this.setState({ data });
       window.appInfo = data;
       this.dataCache = _.pick(data, ['icon', 'iconColor', 'name']);
@@ -141,7 +173,7 @@ export default class AppInfo extends Component {
   };
 
   handleAppConfigClick = type => {
-    this.setState({ appConfigVisible: false, [type]: true });
+    this.setState({ appConfigVisible: false, [type]: true, isEditing: true });
   };
 
   handleAppIconAndNameChange = obj => {
@@ -171,7 +203,7 @@ export default class AppInfo extends Component {
     const { appId } = this.ids;
     const { data: { projectId } = { projectId: '' } } = this.state;
     this.setState({ delAppConfirmVisible: false });
-    api.deleteApp({ appId, projectId }).then(res => {
+    api.deleteApp({ appId, projectId, isHomePage: true }).then(res => {
       navigateTo('/app/my');
     });
   };
@@ -211,10 +243,20 @@ export default class AppInfo extends Component {
 
   renderMenu = ({ type, icon, text, action, ...rest }) => {
     const { data } = this.state;
-    if (!this.state.data.projectId && (type === 'ding' || type === 'weixin' || type === 'worksheetapi')) {
+    const { projectId } = this.state.data;
+    if (rest.featureId) {
+      const featureType = getFeatureStatus(projectId, rest.featureId);
+      if (!featureType) return;
+    }
+    if (
+      _.includes(['createBackup', 'restore', 'export', 'appItemTrash'], type) &&
+      !getFeatureStatus(projectId, rest.featureId)
+    )
+      return;
+    if (!projectId && _.includes(['ding', 'weixin', 'worksheetapi'], type)) {
       return '';
     } else {
-      if (type === 'del' || type === 'worksheetapi') {
+      if (_.includes(['del', 'export', 'createBackup'], type)) {
         return (
           <React.Fragment>
             <div style={{ width: '100%', margin: '6px 0', borderTop: '1px solid #EAEAEA' }} />
@@ -222,6 +264,7 @@ export default class AppInfo extends Component {
           </React.Fragment>
         );
       }
+
       if (type === 'editAppNavStyle') {
         return (
           <Trigger
@@ -241,16 +284,59 @@ export default class AppInfo extends Component {
           </Trigger>
         );
       }
+
       if (type === 'editAppFixStatus') {
         return this.renderMenuHtml({ type, icon, text: rest.getText(data.fixed), action, ...rest });
+      }
+
+      if (type === 'appManageMenu') {
+        return (
+          <Fragment>
+            <div style={{ width: '100%', margin: '6px 0', borderTop: '1px solid #EAEAEA' }} />
+            <Trigger
+              action={['hover']}
+              popupAlign={{ points: ['tl', 'tr'], offset: [0, -6] }}
+              popup={
+                <div className="appManageMenuWrap">
+                  {(rest.subMenuList || []).map(it => this.renderMenu({ ...it }))}
+                </div>
+              }
+              getPopupContainer={() => document.querySelector('.appConfigIcon .appManageMenu .Item-content')}
+            >
+              {this.renderMenuHtml({ type, icon, text, action, ...rest })}
+            </Trigger>
+          </Fragment>
+        );
       }
       return this.renderMenuHtml({ type, icon, text, action, ...rest });
     }
   };
 
-  renderMenuHtml = ({ type, icon, text, action, ...rest }) => {
+  toSetEnterpirse = () => {
+    const { projectId } = this.state.data;
+    navigateTo(`/admin/workwxapp/${projectId}`);
+    this.setState({ noIntegratedWechat: false });
+  };
+  submitApply = () => {
+    const { projectId, appId } = this.state.data;
+    editWorkWXAlternativeAppStatus({
+      projectId,
+      appId,
+    }).then(res => {
+      if (res) {
+        alert(_l('提交申请成功'));
+      } else {
+        alert(_l('提交申请失败'), 2);
+      }
+    });
+    this.setState({ integratedWechat: false });
+  };
+
+  renderMenuHtml = ({ type, icon, text, action, subMenuList = [], ...rest }) => {
     const { appId } = this.ids;
     const { projectId } = this.state.data;
+    const featureType = getFeatureStatus(projectId, rest.featureId);
+
     return (
       <MenuItem
         key={type}
@@ -258,40 +344,51 @@ export default class AppInfo extends Component {
         icon={<Icon className="appConfigItemIcon Font18" icon={icon} />}
         onClick={e => {
           e.stopPropagation();
-          if (type === 'ding') {
-            window.open(`/dingAppCourse/${projectId}/${appId}`);
+
+          if (
+            _.includes(
+              ['createBackup', 'restore', 'export', 'appItemTrash', 'appAnalytics', 'appItemTrash', 'worksheetapi'],
+              type,
+            ) &&
+            getFeatureStatus(projectId, rest.featureId) === '2'
+          ) {
+            buriedUpgradeVersionDialog(projectId, rest.featureId);
             return;
           }
-          if (type === 'weixin') {
-            window.open(`/weixinAppCourse/${projectId}/${appId}`);
+
+          if (type === 'appAnalytics') {
+            window.open(`/analytics/${projectId}/${appId}`, '__blank');
             return;
           }
+
+          if (type === 'publishSettings') {
+            this.setState({ showEditPublishSetDialog: true, appConfigVisible: false });
+            return;
+          }
+
           if (type === 'worksheetapi') {
-            const licenseType = _.get(
-              _.find(md.global.Account.projects, item => item.projectId === projectId) || {},
-              'licenseType',
-            );
-            if (licenseType === 0) {
-              upgradeVersionDialog({
-                projectId,
-                explainText: _l('请升级至付费版解锁开启'),
-                isFree: true,
-              });
-              return;
-            }
             window.open(`/worksheetapi/${appId}`);
             return;
           }
+
           if (type === 'export') {
             this.handleAppConfigClick(action);
             return;
           }
+          if (type === 'appItemTrash') {
+            this.setState({ appItemTrashVisible: true, appConfigVisible: false });
+          }
+
           this.handleAppConfigClick(action);
         }}
         {...rest}
       >
         <span>{text}</span>
+        {type === 'appItemTrash' && featureType === '2' && (
+          <icon className="icon-auto_awesome Font16 mLeft6" style={{ color: '#fcb400' }} />
+        )}
         {type === 'editAppNavStyle' && <Icon className="rightArrow Font20" icon="navigate_next" />}
+        {type === 'appManageMenu' && <Icon className="rightArrow Font20" icon="navigate_next" />}
       </MenuItem>
     );
   };
@@ -308,6 +405,7 @@ export default class AppInfo extends Component {
       indexSideVisible,
       appConfigVisible,
       editAppIntroVisible,
+      isEditing,
       editAppFixStatusVisible,
       optionListVisible,
       exportAppVisible,
@@ -316,6 +414,12 @@ export default class AppInfo extends Component {
       modifyAppIconAndNameVisible,
       copyAppVisible,
       data,
+      showEditPublishSetDialog,
+      createBackupVisisble,
+      manageBackupFilesVisible,
+      isAutofucus,
+      appItemTrashVisible,
+      appAnalyticsVisible,
     } = this.state;
     const {
       id: appId,
@@ -328,6 +432,7 @@ export default class AppInfo extends Component {
       isLock,
       projectId,
       fixed,
+      pcDisplay,
     } = data;
     const isNormalApp = _.includes([1, 5], appStatus);
     const isAuthorityApp = permissionType >= ADVANCE_AUTHORITY;
@@ -347,6 +452,7 @@ export default class AppInfo extends Component {
           backgroundColor: color(iconColor).darken(0.07),
         }}
       >
+        <DocumentTitle title={name} />
         <div className="appInfoWrap">
           {window.isPublicApp || !s ? (
             <div className="mLeft16" />
@@ -378,7 +484,7 @@ export default class AppInfo extends Component {
               </div>
             </div>
           )}
-          {fixed && <div className="appFixed">{_l('维护中')}</div>}
+          {!(pcDisplay && !isAuthorityApp) && fixed && <div className="appFixed">{_l('维护中')}</div>}
           {isNormalApp && isCanEdit(permissionType, isLock) && tb && (
             <div
               className="appConfigIcon pointer"
@@ -405,7 +511,7 @@ export default class AppInfo extends Component {
               data-tip={_l('应用说明')}
               onClick={e => {
                 mousePosition = { x: e.pageX, y: e.pageY };
-                this.setState({ editAppIntroVisible: true });
+                this.setState({ editAppIntroVisible: true, isEditing: false });
               }}
             >
               <Icon className="appIntroIcon Font16" icon="info" />
@@ -424,7 +530,7 @@ export default class AppInfo extends Component {
             />
           )}
         </div>
-        {!(fixed && !isAuthorityApp) && (
+        {!(fixed && !isAuthorityApp) && !(pcDisplay && !isAuthorityApp) && (
           <AppGroup appStatus={appStatus} {...props} {..._.pick(data, ['permissionType', 'isLock'])} />
         )}
 
@@ -437,15 +543,20 @@ export default class AppInfo extends Component {
           animation="zoom"
           style={{ width: '800px' }}
           maskStyle={{ backgroundColor: 'rgba(0, 0, 0, 0.7)' }}
-          bodyStyle={{ minHeight: '480px', padding: 0 }}
+          bodyStyle={{ padding: 0 }}
           maskAnimation="fade"
           mousePosition={mousePosition}
           closeIcon={<Icon icon="close" />}
         >
           <EditAppIntro
+            cacheKey="appIntroDescription"
             description={description}
             permissionType={permissionType}
-            isEditing={!description && isAuthorityApp}
+            // isEditing={!description && isAuthorityApp}
+            isEditing={isEditing}
+            changeEditState={isEditing => {
+              this.setState({ isEditing });
+            }}
             changeSetting={() => {
               this.setState({
                 hasChange: true,
@@ -456,6 +567,7 @@ export default class AppInfo extends Component {
               this.setState({
                 hasChange: false,
               });
+              this.switchVisible({ editAppIntroVisible: false, isShowAppIntroFirst: false, hasChange: false });
             }}
             onCancel={() =>
               this.switchVisible({ editAppIntroVisible: false, isShowAppIntroFirst: false, hasChange: false })
@@ -481,7 +593,11 @@ export default class AppInfo extends Component {
           onClose={() => this.switchVisible({ optionListVisible: false })}
           placement="right"
         >
-          <AllOptionList visible={optionListVisible} {...getIds(props)} />
+          <AllOptionList
+            {...getIds(props)}
+            visible={optionListVisible}
+            onClose={() => this.switchVisible({ optionListVisible: false })}
+          />
         </Drawer>
 
         <Motion style={{ x: spring(indexSideVisible ? 0 : -352) }}>
@@ -500,9 +616,10 @@ export default class AppInfo extends Component {
         )}
         {editAppFixStatusVisible && (
           <AppFixStatus
+            isAutofucus={isAutofucus}
             appId={appId}
             projectId={projectId}
-            fixed={data.fixed}
+            fixed={manageBackupFilesVisible ? false : data.fixed}
             fixRemark={data.fixRemark}
             onChangeStatus={obj => {
               this.setState({
@@ -513,6 +630,88 @@ export default class AppInfo extends Component {
               });
             }}
             onCancel={() => this.setState({ editAppFixStatusVisible: false })}
+          />
+        )}
+        {showEditPublishSetDialog && (
+          <EditPublishSetDialog
+            showEditPublishSetDialog={showEditPublishSetDialog}
+            projectId={projectId}
+            appId={appId}
+            data={data}
+            appName={name}
+            onChangeFixStatus={() => this.setState({ editAppFixStatusVisible: true, isAutofucus: true })}
+            onChangePublish={obj =>
+              this.setState({
+                data: {
+                  ...data,
+                  ...obj,
+                },
+              })
+            }
+            onClose={() => {
+              this.setState({
+                showEditPublishSetDialog: false,
+              });
+            }}
+          />
+        )}
+
+        {createBackupVisisble && (
+          <CreateAppBackupDialog
+            projectId={projectId}
+            appId={appId}
+            appName={name}
+            openManageBackupDrawer={() => {
+              this.setState({
+                manageBackupFilesVisible: true,
+              });
+            }}
+            closeDialog={() => {
+              this.setState({ createBackupVisisble: false });
+            }}
+          />
+        )}
+
+        {manageBackupFilesVisible && (
+          <ManageBackupFilesDialog
+            visible={manageBackupFilesVisible}
+            fixed={data.fixed}
+            onChangeFixStatus={flag => this.setState({ editAppFixStatusVisible: flag, isAutofucus: true })}
+            projectId={projectId}
+            appId={appId}
+            appName={name}
+            manageBackupFilesKey={this.state.manageBackupFilesKey}
+            onClose={() => {
+              this.setState({
+                manageBackupFilesVisible: false,
+              });
+            }}
+            onChangeStatus={obj => {
+              this.setState({
+                data: {
+                  ...data,
+                  ...obj,
+                },
+              });
+            }}
+          />
+        )}
+
+        {appItemTrashVisible && (
+          <AppItemTrash
+            appId={appId}
+            projectId={projectId}
+            onCancel={() => this.setState({ appItemTrashVisible: false })}
+          />
+        )}
+
+        {appAnalyticsVisible && (
+          <AppAnalytics
+            currentAppInfo={{ appId, name, iconColor, iconUrl }}
+            projectId={projectId}
+            onCancel={() => {
+              this.setState({ appAnalyticsVisible: false });
+            }}
           />
         )}
       </div>

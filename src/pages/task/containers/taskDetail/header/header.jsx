@@ -5,9 +5,9 @@ import './header.less';
 import { connect } from 'react-redux';
 import { editTaskStatus, taskFoldStatus, updateTaskNotice, updateTaskLocked, destroyTask, addCheckList } from '../../../redux/actions';
 import { checkIsProject, taskStatusDialog } from '../../../utils/utils';
-import 'mdDialog';
+import 'src/components/mdDialog/dialog';
 import config, { OPEN_TYPE, RELATION_TYPES } from '../../../config/config';
-import mdFunction from 'mdFunction';
+import { expireDialogAsync } from 'src/components/common/function';
 import Menu from 'ming-ui/components/Menu';
 import MenuItem from 'ming-ui/components/MenuItem';
 import ShareFolderOrTask from '../../../components/shareFolderOrTask/shareFolderOrTask';
@@ -26,6 +26,7 @@ import ajaxRequest from 'src/api/taskCenter';
 import withClickAway from 'ming-ui/decorators/withClickAway';
 import createDecoratedComponent from 'ming-ui/decorators/createDecoratedComponent';
 import { navigateTo } from 'src/router/navigateTo';
+import _ from 'lodash';
 
 const ClickAwayable = createDecoratedComponent(withClickAway);
 
@@ -116,7 +117,7 @@ class Header extends Component {
       this.props.addSubTask();
     };
 
-    mdFunction.expireDialogAsync(data.projectID).then(() => {
+    expireDialogAsync(data.projectID).then(() => {
       if (isHidden) {
         this.props.dispatch(
           taskFoldStatus(taskId, 'subTask'),
@@ -180,7 +181,7 @@ class Header extends Component {
 
     this.setState({ showOperator: false });
 
-    mdFunction.expireDialogAsync(data.projectID).then(() => {
+    expireDialogAsync(data.projectID).then(() => {
       render(
         <CopyTask
           name={_l('%0-副本', data.taskName)}

@@ -3,6 +3,7 @@ import { Input } from 'antd';
 import { formatNumberFromInput } from 'src/util';
 import { DynamicValueInputWrap } from '../styled';
 import { OtherFieldList, SelectOtherField, DynamicInput } from '../components';
+import _ from 'lodash';
 
 export default function NumberInput(props) {
   const { dynamicValue, data, clearOldDefault, onDynamicValueChange, defaultType } = props;
@@ -67,12 +68,16 @@ export default function NumberInput(props) {
         />
       ) : (
         <Input
-          autoFocus
           value={value}
           style={{ width: 'calc(100% - 36px)', borderRadius: '3px 0 0 3px' }}
+          placeholder={_l('请输入数值')}
           onBlur={() => {
             if (value) {
-              setValue(value === '-' ? '' : parseFloat(value));
+              const dealValue = value === '-' ? '' : parseFloat(value);
+              setValue(dealValue);
+              if (dealValue === '') {
+                onDynamicValueChange([]);
+              }
             }
           }}
           onChange={e => handleChange(e.target.value)}

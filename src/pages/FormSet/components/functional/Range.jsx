@@ -2,6 +2,7 @@ import React from 'react';
 import withClickAway from 'ming-ui/decorators/withClickAway';
 import { Icon, Radio } from 'ming-ui';
 import styled from 'styled-components';
+import _ from 'lodash';
 
 const RangeBox = styled.div`
   width: 320px;
@@ -196,9 +197,8 @@ class Range extends React.Component {
                     >
                       <input
                         type="checkbox"
-                        className="viewInput"
+                        className="viewInput TxtMiddle"
                         checked={viewIds.includes(it.viewId)}
-                        className="TxtMiddle"
                       />
                       <span className="TxtMiddle">{it.name}</span>
                     </div>

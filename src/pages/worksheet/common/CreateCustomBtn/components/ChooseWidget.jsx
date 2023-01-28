@@ -1,11 +1,13 @@
 import React from 'react';
 import { Icon } from 'ming-ui';
 import { getIconByType } from 'src/pages/widgetConfig/util';
+import { ALL_SYS } from 'src/pages/widgetConfig/config/widget';
 import cx from 'classnames';
 import { Switch } from 'antd';
 import withClickAway from 'ming-ui/decorators/withClickAway';
 import styled from 'styled-components';
-import { SYS } from 'src/pages/widgetConfig/config/widget';
+
+import _ from 'lodash';
 const ChooseWidgetWrap = styled.div`
    {
     width: 300px;
@@ -42,20 +44,6 @@ const ChooseWidgetWrap = styled.div`
         width: 10px;
         height: 10px;
       }
-      // ::-webkit-scrollbar-thumb {
-      //   width: 6px;
-      //   height: 6px;
-      //   border-radius: 6px;
-      //   background: transparent;
-      //   background-clip: padding-box;
-      //   border: 2px solid transparent;
-      // }
-      // &.move {
-      //   ::-webkit-scrollbar-thumb {
-      //     background: rgba(187, 187, 187, 0.8);
-      //     background-clip: padding-box;
-      //   }
-      // }
       .widgetList {
         padding: 8px 16px;
         &:hover {
@@ -132,8 +120,8 @@ export default class ChooseWidget extends React.Component {
     }
   }
   getData = props => {
-    const { writeObject, addRelationControl = [], widgetList = [] } = props;
-    return writeObject !== 1 ? addRelationControl : widgetList; //排除子表
+    const { writeObject, relationControls = [], widgetList = [] } = props;
+    return writeObject !== 1 ? relationControls : widgetList; //排除子表
   };
   setPoint = () => {
     let wh = $(window).height();
@@ -158,16 +146,6 @@ export default class ChooseWidget extends React.Component {
   render() {
     const { SwitchFn, hideFn } = this.props;
     const { data = [], keyWords, writeControls = [], initData = [] } = this.state;
-    // if (writeObject !== 1 && addRelationControl.length <= 0) {
-    //   alert(_l('请选择关联字段'));
-    //   hideFn();
-    //   return;
-    // }
-    // if (data.length <= 0) {
-    //   alert(_l('请选择有效的关联字段'));
-    //   hideFn();
-    //   return;
-    // }
     return (
       <div
         className="ChooseWidgetDialogWrap"
@@ -224,7 +202,7 @@ export default class ChooseWidget extends React.Component {
               data.map((item, index) => {
                 if (
                   (item.type === 29 && item.enumDefault === 2 && item.advancedSetting.showtype === '2') || //排除关联表多条
-                  SYS.includes(item.controlId) //排除系统字段
+                  ALL_SYS.includes(item.controlId) //排除系统字段
                 ) {
                   return '';
                 }
@@ -237,7 +215,7 @@ export default class ChooseWidget extends React.Component {
                       if (!isChecked) {
                         let Controls = this.props.writeControls.concat({
                           controlId: item.controlId,
-                          type: this.props.isDisable(item.type) ? 1 : item.required ? 3 : 2,
+                          type: this.props.isDisable(item.type) ? 1 : item.required ? 3 : 2, //1：只读 2：填写 3：必填
                         });
                         SwitchFn(Controls);
                       } else {

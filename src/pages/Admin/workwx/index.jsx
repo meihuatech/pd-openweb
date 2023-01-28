@@ -1,14 +1,31 @@
-import React from 'react';
+import React, { Fragment } from 'react';
 import PropTypes from 'prop-types';
 import cx from 'classnames';
 import { Link } from 'react-router-dom';
-import { Switch, Icon, Button, LoadDiv } from 'ming-ui';
-import { Tabs, Popover, Radio, Input } from 'antd';
+import { Switch, Icon, Button, LoadDiv, Checkbox } from 'ming-ui';
+import { Tabs, Popover, Radio, Input, Select } from 'antd';
+import ClipboardButton from 'react-clipboard.js';
 import Ajax from 'src/api/workWeiXin';
 import Config from '../config';
 import Dialog from 'ming-ui/components/Dialog';
 import { navigateTo } from 'src/router/navigateTo';
+import BuildAppNewRules from './BuildAppNewRules';
+import IntegrationSetPssword from '../components/IntegrationSetPssword';
+import SyncDialog from './components/SyncDialog';
+import InterfaceLicense from './components/InterfaceLicense';
+import UpgradeVersion from '../components/UpgradeVersion';
+import { getFeatureStatus } from 'src/util';
+import fucExampleImg from 'src/pages/Admin/workwx/img/fucExample.png';
+import setApiExampleImg from 'src/pages/Admin/workwx/img/setApiExample.png';
 import './style.less';
+import _ from 'lodash';
+
+const FEATURE_ID = 19;
+const quickAprData = [
+  { label: 'URL', key: 'url' },
+  { label: 'Token', key: 'token' },
+  { label: 'EncodingAESKey', key: 'encodingAESKey' },
+];
 
 export default class Workwx extends React.Component {
   constructor(props) {
@@ -35,13 +52,15 @@ export default class Workwx extends React.Component {
       show1: false,
       show2: false,
       isLoading: false,
-      failed: false,
-      failedStr: '',
       canSyncBtn: false,
       intergrationScanEnabled: false,
       customMappingFieldEnabled: false,
       jobnumberMappingField: null,
       fieldRadio: null,
+      isSetPassword: false,
+      passwordError: false,
+      syncWXLabel: md.global.Config.IsLocal ? 'job' : 'organize',
+      qwQuickAprData: {},
     };
   }
 
@@ -56,7 +75,7 @@ export default class Workwx extends React.Component {
           corpId: '',
           agentId: '',
           secret: '',
-          status: 1,
+          status: md.global.Config.IsLocal ? 1 : '',
         };
       }
       if (res) {
@@ -80,6 +99,16 @@ export default class Workwx extends React.Component {
           customMappingFieldEnabled: res.customMappingFieldEnabled,
           jobnumberMappingField: res.jobnumberMappingField,
           fieldRadio: res.jobnumberMappingField !== 'workxeixinapp-userid' ? 'customField' : res.jobnumberMappingField,
+          status: res.status,
+          intergrationType: res.intergrationType, // 1代表老的模式，2代表待开发模式
+          syncWXLabel: res.wxTagMappingField ? res.wxTagMappingField : this.state.syncWXLabel,
+          syncWXLabelChecked: res.wxTagMappingField ? true : false,
+          qwQuickAprData: {
+            url: res.workWxCallBackUrl,
+            token: res.workWxToken,
+            encodingAESKey: res.workWxAesKey,
+          },
+          openQuickApproval: !!res.workWxCallBackUrl,
         });
       }
     });
@@ -123,16 +152,12 @@ export default class Workwx extends React.Component {
     });
   };
 
-  handleChangeCustomMappingFieldEnabled = checked => {
-    Ajax.editWXProjectMappingFieldEnabled({
+  // 获取初始密码值
+  getInitialPassword = () => {
+    Ajax.getIntergrationAccountInitializeInfo({
       projectId: Config.projectId,
-      status: checked ? 0 : 1,
     }).then(res => {
-      if (res) {
-        this.setState({
-          customMappingFieldEnabled: !checked,
-        });
-      }
+      this.setState({ password: res, isSetPassword: !!res });
     });
   };
 
@@ -226,7 +251,7 @@ export default class Workwx extends React.Component {
           </Popover>
         </div>
         <div className="Relative InlineBlock inputDiv clearfix">
-          {this.state.canEditInfo ? (
+          {this.state.canEditInfo && this.state.intergrationType !== 2 ? (
             <React.Fragment>
               <input
                 type="text"
@@ -263,98 +288,116 @@ export default class Workwx extends React.Component {
       </React.Fragment>
     );
   };
+  getCount = type => {
+    const { logDetailItems = [] } = this.state;
+    let itemArr = logDetailItems.filter(item => item.type === type);
+    return (itemArr && !_.isEmpty(itemArr) && itemArr[0].items.length) || 0;
+  };
 
-  syncFn = isCheck => {
-    if (isCheck) {
-      this.setState({
-        isLoading: true,
-        showSyncDiaLog: isCheck,
-        canSyncBtn: false,
-      });
-    }
-    Ajax.syncWorkWXToMingByApp({
+  renderOverLinitDialog = () => {
+    const { dialogOverlimit, overlinitLength } = this.state;
+    return (
+      <Dialog
+        width="500px"
+        title={_l('同步失败')}
+        visible={dialogOverlimit}
+        showCancel={false}
+        onCancel={() => {
+          this.setState({ dialogOverlimit: false });
+        }}
+        onOk={() => {
+          this.setState({ dialogOverlimit: false });
+        }}
+      >
+        <div>{_l('超出 %0 个企业微信用户需要被同步，请先增购组织用户', overlinitLength)}</div>
+      </Dialog>
+    );
+  };
+
+  checkSyncFn = showSyncDiaLog => {
+    this.setState({ loading: true });
+    Ajax.checkWorkWXToMingByApp({
       projectId: Config.projectId,
-      check: isCheck, //是否进行预先检查，true返回数据给前端展现但不进行同步，类似企业微信，false进行同步
     }).then(res => {
-      if (res.item1) {
-        this.setState({
-          failed: false,
-        });
-        if (isCheck) {
-          //返回数据给前端展现但不进行同步
-          this.setState({
-            canSyncBtn: true,
-            data: res.item3,
-            isLoading: false,
-          });
-        } else {
-          // 进行成功同步后
-          this.setState({
-            showSyncDiaLog: false,
-            isLoading: false,
-          });
-          alert(_l('成功同步'));
-        }
+      const { item1, item2, item3 = {} } = res;
+      if (!item1) {
+        alert(_l('同步失败'));
+        this.setState({ loading: false });
+        return;
+      }
+
+      const { logDetailItems = [], mingDaoUserInfos = [] } = item3;
+      let itemArr = logDetailItems.filter(item => item.type === 7);
+      let overlinitLength = (itemArr && !_.isEmpty(itemArr) && itemArr[0].items.length) || 0;
+      if (overlinitLength) {
+        this.setState({ overlinitLength, dialogOverlimit: true, loading: false });
+        return;
       } else {
-        //返回数据给前端展现但不进行同步
+        let temp = mingDaoUserInfos.map((item, index) => {
+          let isSame = false;
+          for (let i = 0; i < mingDaoUserInfos.length; i++) {
+            if (
+              item.wxUserInfo &&
+              mingDaoUserInfos[i].wxUserInfo &&
+              item.wxUserInfo.userId === mingDaoUserInfos[i].wxUserInfo.userId &&
+              index !== i
+            ) {
+              isSame = true;
+              break;
+            }
+          }
+          if (isSame) {
+            return { ...item, wxUserInfo: {} };
+          } else {
+            return item;
+          }
+        });
         this.setState({
-          showSyncDiaLog: true,
-          data: res.item3,
-          isLoading: false,
-          failed: true,
-          failedStr: res.item2 ? res.item2 : _l('同步失败！'),
+          mingDaoUserInfos: temp,
+          bindQWUserIds: temp.filter(item => item.wxUserInfo && item.wxUserInfo.userId).map(v => v.wxUserInfo.userId),
+          filterMatchPhoneBindUserIds: temp
+            .filter(item => item.wxUserInfo && item.wxUserInfo.userId && item.wxUserInfo.matchType !== 1)
+            .map(v => v.wxUserInfo.userId),
+          logDetailItems,
+          loading: false,
+          showSyncDiaLog,
+          isBindRelationship: false,
         });
       }
     });
   };
 
   stepRender = () => {
+    let { intergrationType, loading } = this.state;
     return (
       <div className="pBottom100">
-        {!this.state.CorpId && !md.global.Config.IsLocal && (
-          <div
-            className="infoTips"
-            onClick={event => {
-              const { target } = event;
-              if (target.tagName === 'SPAN') {
-                target.classList.contains('contactCustomer') &&
-                  window.KF5SupportBoxAPI &&
-                  window.KF5SupportBoxAPI.open();
-              }
-            }}
-            dangerouslySetInnerHTML={{
-              __html: _l(
-                '因企业微信规则调整，新的对接方案正在开发，支持线下完成对接。您可以%0或者电话咨询客服，联系电话：010-53153053',
-                `<span class="contactCustomer pointer ThemeColor3">${_l('在线咨询客服')}</span>`,
-              ),
-            }}
-          />
+        {intergrationType !== 2 && (
+          <div className="stepItem Relative">
+            <h3 className="stepTitle Font16 Gray">{_l('1.获取对接信息')}</h3>
+            {!this.state.show1 ? (
+              <div
+                className="showDiv flexRow valignWrapper"
+                onClick={() => {
+                  this.setState({
+                    show1: true,
+                  });
+                }}
+              >
+                <Icon icon="sidebar-more" className="Font13 Gray_75 Right Hand" />
+              </div>
+            ) : (
+              <React.Fragment>
+                <p className="mTop16 Font14 Gray_75">{_l('从企业微信后台获取对接信息，即可开始集成以及同步通讯录')}</p>
+                <Link to={`/wxappSyncCourse/${Config.projectId}`} target="_blank" className="mTop16 Font14 howApply">
+                  {_l('如何获取对接信息？')}
+                </Link>
+              </React.Fragment>
+            )}
+          </div>
         )}
         <div className="stepItem Relative">
-          <h3 className="stepTitle Font16 Gray">{_l('1.获取对接信息')}</h3>
-          {!this.state.show1 ? (
-            <div
-              className="showDiv flexRow valignWrapper"
-              onClick={() => {
-                this.setState({
-                  show1: true,
-                });
-              }}
-            >
-              <Icon icon="sidebar-more" className="Font13 Gray_75 Right Hand" />
-            </div>
-          ) : (
-            <React.Fragment>
-              <p className="mTop16 Font14 Gray_75">{_l('从企业微信后台获取对接信息，即可开始集成以及同步通讯录')}</p>
-              <Link to={`/wxappSyncCourse/${Config.projectId}`} target="_blank" className="mTop16 Font14 howApply">
-                {_l('如何获取对接信息？')}
-              </Link>
-            </React.Fragment>
-          )}
-        </div>
-        <div className="stepItem Relative">
-          <h3 className="stepTitle Font16 Gray">{_l('2.对接信息录入')}</h3>
-          {!this.state.show2 && (
+          <h3 className="stepTitle Font16 Gray">{intergrationType === 2 ? _l('1.对接信息') : _l('2.对接信息录入')}</h3>
+          {!this.state.show2 && intergrationType !== 2 && (
             <div
               className="showDiv flexRow valignWrapper"
               onClick={() => {
@@ -366,21 +409,28 @@ export default class Workwx extends React.Component {
               <Icon icon="sidebar-more" className="Font13 Gray_75 Right Hand" />
             </div>
           )}
-          {this.state.isHasInfo && this.state.show2 && (
+          {((this.state.isHasInfo && this.state.show2) || intergrationType === 2) && (
             <span className="Font13 Gray_75 Right closeDing">
               <span
                 className="mLeft10 switchBtn tip-bottom-left"
                 data-tip={_l('关闭企业微信集成后，无法再从企业微信处进入应用')}
               >
-                <Switch checked={!this.state.isCloseDing} onClick={checked => this.editDingStatus(checked ? 2 : 1)} />
+                <Switch
+                  checked={!this.state.isCloseDing}
+                  onClick={checked => {
+                    this.editDingStatus(checked ? 2 : 1);
+                  }}
+                />
               </span>
             </span>
           )}
-          {!this.state.isCloseDing && this.state.show2 && (
+          {((!this.state.isCloseDing && this.state.show2) || intergrationType === 2) && (
             <React.Fragment>
-              <p className="mTop16 Font14 Gray_75">
-                {_l('完成步骤 1 后，填入CorpId、AgentId、Secret后可对接应用与同步通讯录')}
-              </p>
+              {intergrationType !== 2 && (
+                <p className="mTop16 Font14 Gray_75">
+                  {_l('完成步骤 1 后，填入CorpId、AgentId、Secret后可对接应用与同步通讯录')}
+                </p>
+              )}
               <div className="mTop25 infoList">
                 <ul>
                   <li>{this.inputRender('CorpId', 600, 1)}</li>
@@ -388,40 +438,43 @@ export default class Workwx extends React.Component {
                   <li className="mTop16">{this.inputRender('Secret', 600, 3, 4)}</li>
                 </ul>
               </div>
-              <div className="TxtRight mTop30">
-                {!this.state.canEditInfo ? (
-                  <Button
-                    type="primary"
-                    className="editInfo"
-                    onClick={e => {
-                      this.setState({
-                        canEditInfo: true,
-                      });
-                    }}
-                  >
-                    {_l('编辑')}
-                  </Button>
-                ) : (
-                  <Button
-                    type="primary"
-                    className="saveInfo"
-                    onClick={e => {
-                      this.editInfo();
-                    }}
-                  >
-                    {_l('保存')}
-                  </Button>
-                )}
-              </div>
+              {intergrationType !== 2 && (
+                <div className="TxtRight mTop30">
+                  {!this.state.canEditInfo ? (
+                    <Button
+                      type="primary"
+                      className="editInfo"
+                      onClick={e => {
+                        this.setState({
+                          canEditInfo: true,
+                        });
+                      }}
+                    >
+                      {_l('编辑')}
+                    </Button>
+                  ) : (
+                    <Button
+                      type="primary"
+                      className="saveInfo"
+                      onClick={e => {
+                        this.editInfo();
+                      }}
+                    >
+                      {_l('保存')}
+                    </Button>
+                  )}
+                </div>
+              )}
             </React.Fragment>
           )}
         </div>
         <div className="stepItem">
-          <h3 className="stepTitle Font16 Gray">{_l('3.数据同步')}</h3>
+          <h3 className="stepTitle Font16 Gray">{_l('%0数据同步', intergrationType !== 2 ? '3.' : '2.')}</h3>
           <div className="mTop16 syncBox">
             <span className="Font14 syncTxt Gray_75">{_l('从企业微信通讯录同步到该系统')}</span>
             <Button
               type="primary"
+              disabled={loading}
               className={cx('syncBtn', {
                 isNO:
                   (this.state.canEditInfo && !this.state.isHasInfo) ||
@@ -436,83 +489,15 @@ export default class Workwx extends React.Component {
                 ) {
                   return;
                 } else {
-                  this.syncFn(true);
+                  this.checkSyncFn(true);
                 }
               }}
             >
-              {this.state.showSyncDiaLog ? _l('同步中') : _l('同步')}
+              {loading ? _l('正在计算，请稍等') : _l('同步')}
             </Button>
           </div>
         </div>
       </div>
-    );
-  };
-
-  renderSyncDiaLog = () => {
-    return (
-      <Dialog
-        visible={this.state.showSyncDiaLog}
-        className="SyncDiaLog"
-        onCancel={() => {
-          this.setState({
-            showSyncDiaLog: false,
-          });
-        }}
-        overlayClosable={false}
-        title={this.state.failed ? _l('同步失败') : _l('同步内容')}
-        footer={
-          <Button
-            disabled={this.state.canSyncBtn ? false : true}
-            type="primary"
-            onClick={() => {
-              if (!this.state.canSyncBtn) {
-                return;
-              }
-              if (this.state.failed) {
-                this.setState({
-                  showSyncDiaLog: false,
-                });
-              } else {
-                this.setState({
-                  canSyncBtn: false,
-                });
-                this.syncFn(false);
-              }
-            }}
-          >
-            {_l('确认')}
-          </Button>
-        }
-      >
-        <p>
-          {this.state.isLoading ? (
-            <LoadDiv className="" />
-          ) : !this.state.failed ? (
-            _.map(this.state.data, (item, i) => {
-              switch (item.type) {
-                case 4:
-                  return <p>{`新增${item.items.length}个用户`}</p>;
-                case 5:
-                  return <p>{`删除${item.items.length}个用户`}</p>;
-                case 6:
-                  return <p>{`同步${item.items.length}个用户信息`}</p>;
-                case 7:
-                  return <p>{`${item.items.length}个用户信息，由于用户数量已达上限，暂不能同步到通讯录`}</p>;
-                case 8:
-                  return <p>{`新增${item.items.length}个部门`}</p>;
-                case 9:
-                  return <p>{`删除${item.items.length}个部门`}</p>;
-                case 10:
-                  return <p>{`同步${item.items.length}个部门信息`}</p>;
-                default:
-                  break;
-              }
-            })
-          ) : (
-            this.state.failedStr
-          )}
-        </p>
-      </Dialog>
     );
   };
 
@@ -529,37 +514,97 @@ export default class Workwx extends React.Component {
       }
     });
   };
-  // 免费版显示付费升级
-  renderUpgrade = () => {
-    return (
-      <div className="upgradePage flexColumn">
-        <div className="netStateWrap">
-          <div className="imgWrap" />
-          <div className="hint">{_l('当前版本无法使用此功能')}</div>
-          <div className="explain">{_l('请升级到标准版本或以上版本')}</div>
-        </div>
-        {/*<Button
-          type="primary"
-          className="payUpgradeBtn"
-          onClick={() => {
-            navigateTo(`/upgrade/choose?projectId=${Config.projectId}`);
-          }}
-        >
-          {_l('立即购买')}
-        </Button>*/}
-      </div>
-    );
+  changeTab = key => {
+    if (key === 'other') {
+      this.getInitialPassword();
+    }
+  };
+  handleChangeCustomMappingFieldEnabled = checked => {
+    Ajax.editWXProjectMappingFieldEnabled({
+      projectId: Config.projectId,
+      status: checked ? 0 : 1,
+    }).then(res => {
+      if (res) {
+        this.setState({
+          customMappingFieldEnabled: !checked,
+        });
+      }
+    });
+  };
+  changeSyncWXLabel = value => {
+    Ajax.editWXProjectTagMappingField({
+      projectId: Config.projectId,
+      fieldName: value,
+    }).then(res => {
+      if (res) {
+        this.setState({ syncWXLabel: value });
+      } else {
+        alert(_l('操作失败'));
+      }
+    });
+  };
+  syncWXLabel = checked => {
+    Ajax.editWXProjectTagMappingField({
+      projectId: Config.projectId,
+      fieldName: checked ? '' : this.state.syncWXLabel,
+    }).then(res => {
+      if (res) {
+        this.setState({ syncWXLabelChecked: !checked });
+      } else {
+        alert(_l('操作失败'));
+      }
+    });
+  };
+  handleChangeOpenQuickApproval = checked => {
+    const { qwQuickAprData = {} } = this.state;
+    Ajax.editWXIsEnableQuickApprove({
+      projectId: Config.projectId,
+      status: checked ? 2 : 1,
+    }).then(res => {
+      if (res) {
+        this.setState({
+          openQuickApproval: !checked,
+        });
+        if (!checked || _.isEmpty(qwQuickAprData)) {
+          Ajax.getWXProjectSettingInfo({ projectId: Config.projectId }).then(res => {
+            this.setState({
+              qwQuickAprData: {
+                url: res.workWxCallBackUrl,
+                token: res.workWxToken,
+                encodingAESKey: res.workWxAesKey,
+              },
+            });
+          });
+        }
+      } else {
+        alert(_l('操作失败'));
+      }
+    });
+  };
+  handleCopyTextSuccess = () => {
+    return alert(_l('复制成功'));
   };
   render() {
-    if (Config.project.licenseType === 0) {
-      return this.renderUpgrade();
+    let {
+      isPassApply,
+      intergrationType,
+      syncWXLabel,
+      mingDaoUserInfos = [],
+      bindQWUserIds = [],
+      filterMatchPhoneBindUserIds = [],
+      logDetailItems = [],
+      qwQuickAprData = {},
+    } = this.state;
+    const featureType = getFeatureStatus(Config.projectId, FEATURE_ID);
+    if (featureType === '2') {
+      return <UpgradeVersion projectId={Config.projectId} featureId={FEATURE_ID} />;
     }
     if (this.state.pageLoading) {
       return <LoadDiv className="mTop80" />;
     }
     return (
       <div className="workwxMainContent">
-        {!this.state.isPassApply ? (
+        {!this.state.isPassApply && !(!this.state.CorpId && !md.global.Config.IsLocal) && intergrationType !== 2 ? (
           <div className="TxtMiddle">
             <div className="TxtCenter logoBox">
               {this.state.isReject ? (
@@ -626,99 +671,228 @@ export default class Workwx extends React.Component {
             )}
           </div>
         ) : (
-          <Tabs defaultActiveKey="base">
-            <Tabs.TabPane tab={_l('基础')} key="base">
-              {this.stepRender()}
+          <Tabs
+            defaultActiveKey="base"
+            className={cx({ tabStyle: !this.state.status === 1 })}
+            onChange={this.changeTab}
+          >
+            <Tabs.TabPane tab={_l('企业微信集成')} key="base" className="tabStyles">
+              {!this.state.CorpId && !md.global.Config.IsLocal && (this.state.status === 0 || !this.state.status) ? (
+                <BuildAppNewRules
+                  editWXProjectSettingStatus={this.editWXProjectSettingStatus}
+                  isPassApply={isPassApply}
+                  stepRender={this.stepRender}
+                  status={this.state.status}
+                />
+              ) : (
+                this.stepRender()
+              )}
             </Tabs.TabPane>
-            <Tabs.TabPane tab={_l('其他')} key="other">
-              <div className="stepItem flexRow valignWrapper">
-                <div className="flex">
-                  <h3 className="stepTitle Font16 Gray mBottom24">{_l('企业微信扫码登陆')}</h3>
-                  <Switch
-                    disabled={
-                      (this.state.canEditInfo && !this.state.isHasInfo) ||
-                      this.state.isCloseDing ||
-                      this.state.showSyncDiaLog
-                    }
-                    checked={this.state.intergrationScanEnabled}
-                    onClick={this.handleChangeScanEnabled}
-                  />
-                  <div className="mTop16 syncBox">
-                    <span className="Font14 Gray_75">{_l('开启后，可使用企业微信扫一扫，直接登录')}</span>
-                  </div>
-                  <Link
-                    to={`/wxappSyncCourse/${Config.projectId}#scanWorkwx`}
-                    target="_blank"
-                    className="mTop16 Font14 howApply"
-                  >
-                    {_l('如何实现企业微信扫码登陆？')}
-                  </Link>
-                </div>
-              </div>
-              <div className="stepItem flexRow valignWrapper">
-                <div className="flexColumn flex">
-                  <h3 className="stepTitle Font16 Gray mBottom24">{_l('自定义同步字段')}</h3>
-                  <Switch
-                    disabled={
-                      (this.state.canEditInfo && !this.state.isHasInfo) ||
-                      this.state.isCloseDing ||
-                      this.state.showSyncDiaLog
-                    }
-                    checked={this.state.customMappingFieldEnabled}
-                    onClick={this.handleChangeCustomMappingFieldEnabled}
-                  />
-                  <div className="mTop16 syncBox">
-                    <span className="Font14 Gray_75">
-                      {_l(
-                        '完成通讯录同步的基础配置后，可将企业微信用户账号或者企业微信自定义信息字段同步到系统的工号字段',
+            {(this.state.status === 1 || intergrationType === 2) && (
+              <Tabs.TabPane tab={_l('扫码登录与同步')} key="other">
+                {
+                  <div className="stepItem flexRow valignWrapper">
+                    <div className="flex">
+                      <h3 className="stepTitle Font16 Gray mBottom24">{_l('企业微信扫码登录')}</h3>
+                      <Switch
+                        disabled={
+                          (this.state.canEditInfo && !this.state.isHasInfo) ||
+                          this.state.isCloseDing ||
+                          this.state.showSyncDiaLog
+                        }
+                        checked={this.state.intergrationScanEnabled}
+                        onClick={this.handleChangeScanEnabled}
+                      />
+                      <div className="mTop16 syncBox">
+                        <span className="Font14 Gray_75">{_l('开启后，可使用企业微信扫一扫，直接登录')}</span>
+                      </div>
+                      {intergrationType !== 2 ? (
+                        <Link
+                          to={`/wxappSyncCourse/${Config.projectId}#scanWorkwx`}
+                          target="_blank"
+                          className="mTop16 Font14 howApply"
+                        >
+                          {_l('如何实现企业微信扫码登录？')}
+                        </Link>
+                      ) : (
+                        <a
+                          target="_blank"
+                          href="https://help.mingdao.com/Wecom3.html#%E4%BA%8C%E3%80%81%E5%9C%A8%E6%98%8E%E9%81%93%E4%BA%91%E4%BA%8C%E7%BA%A7%E7%99%BB%E5%BD%95%E9%A1%B5%E9%9D%A2%EF%BC%8C%E4%BD%BF%E7%94%A8%E4%BC%81%E4%B8%9A%E5%BE%AE%E4%BF%A1%E6%89%AB%E7%A0%81%E7%99%BB%E5%BD%95"
+                          className="helpEntry"
+                        >
+                          {_l('如何实现企业微信扫码登录？')}
+                        </a>
                       )}
-                    </span>
+                    </div>
                   </div>
-                  <Link
-                    to={`/wxappSyncCourse/${Config.projectId}#syncField`}
-                    target="_blank"
-                    className="mTop16 Font14 howApply"
-                  >
-                    {_l('如何查看企业微信自定义信息字段？')}
-                  </Link>
-                  {this.state.customMappingFieldEnabled && (
-                    <React.Fragment>
-                      <Radio.Group
-                        className="radioGroupWrapper"
-                        onChange={this.handleChangeJobnumberMappingField}
-                        value={this.state.fieldRadio}
+                }
+                {md.global.Config.IsLocal && (
+                  <IntegrationSetPssword
+                    password={this.state.password}
+                    isSetPassword={this.state.isSetPassword}
+                    disabled={
+                      (this.state.canEditInfo && !this.state.isHasInfo) ||
+                      this.state.isCloseDing ||
+                      this.state.showSyncDiaLog
+                    }
+                  />
+                )}
+                <div className="stepItem flexRow valignWrapper">
+                  <div className="flexColumn flex">
+                    <h3 className="stepTitle Font16 Gray">{_l('企业微信字段同步')}</h3>
+                    <div className="mTop16 syncBox mBottom24">
+                      <span className="Font14 Gray_75">
+                        {_l(
+                          '完成通讯录同步的基础配置后，可将企业微信用户账号或者企业微信自定义信息字段同步到系统的工号字段',
+                        )}
+                      </span>
+                    </div>
+                    <div className="flexRow alignItemsCenter mBottom16 syncRow height32">
+                      <Checkbox checked={this.state.syncWXLabelChecked} onClick={this.syncWXLabel}>
+                        {_l('同步企业微信标签')}
+                      </Checkbox>
+                      {this.state.syncWXLabelChecked && (
+                        <span className="mLeft110">
+                          {_l('同步到')}
+                          <Select
+                            style={{ width: 180, margin: '0 10px' }}
+                            value={syncWXLabel}
+                            onChange={this.changeSyncWXLabel}
+                          >
+                            <Option value={'organize'}>{_l('组织角色')}</Option>
+                            <Option value={'job'}>{_l('职位')}</Option>
+                          </Select>
+                          {_l('字段')}
+                        </span>
+                      )}
+                    </div>
+                    <div className="syncRow mBottom8">
+                      <Checkbox
+                        checked={this.state.customMappingFieldEnabled}
+                        onClick={this.handleChangeCustomMappingFieldEnabled}
                       >
-                        <Radio className="Block" value="workxeixinapp-userid">
-                          {_l('企业微信用户账号')}
-                        </Radio>
-                        <Radio className="Block" value="customField">
-                          {_l('企业微信自定义信息字段')}
-                        </Radio>
-                      </Radio.Group>
-                      {this.state.fieldRadio == 'customField' && (
-                        <div className="flexRow customFieldWrapper mTop12 mLeft25">
-                          <Input
-                            className="mRight12"
-                            value={this.state.jobnumberMappingField}
-                            onChange={event => {
-                              this.setState({
-                                jobnumberMappingField: event.target.value,
-                              });
-                            }}
-                          />
-                          <Button type="primary" onClick={this.handleSaveJobnumberMappingField}>
-                            {_l('保存')}
-                          </Button>
+                        {_l('同步企业微信用户账号 或 自定义信息字段 到工号字段')}
+                      </Checkbox>
+                    </div>
+                    <div className="Gray_9e mLeft32">
+                      {_l('企业微信用户账号和企业微信自定义字段只可选择一个同步到工号字段')}
+                    </div>
+                    {this.state.customMappingFieldEnabled && (
+                      <div className="mLeft32">
+                        <div className="flexRow">
+                          <Radio.Group
+                            className="radioGroupWrapper"
+                            onChange={this.handleChangeJobnumberMappingField}
+                            value={this.state.fieldRadio}
+                          >
+                            <Radio className="Block" value="workxeixinapp-userid">
+                              <span className="width225"> {_l('企业微信用户账号')}</span>
+                            </Radio>
+                            <Radio className="Block" value="customField">
+                              <span className="width225">{_l('企业微信自定义信息字段')}</span>
+                            </Radio>
+                          </Radio.Group>
+                          <div className="pTop15">
+                            <div>
+                              <span>{_l('同步到工号字段')}</span>
+                            </div>
+                            <div>
+                              <span>{_l('同步到工号字段')}</span>
+                              <Link
+                                to={`/wxappSyncCourse/${Config.projectId}#syncField`}
+                                target="_blank"
+                                className="mTop16 Font14 howApply mLeft10"
+                              >
+                                {_l('如何同步？')}
+                              </Link>
+                            </div>
+                          </div>
                         </div>
-                      )}
-                    </React.Fragment>
-                  )}
+                        {this.state.fieldRadio == 'customField' && (
+                          <div className="flexRow customFieldWrapper mTop12 mLeft25">
+                            <Input
+                              className="mRight12"
+                              value={this.state.jobnumberMappingField}
+                              onChange={event => {
+                                this.setState({
+                                  jobnumberMappingField: event.target.value,
+                                });
+                              }}
+                            />
+                            <Button type="primary" onClick={this.handleSaveJobnumberMappingField}>
+                              {_l('保存')}
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            </Tabs.TabPane>
+                {/* {md.global.Config.IsLocal && (
+                  <div className="stepItem">
+                    <div className="Font16 Gray mBottom16 bold">{_l('在企业微信中使用快速审批')}</div>
+                    <div className="Gray_9e exampleTxt mBottom24">
+                      {_l(
+                        '此功能需要配置企业微信中的应用接收回调消息服务。配置完成后，企业微信中的工作流审批消息卡片可以直接显示通过否决按钮，无需打开审批详情即可直接完成审批（注：需要审批节点启用了快速审批功能）。',
+                      )}
+                      <Popover title={null} arrowPointAtCenter={true} content={<img src={fucExampleImg} />}>
+                        <span className="Hand ThemeColor">{_l('示例')}</span>
+                      </Popover>
+                    </div>
+                    <Switch checked={this.state.openQuickApproval} onClick={this.handleChangeOpenQuickApproval} />
+                    <div className="Gray_9e mTop24">
+                      {_l('请将下面的字段内容完整准确的复制到企业微信-应用管理-接收消息-设置API接收对应的字段内。')}{' '}
+                      <Popover title={null} arrowPointAtCenter={true} content={<img src={setApiExampleImg} />}>
+                        <span className="Hand ThemeColor">{_l('示例')}</span>
+                      </Popover>
+                    </div>
+                    {this.state.openQuickApproval && (
+                      <Fragment>
+                        {quickAprData.map((it, index) => {
+                          
+                          return (
+                            <div
+                              className={cx('flexRow alignItemsCenter', { mTop24: index == 0, mTop32: index !== 0 })}
+                            >
+                              <div className="Font14 w166">{it.label}</div>
+                              <Input className="w418 Gray" disabled value={qwQuickAprData[it.key]} />
+                              <ClipboardButton
+                                component="span"
+                                data-clipboard-text={qwQuickAprData[it.key]}
+                                onSuccess={this.handleCopyTextSuccess}
+                              >
+                                <span className="mLeft16 Hand ThemeColor">{_l('复制')}</span>
+                              </ClipboardButton>
+                            </div>
+                          );
+                        })}
+                      </Fragment>
+                    )}
+                  </div>
+                )} */}
+              </Tabs.TabPane>
+            )}
+            {intergrationType === 2 && this.state.status === 1 && (
+              <Tabs.TabPane tab={_l('接口许可')} key="interfaceLicense">
+                <InterfaceLicense projectId={Config.projectId} />
+              </Tabs.TabPane>
+            )}
           </Tabs>
         )}
-        {this.state.showSyncDiaLog && this.renderSyncDiaLog()}
+        <SyncDialog
+          getCount={this.getCount}
+          visible={this.state.showSyncDiaLog}
+          isBindRelationship={this.state.isBindRelationship}
+          projectId={Config.projectId}
+          onCancel={() => {
+            this.setState({ showSyncDiaLog: false, isBindRelationship: undefined });
+          }}
+          mingDaoUserInfos={mingDaoUserInfos}
+          bindQWUserIds={bindQWUserIds}
+          filterMatchPhoneBindUserIds={filterMatchPhoneBindUserIds}
+          logDetailItems={logDetailItems}
+        />
+        {this.renderOverLinitDialog()}
       </div>
     );
   }

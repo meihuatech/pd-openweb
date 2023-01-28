@@ -4,7 +4,7 @@ export const NODE_TYPE = {
   BRANCH_ITEM: 2,
   WRITE: 3,
   APPROVAL: 4,
-  NOTICE: 5,
+  CC: 5,
   ACTION: 6,
   SEARCH: 7,
   WEBHOOK: 8,
@@ -19,16 +19,32 @@ export const NODE_TYPE = {
   PUSH: 17,
   FILE: 18,
   TEMPLATE: 19,
+  PBC: 20,
+  JSON_PARSE: 21,
+  AUTHENTICATION: 22,
+  PARAMETER: 23,
+  API_PACKAGE: 24,
+  API: 25,
+  APPROVAL_PROCESS: 26,
+  NOTICE: 27,
   SYSTEM: 100,
   FIND_SINGLE_MESSAGE: 1000,
   FIND_MORE_MESSAGE: 1001,
 };
 
-export const TRIGGER_ID_TYPE = {
+export const TRIGGER_ID = {
   ADD: '1',
   EDIT: '2',
   DELETE: '3',
   ONLY_EDIT: '4',
+  STOP: '105',
+  DISCUSS: '106',
+};
+
+export const ACTION_ID = {
+  ADD: '1',
+  EDIT: '2',
+  DELETE: '3',
   RELATION: '20',
   NUMBER_FORMULA: '100',
   DATE_FORMULA: '101',
@@ -36,6 +52,7 @@ export const TRIGGER_ID_TYPE = {
   PYTHON: '103',
   DATE_DIFF_FORMULA: '104',
   TOTAL_STATISTICS: '105',
+  FUNCTION_CALCULATION: '106',
   SEND_EMAIL_SINGLE_DISPLAY: '201',
   SEND_EMAIL: '202',
   SEND_TEMPLATE_MESSAGE: '203',
@@ -43,10 +60,23 @@ export const TRIGGER_ID_TYPE = {
   FROM_RECORD: '401',
   FROM_ADD: '402',
   FROM_ARRAY: '403',
-  FROM_CODE: '404',
+  FROM_CODE_ARRAY: '404',
   FROM_ARTIFICIAL: '405',
   WORKSHEET_FIND: '406',
   BATCH_FIND: '407',
+  FROM_PBC_INPUT_ARRAY: '408',
+  FROM_API_ARRAY: '409',
+  FROM_PBC_OUTPUT_ARRAY: '410',
+  RECORD_LINK_FIND: '420',
+  PBC: '500',
+  PBC_INPUT: '501',
+  PBC_OUT: '502',
+  JSON_PARSE: '510',
+  FROM_JSON_PARSE_ARRAY: '511',
+  NO_AUTH: '520',
+  BASIC_AUTH: '521',
+  AUTH_CODE: '522',
+  CREDENTIALS: '523',
 };
 
 export const APP_TYPE = {
@@ -56,31 +86,43 @@ export const APP_TYPE = {
   DATE: 6,
   WEBHOOK: 7,
   CUSTOM_ACTION: 8,
+  APPROVAL_START: 9,
+  APPROVAL: 10,
   FORMULA: 11,
   CODE: 12,
   lINK: 13,
   FILE: 14,
+  SUB_PROCESS: 16,
+  PBC: 17,
+  JSON_PARSE: 18,
   USER: 20,
   DEPARTMENT: 21,
   TEMPLATE: 22,
   EXTERNAL_USER: 23,
+  ORGANIZATION_ROLE: 24,
+  NO_AUTH: 30,
+  BASIC_AUTH: 31,
+  OAUTH2: 32,
+  PARAMETER: 40,
+  API_PACKAGE: 41,
+  API: 42,
   SYSTEM: 100,
   VARIABLE: 101,
   PROCESS: 102,
 };
 
 export const CONTROLS_NAME = {
-  1: _l('文本框'),
-  2: _l('文本框'),
+  1: _l('文本'),
+  2: _l('文本'),
   3: _l('手机'),
   4: _l('座机'),
   5: _l('邮箱'),
   6: _l('数值'),
   7: _l('证件'),
   8: _l('金额'),
-  9: _l('单选项'),
-  10: _l('多选项'),
-  11: _l('下拉框'),
+  9: _l('单选'),
+  10: _l('多选'),
+  11: _l('单选'),
   14: _l('附件'),
   15: _l('日期'),
   16: _l('日期时间'),
@@ -102,26 +144,51 @@ export const CONTROLS_NAME = {
   33: _l('自动编号'),
   34: _l('子表'),
   35: _l('级联选择'),
-  36: _l('检查框'),
+  36: _l('检查项'),
   37: _l('汇总'),
   38: _l('公式'),
   40: _l('定位'),
   41: _l('富文本'),
   42: _l('签名'),
-  43: _l('文字识别'),
-  10000001: _l('节点设置人员'),
-  10000002: _l('节点设置人员'),
+  43: _l('文本识别'),
+  44: _l('角色'),
+  45: _l('嵌入'),
+  46: _l('时间'),
+  47: _l('条码'),
+  48: _l('组织角色'),
+  49: _l('API查询'),
+  50: _l('API查询'),
+  10000001: _l('人员'),
+  10000002: _l('人员'),
   10000003: _l('数组'),
   10000004: _l('Row ID'),
+  10000007: _l('普通数组'),
+  10000008: _l('对象数组'),
 };
 
 export const CONDITION_TYPE = {
-  1: _l('是'),
-  2: _l('不是'),
-  3: _l('包含'),
-  4: _l('不包含'),
-  5: _l('开始为'),
-  6: _l('结尾为'),
+  1: {
+    custom: _l('等于'),
+    default: _l('是其中一个'),
+  },
+  2: {
+    custom: _l('不等于'),
+    default: _l('不是任何一个'),
+  },
+  3: {
+    area: _l('下级包含'),
+    relation: _l('标题包含'),
+    custom: _l('包含其中一个'),
+    default: _l('包含'),
+  },
+  4: {
+    area: _l('下级不包含'),
+    relation: _l('标题不包含'),
+    custom: _l('不包含任何一个'),
+    default: _l('不包含'),
+  },
+  5: _l('开头是'),
+  6: _l('结尾是'),
   7: _l('不为空'),
   8: _l('为空'),
   9: _l('等于'),
@@ -144,39 +211,39 @@ export const CONDITION_TYPE = {
   26: _l('结束晚于'),
   27: _l('结束已填写'),
   28: _l('结束未填写'),
-  29: _l('选中'),
-  30: _l('未选中'),
+  29: {
+    0: _l('选中'),
+    1: _l('开启'),
+    2: _l('是'),
+  },
+  30: {
+    0: _l('未选中'),
+    1: _l('关闭'),
+    2: _l('否'),
+  },
   31: _l('不为空'),
   32: _l('为空'),
-  33: _l('是'),
-  34: _l('不是'),
+  33: {
+    single: _l('是其中一个'),
+    multi: _l('包含其中一个'),
+  },
+  34: {
+    single: _l('不是任何一个'),
+    multi: _l('不包含任何一个'),
+  },
   35: _l('属于'),
   36: _l('不属于'),
   37: _l('在范围内'),
   38: _l('不在范围内'),
   39: _l('晚于'),
+  40: _l('晚于等于'),
   41: _l('早于'),
-};
-
-export const GRADE_STAR_TYPE = {
-  1: _l('1星'),
-  2: _l('2星'),
-  3: _l('3星'),
-  4: _l('4星'),
-  5: _l('5星'),
-};
-
-export const GRADE_LEVEL_TYPE = {
-  1: _l('1级'),
-  2: _l('2级'),
-  3: _l('3级'),
-  4: _l('4级'),
-  5: _l('5级'),
-  6: _l('6级'),
-  7: _l('7级'),
-  8: _l('8级'),
-  9: _l('9级'),
-  10: _l('10级'),
+  42: _l('早于等于'),
+  43: _l('同时包含'),
+  44: _l('开头不是'),
+  45: _l('结尾不是'),
+  48: _l('下级包含'),
+  49: _l('下级不包含'),
 };
 
 export const USER_TYPE = {
@@ -186,6 +253,7 @@ export const USER_TYPE = {
   TEXT: 7,
   DEPARTMENT: 8,
   JOB: 9,
+  ORGANIZE_ROLE: 10,
 };
 
 export const USER_ORGANIZE = {
@@ -263,7 +331,7 @@ export const SUPPORT_HREF = {
   '7-406': 'https://help.mingdao.com/flow49.html',
   // 从多条数据节点获取一条指定记录
   '7-407': 'https://help.mingdao.com/flow49.html',
-  // Webhook
+  // 发送API请求
   8: 'https://help.mingdao.com/flow33.html',
   // 公式
   9: 'https://help.mingdao.com/flow27.html',
@@ -287,6 +355,12 @@ export const SUPPORT_HREF = {
   18: 'https://help.mingdao.com/flow30.html',
   // 发送服务号消息
   19: 'https://help.mingdao.com/flow_wechat.html',
+  // 调用业务流程
+  20: 'https://help.mingdao.com/flow70.html',
+  // JSON解析
+  21: 'https://help.mingdao.com/flow75.html',
+  // 调用已集成 API
+  25: 'https://help.mingdao.com/flow60.html',
   // 获取单条系统信息
   1000: 'https://help.mingdao.com/flow44.html',
   // 获取多条系统信息
@@ -390,3 +464,33 @@ export const PUSH_LIST = [
   { text: _l('打开自定义页面'), value: PUSH_TYPE.PAGE },
   { text: _l('打开链接'), value: PUSH_TYPE.LINK },
 ];
+
+export const FIELD_TYPE_LIST = [
+  { text: _l('文本'), value: 2, en: 'string' },
+  { text: _l('数值'), value: 6, en: 'number' },
+  { text: _l('日期时间'), value: 16, en: 'date' },
+  { text: _l('人员'), value: 26, en: 'member' },
+  { text: _l('部门'), value: 27, en: 'department' },
+  { text: _l('附件'), value: 14, en: 'attachment' },
+  { text: _l('数组'), value: 10000003, en: 'array' },
+  { text: _l('普通数组'), value: 10000007, en: 'array' },
+  { text: _l('对象数组'), value: 10000008, en: 'array[object]' },
+];
+
+export const METHODS_TYPE = [
+  { text: 'GET', value: 1 },
+  { text: 'POST', value: 2 },
+  { text: 'PUT', value: 3 },
+  { text: 'DELETE', value: 4 },
+  { text: 'HEAD', value: 5 },
+  { text: 'PATCH', value: 6 },
+];
+
+export const FORMAT_TEXT = {
+  1: 'YYYY-MM-DD HH:mm',
+  2: 'YYYY-MM-DD HH',
+  3: 'YYYY-MM-DD',
+  4: 'YYYY-MM',
+  5: 'YYYY',
+  6: 'YYYY-MM-DD HH:mm',
+};

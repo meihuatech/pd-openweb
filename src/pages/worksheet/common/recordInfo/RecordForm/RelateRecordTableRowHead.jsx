@@ -36,6 +36,7 @@ export default function RowHead(props) {
   const [confirmVisible, setConfirmVisible] = useState();
   const {
     allowAdd,
+    allowOpenRecord,
     layoutChangeVisible,
     allowRemoveRelation,
     className,
@@ -53,6 +54,7 @@ export default function RowHead(props) {
     pageIndex,
     pageSize,
     recordId,
+    relateRecordControlId,
     deleteRelateRow,
     addReocord = () => {},
     saveSheetLayout = () => {},
@@ -74,7 +76,7 @@ export default function RowHead(props) {
       cancelText={_l('取消')}
     >
       <Con className={className} style={style}>
-        {layoutChangeVisible && rowIndex === 0 && (
+        {layoutChangeVisible && rowIndex === -1 && (
           <ChangeSheetLayout
             description={_l('保存表格当前的列宽配置，并应用给所有用户')}
             onSave={saveSheetLayout}
@@ -87,7 +89,7 @@ export default function RowHead(props) {
             key="number"
             style={relateRecordControlPermission.editable && allowEdit ? {} : { display: 'inline-block' }}
           >
-            {(pageIndex - 1) * pageSize + rowIndex}
+            {(pageIndex - 1) * pageSize + rowIndex + 1}
           </span>
         )}
         {row.rowid &&
@@ -96,10 +98,14 @@ export default function RowHead(props) {
           (recordId ? (
             <RecordOperate
               {...{ appId, viewId, worksheetId, recordId: row.rowid, projectId }}
+              relateRecordControlId={relateRecordControlId}
               allowCopy
               allowAdd={allowAdd}
               isRelateRecordTable
-              shows={cx('share', 'print', 'copy', { openinnew: viewId, removeRelation: allowRemoveRelation })}
+              shows={cx('share', 'print', 'copy', {
+                openinnew: viewId && allowOpenRecord,
+                removeRelation: allowRemoveRelation,
+              })}
               formdata={tableControls.map(c => ({ ...c, value: row[c.controlId] }))}
               disableLoadCustomButtons={!viewId}
               allowDelete={row.allowdelete}
@@ -122,17 +128,7 @@ export default function RowHead(props) {
               }}
             />
           ) : (
-            <div
-              className="deleteRowIcon"
-              key="deleteRowIcon"
-              onClick={() => {
-                Dialog.confirm({
-                  title: _l('是否删除此条记录'),
-                  buttonType: 'danger',
-                  onOk: () => deleteRelateRow(row.rowid),
-                });
-              }}
-            >
+            <div className="deleteRowIcon" key="deleteRowIcon" onClick={() => setConfirmVisible(true)}>
               <i className="icon icon-close deleteRow Font18 Hand"></i>
             </div>
           ))}

@@ -1,13 +1,16 @@
 import React, { Component } from 'react';
 import { string, func, bool } from 'prop-types';
 import autoSize from 'ming-ui/decorators/autoSize';
+import ScrollView from 'ming-ui/components/ScrollView';
 import RecordInfoWrapper from 'src/pages/worksheet/common/recordInfo/RecordInfoWrapper';
 import instanceVersion from '../../api/instanceVersion';
 import { STATUS_ERROR_MESSAGE } from './config';
 import './index.less';
 import Header from './Header';
 import StepItem from './StepItem';
-import { getWorkItem, getSwitchPermit } from 'src/api/worksheet';
+import worksheetAjax from 'src/api/worksheet';
+import _ from 'lodash';
+import StepHeader from './StepHeader';
 
 export default class ExecDialog extends Component {
   static propTypes = {
@@ -52,7 +55,7 @@ export default class ExecDialog extends Component {
    * 获取节点的详细数据
    */
   getData = () => {
-    let { id, workId, onRead, onSave } = this.props;
+    let { id, workId, onRead, onSave, onClose } = this.props;
 
     instanceVersion.get({ id, workId }).then(res => {
       const { status, currentWork, currentWorkItem, works, companyId, ...rest } = res;
@@ -60,6 +63,11 @@ export default class ExecDialog extends Component {
       onRead();
 
       if (status) {
+        if (status === 30006) {
+          alert(STATUS_ERROR_MESSAGE[status], 2);
+          onClose();
+          return;
+        }
         this.setState({ errorMsg: STATUS_ERROR_MESSAGE[status] });
       } else {
         this.setState({
@@ -77,21 +85,27 @@ export default class ExecDialog extends Component {
     });
   };
   getPermit = () => {
-    let { id, workId } = this.props;
-    getWorkItem({
-      instanceId: id,
-      workId: workId,
-    }).then(res => {
-      getSwitchPermit({ worksheetId: res.worksheetId }).then(sheetSwitchPermit => {
-        this.setState({
-          sheetSwitchPermit,
-          viewId: res.viewId,
-          worksheetId: res.worksheetId,
-          rowId: res.rowId,
-          loading: false,
+    const { id, workId, onError } = this.props;
+
+    worksheetAjax
+      .getWorkItem({
+        instanceId: id,
+        workId: workId,
+      })
+      .then(res => {
+        worksheetAjax.getSwitchPermit({ worksheetId: res.worksheetId }).then(sheetSwitchPermit => {
+          this.setState({
+            sheetSwitchPermit,
+            viewId: res.viewId,
+            worksheetId: res.worksheetId,
+            rowId: res.rowId,
+            loading: false,
+          });
         });
+      })
+      .fail(res => {
+        onError();
       });
-    });
   };
 
   /**
@@ -125,7 +139,7 @@ export default class ExecDialog extends Component {
     return (
       <RecordInfoWrapperComp
         notDialog={isLand}
-        from={4}
+        from={_.get(currentWork, 'flowNode.type') === 5 ? 3 : 4}
         sheetSwitchPermit={sheetSwitchPermit}
         viewId={viewId}
         recordId={rowId}
@@ -134,6 +148,7 @@ export default class ExecDialog extends Component {
           <Header
             projectId={projectId}
             data={data}
+            works={works}
             currentWorkItem={currentWorkItem}
             errorMsg={errorMsg}
             sheetSwitchPermit={sheetSwitchPermit}
@@ -144,18 +159,30 @@ export default class ExecDialog extends Component {
           />
         }
         workflow={
-          <ul className="workflowStepListWrap">
-            {works.map((item, index) => {
-              return (
-                <StepItem
-                  key={index}
-                  data={item}
-                  currentWork={currentWork}
-                  currentType={(currentWorkItem || {}).type}
-                />
-              );
-            })}
-          </ul>
+          <div className="flexColumn h100">
+            <StepHeader
+              processId={data.processId}
+              instanceId={id}
+              processName={data.processName}
+              isApproval={data.isApproval}
+            />
+            <ScrollView className="flex">
+              <ul className="pAll20 pTop0">
+                {works.map((item, index) => {
+                  return (
+                    <StepItem
+                      key={index}
+                      data={item}
+                      currentWork={currentWork}
+                      currentType={(currentWorkItem || {}).type}
+                      worksheetId={worksheetId}
+                      rowId={rowId}
+                    />
+                  );
+                })}
+              </ul>
+            </ScrollView>
+          </div>
         }
         instanceId={id}
         workId={workId}

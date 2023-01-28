@@ -1,10 +1,11 @@
-import { NODE_TYPE, APP_TYPE, TRIGGER_ID_TYPE } from './enum';
+import _ from 'lodash';
+import { NODE_TYPE, APP_TYPE, ACTION_ID, TRIGGER_ID, CONDITION_TYPE } from './enum';
 
 /**
  * 遍历获取统计id
  */
-export const getSameLevelIds = (data, firstId) => {
-  const ids = [firstId];
+export const getSameLevelIds = (data, firstId, excludeFirstId = false) => {
+  const ids = excludeFirstId ? [] : [firstId];
   let nextId = (data[firstId] || {}).nextId;
 
   while (nextId && nextId !== '99') {
@@ -35,10 +36,18 @@ export const getIcons = (type, appType, actionId) => {
         icon = 'icon-hr_structure';
       } else if (appType === APP_TYPE.DEPARTMENT) {
         icon = 'icon-workflow';
+      } else if (actionId === TRIGGER_ID.DISCUSS) {
+        icon = 'icon-replyto';
       } else if (appType === APP_TYPE.EXTERNAL_USER) {
-        icon = 'icon-folder-public';
+        icon = 'icon-language';
+      } else if (appType === APP_TYPE.PBC) {
+        icon = 'icon-pbc';
+      } else if (appType === APP_TYPE.PARAMETER) {
+        icon = 'icon-parameter';
+      } else if (appType === APP_TYPE.APPROVAL_START) {
+        icon = 'icon-approval';
       } else {
-        icon = 'icon-worksheet';
+        icon = 'icon-table';
       }
       break;
     case NODE_TYPE.WRITE:
@@ -47,18 +56,24 @@ export const getIcons = (type, appType, actionId) => {
     case NODE_TYPE.APPROVAL:
       icon = 'icon-workflow_ea';
       break;
-    case NODE_TYPE.NOTICE:
+    case NODE_TYPE.CC:
       icon = 'icon-workflow_notice';
       break;
     case NODE_TYPE.ACTION:
       if (appType === APP_TYPE.TASK) {
         icon = 'icon-custom_assignment';
-      } else if (appType === APP_TYPE.SHEET && actionId === TRIGGER_ID_TYPE.EDIT) {
+      } else if (appType === APP_TYPE.PROCESS) {
+        icon = 'icon-parameter';
+      } else if (appType === APP_TYPE.SHEET && actionId === ACTION_ID.EDIT) {
         icon = 'icon-workflow_update';
-      } else if (appType === APP_TYPE.SHEET && actionId === TRIGGER_ID_TYPE.ADD) {
+      } else if (appType === APP_TYPE.SHEET && actionId === ACTION_ID.ADD) {
         icon = 'icon-workflow_new';
-      } else if (appType === APP_TYPE.SHEET && actionId === TRIGGER_ID_TYPE.RELATION) {
+      } else if (appType === APP_TYPE.SHEET && actionId === ACTION_ID.RELATION) {
         icon = 'icon-workflow_search';
+      } else if (appType === APP_TYPE.EXTERNAL_USER && actionId === ACTION_ID.EDIT) {
+        icon = 'icon-update_information';
+      } else if (appType === APP_TYPE.EXTERNAL_USER && actionId === ACTION_ID.ADD) {
+        icon = 'icon-invited_users';
       }
       break;
     case NODE_TYPE.SEARCH:
@@ -92,13 +107,37 @@ export const getIcons = (type, appType, actionId) => {
       icon = 'icon-subprocess';
       break;
     case NODE_TYPE.PUSH:
-      icon = 'icon-notifications_11';
+      icon = 'icon-interface_push';
       break;
     case NODE_TYPE.FILE:
       icon = 'icon-print';
       break;
     case NODE_TYPE.TEMPLATE:
       icon = 'icon-wechat';
+      break;
+    case NODE_TYPE.PBC:
+      icon = 'icon-pbc';
+      break;
+    case NODE_TYPE.JSON_PARSE:
+      icon = 'icon-task_custom_polymer';
+      break;
+    case NODE_TYPE.AUTHENTICATION:
+      icon = 'icon-key1';
+      break;
+    case NODE_TYPE.PARAMETER:
+      icon = 'icon-input';
+      break;
+    case NODE_TYPE.API_PACKAGE:
+      icon = 'icon-connect';
+      break;
+    case NODE_TYPE.API:
+      icon = 'icon-api';
+      break;
+    case NODE_TYPE.APPROVAL_PROCESS:
+      icon = 'icon-approval';
+      break;
+    case NODE_TYPE.NOTICE:
+      icon = 'icon-hr_message_reminder';
       break;
     case NODE_TYPE.SYSTEM:
       if (appType === APP_TYPE.PROCESS) {
@@ -130,19 +169,24 @@ export const getIcons = (type, appType, actionId) => {
 };
 
 /**
- * 返回对应的节点颜色
+ * 返回开始对应的节点颜色
  */
-export const getColor = appType => {
+export const getStartNodeColor = (appType, triggerId) => {
   switch (appType) {
     case APP_TYPE.SHEET:
       return 'BGYellow';
     case APP_TYPE.WEBHOOK:
     case APP_TYPE.CUSTOM_ACTION:
+    case APP_TYPE.PBC:
       return 'BGBlueAsh';
     case APP_TYPE.USER:
     case APP_TYPE.DEPARTMENT:
-    case APP_TYPE.EXTERNAL_USER:
       return 'BGGreen';
+    case APP_TYPE.EXTERNAL_USER:
+      if (triggerId === TRIGGER_ID.DISCUSS) return 'BGBlue';
+      return 'BGGreen';
+    case APP_TYPE.APPROVAL_START:
+      return 'BGDarkBlue';
     default:
       return 'BGBlue';
   }
@@ -194,7 +238,10 @@ export const replaceField = (text, fieldMap, connector = '>') => {
   const reg = /\$(\w+-\w+)\$/;
   if (!reg.test(text)) return text;
   const handledText = text.replace(reg, ($0, $1) => {
-    const value = $1.split('-').map(v => fieldMap[v].name);
+    const value = $1
+      .split(/([a-zA-Z0-9#]{24,32})-/)
+      .filter(item => item)
+      .map(v => fieldMap[v].name);
     return ` (${value.join(connector)}) `;
   });
   return replaceField(handledText, fieldMap);
@@ -205,8 +252,8 @@ export const replaceField = (text, fieldMap, connector = '>') => {
  */
 export const checkJSON = value => {
   try {
-    JSON.parse(value);
-    return true;
+    value = JSON.parse((value || '').replace(/\$[^ \r\n]+?\$/g, 1));
+    return _.isObject(value);
   } catch (e) {
     return false;
   }
@@ -228,64 +275,71 @@ export const getConditionList = (type, enumDefault) => {
     case 32:
     case 33:
     case 41:
-      list = { ids: ['1', '2', '3', '4', '5', '6', '8', '7'], defaultConditionId: '1' };
+    case 50:
+      list = { ids: ['1', '2', '3', '4', '5', '44', '6', '45', '8', '7'], defaultConditionId: '1' };
       break;
     case 6:
     case 8:
     case 31:
-      list = { ids: ['9', '10', '11', '12', '13', '14', '15', '16', '8', '7'], defaultConditionId: '9' };
+      list = { ids: ['9', '10', '12', '11', '14', '13', '15', '16', '8', '7'], defaultConditionId: '9' };
       break;
     case 9:
     case 11:
       list = { ids: ['9', '10', '1', '2', '8', '7'], defaultConditionId: '9' };
       break;
     case 10:
-      list = { ids: ['9', '10', '3', '4', '8', '7'], defaultConditionId: '9' };
+      list = { ids: ['9', '10', '3', '4', '43', '8', '7'], defaultConditionId: '9' };
       break;
     case 14:
     case 21:
     case 40:
     case 42:
-      list = { ids: ['31', '32'], defaultConditionId: '31' };
+      list = { ids: ['32', '31'], defaultConditionId: '31' };
       break;
     case 15:
     case 16:
-      list = { ids: ['9', '10', '41', '39', '37', '38', '8', '7'], defaultConditionId: '9' };
+    case 46:
+      list = { ids: ['9', '10', '41', '39', '42', '40', '37', '38', '8', '7'], defaultConditionId: '9' };
       break;
     case 19:
     case 23:
     case 24:
-      list = { ids: ['1', '2', '3', '4', '35', '36', '8', '7'], defaultConditionId: '1' };
+      list = { ids: ['1', '2', '35', '36', '3', '4', '8', '7'], defaultConditionId: '1' };
       break;
     case 28:
       list = { ids: ['1', '2', '8', '7'], defaultConditionId: '1' };
       break;
     case 26:
+    case 48:
     case 10000001:
       if (enumDefault === 0) {
         list = { ids: ['9', '10', '1', '2', '8', '7'], defaultConditionId: '9' };
       } else {
-        list = { ids: ['9', '10', '3', '4', '8', '7'], defaultConditionId: '9' };
+        list = { ids: ['9', '10', '3', '4', '43', '8', '7'], defaultConditionId: '9' };
       }
       break;
     case 27:
       if (enumDefault === 0) {
-        list = { ids: ['9', '10', '1', '2', '35', '36', '8', '7'], defaultConditionId: '9' };
+        list = { ids: ['9', '10', '1', '2', '35', '36', '48', '49', '8', '7'], defaultConditionId: '9' };
       } else {
-        list = { ids: ['9', '10', '3', '4', '35', '36', '8', '7'], defaultConditionId: '9' };
+        list = { ids: ['9', '10', '3', '4', '35', '36', '48', '49', '43', '8', '7'], defaultConditionId: '9' };
       }
       break;
     case 29:
-      list = { ids: ['33', '34', '3', '4', '31', '32'], defaultConditionId: '33' };
+      if (enumDefault === 1) {
+        list = { ids: ['9', '10', '33', '34', '3', '4', '32', '31'], defaultConditionId: '33' };
+      } else {
+        list = { ids: ['9', '10', '33', '34', '43', '32', '31'], defaultConditionId: '33' };
+      }
       break;
     case 36:
       list = { ids: ['29', '30'], defaultConditionId: '29' };
       break;
     case 38:
       if (enumDefault === 1) {
-        list = { ids: ['9', '10', '11', '12', '13', '14', '15', '16', '8', '7'], defaultConditionId: '9' };
+        list = { ids: ['9', '10', '12', '11', '14', '13', '15', '16', '8', '7'], defaultConditionId: '9' };
       } else {
-        list = { ids: ['9', '10', '41', '39', '37', '38', '8', '7'], defaultConditionId: '9' };
+        list = { ids: ['9', '10', '41', '39', '42', '40', '37', '38', '8', '7'], defaultConditionId: '9' };
       }
       break;
   }
@@ -319,7 +373,14 @@ export const getConditionNumber = id => {
     case '35':
     case '36':
     case '39':
+    case '40':
     case '41':
+    case '42':
+    case '43':
+    case '44':
+    case '45':
+    case '48':
+    case '49':
       count = 1;
       break;
     case '7':
@@ -339,4 +400,67 @@ export const getConditionNumber = id => {
   }
 
   return count;
+};
+
+/**
+ * 参数名重复验证
+ */
+export const parameterNameValidation = ({ list, key, value, uniqueKey, uniqueValue, errors, verifyFormat = false }) => {
+  if (value) {
+    if (verifyFormat && !/^[a-zA-Z]{1}\w*$/.test(value.trim())) {
+      errors[uniqueValue] = 1; // 格式不正确
+    } else if (list.filter((o, i) => o[key] === value.trim() && o[uniqueKey] !== uniqueValue).length > 0) {
+      errors[uniqueValue] = 2; // 重复
+    } else {
+      errors[uniqueValue] = '';
+    }
+  } else {
+    errors[uniqueValue] = '';
+  }
+
+  list.forEach(element => {
+    if (
+      element[uniqueKey] !== uniqueValue &&
+      !_.find(list, o => o[key] === element[key] && o[uniqueKey] !== element[uniqueKey])
+    ) {
+      errors[element.controlId] = '';
+    }
+  });
+
+  return errors;
+};
+
+/**
+ * 获取筛选条件对应的文案
+ */
+export const getFilterText = (item, conditionId) => {
+  if (_.includes(['29', '30'], conditionId)) {
+    return CONDITION_TYPE[conditionId][_.get(item || {}, 'advancedSetting.showtype')];
+  }
+
+  if (_.includes(['3', '4'], conditionId) && _.includes([19, 23, 24], item.type)) {
+    return CONDITION_TYPE[conditionId].area;
+  }
+
+  if (_.includes(['3', '4'], conditionId) && item.type === 29) {
+    return CONDITION_TYPE[conditionId].relation;
+  }
+
+  if (_.includes(['3', '4'], conditionId)) {
+    return _.includes([10, 19, 23, 24, 26, 27, 29, 48, 10000001], item.type)
+      ? CONDITION_TYPE[conditionId].custom
+      : CONDITION_TYPE[conditionId].default;
+  }
+
+  if (_.includes(['1', '2'], conditionId)) {
+    return _.includes([1, 2, 3, 4, 5, 7, 28, 32, 33, 41, 50], item.type)
+      ? CONDITION_TYPE[conditionId].custom
+      : CONDITION_TYPE[conditionId].default;
+  }
+
+  if (_.includes(['33', '34'], conditionId) && item.type === 29) {
+    return item.enumDefault === 1 ? CONDITION_TYPE[conditionId].single : CONDITION_TYPE[conditionId].multi;
+  }
+
+  return CONDITION_TYPE[conditionId];
 };

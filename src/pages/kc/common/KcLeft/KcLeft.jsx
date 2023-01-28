@@ -17,7 +17,7 @@ import MenuItem from 'ming-ui/components/MenuItem';
 import Icon from 'ming-ui/components/Icon';
 import Splitter from 'ming-ui/components/Splitter';
 import ScrollView from 'ming-ui/components/ScrollView';
-
+import { index as dialog } from 'src/components/mdDialog/dialog';
 import service from '../../api/service';
 import * as kcActions from '../../redux/actions/kcAction';
 import { ROOT_FILTER_TYPE, ROOT_PERMISSION_TYPE, PICK_TYPE } from '../../constant/enum';
@@ -123,7 +123,7 @@ class KcLeft extends Component {
     );
   }
   componentDidUpdate(prevProps, prevState) {
-    window.localStorage.setItem(
+    safeLocalStorageSetItem(
       'foldedProjects_' + md.global.Account.accountId + '_kc',
       this.state.foldedProjects.join(','),
     );
@@ -372,33 +372,32 @@ class KcLeft extends Component {
   /* 流量详情*/
   @autobind
   usageDialog(usage) {
-    require(['mdDialog'], mdDialog => {
-      let usageContent = '';
-      const percent = (usage.used / usage.total) * 100;
+    let usageContent = '';
+    const percent = (usage.used / usage.total) * 100;
 
-      usageContent +=
-        '<div class="usageList Relative">' +
-        _l('本月上传流量已用') +
-        '<span data-tip="' +
-        _l('在各模块上传文件时，会计入每月上传量。免费用户上传流量为300M/月，付费版用户10G/月，多个组织可叠加。') +
-        '"><i class="icon-help ThemeColor4" ></i></span><span class="usageSize">' +
-        humanFileSize(usage.used) +
-        ' (' +
-        (percent > 100 ? 100 : percent).toFixed(2) +
-        '%)/' +
-        humanFileSize(usage.total) +
-        '</span></div>';
-      mdDialog.index({
-        dialogBoxID: 'usageDialog',
-        className: 'kcDialogBox',
-        width: 410,
-        container: {
-          header: _l('使用详情'),
-          content: usageContent,
-          noText: '',
-          yesText: '',
-        },
-      });
+    usageContent +=
+      '<div class="usageList Relative">' +
+      _l('本月上传流量已用') +
+      '<span data-tip="' +
+      _l('在各模块上传文件时，会计入每月上传量。免费用户上传流量为300M/月，付费版用户10G/月，多个组织可叠加。') +
+      '"><i class="icon-help ThemeColor4" ></i></span><span class="usageSize">' +
+      humanFileSize(usage.used) +
+      ' (' +
+      (percent > 100 ? 100 : percent).toFixed(2) +
+      '%)/' +
+      humanFileSize(usage.total) +
+      '</span></div>';
+
+    dialog({
+      dialogBoxID: 'usageDialog',
+      className: 'kcDialogBox',
+      width: 410,
+      container: {
+        header: _l('使用详情'),
+        content: usageContent,
+        noText: '',
+        yesText: '',
+      },
     });
   }
 
@@ -618,7 +617,7 @@ class KcLeft extends Component {
 
     return (
       <div className="kcLeft">
-        <div className="leftNavHairGlass ThemeBG fixedContainer" />
+        <div className="leftNavHairGlass ThemeBG Fixed" />
         <MDLeftNav className="yunFileNav ThemeBGColor9 snowFixedContainer">
           <div className="flexColumn">
             <div className="fileMenuTop">
@@ -737,49 +736,6 @@ class KcLeft extends Component {
                   .value()}
               </ScrollView>
             </div>
-            <Splitter className="fileHr bottomHr ThemeBorderColor8" />
-            {usage ? (
-              <div
-                className="folderBottom ThemeColor9"
-                onMouseEnter={evt =>
-                  this.setState({
-                    upgradeHint: !md.global.Account.projects.some(project => project.licenseType === 1),
-                    upgradeOffset: $(evt.target).offset(),
-                  })
-                }
-                onMouseLeave={() => this.setState({ upgradeHint: false })}
-              >
-                {this.state.upgradeHint ? (
-                  <div className="upgradeHint" style={{ top: this.state.upgradeOffset.top - 112 }}>
-                    <div className="upgradeCentent">
-                      <span className="hint">{_l('立即开通付费版')}</span>
-                      <span className="hint">{_l('获得无限空间和更大上传流量')}</span>
-                      <a
-                        className="upgradeBtn ThemeBGColor3"
-                        href="/personal?type=enterprise"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        {_l('开通付费版')}
-                      </a>
-                    </div>
-                    <div className="upgradeTip" />
-                  </div>
-                ) : undefined}
-                <div
-                  className="storageInfo ThemeColor9 pointer"
-                  title={_l('本月剩余 %0 上传流量', humanFileSize(usage.total - usage.used))}
-                  onClick={() => this.usageDialog(usage)}
-                >
-                  {_l('已使用')}
-                  <span className="usageAmount ThemeColor9">
-                    {' '}
-                    {humanFileSize(usage.used)} / {humanFileSize(usage.total)}{' '}
-                  </span>
-                  ( <span className="percent ThemeColor9">{(percent > 100 ? 100 : percent).toFixed(2)}</span>% )
-                </div>
-              </div>
-            ) : null}
           </div>
         </MDLeftNav>
       </div>

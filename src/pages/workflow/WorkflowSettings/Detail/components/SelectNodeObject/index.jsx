@@ -2,12 +2,15 @@ import React, { Component, Fragment } from 'react';
 import cx from 'classnames';
 import { Dropdown } from 'ming-ui';
 import { getIcons } from '../../../utils';
+import _ from 'lodash';
 
 export default class SelectNodeObject extends Component {
   /**
    * dropdown title
    */
   renderTitle(item) {
+    const { isIntegration } = this.props;
+
     return (
       <Fragment>
         <span
@@ -18,14 +21,14 @@ export default class SelectNodeObject extends Component {
         />
         <span className={cx('Font14 mLeft5', { errorColor: !item.nodeId })}>{item.nodeName || _l('节点已删除')}</span>
 
-        {item.appId ? (
+        {isIntegration ? null : item.appId ? (
           <Fragment>
             <span className="Font14 mLeft5 bold">{item.appTypeName}</span>
             <span className="Font14 mLeft5 bold">{`“${item.appName}”`}</span>
           </Fragment>
-        ) : (
+        ) : !_.isEmpty(item) ? (
           <span className="Font14 mLeft5 Gray_9e">{_l('工作表已删除')}</span>
-        )}
+        ) : null}
       </Fragment>
     );
   }
@@ -34,17 +37,18 @@ export default class SelectNodeObject extends Component {
    * dropdown list item
    */
   renderDropdownItem(item) {
+    const { isIntegration } = this.props;
+
     return (
       <div className="flexRow" style={{ alignItems: 'center' }}>
         <span className={cx('Font16 Gray_9e', getIcons(item.nodeTypeId, item.appType, item.actionId))} />
         <span className={cx('Font14 mLeft5 ellipsis flex', { Gray_9e: !item.appId })}>{item.nodeName}</span>
-        {item.appId && item.appName ? (
+        {isIntegration ? null : item.appId && item.appName ? (
           <Fragment>
             <span className="Font14 mLeft5 bold flowDropdownGray">{item.appTypeName}</span>
-            <span
-              className="Font14 mLeft5 bold flowDropdownGray ellipsis"
-              style={{ maxWidth: 150 }}
-            >{`“${item.appName}”`}</span>
+            <span className="Font14 mLeft5 bold flowDropdownGray ellipsis" style={{ maxWidth: 150 }}>{`“${
+              item.appName
+            }”`}</span>
           </Fragment>
         ) : (
           <span className="Font14 mLeft5 Gray_75">
@@ -57,12 +61,12 @@ export default class SelectNodeObject extends Component {
   }
 
   render() {
-    const { appList, selectNodeId, selectNodeObj, onChange, smallBorder } = this.props;
+    const { isIntegration, appList, selectNodeId, selectNodeObj, onChange, smallBorder, disabled = false } = this.props;
     const list = (appList || []).map(item => {
       return {
         text: this.renderDropdownItem(item),
         value: item.nodeId,
-        disabled: !item.appId || !item.appName,
+        disabled: (!item.appId || !item.appName) && !isIntegration,
       };
     });
 
@@ -75,6 +79,7 @@ export default class SelectNodeObject extends Component {
         )}
         data={list}
         value={selectNodeId || undefined}
+        disabled={disabled}
         border
         renderTitle={() => selectNodeId && this.renderTitle(selectNodeObj)}
         onChange={onChange}

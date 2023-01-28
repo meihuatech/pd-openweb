@@ -2,18 +2,34 @@ import React from 'react';
 import PropTypes from 'prop-types';
 import cx from 'classnames';
 import { Menu, MenuItem } from 'ming-ui';
-import { fieldCanSort, getSortData } from 'worksheet/util';
+import { emitter, fieldCanSort, getSortData } from 'worksheet/util';
 import { CONTROL_FILTER_WHITELIST } from 'worksheet/common/WorkSheetFilter/enum';
 import BaseColumnHead from 'worksheet/components/BaseColumnHead';
+import { isOtherShowFeild } from 'src/pages/widgetConfig/util';
+import _ from 'lodash';
 
 export default function ColumnHead(props) {
-  const { selected, className, style, control, isAsc, isLast, changeSort, updateSheetColumnWidths, setFilter } = props;
+  const {
+    worksheetId,
+    selected,
+    className,
+    style,
+    control,
+    isAsc,
+    isLast,
+    changeSort,
+    updateSheetColumnWidths,
+    onShowFullValue,
+  } = props;
+  const isShowOtherField = isOtherShowFeild(control);
   const itemType = control.type === 30 ? control.sourceControlType : control.type;
   const filterWhiteKeys = _.flatten(
     Object.keys(CONTROL_FILTER_WHITELIST).map(key => CONTROL_FILTER_WHITELIST[key].keys),
   );
   const canFilter = _.includes(filterWhiteKeys, itemType);
   const canSort = fieldCanSort(itemType);
+  const maskData =
+    _.get(control, 'advancedSetting.datamask') === '1' && _.get(control, 'advancedSetting.isdecrypt') === '1';
   return (
     <BaseColumnHead
       className={className}
@@ -27,6 +43,7 @@ export default function ColumnHead(props) {
       renderPopup={({ closeMenu }) => (
         <Menu className="worksheetColumnHeadMenu" style={{ width: 180 }} onClickAway={closeMenu}>
           {canSort &&
+            !isShowOtherField &&
             getSortData(itemType, control).map(item => (
               <MenuItem
                 key={item.value}
@@ -39,11 +56,16 @@ export default function ColumnHead(props) {
                 {item.text}
               </MenuItem>
             ))}
-
-          {canFilter && !selected && (
+          {maskData && (
+            <MenuItem onClick={onShowFullValue}>
+              <i className="icon icon-eye_off"></i>
+              {_l('解密')}
+            </MenuItem>
+          )}
+          {canFilter && !selected && !isShowOtherField && (
             <MenuItem
               onClick={() => {
-                setFilter(control);
+                emitter.emit('FILTER_ADD_FROM_COLUMNHEAD' + worksheetId + 'trash', control);
                 closeMenu();
               }}
             >
@@ -69,6 +91,5 @@ ColumnHead.propTypes = {
     type: PropTypes.number,
   }),
   changeSort: PropTypes.func,
-  setFilter: PropTypes.func,
   updateSheetColumnWidths: PropTypes.func,
 };

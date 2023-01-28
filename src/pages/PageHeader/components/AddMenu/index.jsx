@@ -1,6 +1,12 @@
 import React from 'react';
 import cx from 'classnames';
 import './index.less';
+import s from 'src/components/common/mstc/s/s';
+import t from 'src/components/common/mstc/t/t';
+import c from 'src/components/common/mstc/c/c';
+import u from 'src/components/common/mstc/u/u';
+import invite from 'src/components/invite';
+import CreateGroup from 'src/components/group/create/creatGroup';
 
 export default function UserMenu() {
   const feedVisible = !md.global.SysSettings.forbidSuites.includes('1');
@@ -14,14 +20,12 @@ export default function UserMenu() {
           feedVisible && (
             <li
               onClick={() => {
-                require(['s'], s => {
-                  s();
-                });
+                s();
               }}
               className="ThemeBGColor3"
             >
               <i className="icon icon-edit Font14" />
-              {_l('创建动态(S)')}
+              {_l('创建动态')}
             </li>
           )
         }
@@ -29,14 +33,12 @@ export default function UserMenu() {
           taskVisible && (
             <li
               onClick={() => {
-                require(['t'], t => {
-                  t();
-                });
+                t();
               }}
               className="ThemeBGColor3"
             >
               <i className="icon icon-task-responsible" />
-              {_l('创建任务(T)')}
+              {_l('创建任务')}
             </li>
           )
         }
@@ -44,14 +46,12 @@ export default function UserMenu() {
           calendarVisible && (
             <li
               onClick={() => {
-                require(['c'], c => {
-                  c();
-                });
+                c();
               }}
               className="ThemeBGColor3"
             >
               <i className="icon icon-bellSchedule" />
-              {_l('创建日程(C)')}
+              {_l('创建日程')}
             </li>
           )
         }
@@ -59,14 +59,12 @@ export default function UserMenu() {
           knowledgeVisible && (
             <li
               onClick={() => {
-                require(['u'], u => {
-                  u();
-                });
+                u();
               }}
               className="ThemeBGColor3"
             >
               <i className="icon icon-knowledge-cloud" />
-              {_l('上传文件(U)')}
+              {_l('上传文件')}
             </li>
           )
         }
@@ -74,9 +72,7 @@ export default function UserMenu() {
       <ul className={cx({'BorderTopGrayC mTop5 pTop5': feedVisible || taskVisible || calendarVisible || knowledgeVisible})}>
         <li
           onClick={() => {
-            require(['src/components/invite'], invite => {
-              invite();
-            });
+            invite();
           }}
           className="inviteMember ThemeBGColor3"
         >
@@ -85,9 +81,7 @@ export default function UserMenu() {
         </li>
         <li
           onClick={() => {
-            require(['src/components/group/create/creatGroup'], CreatGroup => {
-              CreatGroup.createInit({});
-            });
+            CreateGroup.createInit({});
           }}
           className="linkCreateGroup ThemeBGColor3"
         >

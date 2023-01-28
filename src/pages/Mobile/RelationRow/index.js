@@ -4,7 +4,8 @@ import { withRouter } from 'react-router-dom';
 import { bindActionCreators } from 'redux';
 import RelationList from './RelationList';
 import RelationAction from './RelationAction';
-import * as actions from 'src/pages/Mobile/RelationRow/redux/actions';
+import * as actions from 'mobile/RelationRow/redux/actions';
+import _ from 'lodash';
 
 @withRouter
 class Home extends Component {

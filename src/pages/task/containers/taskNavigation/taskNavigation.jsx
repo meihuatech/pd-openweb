@@ -11,7 +11,7 @@ import {
   setStateToStorage,
 } from '../../utils/utils';
 import { connect } from 'react-redux';
-import doT from 'dot';
+import doT from '@mdfe/dot';
 import singleFolderComm from './tpl/singleFolderComm.html';
 import singleFolder from './tpl/singleFolder.html';
 import topFolder from './tpl/topFolder.html';
@@ -24,12 +24,12 @@ import {
   updateFolderArchivedState,
   updateTopFolderList,
 } from '../../redux/actions';
-import 'mdBusinessCard';
+import 'src/components/mdBusinessCard/mdBusinessCard';
 import config from '../../config/config';
-import mdFunction from 'mdFunction';
+import { expireDialogAsync } from 'src/components/common/function';
 import CopyFolder from '../../components/copyFolder/copyFolder';
 import cx from 'classnames';
-import 'mdAutocomplete';
+import mdAutocomplete from 'src/components/mdAutocomplete/mdAutocomplete';
 import searchData from './tpl/searchData.html';
 import {
   createFolder,
@@ -40,6 +40,7 @@ import {
   getLeftMenuCount,
 } from '../../utils/taskComm';
 import { navigateTo } from 'src/router/navigateTo';
+import _ from 'lodash';
 
 const taskNavigationSettings = {
   globalEvent: null,
@@ -149,7 +150,8 @@ class TaskNavigation extends Component {
     });
 
     // 搜索组件
-    $search.mdAutocomplete({
+    mdAutocomplete({
+      element: 'leftSearchTaskOrFolder',
       appendTo: '#taskNavigator .folderSearch',
       source: ajaxRequest,
       op: 'searchFolderList',
@@ -638,7 +640,7 @@ class TaskNavigation extends Component {
             // 复制项目
             case 'copyFolder':
               // 监测网络是否过期
-              mdFunction.expireDialogAsync(projectId).then(() => {
+              expireDialogAsync(projectId).then(() => {
                 that.setState({
                   showCopyFolder: true,
                   projectId,

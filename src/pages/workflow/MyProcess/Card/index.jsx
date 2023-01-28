@@ -4,9 +4,11 @@ import Icon from 'ming-ui/components/Icon';
 import { TABS } from '../index';
 import { Checkbox, Tooltip } from 'antd';
 import { FLOW_FAIL_REASON } from 'src/pages/workflow/WorkflowSettings/History/config';
-import { ACTION_TYPES, TYPE_TO_STYLE, FLOW_NODE_TYPE_STATUS, INSTANCELOG_STATUS } from '../config';
+import { covertTime, ACTION_TYPES, TYPE_TO_STYLE, FLOW_NODE_TYPE_STATUS, INSTANCELOG_STATUS } from '../config';
 import './index.less';
 import SvgIcon from 'src/components/SvgIcon';
+import _ from 'lodash';
+import moment from 'moment';
 
 export default class Card extends Component {
   constructor(props) {
@@ -46,6 +48,7 @@ export default class Card extends Component {
         </div>
       );
     }
+
     if (stateTab === TABS.WAITING_EXAMINE) {
       RenderRightHander = (
         <div className="valignWrapper">
@@ -55,25 +58,26 @@ export default class Card extends Component {
             onClick={event => {
               event.stopPropagation();
               this.props.onAlreadyRead(item);
-            }}>
+            }}
+          >
             <Icon icon="ok" />
             <span className="mLeft5">{_l('已读')}</span>
           </div>
         </div>
       );
     }
+
     if (stateTab === TABS.MY_SPONSOR && currentWorkFlowNodes && currentWorkFlowNodes.length) {
       const currentWorkFlowNode = currentWorkFlowNodes[currentWorkFlowNodes.length - 1];
       RenderState = (
         <div className="state bold valignWrapper">
-          <div className="Font13 Gray_75">
-            {currentWorkFlowNode ? currentWorkFlowNode.name : flowNode.name}
-          </div>
+          <div className="Font13 Gray_75">{currentWorkFlowNode ? currentWorkFlowNode.name : flowNode.name}</div>
           <div className="info mLeft5 Gray_75 Font13">{_l('处理中…')}</div>
         </div>
       );
       RenderRightHander = this.renderTime();
     }
+
     if (stateTab === TABS.COMPLETE) {
       const { type } = this.props;
       const { operationType, operationTime } = workItem;
@@ -86,9 +90,10 @@ export default class Card extends Component {
               {icon ? <Icon icon={icon} className="mRight5" /> : null}
               <div className="Font13">{text}</div>
             </div>
-            {(instanceLog && instanceLog.cause && instanceStatus !== 5) && (
+            {instanceLog && instanceLog.cause && instanceStatus !== 5 && (
               <div className="Font13 mLeft10 Gray_75">
-                {`${instanceLog.cause === 40007 ? '' : _l('节点：')}${ FLOW_FAIL_REASON[instanceLog.cause] || instanceLog.causeMsg }`}
+                {`${instanceLog.cause === 40007 ? '' : _l('节点：')}${FLOW_FAIL_REASON[instanceLog.cause] ||
+                  instanceLog.causeMsg}`}
               </div>
             )}
           </Fragment>
@@ -103,9 +108,7 @@ export default class Card extends Component {
           );
         }
       }
-      RenderRightHander = (
-        <div className="Gray_9e">{createTimeSpan(type === 0 ? completeDate : operationTime)}</div>
-      );
+      RenderRightHander = <div className="Gray_9e">{createTimeSpan(type === 0 ? completeDate : operationTime)}</div>;
     }
 
     return (
@@ -113,6 +116,8 @@ export default class Card extends Component {
         <div className="stateWrapper valignWrapper">
           {this.renderApp()}
           {RenderState}
+          {this.renderTimeConsuming()}
+          {this.renderSurplusTime()}
         </div>
         {RenderRightHander}
       </div>
@@ -127,7 +132,7 @@ export default class Card extends Component {
           <div className="valignWrapper avatarWrapper mRight10">
             <img
               className="accountAvatar"
-              ref={(avatar) => {
+              ref={avatar => {
                 this.avatar = avatar;
               }}
               src={createAccount.avatar}
@@ -142,6 +147,90 @@ export default class Card extends Component {
       </div>
     );
   }
+  renderTimeConsuming() {
+    const { workItem = {} } = this.props.item;
+
+    const workItems = (workItem.workId ? [workItem] : []).filter(
+      item => _.includes([3, 4], item.type) && item.operationTime,
+    );
+    const timeConsuming = [];
+    const endTimeConsuming = [];
+
+    if (!workItems.length) return null;
+
+    workItems.forEach(item => {
+      // 截止时间
+      if (item.dueTime) {
+        endTimeConsuming.push(moment(item.operationTime) - moment(item.dueTime));
+      }
+
+      timeConsuming.push(moment(item.operationTime) - moment(item.receiveTime));
+    });
+
+    const maxTimeConsuming = _.max(timeConsuming) || 0;
+    let maxEndTimeConsuming = _.max(endTimeConsuming) || 0;
+    let autoPass = false;
+
+    if (
+      (workItems[0].opinion || '').indexOf('限时自动通过') > -1 ||
+      (workItems[0].opinion || '').indexOf('限时自动填写') > -1
+    ) {
+      maxEndTimeConsuming = 1;
+      autoPass = true;
+    }
+
+    if (!maxEndTimeConsuming) {
+      const time = covertTime(maxTimeConsuming);
+      return time ? <span className="Gray_9e mLeft10">{_l('耗时：%0', time)}</span> : null;
+    }
+
+    return (
+      <Tooltip
+        title={
+          autoPass ? '' : 
+          maxEndTimeConsuming > 0
+            ? _l('超时 %0 完成', covertTime(maxEndTimeConsuming))
+            : _l('提前 %0 完成', covertTime(maxEndTimeConsuming))
+        }
+      >
+        <span
+          className="stepTimeConsuming flexRow"
+          style={{
+            color: maxEndTimeConsuming > 0 ? '#F44336' : '#4CAF50',
+          }}
+        >
+          <Icon icon={maxEndTimeConsuming > 0 ? 'overdue_network' : 'task'} className="Font14 mRight2" />
+          {_l('耗时：%0', covertTime(maxTimeConsuming))}
+        </span>
+      </Tooltip>
+    );
+  }
+  renderSurplusTime() {
+    const { workItem = {} } = this.props.item;
+    let currentAccountNotified = false;
+    const workItems = (workItem.workId ? [workItem] : []).filter(item => {
+      if (item.executeTime) {
+        currentAccountNotified = true;
+      }
+      return _.includes([3, 4], item.type) && !item.operationTime && item.dueTime;
+    });
+
+    if (!workItems.length) return null;
+
+    const time = moment() - moment(workItems[0].dueTime) || 0;
+
+    return (
+      <span
+        className="stepTimeConsuming flexRow"
+        style={{
+          color: time > 0 ? '#F44336' : currentAccountNotified ? '#FF9800' : '#2196f3',
+        }}
+      >
+        <Icon icon={time > 0 ? 'error1' : 'hourglass'} className="Font14 mRight2" />
+        {time > 0 ? _l('已超时%0', covertTime(time)) : _l('剩余%0', covertTime(time))}
+      </span>
+    );
+  }
   renderApp() {
     const { item } = this.props;
     const { app, process } = item;
@@ -152,7 +241,7 @@ export default class Card extends Component {
         </div>
         <span className="Gray_75 bold ellipsis">
           {app.name}
-          <span className="dot"></span>
+          <span className="dot" />
           {process.name}
         </span>
       </div>
@@ -180,11 +269,11 @@ export default class Card extends Component {
     return (
       <div
         className="mLeft10"
-        onClick={(event) => {
+        onClick={event => {
           event.stopPropagation();
         }}
       >
-        <Tooltip title={disabled ? _l('未开启批量审批或需要填写审批意见、必填项，请单独操作') : null}>
+        <Tooltip title={disabled ? _l('未开启批量审批，请单独操作') : null}>
           <Checkbox
             disabled={disabled}
             checked={approveChecked}
@@ -210,13 +299,7 @@ export default class Card extends Component {
   }
   renderFooter() {
     const { controls } = this.props.item;
-    return (
-      <div className="cardFooter flexRow Font13">
-        {controls.map(item => (
-          this.renderControl(item)
-        ))}
-      </div>
-    );
+    return <div className="cardFooter flexRow Font13">{controls.map(item => this.renderControl(item))}</div>;
   }
   render() {
     const { onClick, approveChecked } = this.props;
@@ -225,7 +308,7 @@ export default class Card extends Component {
         {this.renderHeader()}
         {this.renderBody()}
         {this.renderFooter()}
-        {approveChecked && <div className="approveChecked"></div>}
+        {approveChecked && <div className="approveChecked" />}
       </div>
     );
   }

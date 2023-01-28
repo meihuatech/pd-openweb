@@ -3,7 +3,8 @@ import React from 'react';
 import { connect } from 'react-redux';
 import { bindActionCreators } from 'redux';
 import cx from 'classnames';
-import * as postController from 'src/api/post';
+import DocumentTitle from 'react-document-title';
+import postController from 'src/api/post';
 import LoadDiv from 'ming-ui/components/LoadDiv';
 import Button from 'ming-ui/components/Button';
 
@@ -22,9 +23,11 @@ import AttachmentsLoading from './attachmentsLoading';
 import { formatFileSize, getClassNameByExt, addToken } from 'src/util';
 import './attachmentsPreview.less';
 import { getPssId } from 'src/util/pssId';
+import _ from 'lodash';
 
 class AttachmentsPreview extends React.Component {
   static propTypes = {
+    showTitle: PropTypes.bool,
     attachments: PropTypes.array,
     actions: PropTypes.object,
     onClose: PropTypes.func,
@@ -149,7 +152,7 @@ class AttachmentsPreview extends React.Component {
     if (!this.props.attachments.length) {
       return <LoadDiv />;
     }
-    const { attachments, index, showAttInfo, hideFunctions, extra, error } = this.props;
+    const { showTitle, attachments, index, showAttInfo, hideFunctions, extra, error, options = {} } = this.props;
     const currentAttachment = attachments[index];
     const { ext, name, previewAttachmentType } = currentAttachment;
     let { previewType } = currentAttachment;
@@ -168,10 +171,11 @@ class AttachmentsPreview extends React.Component {
 
     return (
       <div
-        className={cx('attachmentsPreview flexColumn', { fullscreen: isFullScreen })}
+        className={cx('attachmentsPreview flexColumn', options.theme, { fullscreen: isFullScreen })}
         style={this.state.style}
         onWheel={this.onWheel}
       >
+        {showTitle && <DocumentTitle title={name + '.' + ext} />}
         <PreviewHeader onClose={this.props.onClose} />
         <div className="previewPanel" style={!this.state.attInfoFolded && showAttInfo ? { right: 328 } : {}}>
           <div
@@ -255,16 +259,17 @@ class AttachmentsPreview extends React.Component {
                     );
                   }
                   case PREVIEW_TYPE.IFRAME:
-                    {/*if ((ext || '').toLocaleLowerCase() === 'pdf')
+                    {/*if ((ext || '').toLocaleLowerCase() === 'pdf' && !window.isDingTalk) {
                       return (
                         <iframe
                           width="100%"
                           height="100%"
                           frameborder="0"
-                          src={`/preview/pdf/web/viewer.html?url=` + currentAttachment.sourceNode.privateDownloadUrl}
-                        ></iframe>
+                          src={`/preview/pdf/web/viewer.html?url=${currentAttachment.sourceNode.privateDownloadUrl}&showDownload=${showDownload}`}
+                        />
                       );
-                      */}
+                    }
+                    */}
                     if (previewAttachmentType === 'KC' && extra && extra.shareFolderId) {
                       viewUrl = previewUtil.urlAddParams(viewUrl, { shareFolderId: extra.shareFolderId });
                     }
@@ -424,4 +429,4 @@ function mapDispatchToProps(dispatch) {
   };
 }
 
-module.exports = connect(mapStateToProps, mapDispatchToProps)(AttachmentsPreview);
+export default connect(mapStateToProps, mapDispatchToProps)(AttachmentsPreview);

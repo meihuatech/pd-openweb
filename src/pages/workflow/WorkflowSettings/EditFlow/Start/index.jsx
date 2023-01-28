@@ -1,8 +1,10 @@
 import React, { Component, Fragment } from 'react';
 import cx from 'classnames';
 import { CreateNode, NodeOperate } from '../components';
-import { TRIGGER_ID_TYPE, APP_TYPE, EXEC_TIME_TYPE, DATE_TYPE, TIME_TYPE_NAME, CUSTOM_ACTION_TEXT } from '../../enum';
-import { getIcons, getColor } from '../../utils';
+import { TRIGGER_ID, APP_TYPE, EXEC_TIME_TYPE, DATE_TYPE, TIME_TYPE_NAME, CUSTOM_ACTION_TEXT } from '../../enum';
+import { getIcons, getStartNodeColor } from '../../utils';
+import _ from 'lodash';
+import moment from 'moment';
 
 export default class Start extends Component {
   constructor(props) {
@@ -18,10 +20,13 @@ export default class Start extends Component {
     // 子流程
     if (child) {
       const types = {
-        7: 'Webhook',
+        7: _l('发送 API 请求'),
         12: _l('代码块'),
+        17: _l('业务流程数组'),
+        18: _l('JSON 解析'),
         20: _l('人员信息'),
         21: _l('部门信息'),
+        42: _l('API数组'),
         405: _l('人工节点'),
       };
       return (
@@ -44,6 +49,10 @@ export default class Start extends Component {
       );
     }
 
+    if (item.appType === APP_TYPE.PBC && !item.appId) {
+      return <div className="workflowStartNull">{_l('设置输入参数')}</div>;
+    }
+
     if (
       ((item.appType === APP_TYPE.SHEET || item.appType === APP_TYPE.DATE) && !item.appName) ||
       (item.appType === APP_TYPE.LOOP && !item.executeTime) ||
@@ -61,15 +70,15 @@ export default class Start extends Component {
             <span className="Gray_75">{item.appTypeName}</span>“{item.appName}”
           </div>
           <div className="workflowContentInfo ellipsis mTop4">
-            {(item.triggerId === TRIGGER_ID_TYPE.EDIT || item.triggerId === TRIGGER_ID_TYPE.ONLY_EDIT) && (
+            {(item.triggerId === TRIGGER_ID.EDIT || item.triggerId === TRIGGER_ID.ONLY_EDIT) && (
               <span>
-                {item.triggerId === TRIGGER_ID_TYPE.EDIT ? _l('当新增和更新记录时触发') : _l('当更新记录时触发')}
+                {item.triggerId === TRIGGER_ID.EDIT ? _l('当新增和更新记录时触发') : _l('当更新记录时触发')}
                 {item.assignFieldName && _l('：指定字段')}
                 {item.assignFieldName && <span className="blue">{item.assignFieldName}</span>}
               </span>
             )}
-            {item.triggerId === TRIGGER_ID_TYPE.ADD && _l('当新增记录时触发')}
-            {item.triggerId === TRIGGER_ID_TYPE.DELETE && _l('当删除记录时触发')}
+            {item.triggerId === TRIGGER_ID.ADD && _l('当新增记录时触发')}
+            {item.triggerId === TRIGGER_ID.DELETE && _l('当删除记录时触发')}
           </div>
         </Fragment>
       );
@@ -196,21 +205,27 @@ export default class Start extends Component {
       );
     }
 
-    // 人员与部门
+    // 外部用户讨论触发
+    if (item.triggerId === TRIGGER_ID.DISCUSS) {
+      return <div className="pLeft8 pRight8 Gray_75">{_l('当外部用户收到讨论通知时（被回复、被提到）触发')}</div>;
+    }
+
+    // 成员与部门
     if (_.includes([APP_TYPE.USER, APP_TYPE.DEPARTMENT, APP_TYPE.EXTERNAL_USER], item.appType)) {
       const TEXT = {
         [APP_TYPE.USER]: {
-          [TRIGGER_ID_TYPE.ADD]: _l('当新人入职时'),
-          [TRIGGER_ID_TYPE.DELETE]: _l('当人员离职时'),
+          [TRIGGER_ID.ADD]: _l('当新人入职时'),
+          [TRIGGER_ID.DELETE]: _l('当人员离职时'),
         },
         [APP_TYPE.DEPARTMENT]: {
-          [TRIGGER_ID_TYPE.ADD]: _l('当创建部门时'),
-          [TRIGGER_ID_TYPE.DELETE]: _l('当解散部门时'),
+          [TRIGGER_ID.ADD]: _l('当创建部门时'),
+          [TRIGGER_ID.DELETE]: _l('当解散部门时'),
         },
         [APP_TYPE.EXTERNAL_USER]: {
-          [TRIGGER_ID_TYPE.ADD]: _l('当新用户注册时'),
-          [TRIGGER_ID_TYPE.ONLY_EDIT]: _l('当用户登录时'),
-          [TRIGGER_ID_TYPE.DELETE]: _l('当用户被删除时'),
+          [TRIGGER_ID.ADD]: _l('当新用户注册时'),
+          [TRIGGER_ID.ONLY_EDIT]: _l('当用户登录时'),
+          [TRIGGER_ID.DELETE]: _l('当用户注销时'),
+          [TRIGGER_ID.STOP]: _l('当用户被停用时'),
         },
       };
       return (
@@ -219,10 +234,51 @@ export default class Start extends Component {
         </Fragment>
       );
     }
+
+    // PBC
+    if (item.appType === APP_TYPE.PBC) {
+      return (
+        <Fragment>
+          <div className="workflowContentInfo ellipsis">{_l('%0个输入参数', item.count)}</div>
+          {item.isCallBack && (
+            <div className="workflowContentInfo ellipsis">
+              {_l('已启用平台API能力')}
+              <span className="ThemeColor3 ThemeHoverColor2 mLeft5" onMouseDown={this.openDocument}>
+                {_l('查看文档')}
+                <i className="mLeft5 icon-task-new-detail Font12" />
+              </span>
+            </div>
+          )}
+        </Fragment>
+      );
+    }
+
+    // 审批流程
+    if (item.appType === APP_TYPE.APPROVAL_START) {
+      return (
+        <Fragment>
+          <div className="workflowContentInfo ellipsis workflowContentBG">
+            <span className="Gray_9e">{_l('数据对象：')}</span>
+            {_l('工作表“%0”', item.appName)}
+          </div>
+          <div className="pLeft8 pRight8 mTop9 Gray_75 pBottom5">
+            “{item.triggerName || <span style={{ color: '#f44336' }}>{_l('流程已删除')}</span>}”
+            <span className="mLeft5">{_l('触发')}</span>
+          </div>
+        </Fragment>
+      );
+    }
   }
 
+  openDocument = evt => {
+    const { relationId } = this.props;
+
+    evt.stopPropagation();
+    window.open(`/worksheetapi/${relationId}`);
+  };
+
   render() {
-    const { item, selectNodeId, openDetail, isCopy, child } = this.props;
+    const { processId, item, selectNodeId, openDetail, isCopy, child } = this.props;
 
     return (
       <div className="flexColumn">
@@ -231,21 +287,28 @@ export default class Start extends Component {
             className={cx(
               'workflowItem',
               { workflowItemDisabled: isCopy },
-              { errorShadow: item.appId && !item.appName },
+              {
+                errorShadow:
+                  (item.appId && !item.appName && item.appType !== APP_TYPE.PBC) ||
+                  (_.includes([APP_TYPE.DATE, APP_TYPE.PBC], item.appType) && item.isException),
+              },
               { active: selectNodeId === item.id },
             )}
-            onMouseDown={() => openDetail(item.id, item.typeId)}
+            onMouseDown={() => openDetail(processId, item.id, item.typeId)}
           >
             <div className="workflowAvatars flexRow">
               <i
                 className={cx(
                   'workflowAvatar',
-                  child ? 'BGBlueAsh' : getColor(item.appType),
-                  child ? 'icon-subprocess' : getIcons(item.typeId, item.appType),
+                  child ? 'BGBlueAsh' : getStartNodeColor(item.appType, item.triggerId),
+                  child ? 'icon-subprocess' : getIcons(item.typeId, item.appType, item.triggerId),
                 )}
               />
             </div>
-            <NodeOperate nodeClassName={child ? 'BGBlueAsh' : getColor(item.appType)} {...this.props} />
+            <NodeOperate
+              nodeClassName={child ? 'BGBlueAsh' : getStartNodeColor(item.appType, item.triggerId)}
+              {...this.props}
+            />
             <div className="workflowContent">{this.renderContent()}</div>
           </div>
           <CreateNode {...this.props} />

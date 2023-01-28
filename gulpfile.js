@@ -8,15 +8,24 @@ const generate = require('./CI/generate');
 const serve = require('./CI/serve');
 const webpackConfig = require('./CI/webpack.config');
 const webpackConfigForMdFunction = require('./CI/webpack.mdfunction.config');
-const webpackSingleConfig = require('./CI/webpack.single.config');
+const getWebpackSingleConfig = require('./CI/webpack.single.config');
 const { webpackTaskFactory, findEntryMap, uploadFunctionFileToWorksheet } = require('./CI/utils');
-require('./localeTool/gulplang');
+require('./locale/gulplang');
 const isProduction = process.env.NODE_ENV === 'production';
+
+function handleError(err) {
+  console.error(err.toString());
+  process.exit(-1);
+}
 
 /** 生成 html 入口模板 */
 gulp.task('generate-mainweb', done => {
-  generate(done);
-  done();
+  try {
+    generate();
+    done();
+  } catch (err) {
+    handleError(err);
+  }
 });
 
 /** 前端 server 服务 */
@@ -38,7 +47,7 @@ gulp.task('webpack:watch', webpackTaskFactory(merge(webpackConfig, { entry: find
 
 gulp.task(
   'singleEntryWebpack',
-  webpackTaskFactory(merge(webpackSingleConfig, { entry: findEntryMap('single') }), false),
+  webpackTaskFactory(merge(getWebpackSingleConfig('single'), { entry: findEntryMap('single') }), false),
 );
 
 /** MdFunction 库构建 */
@@ -60,6 +69,7 @@ function pipeAll(pipes, done) {
 async function copy(done) {
   pipeAll(
     [
+      gulp.src(['src/common/mdcss/iconfont/**/*']).pipe(gulp.dest('./build/files/staticfiles/iconfont')),
       gulp.src(['src/library/**/*']).pipe(gulp.dest('./build/files/staticfiles/library')),
       gulp.src(['src/common/mdcss/**/*']).pipe(gulp.dest('./build/files/staticfiles/mdcss')),
       gulp.src(['src/common/mdjs/**/*']).pipe(gulp.dest('./build/files/staticfiles/mdjs')),
@@ -69,8 +79,7 @@ async function copy(done) {
       gulp.src(['src/components/images/**/*']).pipe(gulp.dest('./build/files/staticfiles/components/images')),
       gulp.src(['staticfiles/**/*']).pipe(gulp.dest('./build/files/staticfiles')),
       gulp.src(['staticfiles/html/**/*']).pipe(gulp.dest('./build/files')),
-      gulp.src(['locale/en/*.js']).pipe(gulp.dest('./build/files/staticfiles/lang/en')),
-      gulp.src(['locale/zh-Hant/*.js']).pipe(gulp.dest('./build/files/staticfiles/lang/zh-Hant')),
+      gulp.src(['locale/**/*.js']).pipe(gulp.dest('./build/files/staticfiles/lang/')),
     ],
     done,
   );
@@ -94,6 +103,15 @@ gulp.task('copy', done => {
 gulp.task('clean-build', done => {
   gulp.src(['./build*']).pipe($.clean({ force: true }));
   done();
+});
+
+const blackWordList = ['http://hart-dev.com', 'batheticrecords.com', 'http://developer.yahoo.com/yui/license.html'];
+
+gulp.task('remove-unsafe-words', () => {
+  return gulp
+    .src(['./build/dist/**/*.js'])
+    .pipe($.replace(new RegExp(`(${blackWordList.join('|')})`, 'g'), '--****--'))
+    .pipe(gulp.dest('./build/dist'));
 });
 
 /** 本地方法命令 */
@@ -141,12 +159,12 @@ gulp.task('clean-file', done => {
  * 4. 拷贝静态资源
  */
 gulp.task('publish', publishdone => {
-  if (!(fs.existsSync('./build/dist/pack') && fs.existsSync('./build/dist/manifest.json'))) {
-    console.log(gutil.colors.red('publish 失败💀'));
-    console.log('dist 文件不存在，请先执行 release 操作');
-    return;
-  }
-  gulp.series('clean-file', 'generate-mainweb', 'copy', function log(done) {
+  // if (!(fs.existsSync('./build/dist/pack') && fs.existsSync('./build/dist/manifest.json'))) {
+  //   console.log(gutil.colors.red('publish 失败💀'));
+  //   console.log('dist 文件不存在，请先执行 release 操作');
+  //   return;
+  // }
+  gulp.series('clean-file', 'remove-unsafe-words', 'generate-mainweb', 'copy', function log(done) {
     done();
     publishdone();
     console.log(gutil.colors.green('publish 成功 🎉'));

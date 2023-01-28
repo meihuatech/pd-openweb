@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { useUpdateEffect } from 'react-use';
 import { arrayOf, func, shape, string, number } from 'prop-types';
+import { Tooltip } from 'antd';
 import { Input } from 'ming-ui';
 import styled from 'styled-components';
 import { WIDGETS_TO_API_TYPE_ENUM } from 'src/pages/widgetConfig/config/widget';
 import { FILTER_CONDITION_TYPE } from 'worksheet/common/WorkSheetFilter/enum';
 import PasteDialog from '../PasteDialog';
+import _ from 'lodash';
 
 const Out = styled.div`
   display: flex;
@@ -112,7 +114,7 @@ export default function Text(props) {
                 ) {
                   onChange({ values: [newValue.replace(/ /g, '')] });
                 } else if (filterType === FILTER_CONDITION_TYPE.LIKE) {
-                  onChange({ values: newValue.split(' ').filter(v => !!v) });
+                  onChange({ values: newValue.split(' ') });
                 } else {
                   onChange({ values: [newValue] });
                 }
@@ -144,9 +146,9 @@ export default function Text(props) {
         )}
       </Con>
       <AdvancePasteIcon onClick={() => setPasteDialogVisible(true)}>
-        <span data-tip={_l('添加多个搜索关键词')}>
+        <Tooltip title={_l('添加多个搜索关键词')}>
           <i className="icon icon-lookup ThemeHoverColor3" onClick={() => setPasteDialogVisible(true)} />
-        </span>
+        </Tooltip>
       </AdvancePasteIcon>
       {pasteDialogVisible && (
         <PasteDialog

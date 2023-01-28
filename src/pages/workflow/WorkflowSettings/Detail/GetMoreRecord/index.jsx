@@ -1,11 +1,19 @@
 import React, { Component, Fragment } from 'react';
 import { ScrollView, LoadDiv, Dropdown } from 'ming-ui';
 import flowNode from '../../../api/flowNode';
-import { DetailHeader, DetailFooter, SelectNodeObject, FilterAndSort, SpecificFieldsValue } from '../components';
-import { TRIGGER_ID_TYPE } from '../../enum';
+import {
+  DetailHeader,
+  DetailFooter,
+  SelectNodeObject,
+  FilterAndSort,
+  SpecificFieldsValue,
+  FindMode,
+} from '../components';
+import { ACTION_ID, APP_TYPE } from '../../enum';
 import cx from 'classnames';
 import SelectOtherWorksheetDialog from 'src/pages/worksheet/components/SelectWorksheet/SelectOtherWorksheetDialog';
 import { checkConditionsIsNull } from '../../utils';
+import _ from 'lodash';
 
 export default class GetMoreRecord extends Component {
   constructor(props) {
@@ -15,6 +23,7 @@ export default class GetMoreRecord extends Component {
       saveRequest: false,
       showOtherWorksheet: false,
       cacheKey: +new Date(),
+      noAction: false,
     };
   }
 
@@ -40,12 +49,12 @@ export default class GetMoreRecord extends Component {
   /**
    * 获取节点详情
    */
-  getNodeDetail(props) {
+  getNodeDetail(props, actionId) {
     const { processId, selectNodeId, selectNodeType } = props;
 
-    flowNode.getNodeDetail({ processId, nodeId: selectNodeId, flowNodeType: selectNodeType }).then(result => {
+    flowNode.getNodeDetail({ processId, nodeId: selectNodeId, flowNodeType: selectNodeType, actionId }).then(result => {
       result.name = this.props.selectNodeName;
-      this.setState({ data: result, cacheKey: +new Date() });
+      this.setState({ data: result, cacheKey: +new Date(), noAction: !result.actionId || !!actionId });
     });
   }
 
@@ -62,29 +71,42 @@ export default class GetMoreRecord extends Component {
    */
   onSave = () => {
     const { data, saveRequest } = this.state;
-    const { name, actionId, appId, conditions, selectNodeId, fields, sorts, numberFieldValue } = data;
+    const { name, actionId, appId, conditions, selectNodeId, fields, sorts, numberFieldValue, execute } = data;
 
-    if (actionId === TRIGGER_ID_TYPE.FROM_WORKSHEET && !appId) {
+    if (actionId === ACTION_ID.FROM_WORKSHEET && !appId) {
       alert(_l('必须选择工作表'), 2);
       return;
     }
 
-    if (actionId === TRIGGER_ID_TYPE.FROM_RECORD || actionId === TRIGGER_ID_TYPE.FROM_ARRAY) {
+    if (
+      _.includes(
+        [
+          ACTION_ID.FROM_RECORD,
+          ACTION_ID.FROM_ARRAY,
+          ACTION_ID.FROM_API_ARRAY,
+          ACTION_ID.FROM_CODE_ARRAY,
+          ACTION_ID.FROM_PBC_INPUT_ARRAY,
+          ACTION_ID.FROM_PBC_OUTPUT_ARRAY,
+          ACTION_ID.FROM_JSON_PARSE_ARRAY,
+        ],
+        actionId,
+      )
+    ) {
       if (!selectNodeId) {
-        alert(actionId === TRIGGER_ID_TYPE.FROM_RECORD ? _l('必须选择对象') : _l('必须选择Webhook节点'), 2);
+        alert(actionId === ACTION_ID.FROM_RECORD ? _l('必须选择对象') : _l('必须选择节点'), 2);
         return;
       } else if (!fields.length) {
-        alert(actionId === TRIGGER_ID_TYPE.FROM_RECORD ? _l('必须选择他表字段') : _l('必须选择数组'), 2);
+        alert(actionId === ACTION_ID.FROM_RECORD ? _l('必须选择他表字段') : _l('必须选择数组'), 2);
         return;
       }
     }
 
-    if (actionId === TRIGGER_ID_TYPE.FROM_ADD && !selectNodeId) {
+    if (actionId === ACTION_ID.FROM_ADD && !selectNodeId) {
       alert(_l('必须选择新增记录节点'), 2);
       return;
     }
 
-    if (actionId === TRIGGER_ID_TYPE.FROM_ARTIFICIAL && !selectNodeId) {
+    if (actionId === ACTION_ID.FROM_ARTIFICIAL && !selectNodeId) {
       alert(_l('必须选择对象'), 2);
       return;
     }
@@ -111,6 +133,7 @@ export default class GetMoreRecord extends Component {
         selectNodeId,
         sorts,
         numberFieldValue,
+        execute,
       })
       .then(result => {
         this.props.updateNodeData(result);
@@ -137,7 +160,7 @@ export default class GetMoreRecord extends Component {
   };
 
   /**
-   * 获取Webhook数组的参数
+   * 获取发送API请求数组的参数
    */
   getArrayFields = (appType, selectNodeId, controlId) => {
     const { processId } = this.props;
@@ -171,9 +194,9 @@ export default class GetMoreRecord extends Component {
       .then(result => {
         this.updateSource({
           relationControls:
-            data.actionId === TRIGGER_ID_TYPE.FROM_RECORD
+            data.actionId === ACTION_ID.FROM_RECORD
               ? result.filter(item => item.type === 29)
-              : result.filter(item => item.type === 10000003),
+              : result.filter(item => _.includes([10000003, 10000007, 10000008], item.type)),
         });
       });
   };
@@ -203,43 +226,125 @@ export default class GetMoreRecord extends Component {
   renderContent() {
     const { data } = this.state;
     const actionTypes = {
-      400: _l('从工作表获取记录'),
-      401: _l('从记录获取关联记录'),
-      402: _l('从新增节点获取记录'),
-      403: _l('从Webhook数组获取数据'),
-      404: _l('从代码块数组获取数据'),
-      405: _l('从人工节点获取操作明细'),
+      [ACTION_ID.FROM_WORKSHEET]: _l('从工作表获取记录'),
+      [ACTION_ID.FROM_RECORD]: _l('从记录获取关联记录'),
+      [ACTION_ID.FROM_ADD]: _l('从新增节点获取记录'),
+      [ACTION_ID.FROM_ARTIFICIAL]: _l('从人工节点获取操作明细'),
     };
     const { workflowBatchGetDataLimitCount, workflowSubProcessDataLimitCount } = md.global.SysSettings;
     return (
       <div className="workflowDetailBox">
-        <div className="bold">{actionTypes[data.actionId]}</div>
+        {data.actionId &&
+          !_.includes(
+            [
+              ACTION_ID.FROM_ARRAY,
+              ACTION_ID.FROM_API_ARRAY,
+              ACTION_ID.FROM_CODE_ARRAY,
+              ACTION_ID.FROM_PBC_INPUT_ARRAY,
+              ACTION_ID.FROM_PBC_OUTPUT_ARRAY,
+              ACTION_ID.FROM_JSON_PARSE_ARRAY,
+            ],
+            data.actionId,
+          ) && <div className="bold mBottom20">{actionTypes[data.actionId]}</div>}
 
-        <div className="Font14 Gray_75 workflowDetailDesc mTop20">
-        {_l(
+        <div className="Font14 Gray_75 workflowDetailDesc">
+          {_l(
             '您获取的多条数据可供本流程的数据处理节点或子流程节点使用。被数据处理节点（新增、更新、删除）使用，最多支持%0条。被子流程节点使用，最多支持%1条。',
             workflowBatchGetDataLimitCount,
-            workflowSubProcessDataLimitCount
+            workflowSubProcessDataLimitCount,
           )}
+          {data.actionId === ACTION_ID.FROM_RECORD &&
+            _l('注：此方式最多获取1000条关联记录，如果需要获取更多数据，请使用“从工作表获取记录”的方式。')}
         </div>
 
-        {data.actionId === TRIGGER_ID_TYPE.FROM_WORKSHEET && this.renderWorksheet()}
-        {data.actionId === TRIGGER_ID_TYPE.FROM_RECORD && this.renderRecord()}
-        {data.actionId === TRIGGER_ID_TYPE.FROM_ADD && this.renderAdd()}
-        {_.includes([TRIGGER_ID_TYPE.FROM_ARRAY, TRIGGER_ID_TYPE.FROM_CODE], data.actionId) && this.renderArray()}
-        {data.actionId === TRIGGER_ID_TYPE.FROM_ARTIFICIAL && this.renderArtificial()}
+        {(!data.actionId ||
+          _.includes(
+            [
+              ACTION_ID.FROM_ARRAY,
+              ACTION_ID.FROM_API_ARRAY,
+              ACTION_ID.FROM_CODE_ARRAY,
+              ACTION_ID.FROM_PBC_INPUT_ARRAY,
+              ACTION_ID.FROM_PBC_OUTPUT_ARRAY,
+              ACTION_ID.FROM_JSON_PARSE_ARRAY,
+            ],
+            data.actionId,
+          )) &&
+          this.renderSelectArrayType()}
 
-        <div className="mTop20 bold">{_l('限制数量')}</div>
-        <div className="Font13 Gray_9e mTop5">{_l('最多获取条数')}</div>
-        <SpecificFieldsValue
-          processId={this.props.processId}
-          selectNodeId={this.props.selectNodeId}
-          updateSource={numberFieldValue => this.updateSource({ numberFieldValue })}
-          type="number"
-          allowedEmpty
-          data={data.numberFieldValue}
-        />
+        {data.actionId === ACTION_ID.FROM_WORKSHEET && this.renderWorksheet()}
+        {data.actionId === ACTION_ID.FROM_RECORD && this.renderRecord()}
+        {data.actionId === ACTION_ID.FROM_ADD && this.renderAdd()}
+        {_.includes(
+          [
+            ACTION_ID.FROM_ARRAY,
+            ACTION_ID.FROM_API_ARRAY,
+            ACTION_ID.FROM_CODE_ARRAY,
+            ACTION_ID.FROM_PBC_INPUT_ARRAY,
+            ACTION_ID.FROM_PBC_OUTPUT_ARRAY,
+            ACTION_ID.FROM_JSON_PARSE_ARRAY,
+          ],
+          data.actionId,
+        ) && this.renderArray()}
+        {data.actionId === ACTION_ID.FROM_ARTIFICIAL && this.renderArtificial()}
+
+        {data.actionId && (
+          <Fragment>
+            <div className="mTop20 bold">{_l('限制数量')}</div>
+            <div className="Font13 Gray_9e mTop5">{_l('最多获取条数')}</div>
+            <div className="mTop10">
+              <SpecificFieldsValue
+                processId={this.props.processId}
+                selectNodeId={this.props.selectNodeId}
+                updateSource={numberFieldValue => this.updateSource({ numberFieldValue })}
+                type="number"
+                allowedEmpty
+                data={data.numberFieldValue}
+              />
+            </div>
+          </Fragment>
+        )}
+
+        {_.includes([ACTION_ID.FROM_WORKSHEET, ACTION_ID.FROM_RECORD, ACTION_ID.FROM_ADD], data.actionId) && (
+          <FindMode execute={data.execute} onChange={execute => this.updateSource({ execute })} />
+        )}
       </div>
+    );
+  }
+
+  /**
+   * 渲染选择数组类型
+   */
+  renderSelectArrayType() {
+    const { flowInfo } = this.props;
+    const { data, noAction } = this.state;
+    const list = [
+      { text: _l('发送API请求数组'), value: ACTION_ID.FROM_ARRAY },
+      { text: _l('调用已集成API数组'), value: ACTION_ID.FROM_API_ARRAY },
+      { text: _l('代码块数组'), value: ACTION_ID.FROM_CODE_ARRAY },
+      { text: _l('业务流程输入数组'), value: ACTION_ID.FROM_PBC_INPUT_ARRAY },
+      { text: _l('业务流程输出数组'), value: ACTION_ID.FROM_PBC_OUTPUT_ARRAY },
+      { text: _l('JSON解析数组'), value: ACTION_ID.FROM_JSON_PARSE_ARRAY },
+    ];
+
+    if (flowInfo.startAppType !== APP_TYPE.PBC || flowInfo.child) {
+      _.remove(list, item => _.includes([ACTION_ID.FROM_PBC_INPUT_ARRAY], item.value));
+    }
+
+    return (
+      <Fragment>
+        <div className="mTop20 bold">{_l('选择数据类型')}</div>
+        <Dropdown
+          className="flowDropdown mTop10"
+          data={list}
+          value={data.actionId}
+          disabled={!noAction}
+          border
+          onChange={actionId => {
+            this.updateSource({ actionId });
+            this.getNodeDetail(this.props, actionId);
+          }}
+        />
+      </Fragment>
     );
   }
 
@@ -428,12 +533,18 @@ export default class GetMoreRecord extends Component {
       text: controlName,
       value: controlId,
     }));
+    const ArrayTitle = {
+      [ACTION_ID.FROM_ARRAY]: _l('选择发送API请求节点'),
+      [ACTION_ID.FROM_API_ARRAY]: _l('选择API节点'),
+      [ACTION_ID.FROM_CODE_ARRAY]: _l('选择代码块节点'),
+      [ACTION_ID.FROM_PBC_INPUT_ARRAY]: _l('选择业务流程节点'),
+      [ACTION_ID.FROM_PBC_OUTPUT_ARRAY]: _l('选择业务流程节点'),
+      [ACTION_ID.FROM_JSON_PARSE_ARRAY]: _l('选择JSON解析节点'),
+    };
 
     return (
       <Fragment>
-        <div className="mTop20 bold">
-          {data.actionId === TRIGGER_ID_TYPE.FROM_ARRAY ? _l('选择Webhook节点') : _l('选择代码块节点')}
-        </div>
+        <div className="mTop20 bold">{ArrayTitle[data.actionId]}</div>
         <SelectNodeObject
           smallBorder={true}
           appList={data.flowNodeList}
@@ -526,36 +637,43 @@ export default class GetMoreRecord extends Component {
   render() {
     const { data, showOtherWorksheet } = this.state;
 
-    if (_.isEmpty(data) || !data.actionId) {
+    if (_.isEmpty(data)) {
       return <LoadDiv className="mTop15" />;
     }
 
     return (
       <Fragment>
         <DetailHeader
-          data={{ ...data, selectNodeType: this.props.selectNodeType }}
+          {...this.props}
+          data={{ ...data }}
           icon="icon-transport"
           bg="BGYellow"
-          closeDetail={this.props.closeDetail}
           updateSource={this.updateSource}
         />
         <div className="flex mTop20">
           <ScrollView>{this.renderContent()}</ScrollView>
         </div>
         <DetailFooter
+          {...this.props}
           isCorrect={
-            (data.actionId === TRIGGER_ID_TYPE.FROM_WORKSHEET && data.appId) ||
+            (data.actionId === ACTION_ID.FROM_WORKSHEET && data.appId) ||
             (_.includes(
-              [TRIGGER_ID_TYPE.FROM_RECORD, TRIGGER_ID_TYPE.FROM_ARRAY, TRIGGER_ID_TYPE.FROM_CODE],
+              [
+                ACTION_ID.FROM_RECORD,
+                ACTION_ID.FROM_ARRAY,
+                ACTION_ID.FROM_API_ARRAY,
+                ACTION_ID.FROM_CODE_ARRAY,
+                ACTION_ID.FROM_PBC_INPUT_ARRAY,
+                ACTION_ID.FROM_PBC_OUTPUT_ARRAY,
+                ACTION_ID.FROM_JSON_PARSE_ARRAY,
+              ],
               data.actionId,
             ) &&
               data.selectNodeId &&
               data.fields.length) ||
-            (_.includes([TRIGGER_ID_TYPE.FROM_ADD, TRIGGER_ID_TYPE.FROM_ARTIFICIAL], data.actionId) &&
-              data.selectNodeId)
+            (_.includes([ACTION_ID.FROM_ADD, ACTION_ID.FROM_ARTIFICIAL], data.actionId) && data.selectNodeId)
           }
           onSave={this.onSave}
-          closeDetail={this.props.closeDetail}
         />
 
         {showOtherWorksheet && (

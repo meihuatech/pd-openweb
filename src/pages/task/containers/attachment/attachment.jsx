@@ -6,10 +6,10 @@ import config from '../../config/config';
 import { errorMessage, setStateToStorage } from '../../utils/utils';
 import cx from 'classnames';
 import LoadDiv from 'ming-ui/components/LoadDiv';
-import previewAttachments from 'previewAttachments';
+import previewAttachments from 'src/components/previewAttachments/previewAttachments';
 import { attachmentSwitch } from '../../redux/actions';
 import TaskDetail from '../taskDetail/taskDetail';
-import { isVideo, addToken, getClassNameByExt } from 'src/util';
+import { isVideo, downloadFile, getClassNameByExt } from 'src/util';
 
 const attachmentSettings = {
   dialog:
@@ -82,7 +82,7 @@ class Attachment extends Component {
     $('body').on('click.taskAttchment', '#attachmentOperation li', function () {
       if ($(this).attr('data-type') === 'download') {
         if (attachmentSettings.itemData.allowDown === 'ok' && attachmentSettings.itemData.downloadUrl) {
-          window.open(addToken(attachmentSettings.itemData.downloadUrl, !window.isDingTalk));
+          window.open(downloadFile(attachmentSettings.itemData.downloadUrl));
         } else {
           alert(_l('您权限不足，无法下载，请联系管理员或文件上传者'), 3);
         }

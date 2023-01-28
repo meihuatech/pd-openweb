@@ -8,6 +8,8 @@ import accountController from 'src/api/account';
 import captcha from 'src/components/captcha';
 import { Input } from 'antd';
 import './index.less';
+import RegExp from 'src/util/expression';
+import _ from 'lodash';
 
 const checkFuncs = {
   account: ([input, iti]) => {
@@ -22,8 +24,7 @@ const checkFuncs = {
     const { global = {} } = md;
     const { SysSettings = {} } = global;
     const { passwordRegexTip, passwordRegex } = SysSettings;
-    const pwdRegex = passwordRegex || new RegExp('(?=.*[0-9])(?=.*[a-zA-Z]).{8,20}');
-    if (!(pwd && pwdRegex.test(pwd))) {
+    if (!(pwd && RegExp.isPasswordRule(pwd, passwordRegex))) {
       return passwordRegexTip || _l('密码，至少8-20位，且含字母+数字');
     }
   },
@@ -104,7 +105,7 @@ export default class InitPasswordDialog extends React.Component {
   getVerifyCode() {
     const _this = this;
     var throttled = _.throttle(
-      function(res) {
+      function (res) {
         if (res.ret === 0) {
           accountController
             .sendVerifyCode({
@@ -112,6 +113,7 @@ export default class InitPasswordDialog extends React.Component {
               ticket: res.ticket,
               randStr: res.randstr,
               captchaType: md.staticglobal.getCaptchaType(),
+              needCheckCode: false,
             })
             .then(data => {
               if (data === 1) {
@@ -156,7 +158,7 @@ export default class InitPasswordDialog extends React.Component {
     if (verifyCodeTimer) {
       clearInterval(verifyCodeTimer);
     }
-    let verifyCodeTimer = setInterval(function() {
+    let verifyCodeTimer = setInterval(function () {
       if (_this.state.seconds <= 0) {
         _this.setState({ isSendVerify: false });
       } else {
@@ -241,6 +243,7 @@ export default class InitPasswordDialog extends React.Component {
             onChange={this.handleFieldInput('newPwd')}
             onBlur={this.handleFieldBlur('newPwd')}
             onFocus={this.clearError('newPwd')}
+            autocomplete="new-password"
           />
         </div>
         <div className="warnBox">

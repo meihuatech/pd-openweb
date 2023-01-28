@@ -10,7 +10,7 @@ import React, { Component } from 'react';
 import preall from 'src/common/preall';
 import store from '../redux/store';
 import config from '../config';
-import 'mdDialog';
+import 'src/components/mdDialog/dialog';
 import Contents from './Contents';
 import CustomWidgetContainer from './customWidgetContainer';
 import formControl from 'src/api/form';
@@ -18,6 +18,7 @@ import util, { clearStorage } from '../utils/util';
 import { refreshAllWidgets } from '../redux/actions';
 import { autobind } from 'core-decorators';
 import { Provider } from 'react-redux';
+import _ from 'lodash';
 
 @preall
 export default class CustomWidget extends Component {

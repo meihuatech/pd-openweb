@@ -4,6 +4,7 @@ import { AS_ABSTRACT_CONTROL, filterAndFormatterControls } from 'src/pages/works
 import { getIconByType } from 'src/pages/widgetConfig/util';
 import cx from 'classnames';
 import { SYS } from 'src/pages/widgetConfig/config/widget.js';
+import _ from 'lodash';
 
 // 摘要
 export default class Abstract extends React.Component {
@@ -11,8 +12,11 @@ export default class Abstract extends React.Component {
     const { worksheetControls = [], advancedSetting = {}, handleChange } = this.props;
     const { abstract } = advancedSetting;
     let abstractControls = filterAndFormatterControls({
-      // 排除系统字段
-      controls: worksheetControls.filter(item => !SYS.includes(item.controlId)),
+      controls: worksheetControls.filter(
+        item =>
+          !SYS.includes(item.controlId) && // 排除系统字段
+          !(_.includes([48], item.sourceControlType) && item.type === 30), //排除他表字段 组织角色控件
+      ),
       filter: item => _.includes(AS_ABSTRACT_CONTROL, item.type),
     });
     abstractControls = abstractControls.map(it => {

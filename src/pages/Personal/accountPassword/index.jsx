@@ -3,7 +3,7 @@ import './index.less';
 import account from 'src/api/account';
 import accountSetting from 'src/api/accountSetting';
 import accountGuideController from 'src/api/accountGuide';
-import DialogLayer from 'mdDialog';
+import DialogLayer from 'src/components/mdDialog/dialog';
 import ReactDom from 'react-dom';
 import bindAccount from '../bindAccount/bindAccount';
 import unBindAccount from '../bindAccount/unBindAccount';
@@ -14,25 +14,18 @@ import InitPasswordDialog from '../bindAccount/initPasswordDialog/index';
 import cx from 'classnames';
 import captcha from 'src/components/captcha';
 import common from '../common';
-import ValidatePassword from '../bindAccount/validatePasswordDialog';
-import { encrypt } from 'src/util';
-
-const {
-  personal: {
-    accountPassword: { accountBind, privacySetting, qqOrWeixin },
-  },
-} = window.private;
 
 let accountList = [
   { key: 'weiXinBind', icon: 'icon-wechat', color: 'weiBindColor', label: _l('微信') },
   { key: 'qqBind', icon: 'icon-qq', color: 'qqBindColor', label: _l('QQ') },
   { key: 'workBind', color: 'workBindColor', needHide: true },
-].filter(it => (qqOrWeixin ? !_.includes(['weiXinBind', 'qqBind'], it.key) : true));
+];
 
 const tipsConfig = {
   mobilePhone: _l(
     '绑定手机号作为你的登录账号。同时也是管理个人账户和使用系统服务的重要依据。为便于您以后的操作及账户安全，请您尽快绑定。',
   ),
+  isTwoauthentication: _l('两步验证是在输入账号密码后，额外增加一道安全屏障（手机短信或邮箱验证码），保障您的帐号安全'),
 };
 
 const TPType = {
@@ -54,15 +47,6 @@ const WORKBINDOPTION = state => {
       return { icon: 'icon-feishu', label: _l('飞书') };
   }
 };
-
-const settingOptions = {
-  openDeskNotice: 2,
-  openWeixinLogin: 3,
-  joinFriendMode: 5,
-  lang: 6,
-  isPrivateMobile: 9,
-  isPrivateEmail: 10,
-};
 export default class AccountChart extends React.Component {
   constructor(props) {
     super(props);
@@ -79,6 +63,8 @@ export default class AccountChart extends React.Component {
       isPrivateEmail: false,
       needInit: false, //是否需要初始化
       showWarn: true,
+      isTwoauthentication: false,
+      wxQRCodeLoading: true,
     };
   }
 
@@ -101,6 +87,7 @@ export default class AccountChart extends React.Component {
         joinFriendMode: info.joinFriendMode,
         isPrivateMobile: info.isPrivateMobile,
         isPrivateEmail: info.isPrivateEmail,
+        isTwoauthentication: info.isTwoauthentication,
         loading: false,
       });
     });
@@ -219,7 +206,7 @@ export default class AccountChart extends React.Component {
   sureSettings(settingNum, value, successCallback) {
     accountSetting
       .editAccountSetting({
-        settingType: settingOptions[settingNum],
+        settingType: common.settingOptions[settingNum],
         settingValue: value,
       })
       .then(data => {
@@ -384,13 +371,10 @@ export default class AccountChart extends React.Component {
     return (
       <div className={cx('initPasswordWarning', { Hidden: !(needInit && showWarn) })}>
         <span className="warnColor">
-          <span className="icon-error1 Font16 mRight8 TxtMiddle"></span>
+          <span className="icon-error1 Font16 mRight8 TxtMiddle" />
           <span>{_l('建议您绑定手机号，绑定后可以直接在官网和 App 登录')}</span>
         </span>
-        <span
-          className="icon-clear Font16 ThemeHoverColor3 Hand"
-          onClick={() => this.setState({ showWarn: false })}
-        ></span>
+        <span className="icon-clear Font16 ThemeHoverColor3 Hand" onClick={() => this.setState({ showWarn: false })} />
       </div>
     );
   }
@@ -398,7 +382,7 @@ export default class AccountChart extends React.Component {
   renderTips = key => {
     return (
       <Tooltip popupPlacement="top" text={<span>{tipsConfig[key]}</span>}>
-        <span className="icon-novice-circle Gray_bd Hand mLeft5 Font15"></span>
+        <span className="icon-novice-circle Gray_bd Hand mLeft5 Font15" />
       </Tooltip>
     );
   };
@@ -412,6 +396,19 @@ export default class AccountChart extends React.Component {
         {_l('取消红点提示')}
       </span>
     );
+  };
+
+  // 注销
+  dealLoagout = () => {
+    account.validateLogoffAccount().then(res => {
+      if (res === 1) {
+        location.href = '/cancellation.htm';
+      } else if (res === 20) {
+        alert(_l('您是平台唯一管理员，无法注销'));
+      } else if (res === 30) {
+        alert(_l('您尚有未退出的组织，请先至 个人中心-我的组织 退出所有组织，方可注销'));
+      }
+    });
   };
 
   render() {
@@ -439,7 +436,7 @@ export default class AccountChart extends React.Component {
           <span>
             <span className="Gray Relative">
               {mobilePhone || _l('未绑定')}
-              {mobilePhoneWarnLight && <span className="warnLight warnLightMEPosition warnLightPhone"></span>}
+              {mobilePhoneWarnLight && <span className="warnLight warnLightMEPosition warnLightPhone" />}
             </span>
             {mobilePhone ? (
               <Fragment>
@@ -468,7 +465,7 @@ export default class AccountChart extends React.Component {
               </span>
             )}
           </span>
-          {this.renderRedDot(mobilePhoneWarnLight, 'cancelRedDotmobilePhone')}
+          {this.renderRedDot(mobilePhoneWarnLight, 'accountMobilePhone')}
         </div>
         {needInit ? null : (
           <Fragment>
@@ -484,7 +481,7 @@ export default class AccountChart extends React.Component {
                   ) : (
                     _l('未绑定')
                   )}
-                  {emailWarnLight ? <span className="warnLight warnLightMEPosition warnLightEmail"></span> : null}
+                  {emailWarnLight ? <span className="warnLight warnLightMEPosition warnLightEmail" /> : null}
                 </span>
                 {email ? (
                   <Fragment>
@@ -510,7 +507,7 @@ export default class AccountChart extends React.Component {
                   </span>
                 )}
               </span>
-              {this.renderRedDot(emailWarnLight, 'cancelRedDotEmail')}
+              {this.renderRedDot(emailWarnLight, 'accountEmail')}
             </div>
             <div className="accountRowItem">
               <div className="accountLabel Gray_75">{_l('密码')}</div>
@@ -520,8 +517,7 @@ export default class AccountChart extends React.Component {
             </div>
           </Fragment>
         )}
-
-        {accountBind ? null : (
+        {!md.global.Config.IsLocal && (
           <div className="accountRowItem">
             <div className="accountLabel Gray_75">{_l('账号绑定')}</div>
             {accountList.map(({ key, label, color, icon, needHide = false }, index) => {
@@ -541,13 +537,16 @@ export default class AccountChart extends React.Component {
             })}
           </div>
         )}
-
-        {privacySetting ? null : (
-          <Fragment>
-            <div className="Font17 Bold Gray mBottom40 mTop15">{_l('隐私')}</div>
-            {this.joinFriend()}
-          </Fragment>
+        {md.global.Config.IsPlatformLocal && (
+          <div className="accountRowItem">
+            <div className="accountLabel Gray_75">{_l('账户注销')}</div>
+            <div className="logout Hand" onClick={this.dealLoagout}>
+              {_l('注销')}
+            </div>
+          </div>
         )}
+        <div className="Font17 Bold Gray mBottom40 mTop20">{_l('隐私')}</div>
+        {this.joinFriend()}
       </div>
     );
   }

@@ -6,6 +6,8 @@ import { STATUS2COLOR } from './config';
 import styled from 'styled-components';
 import { Menu, MenuItem, Support } from 'ming-ui';
 import { SUPPORT_HREF } from '../enum';
+import _ from 'lodash';
+import moment from 'moment';
 
 const HISTORY_TITLE = [
   { id: 'status', text: _l('状态') },
@@ -13,6 +15,7 @@ const HISTORY_TITLE = [
   { id: 'cause', text: _l('原因') },
   { id: 'time', text: _l('触发时间') },
   { id: 'retry', text: '' },
+  { id: 'version', text: '' },
 ];
 
 const Box = styled.div`
@@ -45,6 +48,7 @@ export default class HistoryList extends Component {
     accumulation: any,
     getMore: func,
     hasMoreData: bool,
+    requestPending: bool,
     onRecovery: func,
   };
   static defaultProps = {
@@ -154,7 +158,7 @@ export default class HistoryList extends Component {
   }
 
   render() {
-    const { data, getMore, hasMoreData, accumulation, ...res } = this.props;
+    const { data, getMore, hasMoreData, requestPending, accumulation, ...res } = this.props;
     return (
       <div className="historyListWrap">
         <ul className="historyListTitle">
@@ -190,7 +194,7 @@ export default class HistoryList extends Component {
         {hasMoreData && (
           <div className="moreDataWrap">
             <div className="moreData" onClick={getMore}>
-              {_l('更多')}
+              {requestPending ? _l('加载中...') : _l('更多')}
             </div>
           </div>
         )}

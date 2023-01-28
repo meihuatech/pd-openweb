@@ -3,6 +3,7 @@ import { Motion, spring } from 'react-motion';
 import PropTypes from 'prop-types';
 import styled from 'styled-components';
 import SvgIcon from 'src/components/SvgIcon';
+import _ from 'lodash';
 
 const Con = styled.div`
   display: flex;
@@ -146,7 +147,9 @@ export default function RelateRecordTableNav(props) {
               </IconCon>
             )}
             {control.controlName}
-            {!!control.value && Number(control.value) !== 0 && <Num> ( {control.value || 0} ) </Num>}
+            {_.isNumber(Number(control.value)) && !_.isNaN(Number(control.value)) && Number(control.value) !== 0 && (
+              <Num> ( {control.value || 0} ) </Num>
+            )}
           </Tab>
         ))}
       </TabCon>

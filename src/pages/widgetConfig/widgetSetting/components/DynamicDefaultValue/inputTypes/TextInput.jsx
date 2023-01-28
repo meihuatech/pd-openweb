@@ -4,6 +4,7 @@ import { TagTextarea } from 'ming-ui';
 import { SelectOtherField, OtherField, DynamicInput } from '../components';
 import { DynamicValueInputWrap } from '../styled';
 import { transferValue } from '../util';
+import _ from 'lodash';
 
 export default class TextInput extends Component {
   static propTypes = {
@@ -21,8 +22,10 @@ export default class TextInput extends Component {
     const { dynamicValue, data, clearOldDefault, onDynamicValueChange } = this.props;
     const { default: defaultValue } = data;
     if (defaultValue) {
-      onDynamicValueChange(dynamicValue.concat({ cid: '', rcid: '', staticValue: defaultValue }));
+      const newDynamicValue = dynamicValue.concat({ cid: '', rcid: '', staticValue: defaultValue });
+      onDynamicValueChange(newDynamicValue);
       clearOldDefault();
+      this.setDynamicValue(newDynamicValue);
     } else {
       this.setDynamicValue(dynamicValue);
     }
@@ -68,10 +71,11 @@ export default class TextInput extends Component {
 
   handleDynamicValue = (newField = []) => {
     if (this.$tagtextarea) {
-      const { cid = '', rcid = '' } = newField[0];
+      const { cid = '', rcid = '', staticValue } = newField[0];
       const id = rcid ? `${cid}~${rcid}` : `${cid}`;
       this.$tagtextarea.insertColumnTag(id);
-      const newValue = this.$tagtextarea.cmObj.getValue();
+      const newValue =
+        cid === 'search-keyword' && !staticValue ? '$search-keyword$' : this.$tagtextarea.cmObj.getValue();
       this.transferValue(newValue);
     }
   };
@@ -85,6 +89,7 @@ export default class TextInput extends Component {
         ) : (
           <TagTextarea
             className="tagTextAreaWrap"
+            placeholder={_l('请输入')}
             renderTag={(tag, options) => {
               const [cid = '', rcid = ''] = tag.split('~');
               return <OtherField className="tagTextField overflow_ellipsis" item={{ cid, rcid }} {...this.props} />;

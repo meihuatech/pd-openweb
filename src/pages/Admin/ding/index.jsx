@@ -3,27 +3,27 @@ import PropTypes from 'prop-types';
 import cx from 'classnames';
 import { Link } from 'react-router-dom';
 import { Switch, Icon, Button, LoadDiv, Radio } from 'ming-ui';
-import { Tabs, Popover } from 'antd';
+import { Tabs, Popover, Input } from 'antd';
 import Ajax from 'src/api/workWeiXin';
 import Config from '../config';
 import Dialog from 'ming-ui/components/Dialog';
-import { map } from 'lodash';
-import { navigateTo } from 'src/router/navigateTo';
+import IntegrationSetPssword from '../components/IntegrationSetPssword';
+import UpgradeVersion from '../components/UpgradeVersion';
+import { getFeatureStatus } from 'src/util';
 import './style.less';
+import _ from 'lodash';
 
 const optionTypes = [
   { label: _l('新开浏览器打开'), key: 1 },
   { label: _l('钉钉内打开'), key: 2 },
 ];
+const FEATURE_ID = 10;
 
 export default class Ding extends React.Component {
   constructor(props) {
     super(props);
     this.state = {
       pageLoading: true,
-      hasApply: false, //是否已提交申请/尚未提交申请false
-      isPassApply: false, //是否已通过申请
-      isReject: false, //是否已拒绝申请
       isHasInfo: false, //是否已填对接信息
       canEditInfo: true, //是否可编辑输入框
       isShowCorpId: false,
@@ -49,6 +49,8 @@ export default class Ding extends React.Component {
       canSyncBtn: false,
       intergrationClientWorkingPattern: 0,
       intergrationTodoMessageEnabled: false,
+      isSetPassword: false,
+      passwordError: false,
     };
   }
 
@@ -60,10 +62,7 @@ export default class Ding extends React.Component {
       });
       if (res) {
         this.setState({
-          hasApply: !!res,
           //"status: 集成状态，主要通过该值展现：1代表申请通过并提供了使用；0代表提交了申请；-1代表拒绝申请；2代表之前集成过但关闭了集成"
-          isPassApply: [0, 1, 2].includes(res.status),
-          isReject: res.status === -1,
           CorpId: res.corpId,
           AppKey: res.appKey,
           AppSecret: res.appSecret,
@@ -79,6 +78,7 @@ export default class Ding extends React.Component {
           show2: !(res.corpId && res.agentId && res.appKey && res.appSecret && res.status != 2),
           intergrationClientWorkingPattern: res.intergrationClientWorkingPattern,
           intergrationTodoMessageEnabled: res.intergrationTodoMessageEnabled,
+          status: res.status,
         });
       }
     });
@@ -188,7 +188,7 @@ export default class Ding extends React.Component {
                 value={!this.state[`isShow${strId}`] ? this.state[`${strId}Format`] : this.state[strId]}
               />
               <Icon
-                icon={!this.state[`isShow${strId}`] ? 'circulated' : 'public-folder-hidden'}
+                icon={!this.state[`isShow${strId}`] ? 'circulated' : 'visibility_off'}
                 className="Gray_9e Font18 isShowIcon"
                 onClick={() => {
                   this.setState({
@@ -486,106 +486,40 @@ export default class Ding extends React.Component {
       }
     });
   }
-  // 免费版显示付费升级
-  renderUpgrade = () => {
-    return (
-      <div className="upgradePage flexColumn">
-        <div className="netStateWrap">
-          <div className="imgWrap" />
-          <div className="hint">{_l('当前版本无法使用此功能')}</div>
-          <div className="explain">{_l('请升级到标准版本或以上版本')}</div>
-        </div>
-        {/*<Button
-          type="primary"
-          className="payUpgradeBtn"
-          onClick={() => {
-            navigateTo(`/upgrade/choose?projectId=${Config.projectId}`);
-          }}
-        >
-          {_l('立即购买')}
-        </Button>*/}
-      </div>
-    );
+
+  // 获取初始密码值
+  getInitialPassword = () => {
+    Ajax.getIntergrationAccountInitializeInfo({
+      projectId: Config.projectId,
+    }).then(res => {
+      this.setState({ password: res, isSetPassword: !!res });
+    });
+  };
+
+  changeTab = key => {
+    if (key === 'other') {
+      this.getInitialPassword();
+    }
   };
   render() {
-    if (Config.project.licenseType === 0) {
-      return this.renderUpgrade();
+    const featureType = getFeatureStatus(Config.projectId, FEATURE_ID);
+    if (featureType === '2') {
+      return <UpgradeVersion projectId={Config.projectId} featureId={FEATURE_ID} />;
     }
     if (this.state.pageLoading) {
       return <LoadDiv className="mTop80" />;
     }
     return (
       <div className="dingMainContent">
-        {!this.state.isPassApply ? (
-          <div className="TxtMiddle">
-            <div className="TxtCenter logoBox">
-              {this.state.isReject ? (
-                <React.Fragment>
-                  <Icon icon="closeelement-bg-circle" className="Red iconReject" />
-                </React.Fragment>
-              ) : (
-                <React.Fragment>
-                  <span className="mdIcon">
-                    <Icon icon="feed" className="Font40 White" />
-                  </span>
-                  <Icon icon="swap_horiz" className="Font36 mLeft30 mRight30 Gray_bd" />
-                  <Icon icon="invite-ding" className="TxtCenter" />
-                </React.Fragment>
-              )}
-            </div>
-            {!this.state.hasApply ? (
-              <div className="TxtCenter mTop50">
-                <h2 className="Font26 Gray">{_l('申请钉钉集成')}</h2>
-                <p className="mTop24 mBottom32 Font16 Gray_75">{_l('申请通过后，可将应用安装到钉钉工作台！')}</p>
-                <Button
-                  type="primary"
-                  className="applyBtn mBottom10"
-                  onClick={e => {
-                    // 提交申请
-                    this.editDDProjectSettingStatus(0, () => {
-                      this.setState({
-                        hasApply: true,
-                        isPassApply: true, //申请后直接进入编辑
-                      });
-                    });
-                  }}
-                >
-                  {_l('立即申请')}
-                </Button>
-              </div>
-            ) : (
-              <div className="TxtCenter mTop50">
-                {this.state.isReject ? (
-                  <React.Fragment>
-                    <h2 className="Font18 Gray">{_l('试用已过期，请付费后继续使用')}</h2>
-                    <p className="mTop15 Font13 Gray_75">{_l('如有疑问，请联系您的专属顾问')}</p>
-                    <Button
-                      type="primary"
-                      className="applyBtn mBottom10 mTop25"
-                      onClick={e => {
-                        // 前往付费
-                        navigateTo(`/upgrade/choose?projectId=${Config.projectId}`);
-                      }}
-                    >
-                      {_l('前往付费')}
-                    </Button>
-                  </React.Fragment>
-                ) : (
-                  <React.Fragment>
-                    {/* <h2 className="Font26 Gray">{_l('申请已提交')}</h2>
-                    <p className="mTop24 mBottom32 Font16 Gray_75">
-                      {_l('预计两个工作日反馈信息，如有疑问，请联系您的专属顾问')}
-                    </p> */}
-                  </React.Fragment>
-                )}
-              </div>
-            )}
-          </div>
-        ) : (
-          <Tabs defaultActiveKey="base">
-            <Tabs.TabPane tab={_l('基础')} key="base">
-              {this.stepRender()}
-            </Tabs.TabPane>
+        <Tabs
+          defaultActiveKey="base"
+          onChange={this.changeTab}
+          className={cx({ tabStyle: !(this.state.status === 1 && !this.state.isCloseDing) })}
+        >
+          <Tabs.TabPane tab={_l('钉钉集成')} key="base">
+            {this.stepRender()}
+          </Tabs.TabPane>
+          {this.state.status === 1 && !this.state.isCloseDing && (
             <Tabs.TabPane tab={_l('其他')} key="other">
               <div className="stepItem">
                 <h3 className="stepTitle Font16 Gray pBottom5">{_l('应用在钉钉PC端打开方式')}</h3>
@@ -619,7 +553,7 @@ export default class Ding extends React.Component {
                         dangerouslySetInnerHTML={{
                           __html: _l(
                             '此功能需要在钉钉中开启添加待办任务接口权限。%0如何开启？%1',
-                            '<a href="https://developers.dingtalk.com/document/app/to-do-api-permission" target="_blank">',
+                            '<a href="https://help.mingdao.com/dingding.html#1%E3%80%81%E5%BE%85%E5%8A%9E%E6%B6%88%E6%81%AF%E5%90%8C%E6%AD%A5" target="_blank">',
                             '</a>',
                           ),
                         }}
@@ -628,9 +562,16 @@ export default class Ding extends React.Component {
                   </div>
                 </div>
               </div>
+              {md.global.Config.IsLocal && (
+                <IntegrationSetPssword
+                  password={this.state.password}
+                  isSetPassword={this.state.isSetPassword}
+                  disabled={this.state.isCloseDing}
+                />
+              )}
             </Tabs.TabPane>
-          </Tabs>
-        )}
+          )}
+        </Tabs>
         {this.state.showSyncDiaLog && this.renderSyncDiaLog()}
       </div>
     );

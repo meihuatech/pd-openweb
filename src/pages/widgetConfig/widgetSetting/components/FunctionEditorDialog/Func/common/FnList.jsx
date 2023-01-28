@@ -4,9 +4,11 @@ import { func, string } from 'prop-types';
 import { Collapse } from 'antd';
 import { functionTypes, functionDetails } from '../enum';
 import 'antd/lib/collapse/style/index.css';
+import _ from 'lodash';
 
 const ExpandIcon = styled.i`
   display: inline-block;
+  margin-top: -2px;
   font-size: 16px;
   color: #9d9d9d;
   vertical-align: middle !important;
@@ -17,10 +19,13 @@ const Con = styled.div`
   padding: 10px 0;
   .fnTitle {
     font-weight: bold;
-    margin-left: 18px;
   }
   .ant-collapse-header {
     padding: 12px 14px !important;
+  }
+  .ant-collapse > .ant-collapse-item > .ant-collapse-header .ant-collapse-arrow {
+    margin-right: 4px;
+    vertical-align: middle;
   }
   .fnItem {
     font-size: 13px;

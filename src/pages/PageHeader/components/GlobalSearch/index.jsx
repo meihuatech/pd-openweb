@@ -5,6 +5,7 @@ import Icon from 'ming-ui/components/Icon';
 import SearchContent from 'src/pages/SmartSearch/components/reactSmartSearch';
 import { navigateTo } from 'router/navigateTo';
 import './index.less';
+import _ from 'lodash';
 
 export default class GlobalSearch extends Component {
   static propTypes = {
@@ -56,8 +57,10 @@ export default class GlobalSearch extends Component {
     e.stopPropagation();
     const { searchVal } = this.state;
     if (!searchVal) return;
+    console.log(searchVal)
     if (e.key === 'Enter') {
-      navigateTo(`/search?search_key=${searchVal}`);
+      navigateTo(`/search?search_key=${encodeURIComponent(searchVal)}`);
+      // navigateTo(`/search?search_key=${searchVal}`);
     }
   };
 

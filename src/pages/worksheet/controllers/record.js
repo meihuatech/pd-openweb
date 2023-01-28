@@ -1,14 +1,42 @@
-import { getRowDetail, addWorksheetRow as addWorksheetRowApi } from 'src/api/worksheet';
+import worksheetAjax from 'src/api/worksheet';
+import kcAjax from 'src/api/kc';
+import attachmentAjax from 'src/api/attachment';
 import { formatControlToServer } from 'src/components/newCustomFields/tools/utils.js';
 import { RELATE_RECORD_SHOW_TYPE } from 'worksheet/constants/enum';
 import { FORM_HIDDEN_CONTROL_IDS } from 'src/pages/widgetConfig/config/widget';
 import { updateOptionsOfControls, checkCellIsEmpty } from 'worksheet/util';
+import _ from 'lodash';
+
+export async function downloadAttachmentById({ fileId, refId }) {
+  try {
+    if (!fileId && !refId) {
+      throw new Error();
+    }
+    let data;
+    if (refId) {
+      data = await kcAjax.getNodeDetail({
+        actionType: 14,
+        id: refId,
+      });
+    } else {
+      data = await attachmentAjax.getAttachmentDetail({
+        fileId,
+      });
+    }
+    window.open(data.downloadUrl);
+  } catch (err) {
+    console.error(err);
+    alert(_l('下载附件失败', 3));
+  }
+}
 
 export function getFormDataForNewRecord({
+  isCustomButton,
   worksheetInfo,
   defaultRelatedSheet = {},
   defaultFormData = {},
   defaultFormDataEditable,
+  writeControls = [],
 }) {
   return new Promise((resolve, reject) => {
     let controls = _.cloneDeep(worksheetInfo.template.controls);
@@ -17,6 +45,9 @@ export function getFormDataForNewRecord({
         controls = controls
           .filter(c => !_.includes(FORM_HIDDEN_CONTROL_IDS, c.controlId))
           .map(control => {
+            if (isCustomButton && _.get(control, 'controlPermissions.2') === '0') {
+              control.controlPermissions = control.controlPermissions.slice(0, 2) + '1';
+            }
             if (
               control.type === 29 &&
               Number(control.advancedSetting.showtype) !== RELATE_RECORD_SHOW_TYPE.LIST &&
@@ -55,6 +86,15 @@ export function getFormDataForNewRecord({
             return { ...control };
           });
         controls = controls.map(control => {
+          const writeControl = _.find(writeControls, wc => control.controlId === wc.controlId) || {};
+          if (writeControl.defsource) {
+            control.value = '';
+            if (_.includes([9, 10, 11], control.type)) {
+              control.value = control.default = safeParse(writeControl.defsource)[0].staticValue;
+            } else {
+              control.advancedSetting = { ...(control.advancedSetting || {}), defsource: writeControl.defsource };
+            }
+          }
           if (control.type === 30 && !control.value) {
             const parentControl = _.find(
               worksheetInfo.template.controls,
@@ -97,10 +137,11 @@ export function getFormDataForNewRecord({
       if (control && control.type === 29 && _.find(controls, c => c.dataSource === `$${control.controlId}$`)) {
         const value = safeParse(defaultFormData[control.controlId]);
         if (value.length && value[0].sid && !value[0].sourcevalue) {
-          getRowDetail({
-            worksheetId: control.dataSource,
-            rowId: value[0].sid,
-          })
+          worksheetAjax
+            .getRowDetail({
+              worksheetId: control.dataSource,
+              rowId: value[0].sid,
+            })
             .then(res => {
               value[0].sourcevalue = res.rowData;
               defaultFormData[control.controlId] = JSON.stringify(value);
@@ -119,8 +160,6 @@ export function getFormDataForNewRecord({
 
 export function submitNewRecord(props) {
   const {
-    notDialog,
-    resetForm,
     appId,
     projectId,
     addType,
@@ -128,19 +167,14 @@ export function submitNewRecord(props) {
     worksheetId,
     masterRecord,
     formdata,
-    continueAdd,
     customBtn,
-    sheetAddWorksheetRow,
-    addWorksheetRow,
-    onAdd,
     updateWorksheetControls,
-    onSubmitBegin = () => {},
     onSubmitEnd = () => {},
-    onCancel = () => {},
+    onSubmitSuccess = () => {},
     customwidget,
     setRequesting,
+    rowStatus,
   } = props;
-  onSubmitBegin();
   const receiveControls = formdata
     .filter(item => item.type !== 30 && item.type !== 31 && item.type !== 32)
     .map(formatControlToServer)
@@ -150,34 +184,50 @@ export function submitNewRecord(props) {
     receiveControls,
     appId,
     projectId,
-    addType,
     viewId,
     worksheetId,
     masterRecord,
     pushUniqueId: md.global.Config.pushUniqueId,
+    rowStatus: rowStatus ? rowStatus : 1,
     ...customBtn,
   };
   if (args.masterRecord && !args.masterRecord.rowId) {
     delete args.masterRecord;
   }
-  addWorksheetRowApi(args)
+  worksheetAjax
+    .addWorksheetRow(args)
     .then(res => {
+      if (rowStatus === 21) {
+        if (res.resultCode === 20) {
+          //达到上限
+          onSubmitEnd();
+          setRequesting(false);
+          onSubmitSuccess({ isOverLimit: true, rowData: [] });
+          return;
+        } else if (res.data) {
+          alert(_l('保存草稿成功'));
+          onSubmitSuccess({ rowData: [] });
+          onSubmitEnd();
+          setRequesting(false);
+        } else {
+          alert(_l('保存草稿失败'));
+        }
+        return;
+      }
+      if (res.resultCode === 1 && !res.data) {
+        alert(_l('记录添加成功'));
+        onSubmitEnd();
+        setRequesting(false);
+        return;
+      }
       if (res.resultCode === 1) {
-        const resetOptions = {};
+        let newControls;
         let newOptionControls = updateOptionsOfControls(formdata, res.data);
         if (newOptionControls.length && _.isFunction(updateWorksheetControls)) {
           updateWorksheetControls(newOptionControls);
-          resetOptions.newControls = newOptionControls.map(c => ({ ...c, value: res.data[c.controlId] }));
+          newControls = newOptionControls.map(c => ({ ...c, value: res.data[c.controlId] }));
         }
-        if (continueAdd || notDialog) {
-          alert('保存成功', 1, 1000);
-          resetForm(resetOptions);
-        } else {
-          onCancel();
-        }
-        if (_.isFunction(onAdd)) {
-          onAdd(res.data);
-        }
+        onSubmitSuccess({ rowData: res.data, newControls });
       } else if (res.resultCode === 11) {
         if (customwidget.current && _.isFunction(customwidget.current.uniqueErrorUpdate)) {
           customwidget.current.uniqueErrorUpdate(res.badData);
@@ -196,4 +246,59 @@ export function submitNewRecord(props) {
         alert(err || _l('记录添加失败'), 3);
       }
     });
+}
+
+export function copyRow({ worksheetId, viewId, rowIds, relateRecordControlId }, done = () => {}) {
+  worksheetAjax
+    .copyRow({
+      worksheetId,
+      viewId,
+      rowIds,
+      copyRelationControlId: relateRecordControlId,
+    })
+    .then(res => {
+      if (res && res.resultCode === 1) {
+        alert(_l('复制成功'));
+        done(res.data);
+      } else if (res && res.resultCode === 7) {
+        alert(_l('复制失败，权限不足！'), 3);
+      } else if (res && res.resultCode === 9) {
+        alert(_l('复制失败，超过最大数量！'), 3);
+      } else if (res && res.resultCode === 11) {
+        alert(_l('复制失败，当前表存在唯一字段'), 3);
+      } else {
+        alert(_l('复制失败！'), 3);
+      }
+    })
+    .fail(err => {
+      console.log(err);
+      alert(_l('复制失败！'), 3);
+    });
+}
+
+export async function openControlAttachmentInNewTab({
+  appId,
+  controlId,
+  fileId,
+  recordId,
+  viewId,
+  worksheetId,
+  getType,
+}) {
+  if (!controlId || !fileId || !recordId || !worksheetId) {
+    console.error('参数不全');
+    return;
+  }
+  const shareId = await worksheetAjax.getAttachmentShareId({
+    appId,
+    controlId,
+    fileId,
+    rowId: recordId,
+    viewId,
+    worksheetId,
+    getType,
+  });
+  if (shareId) {
+    window.open(`${window.subPath ? window.subPath : ''}/recordfile/${shareId}/${getType}`);
+  }
 }

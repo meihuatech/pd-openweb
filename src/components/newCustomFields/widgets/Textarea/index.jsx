@@ -1,9 +1,11 @@
 import PropTypes from 'prop-types';
 import React, { Component, Fragment } from 'react';
-import { Textarea } from 'ming-ui';
-import Linkify from 'react-linkify';
+import { Textarea, Linkify, Icon } from 'ming-ui';
 import cx from 'classnames';
 import TextScanQRCode from '../../components/TextScanQRCode';
+import { getIsScanQR } from '../../components/ScanQRCode';
+import { dealMaskValue } from 'src/pages/widgetConfig/widgetSetting/components/ControlMask/util';
+import { browserIsMobile } from 'src/util';
 
 export default class Widgets extends Component {
   static propTypes = {
@@ -18,6 +20,25 @@ export default class Widgets extends Component {
 
   state = {
     isEditing: false,
+    originValue: '',
+    maskStatus: _.get(this.props, 'advancedSetting.datamask') === '1',
+  };
+
+  isOnComposition = false;
+
+  componentWillReceiveProps(nextProps, nextState) {
+    if (this.text) {
+      this.text.value =
+        nextProps.enumDefault === 2 ? (nextProps.value || '').replace(/\r\n|\n/g, ' ') : nextProps.value || '';
+    }
+  }
+
+  onFocus = e => {
+    // 多行文本 tab键聚焦 值不写入问题
+    if (this.props.enumDefault !== 2 && this.text && this.text.value !== this.props.value) {
+      this.joinTextareaEdit(e)
+    }
+    this.setState({ originValue: e.target.value.trim() });
   };
 
   onChange = value => {
@@ -26,21 +47,25 @@ export default class Widgets extends Component {
 
   onBlur = () => {
     const { onBlur } = this.props;
+    const { originValue } = this.state;
 
     this.setState({ isEditing: false });
     if (navigator.userAgent.toLowerCase().indexOf('micromessenger') >= 0) {
       // 处理微信webview键盘收起 网页未撑开
       window.scrollTo(0, 0);
     }
-    onBlur();
+    onBlur(originValue);
   };
 
   /**
    * 多行文本进入编辑
    */
   joinTextareaEdit = evt => {
-    const { disabled, advancedSetting } = this.props;
+    const { disabled, advancedSetting, value } = this.props;
     const href = evt.target.getAttribute('href');
+
+    // 复制中的时候不进入编辑
+    if (window.getSelection().toString()) return;
 
     if (href) {
       const a = document.createElement('a');
@@ -51,22 +76,59 @@ export default class Widgets extends Component {
       evt.preventDefault();
     } else if (!disabled && advancedSetting.dismanual !== '1') {
       this.setState({ isEditing: true }, () => {
-        this.text && this.text.focus();
+        if (this.text) {
+          this.text.value = value || '';
+          this.text.focus();
+        }
       });
     }
   };
 
+  getShowValue = hint => {
+    const { value = '', advancedSetting } = this.props;
+    const isUnLink = advancedSetting.analysislink !== '1';
+
+    if (value) {
+      if (this.state.maskStatus) {
+        return dealMaskValue(this.props);
+      }
+      return isUnLink ? value : <Linkify properties={{ target: '_blank' }}>{value}</Linkify>;
+    } else {
+      return hint;
+    }
+  };
+
   render() {
-    const { disabled, value = '', enumDefault, strDefault = '10', advancedSetting } = this.props;
+    const {
+      disabled,
+      value = '',
+      enumDefault,
+      strDefault = '10',
+      advancedSetting,
+      projectId,
+      maskPermissions,
+    } = this.props;
     let { hint } = this.props;
-    const { isEditing } = this.state;
+    const { isEditing, maskStatus } = this.state;
+    const isMask = maskPermissions && enumDefault === 2 && value && maskStatus;
     const disabledInput = advancedSetting.dismanual === '1';
     const isSingleLine = enumDefault === 2;
-    const isWxWork = window.navigator.userAgent.toLowerCase().includes('wxwork');
-    const isWx = window.navigator.userAgent.toLowerCase().includes('micromessenger') && !md.global.Account.isPortal;
-    const isWeLink = window.navigator.userAgent.toLowerCase().includes('huawei-anyoffice');
-    const isDing = window.navigator.userAgent.toLowerCase().includes('dingtalk');
-    const startTextScanCode = !disabled && ((isWx && !isWxWork) || isWeLink || isDing) && strDefault.split('')[1] === '1';
+    const isScanQR = getIsScanQR();
+    const startTextScanCode = !disabled && isScanQR && strDefault.split('')[1] === '1';
+    const compositionOptions = {
+      onCompositionStart: () => (this.isOnComposition = true),
+      onCompositionEnd: event => {
+        if (event.type === 'compositionend') {
+          this.isOnComposition = false;
+        }
+
+        // 谷歌浏览器：compositionstart onChange compositionend
+        // 火狐浏览器：compositionstart compositionend onChange
+        if (navigator.userAgent.indexOf('Chrome') > -1) {
+          this.onChange(event.target.value);
+        }
+      },
+    };
 
     // 开启扫码输入并且禁止手动输入
     if (startTextScanCode && disabledInput) {
@@ -83,6 +145,7 @@ export default class Widgets extends Component {
               'customFormControlBox customFormTextareaBox',
               { Gray_bd: !value },
               { controlDisabled: disabled },
+              { textAreaDisabledControl: enumDefault === 1 && disabled },
             )}
             style={{
               minHeight: enumDefault === 1 ? 90 : 36,
@@ -91,7 +154,17 @@ export default class Widgets extends Component {
             }}
             onClick={this.joinTextareaEdit}
           >
-            {value ? <Linkify properties={{ target: '_blank' }}>{value}</Linkify> : hint}
+            <span
+              className={cx({ maskHoverTheme: disabled && isMask })}
+              style={browserIsMobile() ? { wordWrap: 'break-word' } : {}}
+              onClick={() => {
+                if (disabled && isMask) this.setState({ maskStatus: false });
+              }}
+            >
+              {this.getShowValue(hint)}
+              {isMask && <Icon icon="eye_off" className={cx('Gray_bd', disabled ? 'mLeft7' : 'maskIcon')} />}
+            </span>
+
             {!disabled && !disabledInput && (
               <input type="text" className="smallInput" onFocus={() => this.setState({ isEditing: true })} />
             )}
@@ -100,13 +173,17 @@ export default class Widgets extends Component {
           <input
             type="text"
             className="customFormControlBox escclose"
-            style={{ width: startTextScanCode ? 'calc(100% - 42px)' : '100%', paddingTop: 2 }}
+            style={{ width: startTextScanCode ? 'calc(100% - 42px)' : '100%', padding: '7px 12px 6px' }}
             ref={text => {
               this.text = text;
             }}
             placeholder={hint}
-            value={(value || '').replace(/\r\n|\n/g, ' ')}
-            onChange={event => this.onChange(event.target.value)}
+            onFocus={this.onFocus}
+            onChange={event => {
+              if (!this.isOnComposition) {
+                this.onChange(event.target.value);
+              }
+            }}
             onBlur={event => {
               const trimValue = event.target.value.trim();
               if (trimValue !== value) {
@@ -114,6 +191,7 @@ export default class Widgets extends Component {
               }
               this.onBlur();
             }}
+            {...compositionOptions}
           />
         ) : (
           <Textarea
@@ -122,15 +200,29 @@ export default class Widgets extends Component {
             style={{ width: startTextScanCode ? 'calc(100% - 42px)' : '100%' }}
             minHeight={enumDefault === 1 ? 90 : 36}
             maxHeight={400}
-            value={value}
+            manualRef={text => {
+              this.text = text;
+            }}
             placeholder={hint}
             spellCheck={false}
-            onChange={this.onChange}
-            onBlur={this.onBlur}
+            onFocus={this.onFocus}
+            onChange={value => {
+              if (!this.isOnComposition) {
+                this.onChange(value);
+              }
+            }}
+            onBlur={event => {
+              const trimValue = event.target.value.trim();
+              if (trimValue !== value) {
+                this.onChange(trimValue);
+              }
+              this.onBlur();
+            }}
+            {...compositionOptions}
           />
         )}
 
-        {startTextScanCode && <TextScanQRCode onChange={this.onChange} />}
+        {startTextScanCode && <TextScanQRCode projectId={projectId} onChange={this.onChange} />}
       </Fragment>
     );
   }

@@ -58,26 +58,46 @@ const OPTIONS_TYPE = [
   { text: _l('升序'), value: true },
   { text: _l('降序'), value: false },
 ];
+export const NAVSHOW_TYPE = [
+  //空或者0：全部 1：有数据的项 2：指定项 3：满足条件的项
+  { text: _l('全部'), value: '0' },
+  { text: _l('显示有数据的项'), value: '1' },
+  { text: _l('显示指定项'), value: '2' },
+  { text: _l('显示满足筛选条件的项'), value: '3' },
+  //   全部
+  // 显示有数据的项
+  // 显示指定项（包含未指定/为空发分组）
+  // 显示满足筛选条件的项（仅关联记录作为分组时）
+];
 export const OPTIONS = {
   //选项
-  key: 'isAsc',
-  default: true,
-  types: OPTIONS_TYPE,
+  data: [
+    { key: 'navshow', types: NAVSHOW_TYPE.filter(o => o.value !== '3'), txt: '显示项', default: '0' },
+    { key: 'isAsc', types: OPTIONS_TYPE, txt: '排序方式', default: true },
+  ],
   keys: [
     11, // 选项
     10, // 多选
     9, // 单选 平铺
   ],
-  txt: '排序方式',
 };
-
+const RELATE_TYPE = [
+  { text: _l('是'), value: 24 },
+  { text: _l('属于'), value: 11 },
+];
 export const RELATES = {
   //选项
-  key: 'viewId',
   keys: [29],
-  // types: RELATE_TYPE,
-  des: '当前选择为关联记录字段，可以继续选择关联表中的层级视图生成树状导航',
-  txt: '层级视图',
+  data: [
+    { key: 'viewId', txt: '层级视图', des: '当前选择为关联记录字段，可以继续选择关联表中的层级视图生成树状导航' },
+    { key: 'filterType', types: RELATE_TYPE, txt: '筛选方式', default: 11 },
+    { key: 'navshow', types: NAVSHOW_TYPE, txt: '显示项', default: '0' },
+  ],
+};
+export const CASCADER = {
+  //选项
+  keys: [35],
+  data: [{ key: 'filterType', types: RELATE_TYPE, txt: '筛选方式', default: 11 }],
 };
 export const getSetDefault = control => {
   let { controlId = '', type } = control;
@@ -86,11 +106,14 @@ export const getSetDefault = control => {
     dataType: type,
   };
   let data = {};
-  [OPTIONS, RELATES].map(o => {
+  [OPTIONS, RELATES, CASCADER].map(o => {
     if (o.keys.includes(type)) {
-      data = {
-        [o.key]: o.default,
-      };
+      o.data.map(it => {
+        data = {
+          ...data,
+          [it.key]: it.default,
+        };
+      });
     }
   });
   return {
@@ -100,16 +123,18 @@ export const getSetDefault = control => {
 };
 
 export const getSetHtmlData = type => {
-  let data = {};
+  let data = [];
   type &&
-    [OPTIONS, RELATES].map(o => {
-      if (o.keys.includes(type)) {
-        data = {
-          txt: o.txt,
-          des: o.des,
-          types: o.types,
-          key: o.key,
-        };
+    [OPTIONS, RELATES, CASCADER].map(it => {
+      if (it.keys.includes(type)) {
+        it.data.map(o => {
+          data.push({
+            txt: o.txt,
+            des: o.des,
+            types: o.types,
+            key: o.key,
+          });
+        });
       }
     });
   return data;

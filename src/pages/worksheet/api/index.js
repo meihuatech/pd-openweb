@@ -1,18 +1,20 @@
-import { getRowDetail as getRowDetailApi } from 'src/api/worksheet';
-import { updateWorksheetRow } from 'src/api/worksheet';
-import { replaceByIndex } from 'worksheet/util';
+import worksheetAjax from 'src/api/worksheet';
+import { SYSTEM_CONTROL } from 'src/pages/widgetConfig/config/widget';
 import { FORM_HIDDEN_CONTROL_IDS } from 'src/pages/widgetConfig/config/widget';
+import _ from 'lodash';
 
-export function getRowDetail(params, controls) {
+export function getRowDetail(params, controls, options = {}) {
   return new Promise((resolve, reject) => {
     if (!controls) {
       params.getTemplate = true;
     }
-    getRowDetailApi(params)
+    worksheetAjax.getRowDetail(params, options)
       .then(data => {
         const rowData = safeParse(data.rowData);
-        data.formData = (controls || data.templateControls || []).map(c => ({
+        let controlPermissions = safeParse(rowData.controlpermissions);
+        data.formData = (controls || (data.templateControls || []).concat(SYSTEM_CONTROL) || []).map(c => ({
           ...c,
+          controlPermissions: controlPermissions[c.controlId] || c.controlPermissions,
           dataSource: c.dataSource || '',
           value: rowData[c.controlId],
           hidden: _.includes(FORM_HIDDEN_CONTROL_IDS, c.controlId),
@@ -34,7 +36,7 @@ export function deleteAttachmentOfControl(
     },
   ];
 
-  updateWorksheetRow({
+  worksheetAjax.updateWorksheetRow({
     appId,
     viewId,
     worksheetId,

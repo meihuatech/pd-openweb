@@ -1,4 +1,8 @@
-﻿// 页面 初始化
+﻿import doT from '@mdfe/dot';
+import inviteSingleTpl from './tpl/refuserDialogHtml.html';
+import calendarController from 'src/api/calendar';
+
+// 页面 初始化
 // 公用配置
 // 页面 初始化
 // 公用配置
@@ -13,10 +17,7 @@ Comm.settings = {
   otherUsers: [],
 };
 
-Comm.doT = require('dot');
-
-// 请求方法集合
-Comm.ajaxRequest = require('src/api/calendar');
+Comm.doT = doT;
 
 // url参数
 Comm.getQueryString = function (name) {
@@ -38,52 +39,50 @@ Comm.inviteCalendar = {
     Comm.confirmOrUnconfirmInviteMe(calendarId, 1, '', recurTime, catID);
   },
   refuse: function (calendarId, recurTime, catID) {
-    require(['./tpl/refuserDialogHtml.html'], function (inviteSingleTpl) {
-      $.DialogLayer({
-        dialogBoxID: 'inviteDirectMessages',
-        width: 488,
-        container: {
-          header: '<span class="resuserTitle ThemeColor3">请回复您不能参加的原因</span>',
-          content: Comm.doT.template(inviteSingleTpl)({}),
-          noText: '',
-          yesText: '不能参加',
-          yesFn: function () {
-            // 其他
-            var $selectRadio = $('#refuserstd input:radio:checked');
-            var reason =
-              $selectRadio.attr('id') == 'radOther'
-                ? $('#txtrefuseReason')
-                    .val()
-                    .trim()
-                : $selectRadio.val();
+    $.DialogLayer({
+      dialogBoxID: 'inviteDirectMessages',
+      width: 488,
+      container: {
+        header: '<span class="resuserTitle ThemeColor3">请回复您不能参加的原因</span>',
+        content: Comm.doT.template(inviteSingleTpl)({}),
+        noText: '',
+        yesText: '不能参加',
+        yesFn: function () {
+          // 其他
+          var $selectRadio = $('#refuserstd input:radio:checked');
+          var reason =
+            $selectRadio.attr('id') == 'radOther'
+              ? $('#txtrefuseReason')
+                  .val()
+                  .trim()
+              : $selectRadio.val();
 
-            if (reason === '' || reason == _l('输入您拒绝邀请的理由')) {
-              alert('请输入不能参加的理由', 3);
-              $('#txtrefuseReason').focus();
-              return false;
-            }
+          if (reason === '' || reason == _l('输入您拒绝邀请的理由')) {
+            alert('请输入不能参加的理由', 3);
+            $('#txtrefuseReason').focus();
+            return false;
+          }
 
-            Comm.confirmOrUnconfirmInviteMe(calendarId, 2, reason, recurTime, '');
-          },
+          Comm.confirmOrUnconfirmInviteMe(calendarId, 2, reason, recurTime, '');
         },
-        readyFn: function () {
-          // 不能参加的理由
-          $('#refuserstd').on('change', 'input:radio', function () {
-            if ($('#radOther').attr('checked')) {
-              $('#txtrefuseReason').show();
-            } else {
-              $('#txtrefuseReason').hide();
-            }
-          });
-        },
-      });
+      },
+      readyFn: function () {
+        // 不能参加的理由
+        $('#refuserstd').on('change', 'input:radio', function () {
+          if ($('#radOther').attr('checked')) {
+            $('#txtrefuseReason').show();
+          } else {
+            $('#txtrefuseReason').hide();
+          }
+        });
+      },
     });
   },
 };
 
 // 发送请求 state:1 确认参加 or state:2 拒绝参加
 Comm.confirmOrUnconfirmInviteMe = function (calendarId, status, remark, recurTime, catID) {
-  Comm.ajaxRequest
+  calendarController
     .changeMember({
       calendarID: calendarId,
       recurTime: recurTime,
@@ -131,7 +130,7 @@ Comm.errorMessage = function (error) {
 
 // 查找用户所有分类
 Comm.getUserAllCalCategories = function (callback) {
-  Comm.ajaxRequest.getUserAllCalCategories().then(function (source) {
+  calendarController.getUserAllCalCategories().then(function (source) {
     if (source.code == 1) {
       if ($.isFunction(callback)) {
         callback(source.data);
@@ -143,4 +142,4 @@ Comm.getUserAllCalCategories = function (callback) {
 };
 
 // 导出配置
-module.exports = Comm;
+export default Comm;

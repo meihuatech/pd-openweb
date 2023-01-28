@@ -14,7 +14,10 @@ import {
   ACTION_TYPE,
   COUNTER_TYPE,
 } from './config';
-import { resetInstance, endInstance } from '../../api/instanceVersion';
+import instanceVersion from '../../api/instanceVersion';
+import process from '../../api/process';
+import _ from 'lodash';
+import moment from 'moment';
 
 export default class HistoryDetail extends Component {
   static propTypes = {
@@ -30,31 +33,43 @@ export default class HistoryDetail extends Component {
   state = {
     data: {},
     isRetry: false,
+    processInfo: {},
   };
 
   retryPosition = '';
 
   componentWillMount() {
     this.getData();
+    this.getProcessPublish();
   }
 
   getData = () => {
     const { id } = this.props;
     id &&
-      api.getHistoryDetail({ instanceId: id }).then(data => {
-        this.setState({ data });
-      });
+      api
+        .getHistoryDetail({ instanceId: id }, { isIntegration: location.href.indexOf('integration') > -1 })
+        .then(data => {
+          this.setState({ data });
+        });
+  };
+
+  getProcessPublish = () => {
+    const { id } = this.props;
+
+    process.getProcessPublish({ instanceId: id }).then(res => {
+      this.setState({ processInfo: res });
+    });
   };
 
   renderOperationInfo = item => {
     const { cause, causeMsg } = this.state.data.instanceLog;
-    const { flowNode, workItems, countersign, countersignType, status, log = {}, sourceId } = item;
+    const { flowNode, workItems, countersign, countersignType, status, log = {}, sourceId, scheduleActions } = item;
 
     if (!sourceId && log.executeType === 2) {
       return <div className="Gray_75">{_l('跳过')}</div>;
     }
 
-    const { type } = flowNode;
+    const { type, appType } = flowNode;
     const names = workItems.map(item => {
       const { workItemAccount, workItemLog } = item;
       if (workItemLog && workItemAccount) {
@@ -65,13 +80,17 @@ export default class HistoryDetail extends Component {
       }
     });
 
+    const isApproval = appType === 9 && type === 0;
+
     return (
       <Fragment>
         <div className="personDetail flex Gray_75 flexRow">
-          {_.includes([3, 4, 5], type) && (
+          {(_.includes([0, 3, 4, 5], type) || isApproval) && (
             <Fragment>
               <div className="personInfo">
-                <span>{_l('%0人：', NODE_TYPE[type].text)}</span>
+                <span>
+                  {isApproval ? _l('发起人：') : type === 0 ? _l('触发者：') : _l('%0人：', NODE_TYPE[type].text)}
+                </span>
                 {names.map(
                   (item, index) =>
                     item && (
@@ -80,6 +99,21 @@ export default class HistoryDetail extends Component {
                         {index < names.length - 1 && '、'}
                       </span>
                     ),
+                )}
+
+                {scheduleActions && !!scheduleActions.length && (
+                  <div>
+                    <span>{_l('提醒人：')}</span>
+                    {scheduleActions.map((item, i) =>
+                      item.accounts.map((obj, j) => (
+                        <Fragment key={`${i}-${j}`}>
+                          <span>{obj.fullName}</span>
+                          <span className="Gray_9e">({moment(item.executeTime).format('MM-DD HH:mm')})</span>
+                          {(i !== scheduleActions.length - 1 || j !== item.accounts.length - 1) && <span>、</span>}
+                        </Fragment>
+                      )),
+                    )}
+                  </div>
                 )}
               </div>
               {_.includes([4, 5], status) && !countersign && (
@@ -132,7 +166,7 @@ export default class HistoryDetail extends Component {
     const { data, isRetry } = this.state;
     const { instanceLog, logs } = data;
     const { cause } = instanceLog;
-    const showRetry = (data.status === 3 && _.includes([20001, 20002], cause)) || data.status === 4;
+    const showRetry = (data.status === 3 && _.includes([20001, 20002], cause)) || (status === 4 && cause !== 7777);
     const showSuspend = data.status === 1;
 
     if ((showRetry || showSuspend) && !disabled) {
@@ -147,7 +181,7 @@ export default class HistoryDetail extends Component {
             e.stopPropagation();
 
             this.retryPosition = retryPosition;
-            this.operationInstance(showRetry ? resetInstance : endInstance);
+            this.operationInstance(showRetry ? instanceVersion.resetInstance : instanceVersion.endInstance);
           }}
         >
           {showRetry ? (
@@ -187,7 +221,7 @@ export default class HistoryDetail extends Component {
   };
 
   render() {
-    const { data, isRetry } = this.state;
+    const { data, isRetry, processInfo } = this.state;
     if (_.isEmpty(data)) return <LoadDiv />;
 
     const { onClick } = this.props;
@@ -207,7 +241,9 @@ export default class HistoryDetail extends Component {
             {isRetry && this.retryPosition === 'header' && <div className="workflowRetryLoading" />}
             <HistoryStatus statusCode={data.status} size={44} color={color} textSize={18} />
             <div className="title flex mRight15">
-              <div className="overflow_ellipsis Font18">{_l('数据：') + title}</div>
+              <div className="overflow_ellipsis Font18">
+                {_l('数据：') + (works.length && works[0].flowNode.appType === 17 ? _l('输入参数') : (title || ''))}
+              </div>
               <div style={{ color }}>
                 {cause
                   ? cause === 40007
@@ -222,7 +258,22 @@ export default class HistoryDetail extends Component {
             </div>
           </div>
           <div className="logWrap">
-            <div className="logTitle Font16 Gray_75">{_l('日志')}</div>
+            <div className="logTitle Font16 Gray_75 flexRow" style={{ alignItems: 'center' }}>
+              <div className="flex">{_l('日志')}</div>
+              {!_.isEmpty(processInfo) && (
+                <div className="Font13 Normal">
+                  {_l('版本：%0', moment(processInfo.lastPublishDate).format('YYYY-MM-DD HH:mm'))}
+                  <span
+                    className="mLeft5 ThemeColor3 ThemeHoverColor2 pointer"
+                    onClick={() => {
+                      location.href = `/workflowedit/${processInfo.id}`;
+                    }}
+                  >
+                    {_l('详情')}
+                  </span>
+                </div>
+              )}
+            </div>
             <ul className="logList">
               {works.map((item, index) => {
                 const { flowNode, startDate, endDate, status, logs, multipleLevelType, sort } = item;
@@ -257,7 +308,7 @@ export default class HistoryDetail extends Component {
                     </div>
 
                     <div className="operationPerson">
-                      {flowNode.type === 16
+                      {_.includes([16, 20, 26], flowNode.type)
                         ? this.renderSubProcess(item)
                         : flowNode.type === 19
                         ? this.renderTemplateInfo(item)

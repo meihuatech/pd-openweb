@@ -10,8 +10,7 @@ import store from 'src/redux/configureStore';
 import { socketInit } from 'src/socket/mobileSocketInit';
 import { ROUTE_CONFIG, PORTAL } from './config';
 import './index.less';
-
-const isWxWork = window.navigator.userAgent.toLowerCase().includes('wxwork');
+import _ from 'lodash';
 
 const isIphonex = () => {
   if (typeof window !== 'undefined' && window) {
@@ -20,15 +19,26 @@ const isIphonex = () => {
   return false;
 };
 
+const isMiniprogram = window.navigator.userAgent.toLowerCase().includes('miniprogram');
+const isWxWork = window.navigator.userAgent.toLowerCase().includes('wxwork');
+
 @preall
 @withRouter
 @DeclareConfirm
 class App extends Component {
   constructor(props) {
     super(props);
+
+    // 处理底部导航缓存内容过多localStorage溢出问题
+    Object.keys(localStorage).forEach(key => {
+      if (key.indexOf('currentNavWorksheetInfo') > -1) {
+        localStorage.removeItem(key);
+      }
+    });
+
     this.genRouteComponent = genRouteComponent();
-    if (isWxWork && isIphonex()) {
-      document.body.classList.add('wxworkBody');
+    if (isIphonex() && (isMiniprogram || isWxWork)) {
+      document.body.classList.add('iphoneBody');
     }
     socketInit();
   }

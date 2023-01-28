@@ -7,6 +7,7 @@ import publicWorksheetAjax from 'src/api/publicWorksheet';
 import { TextAbsoluteCenter } from 'worksheet/components/StyledComps';
 import { getFilter } from 'worksheet/common/WorkSheetFilter/util';
 import ReacordItem from './RecordItem';
+import _, { times } from 'lodash';
 
 export default class RelateRecordList extends React.PureComponent {
   static propTypes = {
@@ -33,9 +34,12 @@ export default class RelateRecordList extends React.PureComponent {
       keyWords: '',
       records: [],
       pageIndex: 1,
+      activeId: undefined,
     };
     this.handleSearch = _.debounce(this.handleSearch, 500);
   }
+
+  con = React.createRef();
 
   componentDidMount() {
     const { control } = this.props;
@@ -60,6 +64,54 @@ export default class RelateRecordList extends React.PureComponent {
     if (nextProps.keyWords !== this.props.keyWords) {
       this.handleSearch(nextProps.keyWords);
     }
+  }
+
+  @autobind
+  handleEnter() {
+    const { onItemClick } = this.props;
+    const { activeId, records } = this.state;
+    const newActiveRecord = _.find(records, { rowid: activeId });
+    if (newActiveRecord) {
+      onItemClick(newActiveRecord);
+    }
+  }
+
+  handleUpdateScroll(newIndex) {
+    let itemHeight = 34;
+    try {
+      itemHeight = this.con.current.querySelector(`.RelateRecordListItem:nth-child(${newIndex})`).offsetHeight;
+    } catch (err) {}
+    const scrollContent = this.con.current.querySelector('.nano-content');
+    const height = scrollContent.clientHeight;
+    const scrollTop = scrollContent.scrollTop;
+    if (itemHeight * newIndex - scrollTop > height - 20) {
+      scrollContent.scrollTop = itemHeight * newIndex - height + itemHeight;
+    } else if (itemHeight * newIndex < scrollTop) {
+      scrollContent.scrollTop = itemHeight * newIndex;
+    }
+  }
+
+  @autobind
+  updateActiveId(offset) {
+    const { activeId, records } = this.state;
+    let currentIndex;
+    if (!activeId) {
+      currentIndex = -1;
+    } else {
+      currentIndex = _.findIndex(records, { rowid: activeId });
+    }
+    if (_.isUndefined(currentIndex)) {
+      currentIndex = -1;
+    }
+    const newActiveRecord = records[currentIndex + offset];
+    this.handleUpdateScroll(currentIndex + offset);
+    if (!newActiveRecord) {
+      return;
+    }
+    const newActiveId = newActiveRecord.rowid;
+    this.setState({
+      activeId: newActiveId,
+    });
   }
 
   loadRecorcd() {
@@ -127,7 +179,7 @@ export default class RelateRecordList extends React.PureComponent {
     this.searchAjax = getFilterRowsPromise(args);
     this.searchAjax.then(res => {
       if (res.resultCode === 1) {
-        let newRecords = res.data;
+        let newRecords = res.data.filter(row => row.rowid !== recordId);
         this.setState({
           records: records.concat(newRecords),
           loading: false,
@@ -135,6 +187,13 @@ export default class RelateRecordList extends React.PureComponent {
           controls: res.template ? res.template.controls : [],
           worksheet: res.worksheet || {},
         });
+        if (pageIndex === 1) {
+          if (newRecords[0]) {
+            this.setState({
+              activeId: newRecords[0].rowid,
+            });
+          }
+        }
       } else {
         this.setState({
           loading: false,
@@ -181,7 +240,7 @@ export default class RelateRecordList extends React.PureComponent {
       allowNewRecord,
       onNewRecord,
     } = this.props;
-    const { error, loading, worksheet = {}, keyWords, controls, records, loadouted, allowAdd } = this.state;
+    const { error, loading, worksheet = {}, keyWords, controls, records, loadouted, allowAdd, activeId } = this.state;
     if (_.get(control, 'advancedSetting.clicksearch') === '1' && !keyWords) {
       return null;
     }
@@ -193,6 +252,7 @@ export default class RelateRecordList extends React.PureComponent {
     return (
       <div
         className="RelateRecordList flexColumn"
+        ref={this.con}
         style={_.assign({}, style, isMobile ? { width: window.innerWidth } : {})}
       >
         <div
@@ -229,6 +289,7 @@ export default class RelateRecordList extends React.PureComponent {
               {!!records.length &&
                 records.map((record, index) => (
                   <ReacordItem
+                    active={activeId === record.rowid}
                     multiple={multiple}
                     selected={_.find(selectedIds, fid => record.rowid === fid)}
                     showCoverAndControls={showCoverAndControls}
@@ -238,7 +299,11 @@ export default class RelateRecordList extends React.PureComponent {
                     showControls={showControls}
                     coverCid={coverCid}
                     data={record}
-                    onClick={() => onItemClick(record)}
+                    onClick={e => {
+                      e.stopPropagation();
+                      this.setState({ activeId: undefined });
+                      onItemClick(record);
+                    }}
                   />
                 ))}
               {loading && (
@@ -251,7 +316,14 @@ export default class RelateRecordList extends React.PureComponent {
         </div>
         <div style={{ borderTop: '1px solid #ddd' }} />
         {allowNewRecord && allowAdd && !window.isPublicWorksheet && (!error || error === 'notCorrectCondition') && (
-          <div className="RelateRecordList-create" onClick={onNewRecord}>
+          <div
+            className="RelateRecordList-create"
+            onClick={e => {
+              e.stopPropagation();
+              this.setState({ activeId: undefined });
+              onNewRecord(e);
+            }}
+          >
             <i className="icon icon-plus"></i> {worksheet.entityName || (control && control.sourceEntityName)}
           </div>
         )}

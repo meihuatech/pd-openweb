@@ -3,7 +3,7 @@ import { func, string } from 'prop-types';
 import Icon from 'ming-ui/components/Icon';
 import Dialog from 'ming-ui/components/Dialog/Dialog';
 import OtherAction from './OtherAction';
-import 'dialogSelectUser';
+import 'src/components/dialogSelectUser/dialogSelectUser';
 
 export default class AddApproveWay extends Component {
   static PropTypes = {
@@ -68,7 +68,7 @@ export default class AddApproveWay extends Component {
   };
 
   render() {
-    let { onCancel, onSubmit, ...props } = this.props;
+    let { onCancel, onSubmit } = this.props;
     let { otherActionVisible, selectedUser, action } = this.state;
     return (
       <Fragment>
@@ -77,11 +77,16 @@ export default class AddApproveWay extends Component {
             <div
               className="action flexRow"
               onClick={() => {
-                if (onSubmit({ noSave: true })) {
-                  this.selectUserTransfer('after');
-                } else {
-                  onCancel();
-                }
+                onSubmit({
+                  noSave: true,
+                  callback: err => {
+                    if (!err) {
+                      this.selectUserTransfer('after');
+                    } else {
+                      onCancel();
+                    }
+                  },
+                });
               }}
             >
               <div className="text flex">{_l('通过申请后增加一位审批人')}</div>
@@ -95,10 +100,10 @@ export default class AddApproveWay extends Component {
         </Dialog>
         {otherActionVisible && (
           <OtherAction
+            {...this.props}
             selectedUser={selectedUser}
             action={action}
             onOk={this.onOk}
-            {...{ props }}
             onCancel={() => this.handleApproveVisible(false)}
           />
         )}

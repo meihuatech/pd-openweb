@@ -17,8 +17,7 @@ import {
 } from './config';
 import './index.less';
 import { browserIsMobile } from 'src/util';
-const {dialog: {netState: {buyBtn}}} = window.private
-
+import _ from 'lodash';
 class NetState extends Component {
   static propTypes = {
     onClose: func,
@@ -91,7 +90,7 @@ class NetState extends Component {
     const { projectId, moduleType, maxCount } = this.props;
     const { projectInfo } = this.state;
     const { licenseType = 0 } = projectInfo;
-    const versionId = _.get(projectInfo, ['version', 'versionId']);
+    const versionIdV2 = _.get(projectInfo, ['version', 'versionIdV2']);
     let versionType;
     let displayObj;
     // 服务类型: 工作流、应用、工作表...
@@ -104,7 +103,11 @@ class NetState extends Component {
        * 1: 正式版
        * 2: 体验版
        */
-      versionType = _.includes([1], licenseType) ? VERSION[licenseType][versionId] : VERSION[licenseType];
+      versionType = _.includes([1], licenseType)
+        ? md.global.Config.IsLocal
+          ? VERSION[licenseType]['3']
+          : VERSION[licenseType][versionIdV2]
+        : VERSION[licenseType];
       // }
     } else {
       versionType = 'individual';
@@ -140,29 +143,33 @@ class NetState extends Component {
     // 事件处理函数参数
     const para = { projectId, serviceType, versionType };
 
-    const { hint, explain, btnText, operationText } = displayObj || {};
+    const { hint, explain = '', btnText, operationText } = displayObj || {};
 
     return (
       <div className="netStateWrap">
         <div className="imgWrap" />
         <div className="hint">{hint}</div>
-        <div className="explain">
-          {_.isNumber(Number(maxCount))
-            ? explain.replace(/\d+/, maxCount >= 1000 ? maxCount / 10000 : maxCount)
-            : explain}
-        </div>
-        <div className={cx('operationWrap', versionType, { Hidden: buyBtn })}>
-          {btnText && (
-            <div className={cx('operationBtn', versionType)} onClick={() => this.handleClick('operationBtn', para)}>
-              {btnText}
-            </div>
-          )}
-          {operationText && (
-            <div className="operationText" onClick={() => this.handleClick('operationTxt', para)}>
-              {operationText}
-            </div>
-          )}
-        </div>
+        {!md.global.Config.IsLocal && (
+          <div className="explain">
+            {_.isNumber(Number(maxCount))
+              ? explain.replace(/\d+/, maxCount >= 1000 ? maxCount / 10000 : maxCount)
+              : explain}
+          </div>
+        )}
+        {!md.global.Config.IsLocal && (
+          <div className={cx('operationWrap', versionType)}>
+            {btnText && (
+              <div className={cx('operationBtn', versionType)} onClick={() => this.handleClick('operationBtn', para)}>
+                {btnText}
+              </div>
+            )}
+            {operationText && (
+              <div className="operationText" onClick={() => this.handleClick('operationTxt', para)}>
+                {operationText}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     );
   }

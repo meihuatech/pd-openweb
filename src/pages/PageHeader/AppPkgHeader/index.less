@@ -262,12 +262,7 @@
     .appExtensionItem {
       .headerColorSwitch;
       padding: 12px;
-      font-size: 14px;
       cursor: pointer;
-
-      span {
-        margin-left: 6px;
-      }
     }
   }
 
@@ -279,6 +274,9 @@
     width: 100%;
     overflow-x: scroll;
     overflow-y: hidden;
+    &::-webkit-scrollbar {
+      display: none;
+  }
   }
 
   .emptyAppItemWrap {
@@ -464,6 +462,9 @@
     .flexCenterHeight;
     padding: 0 20px;
     color: #fff;
+    a {
+      color: #fff;
+    }
 
     input {
       box-sizing: border-box;

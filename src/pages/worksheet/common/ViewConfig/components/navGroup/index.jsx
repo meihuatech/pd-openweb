@@ -1,13 +1,17 @@
 import React, { createRef, useState, useEffect, useRef } from 'react';
+import { useSetState } from 'react-use';
 import styled from 'styled-components';
-import { Icon, Dropdown } from 'ming-ui';
+import { Icon, Dropdown, Checkbox, Tooltip } from 'ming-ui';
 import cx from 'classnames';
 import { getIconByType } from 'src/pages/widgetConfig/util';
 import { canNavGroup, getSetDefault, getSetHtmlData } from './util';
 import bgNavGroups from './img/bgNavGroups.png';
 import AddCondition from 'src/pages/worksheet/common/WorkSheetFilter/components/AddCondition';
 import sheetAjax from 'src/api/worksheet';
-
+import { filterOnlyShowField } from 'src/pages/widgetConfig/util';
+import { updateViewAdvancedSetting } from 'src/pages/worksheet/common/ViewConfig/util';
+import NavShow from './NavShow';
+import _ from 'lodash';
 const Wrap = styled.div`
   .hasData {
     .cancle {
@@ -197,11 +201,25 @@ const Wrap = styled.div`
 
 export default function NavGroup(params) {
   let ajaxInfoFn = null;
-  const { worksheetControls = [], view = {}, updateCurrentView, worksheetId } = params;
+  const { worksheetControls = [], view = {}, updateCurrentView, worksheetId, columns, currentSheetInfo = {} } = params;
   let [navGroup, setData] = useState({});
   let [filterData, setDatas] = useState();
+  let [usenav, setUsenav] = useState(); //空或者0：不使用筛选条件作为默认值 1：使用筛选条件作为默认值 ，老数据后端回兼容，新配置需要前端把这个值设为1
   let [showAddCondition, setShowAddCondition] = useState();
   const [relateSheetInfo, setRelateSheetInfo] = useState([]);
+  const [relateControls, setRelateControls] = useState([]);
+  const [{ navshow, navfilters }, setState] = useSetState({
+    navshow: 0,
+    navfilters: '[]',
+  });
+  useEffect(() => {
+    const { advancedSetting = {} } = view;
+    setUsenav(!advancedSetting.usenav || advancedSetting.usenav === '0' ? '0' : '1');
+    setState({
+      navshow: advancedSetting.navshow,
+      navfilters: advancedSetting.navfilters || '[]',
+    });
+  }, [view]);
   useEffect(() => {
     const groupData = view.navGroup || [];
     let navGroup = groupData.length > 0 ? groupData[0] : {};
@@ -214,25 +232,40 @@ export default function NavGroup(params) {
   const onDelete = () => {
     updateView(undefined);
   };
-  const updateView = navGroup => {
+  const updateView = (navGroup, advancedSetting) => {
     setData(navGroup);
+    let editAttrs = ['navGroup'];
+    let param = { navGroup: navGroup ? [navGroup] : [] };
+    if (!!advancedSetting) {
+      editAttrs.push('advancedSetting');
+      param = {
+        ...param,
+        advancedSetting: updateViewAdvancedSetting(view, {
+          ...advancedSetting,
+        }),
+      };
+    }
     updateCurrentView(
       Object.assign(view, {
-        navGroup: navGroup ? [navGroup] : [],
-        editAttrs: ['navGroup'],
+        ...param,
+        editAttrs: editAttrs,
       }),
     );
   };
   const addNavGroups = data => {
     const d = getSetDefault(data);
-    updateView(d);
+    updateView(d, {
+      navshow: '0',
+      navfilters: JSON.stringify([]),
+      usenav: '1', //新配置需要前端把这个值设为1
+    });
     setShowAddCondition(false);
     data.type === 29 && data.dataSource && getRelate(data.dataSource);
   };
 
   const getRelate = worksheetId => {
     ajaxInfoFn && ajaxInfoFn.abort();
-    ajaxInfoFn = sheetAjax.getWorksheetInfo({ worksheetId, getViews: true });
+    ajaxInfoFn = sheetAjax.getWorksheetInfo({ worksheetId, getViews: true, getTemplate: true });
     ajaxInfoFn.then(data => {
       ajaxInfoFn = '';
       const fieldList = data.views
@@ -241,15 +274,28 @@ export default function NavGroup(params) {
           return { value: o.viewId, text: o.name };
         });
       setRelateSheetInfo(fieldList);
+      setRelateControls(_.get(data, ['template', 'controls']));
     });
   };
-
+  const updateAdvancedSetting = data => {
+    updateCurrentView(
+      Object.assign(view, {
+        advancedSetting: updateViewAdvancedSetting(view, {
+          ...data,
+        }),
+        editAttrs: ['advancedSetting'],
+      }),
+    );
+  };
+  const updateViewSetUsenav = data => {
+    updateAdvancedSetting({ usenav: data });
+  };
   const renderAdd = ({ width, comp }) => {
     return (
       <AddCondition
         renderInParent
         className="addControl"
-        columns={worksheetControls.filter(
+        columns={filterOnlyShowField(worksheetControls).filter(
           o => canNavGroup(o, worksheetId), // && !navGroup.controlId === o.controlId,
         )}
         onAdd={addNavGroups}
@@ -267,43 +313,96 @@ export default function NavGroup(params) {
 
   const renderDrop = data => {
     let htmlData = getSetHtmlData(data.type);
-    if (!htmlData.types && data.type !== 29) {
-      return '';
-    }
-    if (data.type === 29) {
-      htmlData.types = relateSheetInfo;
-      if (relateSheetInfo.length <= 0) {
-        htmlData.types = [
-          { text: <span className="Gray_9e">{_l('关联表中没有本表关联类型的层级视图，请先去添加一个')}</span>, isTip: true },
-        ];
+    return htmlData.map(o => {
+      if (o.key === 'viewId' && data.type === 29) {
+        o.types = relateSheetInfo;
+        if (relateSheetInfo.length <= 0) {
+          o.types = [
+            {
+              text: <span className="Gray_9e">{_l('关联表中没有本表关联类型的层级视图，请先去添加一个')}</span>,
+              isTip: true,
+            },
+          ];
+        }
       }
-    }
-    return (
-      <React.Fragment>
-        {htmlData.txt && <div className="title mTop30 Gray">{htmlData.txt}</div>}
-        {htmlData.des && <div className="des mTop5 Gray_9e">{htmlData.des}</div>}
-        <Dropdown
-          data={htmlData.types}
-          value={!navGroup[htmlData.key] && data.type === 29 ? null : navGroup[htmlData.key]}
-          className="flex"
-          onChange={newValue => {
-            updateView({ ...navGroup, [htmlData.key]: newValue });
-          }}
-          cancelAble={[29, 35].includes(data.type)}
-          renderError={() => {
-            if (data.type === 29 && relateSheetInfo.length <= 0) {
-              return '';
-            }
-            return (
-              <span className="Red TxtMiddle">
-                <Icon icon={'error1'} className={cx('mRight12 Font16')} />
-                <span className="">{_l('该视图已删除')}</span>
-              </span>
-            );
-          }}
-        />
-      </React.Fragment>
-    );
+      if (data.type === 29 && !navGroup.viewId && o.key === 'filterType') {
+        //关联记录不是以层级视图时，没有筛选方式
+        return '';
+      }
+      if (data.type === 29 && !!navGroup.viewId && o.key === 'navshow') {
+        //关联记录 以层级视图时，没有显示项
+        return '';
+      }
+      let value = !navGroup[o.key] && data.type === 29 ? null : navGroup[o.key];
+      if (o.key === 'filterType' && [29, 35].includes(data.type)) {
+        value = value === 11 ? value : 24; //筛选方式 24是 | 11包含 老数据是0 按照24走
+      }
+      if (o.key === 'navshow') {
+        return (
+          <NavShow
+            params={o}
+            value={navshow}
+            onChange={newValue => {
+              updateCurrentView(
+                Object.assign(view, {
+                  advancedSetting: updateViewAdvancedSetting(view, {
+                    ...newValue,
+                  }),
+                  editAttrs: ['advancedSetting'],
+                }),
+              );
+            }}
+            navfilters={navfilters}
+            filterInfo={{
+              relateControls: relateControls,
+              allControls: worksheetControls,
+              globalSheetInfo: _.pick(currentSheetInfo, [
+                'appId',
+                'groupId',
+                'name',
+                'projectId',
+                'roleType',
+                'worksheetId',
+              ]),
+              columns,
+              viewControl: data.controlId,
+            }}
+          />
+        );
+      }
+      return (
+        <React.Fragment>
+          {o.txt && <div className="title mTop30 Gray Bold">{o.txt}</div>}
+          {o.des && <div className="des mTop5 Gray_9e">{o.des}</div>}
+          <Dropdown
+            data={o.types}
+            value={value}
+            className="flex"
+            onChange={newValue => {
+              updateView(
+                { ...navGroup, [o.key]: newValue },
+                o.key === 'viewId' && data.type === 29 //关联记录 以层级视图时，没有显示项
+                  ? { navshow: '0', navfilters: JSON.stringify([]) }
+                  : null,
+              );
+            }}
+            cancelAble={[29, 35].includes(data.type)}
+            renderError={() => {
+              if (data.type === 29 && relateSheetInfo.length > 0 && o.key === 'viewId') {
+                return (
+                  <span className="Red TxtMiddle">
+                    <Icon icon={'error1'} className={cx('mRight12 Font16')} />
+                    <span className="">{_l('该视图已删除')}</span>
+                  </span>
+                );
+              } else {
+                return '';
+              }
+            }}
+          />
+        </React.Fragment>
+      );
+    });
   };
 
   return (
@@ -316,7 +415,7 @@ export default function NavGroup(params) {
           </div>
           <React.Fragment>
             <div className="con">
-              <div className="title mTop25 Gray">
+              <div className="title mTop25 Gray Bold">
                 {_l('筛选字段')}
                 <span
                   className="cancle Right"
@@ -345,7 +444,17 @@ export default function NavGroup(params) {
                         />
                       ) : null}
                       <div className="itemText">
-                        {filterData.isErr ? _l('该字段已删除') : _.get(filterData, ['controlName'])}
+                        {filterData.isErr ? (
+                          <Tooltip
+                            popupPlacement="bottom"
+                            text={<span>{_l('ID: %0', _.get(filterData, ['controlId']))}</span>}
+                            tooltipClass="deleteHoverTips"
+                          >
+                            <span>{_l('该字段已删除')}</span>
+                          </Tooltip>
+                        ) : (
+                          _.get(filterData, ['controlName'])
+                        )}
                       </div>
                       <Icon icon={'arrow-down-border'} className="mLeft12 Gray_9e" />
                     </div>
@@ -355,6 +464,31 @@ export default function NavGroup(params) {
               {filterData && !filterData.isErr && renderDrop(filterData)}
             </div>
           </React.Fragment>
+          <h6 className="mTop30 Font13 Bold">{_l('设置')}</h6>
+          <div className="mTop13">
+            <Checkbox
+              className="checkBox InlineBlock"
+              text={_l('创建记录时，以选中列表作为默认值')}
+              checked={usenav + '' === '1'}
+              onClick={() => {
+                updateViewSetUsenav(usenav + '' === '1' ? '0' : '1');
+              }}
+            />
+            <Tooltip
+              popupPlacement="bottom"
+              text={
+                <span>
+                  {_l(
+                    '如：在商品表中以商品类型（生鲜、副食、饮料等）作为筛选列表时，如果当前选中了饮料分类，则创建记录时商品类型默认为饮料。',
+                  )}
+                </span>
+              }
+            >
+              <div className="Hand InlineBlock TxtTop mLeft5">
+                <Icon icon="workflow_help" className="Gray_9e helpIcon Font18 InlineBlock mTop2" />
+              </div>
+            </Tooltip>
+          </div>
         </div>
       ) : (
         <div className="noData">

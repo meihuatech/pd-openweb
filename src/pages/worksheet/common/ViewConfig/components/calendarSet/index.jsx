@@ -1,14 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import SelectStartOrEnd from '../SelectStartOrEndControl/SelectStartOrEnd';
+import SelectStartOrEndGroups from '../SelectStartOrEndControl/SelectStartOrEndGroups';
 import { updateViewAdvancedSetting } from 'src/pages/worksheet/common/ViewConfig/util.js';
-import { Checkbox } from 'ming-ui';
+import { Checkbox, Icon } from 'ming-ui';
+import { Select } from 'antd';
 import Color from '../Color';
 let obj = [_l('月'), _l('周'), _l('日')];
-let weekObj = [_l('周一'), _l('周二'), _l('周三'), _l('周四'), _l('周五'), _l('周六'), _l('周天')];
+let weekObj = [_l('周一'), _l('周二'), _l('周三'), _l('周四'), _l('周五'), _l('周六'), _l('周日')];
 import styled from 'styled-components';
 import cx from 'classnames';
 import { getAdvanceSetting } from 'src/util';
-import { getCalendarViewType, getTimeControls } from 'src/pages/worksheet/views/CalendarView/util';
+import { getCalendarViewType, getTimeControls, getCalendartypeData } from 'src/pages/worksheet/views/CalendarView/util';
+import { isTimeStyle } from 'src/pages/worksheet/views/CalendarView/util';
+import _ from 'lodash';
+
 const CalendarTypeChoose = styled.div`
   ul > li {
     margin-top: 10px;
@@ -76,9 +80,24 @@ const ShowChoose = styled.div`
     }
   }
 `;
+const TimeDropdownChoose = styled.div`
+  margin-top: 6px;
+  .timeDropdown {
+    width: 100%;
+    .ant-select-selector {
+      border-radius: 3px;
+      line-height: 36px;
+      height: 36px !important;
+      span {
+        line-height: 36px;
+        height: 36px;
+      }
+    }
+  }
+`;
 export default function CalendarSet(props) {
   const { appId, view, updateCurrentView, worksheetControls } = props;
-  const { advancedSetting = {} } = view;
+  const { advancedSetting = {}, worksheetId, viewId } = view;
   const {
     calendarType = '0',
     unlunar, //默认显示农历
@@ -97,27 +116,42 @@ export default function CalendarSet(props) {
       editAttrs: ['advancedSetting'],
     });
   };
-  const { begindate = '', hour24 = '0' } = getAdvanceSetting(view);
-  const startData = worksheetControls.filter(item => item.controlId === begindate);
-  const isDelete = begindate && (!startData || startData.length <= 0);
+  let { begindate = '', hour24 = '0', enddate, weekbegin = '1', showall = '0' } = getAdvanceSetting(view);
+  let calendarcids = [];
+  try {
+    calendarcids = JSON.parse(_.get(view, ['advancedSetting', 'calendarcids']));
+  } catch (error) {
+    calendarcids = [];
+  }
+  if (calendarcids.length <= 0) {
+    calendarcids = begindate //兼容老配置
+      ? [{ begin: begindate, end: enddate }]
+      : [
+          {
+            begin: (worksheetControls.filter(o => isTimeStyle(o))[0] || {}).controlId,
+          },
+        ];
+  }
+
+  const startData = worksheetControls.filter(item => item.controlId === calendarcids[0].begin);
+  const isDelete = calendarcids[0].begin && (!startData || startData.length <= 0);
   return (
     <React.Fragment>
       <div className="title Font13 bold">{_l('日期')}</div>
-      <SelectStartOrEnd
+      <SelectStartOrEndGroups
         {...props}
+        controls={worksheetControls}
+        begindate={begindate}
+        enddate={enddate}
         handleChange={obj => {
-          const { begindate } = obj;
+          // const { begindate } = obj;
           const { moreSort } = view;
           // 第一次创建calendar时，配置排序数据
           if (!!begindate && !moreSort) {
             let data = {};
             data = {
-              sortCid: begindate,
-              editAttrs: ['moreSort', 'sortCid', 'sortType', 'advancedSetting'],
-              moreSort: [
-                { controlId: begindate, isAsc: true },
-                { controlId: 'ctime', isAsc: false },
-              ],
+              editAttrs: ['moreSort', 'sortType', 'advancedSetting'], // 'sortCid', 'sortType' 老的视图如果没配置过逻辑兼容的 现在用的moreSort
+              moreSort: [{ controlId: 'ctime', isAsc: false }],
               sortType: 2,
             };
             updateCurrentView({
@@ -150,7 +184,10 @@ export default function CalendarSet(props) {
                 className={cx('Hand', { current: String(i) === calendarType })}
                 onClick={() => {
                   handleChange({ calendarType: String(i) });
-                  window.localStorage.setItem('CalendarViewType', getCalendarViewType(String(i), startData));
+                  let type = getCalendarViewType(String(i), startData);
+                  let data = getCalendartypeData();
+                  data[`${worksheetId}-${viewId}`] = type;
+                  safeLocalStorageSetItem('CalendarViewType', JSON.stringify(data));
                 }}
               >
                 {it}
@@ -159,6 +196,40 @@ export default function CalendarSet(props) {
           })}
         </ul>
       </CalendarTypeChoose>
+      <div className="title Font13 bold mTop32">{_l('每周的第一天')}</div>
+      <TimeDropdownChoose>
+        <Select
+          className={cx('timeDropdown', {})}
+          value={[weekbegin]}
+          optionLabelProp="label"
+          placeholder={_l('请选择')}
+          suffixIcon={<Icon icon="arrow-down-border Font14" />}
+          dropdownClassName="dropConOption"
+          onChange={value => {
+            if (value === weekbegin) {
+              return;
+            }
+            handleChange({ weekbegin: String(value) });
+          }}
+          notFoundContent={_l('当前工作表中没有单选字段，请先去添加一个')}
+        >
+          {weekObj
+            .map((o, i) => {
+              return {
+                text: o,
+                value: i + 1,
+              };
+            })
+            // .filter(o => unweekday.indexOf(o.value) < 0)
+            .map((item, i) => {
+              return (
+                <Select.Option value={item.value + ''} key={i} label={item.text}>
+                  {item.text}
+                </Select.Option>
+              );
+            })}
+        </Select>
+      </TimeDropdownChoose>
       <div className="title Font13 bold mTop32">{_l('设置')}</div>
       <ShowChoose>
         <Checkbox
@@ -216,6 +287,14 @@ export default function CalendarSet(props) {
             handleChange({ hour24: hour24 !== '1' ? '1' : '0' });
           }}
           text={_l('24小时制')}
+        />
+        <Checkbox
+          checked={showall === '1'}
+          className="mTop18"
+          onClick={() => {
+            handleChange({ showall: showall !== '1' ? '1' : '0' });
+          }}
+          text={_l('显示所有日程')}
         />
       </ShowChoose>
     </React.Fragment>

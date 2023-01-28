@@ -1,5 +1,7 @@
 import { MSGTYPES, APPID, SOURCE_TYPE } from './constants';
-
+import { browserIsMobile } from 'src/util';
+import { replacePorTalUrl } from 'src/pages/PortalAccount/util'
+import moment from 'moment';
 export const formatInboxItem = function (inboxItem) {
   const createUser = inboxItem.CreateUser || {};
   const { accountId, fullname, avatar } = createUser;
@@ -238,7 +240,8 @@ export const buildSourceLink = function (type, _sourceId, _extendsId) {
       linkUrl = '/apps/task/folder_' + sourceId + '#detail';
       break;
     case SOURCE_TYPE.CALENDAR:
-      linkUrl = '/apps/calendar/detail_' + (childId ? sourceId + '_' + moment(childId).format('YYYYMMDDHHmmss') : sourceId);
+      linkUrl =
+        '/apps/calendar/detail_' + (childId ? sourceId + '_' + moment(childId).format('YYYYMMDDHHmmss') : sourceId);
       break;
     case SOURCE_TYPE.WORKSHEET:
       linkUrl = '/worksheet/' + sourceId;
@@ -249,7 +252,9 @@ export const buildSourceLink = function (type, _sourceId, _extendsId) {
         if (!appId || !viewId) {
           linkUrl = ' /worksheet/' + sourceId + '/row/' + childId + '?share';
         } else {
-          linkUrl = `/app/${appId}/${sourceId}/${viewId}/row/${childId}?share`;
+          linkUrl = !browserIsMobile()
+            ? replacePorTalUrl(`/app/${appId}/${sourceId}/${viewId}/row/${childId}?share`)
+            : `/mobile/record/${appId}/${sourceId}/${viewId}/${childId}?share`;//h5跳到记录详情
         }
       } else {
         linkUrl = ' /worksheet/' + sourceId + '/row/' + childId + '?share';
@@ -258,5 +263,5 @@ export const buildSourceLink = function (type, _sourceId, _extendsId) {
     default:
       break;
   }
-  return linkUrl;
+  return `${window.subPath || ''}${linkUrl}`;
 };

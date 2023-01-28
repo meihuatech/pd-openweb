@@ -25,6 +25,13 @@
         background: darken(@gray, 20%);
       }
     }
+    &--danger-gray {
+      color: @grayDarker;
+      background: @grayLightest;
+      &:hover {
+        background: #ffebeb;
+      }
+    }
     &--success {
       background: @successColor;
       &:hover {
@@ -171,6 +178,10 @@
     height: 12px;
   }
   .ming.Button--medium & {
+    width: 14px;
+    height: 14px;
+  }
+  .ming.Button--mdnormal & {
     width: 14px;
     height: 14px;
   }

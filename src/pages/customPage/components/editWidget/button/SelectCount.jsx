@@ -4,31 +4,46 @@ import styled from 'styled-components';
 import Trigger from 'rc-trigger';
 import cx from 'classnames';
 import 'rc-trigger/assets/index.css';
+import _ from 'lodash';
 
 const SelectCountWrap = styled.div`
-  border: 1px solid #d5d5d5;
   display: flex;
   cursor: pointer;
   margin-right: 10px;
+  position: relative;
   .countWrap {
     box-sizing: border-box;
-    text-align: center;
     line-height: 30px;
-    width: 32px;
-    border-right: 1px solid #d5d5d5;
+    width: 60px;
+    padding: 0 10px;
     background: #fff;
+    border-radius: 3px;
   }
   .operateWrap {
-    .divider {
-      width: 100%;
-      height: 1px;
-      background-color: #eee;
-    }
+    position: absolute;
+    top: 0;
+    right: 0;
     .item {
+      color: #9e9e9e;
       display: flex;
       width: 26px;
+      height: 15px;
       justify-content: center;
       align-items: center;
+      &:hover {
+        color: #2196f3;
+      }
+    }
+    .add {
+      padding-top: 1px;
+    }
+    .sub {
+      padding-bottom: 3px;
+    }
+  }
+  .disabled {
+    color: #DDDDDD !important;
+    &:hover {
     }
   }
 `;
@@ -37,6 +52,8 @@ const CountList = styled.ul`
   padding: 6px 0;
   flex-direction: column;
   width: 60px;
+  max-height: 300px;
+  overflow-y: auto;
   border-radius: 2px;
   background-color: #fff;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.29);
@@ -69,9 +86,9 @@ export default function SelectCount({ count = 5, maxCount = 10, minCount = 0, on
         }}
         popupVisible={visible}
         onPopupVisibleChange={value => setVisible(value)}
-        // getPopupContainer={() => $ref.current}
+        getPopupContainer={() => $ref.current}
         popup={
-          <CountList>
+          <CountList style={{ width: _.get($ref, 'current.clientWidth') }}>
             {getList().map(item => (
               <li
                 key={item}
@@ -93,7 +110,6 @@ export default function SelectCount({ count = 5, maxCount = 10, minCount = 0, on
         <div className={cx('add item', { disabled: count === maxCount })} onClick={() => onChange(Math.min(maxCount, count + 1))}>
           <i className="icon-arrow-up-border"></i>
         </div>
-        <div className="divider"></div>
         <div className={cx('sub item', { disabled: count === minCount })} onClick={() => onChange(Math.max(minCount, count - 1))}>
           <i className="icon-arrow-down-border"></i>
         </div>

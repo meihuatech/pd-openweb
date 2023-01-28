@@ -4,20 +4,25 @@ import './index.less';
 import cx from 'classnames';
 import { RENDER_RECORD_NECESSARY_ATTR, getRecordAttachments } from '../util';
 import RecordInfoWrapper from 'src/pages/worksheet/common/recordInfo/RecordInfoWrapper';
+import { RecordInfoModal } from 'mobile/Record';
 import { getAdvanceSetting, browserIsMobile } from 'src/util';
 import NoRecords from 'src/pages/worksheet/components/WorksheetTable/components/NoRecords';
 import { connect } from 'react-redux';
 import { bindActionCreators } from 'redux';
 import ViewEmpty from '../components/ViewEmpty';
 import { isEmpty } from 'lodash';
-import { renderCellText } from 'worksheet/components/CellControls';
+import renderCellText from 'src/pages/worksheet/components/CellControls/renderText';
 import GalleryItem from './GalleryItem';
 import { isOpenPermit } from 'src/pages/FormSet/util.js';
 import { permitList } from 'src/pages/FormSet/config.js';
 import * as actions from 'worksheet/redux/actions/galleryview';
-import { addRecord } from 'worksheet/common/newRecord';
-import { navigateTo } from 'src/router/navigateTo';
+import addRecord from 'worksheet/common/newRecord/addRecord';
 import autoSize from 'ming-ui/decorators/autoSize';
+import { transferValue } from 'src/pages/widgetConfig/widgetSetting/components/DynamicDefaultValue/util';
+import { getEmbedValue } from 'src/components/newCustomFields/tools/utils.js';
+import { controlState } from 'src/components/newCustomFields/tools/utils';
+
+const isMobile = browserIsMobile();
 
 @autoSize
 @connect(
@@ -93,6 +98,10 @@ export default class RecordGallery extends Component {
   };
 
   scrollLoad = (e, o) => {
+    const { maxCount } = this.props;
+    if (maxCount) {
+      return;
+    }
     const { galleryViewRecordCount, gallery, galleryLoading, galleryIndex } = this.props.galleryview;
     if (o.maximum - o.position <= 30 && gallery.length < galleryViewRecordCount && !galleryLoading) {
       const nextPageIndex = galleryIndex + 1;
@@ -119,7 +128,7 @@ export default class RecordGallery extends Component {
   };
 
   formData = row => {
-    const { base, controls, views } = this.props;
+    const { base, controls, views, sheetSwitchPermit } = this.props;
     const { viewId } = base;
     const view = views.find(o => o.viewId === viewId) || {};
     const { displayControls = [] } = view;
@@ -131,8 +140,18 @@ export default class RecordGallery extends Component {
       // 标题字段
       arr.push({ ..._.pick(titleControl, RENDER_RECORD_NECESSARY_ATTR), value: parsedRow[titleControl.controlId] });
     }
+    const isShowWorkflowSys = isOpenPermit(permitList.sysControlSwitch, sheetSwitchPermit);
+    let displayControlsCopy = !isShowWorkflowSys
+      ? displayControls.filter(
+          it =>
+            !_.includes(
+              ['wfname', 'wfstatus', 'wfcuaids', 'wfrtime', 'wfftime', 'wfdtime', 'wfcaid', 'wfctime', 'wfcotime'],
+              it,
+            ),
+        )
+      : displayControls;
     // 配置的显示字段
-    displayControls.forEach(id => {
+    displayControlsCopy.forEach(id => {
       const currentControl = _.find(controls, ({ controlId }) => controlId === id);
       if (currentControl) {
         const value = parsedRow[id];
@@ -154,7 +173,7 @@ export default class RecordGallery extends Component {
 
   render() {
     const { base, views, sheetSwitchPermit, galleryview, filters, worksheetInfo, controls, quickFilter } = this.props;
-    const { viewId, appId, worksheetId } = base;
+    const { viewId, appId, worksheetId, groupId } = base;
     const currentView = views.find(o => o.viewId === viewId) || {};
     const { gallery = [], galleryViewLoading, galleryLoading, galleryIndex } = galleryview;
     const { coverCid } = currentView;
@@ -180,7 +199,7 @@ export default class RecordGallery extends Component {
       );
     }
     if (gallery.length <= 0) {
-      if (filters.keyWords || !isEmpty(filters.filterControls) || browserIsMobile()) {
+      if (filters.keyWords || !isEmpty(filters.filterControls) || isMobile) {
         return <ViewEmpty filters={filters} />;
       }
       return (
@@ -210,31 +229,62 @@ export default class RecordGallery extends Component {
           }}
         >
           {gallery.map((item, index) => {
+            let formData = controls.map(o => {
+              return { ...o, value: item[o.controlId] };
+            });
             const { coverImage, allAttachments } = getRecordAttachments(item[coverCid]);
+            let coverData = { ...(controls.find(it => it.controlId === coverCid) || {}), value: item[coverCid] };
+            if (coverData.type === 45) {
+              //嵌入字段 dataSource需要转换
+              let dataSource = transferValue(coverData.value);
+              let urlList = [];
+              dataSource.map(o => {
+                if (!!o.staticValue) {
+                  urlList.push(o.staticValue);
+                } else {
+                  urlList.push(
+                    getEmbedValue(
+                      {
+                        projectId: worksheetInfo.projectId,
+                        appId,
+                        groupId,
+                        worksheetId,
+                        viewId,
+                        recordId,
+                      },
+                      o.cid,
+                    ),
+                  );
+                }
+              });
+              coverData = { ...coverData, value: urlList.join('') };
+            }
+            let abstractData = controls.find(it => it.controlId === abstract) || {};
             let data = {
-              coverData: { ...(controls.find(it => it.controlId === coverCid) || {}), value: item[coverCid] },
+              coverData,
               coverImage,
               allAttachments,
               allowEdit: item.allowedit,
               allowDelete: item.allowdelete,
               rawRow: item,
               fields: this.formData(item),
+              formData,
               rowId: item.rowid,
-              abstractValue: abstract
+              abstractValue: abstract //&& controlState(abstractData).visible //排除无查看权限的
                 ? renderCellText({
-                    ...(controls.find(it => it.controlId === abstract) || {}),
+                    ...abstractData,
                     value: item[abstract],
                   })
                 : '',
             };
             return (
               <div
-                className="galleryItem"
-                style={browserIsMobile() ? { width: '100%', padding: '5px 0px' } : { width: this.getWith() }}
+                className={cx('galleryItem', { mobile: isMobile })}
+                style={isMobile ? { width: '100%', padding: '5px 0px' } : { width: this.getWith() }}
                 onClick={() => {
-                  if (browserIsMobile()) {
-                    let url = `/mobile/record/${appId}/${worksheetId}/${viewId}/${item.rowid}`;
-                    navigateTo(url);
+                  const isMingdao = navigator.userAgent.toLowerCase().indexOf('mingdao application') >= 0;
+                  if (isMingdao) {
+                    window.location.href = `/mobile/record/${appId}/${worksheetId}/${viewId}/${item.rowid}`;
                     return;
                   }
                   this.setState({ recordId: item.rowid, recordInfoVisible: true });
@@ -258,36 +308,51 @@ export default class RecordGallery extends Component {
           })}
           {galleryLoading && <LoadDiv size="big" className="mTop32" />}
           {/* 表单信息 */}
-          {recordInfoVisible && (
-            <RecordInfoWrapper
-              sheetSwitchPermit={sheetSwitchPermit} // 表单权限
-              allowAdd={worksheetInfo.allowAdd}
-              visible
-              projectId={worksheetInfo.projectId}
-              appId={appId}
-              viewId={viewId}
-              from={1}
-              hideRecordInfo={() => {
-                this.setState({ recordInfoVisible: false });
-              }}
-              view={currentView}
-              recordId={recordId}
-              worksheetId={worksheetId}
-              rules={worksheetInfo.rules}
-              updateSuccess={(ids, updated, data) => {
-                this.props.updateRow(data);
-              }}
-              onDeleteSuccess={data => {
-                // 删除行数据后重新加载页面
-                this.props.deleteRow();
-                this.setState({ recordInfoVisible: false });
-              }}
-              handleAddSheetRow={data => {
-                this.props.updateRow(data);
-                this.setState({ recordInfoVisible: false });
-              }}
-            />
-          )}
+          {recordInfoVisible &&
+            (isMobile ? (
+              <RecordInfoModal
+                className="full"
+                visible
+                appId={appId}
+                worksheetId={worksheetId}
+                viewId={viewId}
+                rowId={recordId}
+                onClose={() => {
+                  this.setState({ recordInfoVisible: false });
+                }}
+              />
+            ) : (
+              <RecordInfoWrapper
+                sheetSwitchPermit={sheetSwitchPermit} // 表单权限
+                allowAdd={worksheetInfo.allowAdd}
+                visible
+                projectId={worksheetInfo.projectId}
+                currentSheetRows={gallery}
+                showPrevNext={true}
+                appId={appId}
+                viewId={viewId}
+                from={1}
+                hideRecordInfo={() => {
+                  this.setState({ recordInfoVisible: false });
+                }}
+                view={currentView}
+                recordId={recordId}
+                worksheetId={worksheetId}
+                rules={worksheetInfo.rules}
+                updateSuccess={(ids, updated, data) => {
+                  this.props.updateRow(data);
+                }}
+                onDeleteSuccess={data => {
+                  // 删除行数据后重新加载页面
+                  this.props.deleteRow();
+                  this.setState({ recordInfoVisible: false });
+                }}
+                handleAddSheetRow={data => {
+                  this.props.updateRow(data);
+                  this.setState({ recordInfoVisible: false });
+                }}
+              />
+            ))}
         </div>
       </ScrollView>
     );

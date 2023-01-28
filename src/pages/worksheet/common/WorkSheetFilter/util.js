@@ -1,4 +1,6 @@
-import { renderCellText } from 'src/pages/worksheet/components/CellControls';
+import _ from 'lodash';
+import moment from 'moment';
+import renderCellText from 'src/pages/worksheet/components/CellControls/renderText';
 import { getFormData, getSelectedOptions } from 'src/pages/worksheet/util';
 import { getIconByType } from 'src/pages/widgetConfig/util';
 import {
@@ -9,10 +11,15 @@ import {
   API_ENUM_TO_TYPE,
 } from './enum';
 
-export function formatConditionForSave(condition, relationType) {
-  let { values, controlType } = condition;
+export function formatConditionForSave(condition, relationType, options = {}) {
+  let { controlId, values, controlType } = condition;
+  const { returnFullValues } = options;
+  if (_.get(condition, 'control') && controlType === 25) {
+    controlType = 8;
+    controlId = condition.control.dataSource.slice(1, -1);
+  }
   return {
-    controlId: condition.controlId,
+    controlId: controlId,
     dataType: controlType,
     spliceType: relationType,
     filterType: condition.type,
@@ -20,8 +27,11 @@ export function formatConditionForSave(condition, relationType) {
     dateRangeType: condition.dateRangeType,
     maxValue: condition.maxValue,
     minValue: condition.minValue,
+    isDynamicsource: condition.isDynamicsource,
+    dynamicSource: condition.dynamicSource || [],
     value: condition.value,
-    values,
+    values:
+      returnFullValues && _.includes([26, 27, 29, 19, 23, 24, 35, 48], controlType) ? condition.fullValues : values,
   };
 }
 
@@ -49,11 +59,26 @@ export function formatValues(controlType, filterType, values = []) {
     ) {
       return values;
     }
-    if (_.includes([26, 27, 19, 23, 24, 29, 35], controlType)) {
+    if (_.includes([26, 27, 19, 23, 24, 29, 35, 48], controlType)) {
       return values.map(value => safeParse(value).id).filter(_.identity);
     }
   } catch (err) {}
   return values;
+}
+
+export function formatValuesOfCondition(condition) {
+  return condition.isGroup && condition.groupFilters
+    ? {
+        ...condition,
+        groupFilters: condition.groupFilters.map(c => ({
+          ...c,
+          values: formatValues(c.dataType, c.filterType, c.values),
+        })),
+      }
+    : {
+        ...condition,
+        values: formatValues(condition.dataType, condition.filterType, condition.values),
+      };
 }
 
 export function getTypeKey(type) {
@@ -62,51 +87,111 @@ export function getTypeKey(type) {
   return typeKey;
 }
 
+// TODO
 export function formatValuesOfOriginConditions(conditions) {
   return conditions.map(condition =>
-    Object.assign({}, condition, {
-      values: formatValues(condition.dataType, condition.filterType, condition.values),
-    }),
+    condition.isGroup && condition.groupFilters
+      ? {
+          ...condition,
+          groupFilters: condition.groupFilters.map(c => ({
+            ...c,
+            values: formatValues(c.dataType, c.filterType, c.values),
+          })),
+        }
+      : {
+          ...condition,
+          values: formatValues(condition.dataType, condition.filterType, condition.values),
+        },
   );
+}
+
+function formatConditions(items) {
+  return items.map(condition => {
+    const conditionGroupType = (CONTROL_FILTER_WHITELIST[getTypeKey(condition.dataType)] || {}).value;
+    return {
+      controlId: condition.controlId,
+      controlType: condition.dataType,
+      conditionGroupType,
+      keyStr: condition.controlId + Math.random().toString(16).slice(2),
+      type: condition.filterType,
+      dateRange: condition.dateRange,
+      dateRangeType: condition.dateRangeType,
+      spliceType: condition.spliceType,
+      maxValue: condition.maxValue,
+      minValue: condition.minValue,
+      value: condition.value,
+      fullValues: condition.values,
+      values: formatValues(condition.dataType, condition.filterType, condition.values),
+      folded: condition.folded,
+      dynamicSource: condition.dynamicSource || [],
+      isDynamicsource: condition.isDynamicsource,
+    };
+  });
 }
 
 export function formatOriginFilterValue(item) {
   item = typeof item === 'string' ? JSON.parse(item) : item;
   const items = item.items || [];
-  return {
+  const result = {
     id: item.filterId,
     name: item.name,
     type: item.type,
     createAccountId: item.createAccountId,
     relationType: items[0] ? items[0].spliceType : FILTER_RELATION_TYPE.AND,
-    conditions: items.map(condition => {
-      const conditionGroupType = (CONTROL_FILTER_WHITELIST[getTypeKey(condition.dataType)] || {}).value;
-      return {
-        controlId: condition.controlId,
-        controlType: condition.dataType,
-        conditionGroupType,
-        keyStr: condition.controlId + Math.random().toString(16).slice(2),
-        type: condition.filterType,
-        dateRange: condition.dateRange,
-        dateRangeType: condition.dateRangeType,
-        spliceType: condition.spliceType,
-        maxValue: condition.maxValue,
-        minValue: condition.minValue,
-        value: condition.value,
-        originValues: condition.values,
-        fullValues: condition.values,
-        values: formatValues(condition.dataType, condition.filterType, condition.values),
-        folded: condition.folded,
-        dynamicSource: condition.dynamicSource || [],
-        isDynamicsource: condition.isDynamicsource,
-      };
-    }),
+    conditions: formatConditions(items),
   };
+  return result;
+}
+
+export function formatOriginFilterGroupValue(filter) {
+  filter = typeof item === 'string' ? JSON.parse(filter) : filter;
+  const items = _.get(filter, 'items') || [];
+  const isGroup = items[0] && items[0].isGroup;
+  const result = {
+    id: filter.filterId || '',
+    name: filter.name,
+    type: filter.type,
+    createAccountId: filter.createAccountId,
+    isGroup,
+  };
+  if (isGroup) {
+    result.conditionsGroups = items.map(conditionsGroup => ({
+      ...conditionsGroup,
+      conditionSpliceType: _.get(conditionsGroup, 'groupFilters.0.spliceType') || FILTER_RELATION_TYPE.AND,
+      conditions: formatConditions(conditionsGroup.groupFilters),
+    }));
+  } else {
+    result.conditionsGroups = [
+      {
+        spliceType: FILTER_RELATION_TYPE.AND,
+        conditionSpliceType: _.get(items, '0.spliceType') || FILTER_RELATION_TYPE.AND,
+        conditions: formatConditions(items),
+      },
+    ];
+  }
+  return result;
 }
 
 export function checkFilterConditionsAvailable(filter) {
   const { conditions } = filter;
   return conditions && conditions.length && _.every(conditions, condition => checkConditionAvailable(condition));
+}
+
+export function filterUnavailableConditions(conditions) {
+  let newConditions = [...conditions];
+  newConditions = newConditions.map(condition => {
+    if (condition.isGroup && condition.groupFilters) {
+      condition.groupFilters = condition.groupFilters.filter(checkConditionAvailable);
+    }
+    return condition;
+  });
+  return newConditions.filter(condition => {
+    if (condition.isGroup) {
+      return !!condition.groupFilters.length;
+    } else {
+      return checkConditionAvailable(condition);
+    }
+  });
 }
 
 export function checkConditionAvailable(condition) {
@@ -149,6 +234,7 @@ export function checkConditionAvailable(condition) {
     case CONTROL_FILTER_WHITELIST.BOOL.value:
       return true;
     case CONTROL_FILTER_WHITELIST.DATE.value:
+    case CONTROL_FILTER_WHITELIST.TIME.value:
       if (type === FILTER_CONDITION_TYPE.DATE_BETWEEN || type === FILTER_CONDITION_TYPE.DATE_NBETWEEN) {
         return !_.isUndefined(minValue) && !_.isUndefined(maxValue);
       } else {
@@ -204,7 +290,7 @@ export function getConditionOverrideValue(type, condition) {
       } else {
         return Object.assign({}, base, {
           dateRange: dateRange || 1,
-          value: formatDateValue({ type, value }),
+          value: _.includes([10, 11], dateRange) ? value : formatDateValue({ type, value }),
           dateRangeType: dateRangeType || 1,
         });
       }
@@ -228,86 +314,243 @@ export function compareControlType(widget, type) {
   return false;
 }
 
-export function getFilterTypes(type, control = {}, conditionType, from) {
-  let types = [];
+export function getFilterTypes(control = {}, conditionType, from) {
+  let typeEnums = [];
+  const { type } = control;
   const typeKey = getTypeKey(type);
-  if (_.includes([19, 23, 24], type)) {
-    return [
-      FILTER_CONDITION_TYPE.EQ,
-      FILTER_CONDITION_TYPE.NE,
-      FILTER_CONDITION_TYPE.ISNULL,
-      FILTER_CONDITION_TYPE.HASVALUE,
-      FILTER_CONDITION_TYPE.BETWEEN,
-      FILTER_CONDITION_TYPE.NBETWEEN,
-      ...(from === 'rule' ? [] : [FILTER_CONDITION_TYPE.LIKE, FILTER_CONDITION_TYPE.NCONTAIN]),
-    ].map(filterType => ({
-      value: filterType,
-      text: getFilterTypeLabel(typeKey, filterType, control),
-    }));
+  switch (type) {
+    // 文本类型
+    case 2: // 文本框
+    case 3: // 电话号码
+    case 4: // 座机
+    case 5: // 邮件地址
+    case 7: // 证件
+    case 32: // 文本组合
+    case 33: // 自动编号
+      typeEnums = [
+        FILTER_CONDITION_TYPE.EQ,
+        FILTER_CONDITION_TYPE.NE,
+        FILTER_CONDITION_TYPE.LIKE,
+        FILTER_CONDITION_TYPE.NCONTAIN,
+        FILTER_CONDITION_TYPE.START,
+        FILTER_CONDITION_TYPE.N_START,
+        FILTER_CONDITION_TYPE.END,
+        FILTER_CONDITION_TYPE.N_END,
+        FILTER_CONDITION_TYPE.ISNULL,
+        FILTER_CONDITION_TYPE.HASVALUE,
+      ];
+      break;
+    case 6: // 数值
+    case 8: // 金额
+    case 25: // 大写金额
+    case 31: // 公式
+    case 37: // 汇总
+      typeEnums = [
+        FILTER_CONDITION_TYPE.EQ,
+        FILTER_CONDITION_TYPE.NE,
+        FILTER_CONDITION_TYPE.GT,
+        FILTER_CONDITION_TYPE.LT,
+        FILTER_CONDITION_TYPE.GTE,
+        FILTER_CONDITION_TYPE.LTE,
+        FILTER_CONDITION_TYPE.BETWEEN,
+        FILTER_CONDITION_TYPE.NBETWEEN,
+        FILTER_CONDITION_TYPE.ISNULL,
+        FILTER_CONDITION_TYPE.HASVALUE,
+      ];
+      break;
+    case 14: // 附件
+    case 21: // 自由连接
+    case 36: // 检查框
+    case 40: // 定位
+    case 42: // 签名
+      typeEnums = [FILTER_CONDITION_TYPE.HASVALUE, FILTER_CONDITION_TYPE.ISNULL];
+      break;
+    case 28: // 等级
+      typeEnums = [
+        FILTER_CONDITION_TYPE.EQ,
+        FILTER_CONDITION_TYPE.NE,
+        FILTER_CONDITION_TYPE.ISNULL,
+        FILTER_CONDITION_TYPE.HASVALUE,
+      ];
+      break;
+    case 48: // 角色权限
+      typeEnums = [
+        FILTER_CONDITION_TYPE.ARREQ,
+        FILTER_CONDITION_TYPE.ARRNE,
+        FILTER_CONDITION_TYPE.EQ,
+        FILTER_CONDITION_TYPE.NE,
+        ...(control.enumDefault === 1 ? [FILTER_CONDITION_TYPE.ALLCONTAIN] : []),
+        FILTER_CONDITION_TYPE.ISNULL,
+        FILTER_CONDITION_TYPE.HASVALUE,
+      ];
+      break;
+    case 11: // 选项
+    case 10: // 多选
+    case 9: // 单选 平铺
+      typeEnums = [
+        FILTER_CONDITION_TYPE.ARREQ,
+        FILTER_CONDITION_TYPE.ARRNE,
+        FILTER_CONDITION_TYPE.EQ,
+        FILTER_CONDITION_TYPE.NE,
+        ...(type === 10 ? [FILTER_CONDITION_TYPE.ALLCONTAIN] : []),
+        FILTER_CONDITION_TYPE.ISNULL,
+        FILTER_CONDITION_TYPE.HASVALUE,
+      ];
+      break;
+    case 15: // 日期
+    case 16: //  日期时间
+      typeEnums = [
+        ...(type === 15
+          ? [FILTER_CONDITION_TYPE.DATEENUM, FILTER_CONDITION_TYPE.NDATEENUM]
+          : [FILTER_CONDITION_TYPE.DATE_EQ, FILTER_CONDITION_TYPE.DATE_NE]),
+        FILTER_CONDITION_TYPE.DATE_LT,
+        FILTER_CONDITION_TYPE.DATE_GT,
+        FILTER_CONDITION_TYPE.DATE_LTE,
+        FILTER_CONDITION_TYPE.DATE_GTE,
+        FILTER_CONDITION_TYPE.DATE_BETWEEN,
+        FILTER_CONDITION_TYPE.DATE_NBETWEEN,
+        FILTER_CONDITION_TYPE.ISNULL,
+        FILTER_CONDITION_TYPE.HASVALUE,
+      ];
+      break;
+    case 19:
+    case 23:
+    case 24:
+      typeEnums = [
+        FILTER_CONDITION_TYPE.EQ,
+        FILTER_CONDITION_TYPE.NE,
+        FILTER_CONDITION_TYPE.BETWEEN,
+        FILTER_CONDITION_TYPE.NBETWEEN,
+        ...(from === 'rule' ? [] : [FILTER_CONDITION_TYPE.LIKE, FILTER_CONDITION_TYPE.NCONTAIN]),
+        FILTER_CONDITION_TYPE.ISNULL,
+        FILTER_CONDITION_TYPE.HASVALUE,
+      ];
+      break;
+    case 26: // 人员
+      typeEnums = [
+        FILTER_CONDITION_TYPE.ARREQ,
+        FILTER_CONDITION_TYPE.ARRNE,
+        FILTER_CONDITION_TYPE.EQ,
+        FILTER_CONDITION_TYPE.NE,
+        ...(control.enumDefault === 1 ? [FILTER_CONDITION_TYPE.ALLCONTAIN] : []),
+        FILTER_CONDITION_TYPE.ISNULL,
+        FILTER_CONDITION_TYPE.HASVALUE,
+      ].concat(
+        _.includes(['caid', 'ownerid'], control.controlId)
+          ? [FILTER_CONDITION_TYPE.NORMALUSER, FILTER_CONDITION_TYPE.PORTALUSER]
+          : [],
+      );
+      break;
+    case 27: // 部门
+      typeEnums = [
+        FILTER_CONDITION_TYPE.ARREQ,
+        FILTER_CONDITION_TYPE.ARRNE,
+        FILTER_CONDITION_TYPE.EQ,
+        FILTER_CONDITION_TYPE.NE,
+        FILTER_CONDITION_TYPE.BETWEEN,
+        FILTER_CONDITION_TYPE.NBETWEEN,
+        ...(from === 'rule' ? [] : [FILTER_CONDITION_TYPE.LIKE, FILTER_CONDITION_TYPE.NCONTAIN]),
+        ...(control.enumDefault === 1 ? [FILTER_CONDITION_TYPE.ALLCONTAIN] : []),
+        FILTER_CONDITION_TYPE.ISNULL,
+        FILTER_CONDITION_TYPE.HASVALUE,
+      ];
+      break;
+    case 35: // 级联
+      typeEnums = [
+        FILTER_CONDITION_TYPE.RCEQ,
+        FILTER_CONDITION_TYPE.RCNE,
+        FILTER_CONDITION_TYPE.BETWEEN,
+        FILTER_CONDITION_TYPE.NBETWEEN,
+        FILTER_CONDITION_TYPE.ISNULL,
+        FILTER_CONDITION_TYPE.HASVALUE,
+      ];
+      break;
+    case 29: // 关联
+      typeEnums =
+        conditionType &&
+        (conditionType === FILTER_CONDITION_TYPE.LIKE || conditionType === FILTER_CONDITION_TYPE.NCONTAIN) // 兼容老数据
+          ? [
+              FILTER_CONDITION_TYPE.ARREQ,
+              FILTER_CONDITION_TYPE.ARRNE,
+              FILTER_CONDITION_TYPE.LIKE,
+              FILTER_CONDITION_TYPE.NCONTAIN,
+              FILTER_CONDITION_TYPE.RCEQ,
+              FILTER_CONDITION_TYPE.RCNE,
+              ...(control.enumDefault === 2 ? [FILTER_CONDITION_TYPE.ALLCONTAIN] : []),
+              FILTER_CONDITION_TYPE.ISNULL,
+              FILTER_CONDITION_TYPE.HASVALUE,
+            ]
+          : [
+              FILTER_CONDITION_TYPE.ARREQ,
+              FILTER_CONDITION_TYPE.ARRNE,
+              FILTER_CONDITION_TYPE.RCEQ,
+              FILTER_CONDITION_TYPE.RCNE,
+              ...(control.enumDefault === 2 ? [FILTER_CONDITION_TYPE.ALLCONTAIN] : []),
+              FILTER_CONDITION_TYPE.ISNULL,
+              FILTER_CONDITION_TYPE.HASVALUE,
+            ];
+      break;
+    case 34: // 子表
+      typeEnums = [FILTER_CONDITION_TYPE.ISNULL, FILTER_CONDITION_TYPE.HASVALUE];
+      break;
+    case 46: // 时间字段
+      typeEnums = [
+        FILTER_CONDITION_TYPE.DATEENUM,
+        FILTER_CONDITION_TYPE.NDATEENUM,
+        FILTER_CONDITION_TYPE.DATE_LT,
+        FILTER_CONDITION_TYPE.DATE_GT,
+        FILTER_CONDITION_TYPE.DATE_LTE,
+        FILTER_CONDITION_TYPE.DATE_GTE,
+        FILTER_CONDITION_TYPE.DATE_BETWEEN,
+        FILTER_CONDITION_TYPE.DATE_NBETWEEN,
+        FILTER_CONDITION_TYPE.ISNULL,
+        FILTER_CONDITION_TYPE.HASVALUE,
+      ];
+      break;
+    default:
+      typeEnums = [];
   }
-  if (type === 27) {
-    return [
-      FILTER_CONDITION_TYPE.EQ,
-      FILTER_CONDITION_TYPE.NE,
-      FILTER_CONDITION_TYPE.BETWEEN,
-      FILTER_CONDITION_TYPE.NBETWEEN,
-      FILTER_CONDITION_TYPE.ISNULL,
-      FILTER_CONDITION_TYPE.HASVALUE,
-    ].map(filterType => ({
-      value: filterType,
-      text: getFilterTypeLabel(typeKey, filterType, control),
-    }));
+  if (from === 'subTotal') {
+    typeEnums = typeEnums.filter(type => type !== FILTER_CONDITION_TYPE.ALLCONTAIN);
   }
-  if (type === 29) {
-    const typeEnums =
-      conditionType &&
-      (conditionType === FILTER_CONDITION_TYPE.LIKE || conditionType === FILTER_CONDITION_TYPE.NCONTAIN)
-        ? [
-            FILTER_CONDITION_TYPE.LIKE,
-            FILTER_CONDITION_TYPE.NCONTAIN,
-            FILTER_CONDITION_TYPE.RCEQ,
-            FILTER_CONDITION_TYPE.RCNE,
-            FILTER_CONDITION_TYPE.ISNULL,
-            FILTER_CONDITION_TYPE.HASVALUE,
-          ]
-        : [
-            FILTER_CONDITION_TYPE.RCEQ,
-            FILTER_CONDITION_TYPE.RCNE,
-            FILTER_CONDITION_TYPE.ISNULL,
-            FILTER_CONDITION_TYPE.HASVALUE,
-          ];
-    types = typeEnums.map(filterType => ({
-      value: filterType,
-      text: getFilterTypeLabel(typeKey, filterType, control),
-    }));
-    return types;
+  return typeEnums.map(filterType => ({
+    value: filterType,
+    text: getFilterTypeLabel(typeKey, filterType, control),
+  }));
+}
+
+function getDefaultFilterType(control) {
+  // 文本类
+  if (_.includes([2, 3, 4, 5, 7, 32, 33], control.type)) {
+    return FILTER_CONDITION_TYPE.LIKE;
   }
-  if (type === 26 && _.includes(['caid', 'ownerid'], control.controlId)) {
-    return [
-      FILTER_CONDITION_TYPE.EQ,
-      FILTER_CONDITION_TYPE.NE,
-      FILTER_CONDITION_TYPE.ISNULL,
-      FILTER_CONDITION_TYPE.HASVALUE,
-      FILTER_CONDITION_TYPE.NORMALUSER,
-      FILTER_CONDITION_TYPE.PORTALUSER,
-    ].map(filterType => ({
-      value: filterType,
-      text: getFilterTypeLabel(typeKey, filterType, control),
-    }));
+  // 数值类
+  if (_.includes([6, 8, 25, 31, 37], control.type)) {
+    return FILTER_CONDITION_TYPE.BETWEEN;
   }
-  if (typeKey) {
-    types = CONTROL_FILTER_WHITELIST[typeKey].types.map(filterType => ({
-      value: filterType,
-      text: getFilterTypeLabel(typeKey, filterType, control, type),
-    }));
+  if (_.includes([15, 46], control.type)) {
+    return FILTER_CONDITION_TYPE.DATEENUM;
   }
-  return types;
+  if (control.type === 16) {
+    return FILTER_CONDITION_TYPE.DATE_EQ;
+  }
+  if (_.includes([15, 46], control.type)) {
+    return FILTER_CONDITION_TYPE.DATEENUM;
+  }
+  if (_.includes([29, 35], control.type)) {
+    return FILTER_CONDITION_TYPE.RCEQ;
+  }
 }
 
 export function getDefaultCondition(control) {
   const conditionGroupKey = getTypeKey(control.type);
   const conditionGroupType =
     CONTROL_FILTER_WHITELIST[conditionGroupKey] && CONTROL_FILTER_WHITELIST[conditionGroupKey].value;
+  const filterTypesOfControl = getFilterTypes(control);
+  let defaultFilterType = getDefaultFilterType(control) || FILTER_CONDITION_TYPE.EQ || filterTypesOfControl[0].value;
+  if (_.isUndefined(defaultFilterType) || !_.find(filterTypesOfControl, c => c.value === defaultFilterType)) {
+    defaultFilterType = filterTypesOfControl[0].value;
+  }
   const baseCondition = {
     controlId: control.controlId,
     controlType: control.type,
@@ -315,16 +558,11 @@ export function getDefaultCondition(control) {
     control,
     conditionGroupType,
     type:
-      conditionGroupType === CONTROL_FILTER_WHITELIST.BOOL.value
-        ? FILTER_CONDITION_TYPE.HASVALUE
-        : getFilterTypes(control.type)[0].value,
+      conditionGroupType === CONTROL_FILTER_WHITELIST.BOOL.value ? FILTER_CONDITION_TYPE.HASVALUE : defaultFilterType,
   };
   if (conditionGroupType === CONTROL_FILTER_WHITELIST.BOOL.value && control.type === 36) {
     baseCondition.type = FILTER_CONDITION_TYPE.EQ;
     baseCondition.value = 1;
-  }
-  if (conditionGroupType === CONTROL_FILTER_WHITELIST.DATE.value) {
-    baseCondition.dateRange = 1;
   }
   return baseCondition;
 }
@@ -335,18 +573,22 @@ export function getDefaultCondition(control) {
  *  */
 export function redefineComplexControl(contorl) {
   if (contorl.type === 37) {
-    return { ...contorl, ...{ type: contorl.enumDefault2 || 6 } };
+    return { ...contorl, ...{ type: contorl.enumDefault2 || 6, originType: contorl.type } };
   }
   if (contorl.type === 30) {
     return {
       ...contorl,
       ...{
         type: contorl.sourceControltype === 37 ? contorl.enumDefault2 : contorl.sourceControlType,
+        originType: contorl.type,
       },
     };
   }
   if (contorl.type === 38) {
-    return { ...contorl, ...{ type: contorl.enumDefault === 2 ? 15 : 6 } };
+    return { ...contorl, ...{ type: contorl.enumDefault === 2 ? 15 : 6, originType: contorl.type } };
+  }
+  if (contorl.type === 50) {
+    return { ...contorl, ...{ type: 2, originType: contorl.type } };
   }
   return { ...contorl };
 }
@@ -397,17 +639,27 @@ export function relateDy(conditionType, contorls, control, defaultValue) {
   if (
     defaultValue === FILTER_CONDITION_TYPE.ISNULL || // 为空
     defaultValue === FILTER_CONDITION_TYPE.HASVALUE || // 不为空
-    defaultValue === FILTER_CONDITION_TYPE.BETWEEN || // 在范围内
-    defaultValue === FILTER_CONDITION_TYPE.NBETWEEN // 不在范围内
+    // 在范围内 不在范围内(部门、地区支持属于不属于)
+    ((defaultValue === FILTER_CONDITION_TYPE.BETWEEN || defaultValue === FILTER_CONDITION_TYPE.NBETWEEN) &&
+      !_.includes(
+        [
+          API_ENUM_TO_TYPE.GROUP_PICKER,
+          API_ENUM_TO_TYPE.AREA_INPUT_19,
+          API_ENUM_TO_TYPE.AREA_INPUT_23,
+          API_ENUM_TO_TYPE.AREA_INPUT_24,
+        ],
+        conditionType,
+      ))
   ) {
     return [];
   }
   let typeList = [];
   switch (conditionType) {
-    // 文本框、文本组合
+    // 文本框、文本组合、自动编号
     case API_ENUM_TO_TYPE.TEXTAREA_INPUT_1:
     case API_ENUM_TO_TYPE.TEXTAREA_INPUT_2:
     case API_ENUM_TO_TYPE.CONCATENATE:
+    case API_ENUM_TO_TYPE.AUTOID:
       // 除了检查框、自由连接、等级、他表字段以外所有能取到文本值的字段类型
       // 除分段、备注、富文本、单选项、多选项、地区、人员、部门、检查框、附件、自由连接、签名、表关联、他表字段、汇总、子表外
       typeList = [
@@ -431,6 +683,9 @@ export function relateDy(conditionType, contorls, control, defaultValue) {
         API_ENUM_TO_TYPE.RELATESHEET,
         API_ENUM_TO_TYPE.SUBTOTAL,
         API_ENUM_TO_TYPE.SUBLIST,
+        API_ENUM_TO_TYPE.EMBED,
+        API_ENUM_TO_TYPE.BARCODE,
+        API_ENUM_TO_TYPE.CASCADER,
       ];
       return _.filter(contorls, items => !_.includes(typeList, items.type));
     // 电话、证件、邮件
@@ -448,12 +703,11 @@ export function relateDy(conditionType, contorls, control, defaultValue) {
         API_ENUM_TO_TYPE.EMAIL_INPUT, // 邮件
       ];
       return _.filter(contorls, items => _.includes(typeList, items.type));
-    // 数值、金额、公式、自动编号
+    // 数值、金额、公式
     case API_ENUM_TO_TYPE.NUMBER_INPUT:
     case API_ENUM_TO_TYPE.MONEY_AMOUNT_8:
     case API_ENUM_TO_TYPE.MONEY_CN:
     case API_ENUM_TO_TYPE.NEW_FORMULA_31:
-    case API_ENUM_TO_TYPE.AUTOID:
       // 数值、金额、公式和汇总（数值类型）、自动编号
       typeList = [
         API_ENUM_TO_TYPE.MONEY_AMOUNT_8,
@@ -531,14 +785,13 @@ export function relateDy(conditionType, contorls, control, defaultValue) {
         items =>
           _.includes(typeList, items.type) &&
           items.dataSource === control.dataSource &&
-          items.controlId !== control.controlId,
+          (control.containSelf || items.controlId !== control.controlId),
       );
-    // 关联单条
+    // 关联单条、级联选择
     case API_ENUM_TO_TYPE.RELATESHEET:
-      return _.filter(
-        contorls,
-        items => items.type === API_ENUM_TO_TYPE.RELATESHEET && items.dataSource === control.dataSource,
-      );
+    case API_ENUM_TO_TYPE.CASCADER:
+      typeList = [API_ENUM_TO_TYPE.RELATESHEET, API_ENUM_TO_TYPE.CASCADER];
+      return _.filter(contorls, items => _.includes(typeList, items.type) && items.dataSource === control.dataSource);
     // 人员单选 人员多选
     case API_ENUM_TO_TYPE.USER_PICKER:
       // 人员单选、人员多选
@@ -547,6 +800,9 @@ export function relateDy(conditionType, contorls, control, defaultValue) {
     case API_ENUM_TO_TYPE.GROUP_PICKER:
       // 部门
       return _.filter(contorls, items => items.type === API_ENUM_TO_TYPE.GROUP_PICKER);
+    // 组织角色
+    case API_ENUM_TO_TYPE.ORG_ROLE:
+      return _.filter(contorls, items => items.type === API_ENUM_TO_TYPE.ORG_ROLE);
     // 地区，检查框，附件
     case API_ENUM_TO_TYPE.AREA_INPUT_24:
     case API_ENUM_TO_TYPE.AREA_INPUT_19:
@@ -579,7 +835,7 @@ export function getFilter({ control, formData = [] }) {
   } catch (err) {
     return [];
   }
-  conditions = conditions.map(condition => {
+  function handleFormatCondition(condition) {
     if (_.isEmpty(condition.dynamicSource)) {
       return Object.assign({}, condition, {
         values: formatValues(condition.dataType, condition.filterType, condition.values),
@@ -587,6 +843,28 @@ export function getFilter({ control, formData = [] }) {
     } else {
       condition.dateRange = 0;
       return fillConditionValue({ condition, formData, relateControl: control });
+    }
+  }
+  conditions = conditions.map(condition => {
+    if (!(condition.isGroup && condition.groupFilters)) {
+      return handleFormatCondition(condition);
+    } else {
+      const formattedGroupFilters = condition.groupFilters.map(handleFormatCondition);
+      if (_.get(condition, 'groupFilters.0.spliceType') === 1) {
+        // 且 条件
+        return !formattedGroupFilters.filter(f => !f).length
+          ? {
+              ...condition,
+              groupFilters: formattedGroupFilters,
+            }
+          : false;
+      } else {
+        // 或 条件
+        return {
+          ...condition,
+          groupFilters: formattedGroupFilters.filter(_.identity),
+        };
+      }
     }
   });
   const filteredConditions = conditions.filter(_.identity);
@@ -614,7 +892,7 @@ export function fillConditionValue({ condition, formData, relateControl }) {
     },
     {
       controlId: 'caid',
-      controlName: _l('创建人'),
+      controlName: _l('创建者'),
       type: 26,
     },
     {
@@ -739,6 +1017,13 @@ export function fillConditionValue({ condition, formData, relateControl }) {
     } catch (err) {
       condition.values = [];
     }
+  } else if (dataType === 48) {
+    try {
+      const groups = JSON.parse(value);
+      condition.values = groups.map(group => group.organizeId);
+    } catch (err) {
+      condition.values = [];
+    }
   } else if (
     _.includes(
       [API_ENUM_TO_TYPE.AREA_INPUT_24, API_ENUM_TO_TYPE.AREA_INPUT_19, API_ENUM_TO_TYPE.AREA_INPUT_23],
@@ -766,7 +1051,7 @@ export function formatDateValue({ type, value }) {
 
 export const getTabTypeBySelectUser = (control = {}) => {
   const { advancedSetting = {}, sourceControl = {}, controlId } = control;
-  return _.includes(['caid', 'ownerid'], controlId)
+  return _.includes(['caid', 'ownerid', 'daid'], controlId)
     ? 3
     : (advancedSetting.usertype || _.get(sourceControl.advancedSetting || {}, 'usertype')) === '2'
     ? 2

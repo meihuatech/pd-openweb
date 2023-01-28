@@ -8,9 +8,10 @@ import Menu from 'ming-ui/components/Menu';
 import MenuItem from 'ming-ui/components/MenuItem';
 import createDecoratedComponent from 'ming-ui/decorators/createDecoratedComponent';
 import withHoverState from 'ming-ui/decorators/withHoverState';
-import mdFunction from 'mdFunction';
+import { expireDialogAsync } from 'src/components/common/function';
 import Trigger from 'rc-trigger';
 import { NODE_STATUS, PICK_TYPE } from '../constant/enum';
+import _ from 'lodash';
 
 const HoverState = createDecoratedComponent(withHoverState);
 
@@ -55,8 +56,7 @@ export default class KcListHeader extends Component {
   handleAddNodeBtn() {
     const { currentRoot } = this.props;
     if (typeof currentRoot === 'object' && currentRoot.project) {
-      mdFunction
-        .expireDialogAsync(currentRoot.project.projectId)
+      expireDialogAsync(currentRoot.project.projectId)
         .then(() => {
           this.setState({ showAddNodeBtnMenu: true });
         })

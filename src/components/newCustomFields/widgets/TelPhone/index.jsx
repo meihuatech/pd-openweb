@@ -4,6 +4,7 @@ import cx from 'classnames';
 import { Icon } from 'ming-ui';
 import { FROM } from '../../tools/config';
 import { browserIsMobile } from 'src/util';
+import _ from 'lodash';
 
 export default class Widgets extends Component {
   static propTypes = {
@@ -15,11 +16,19 @@ export default class Widgets extends Component {
     from: PropTypes.number,
   };
 
+  state = {
+    originValue: '',
+  };
+
   componentWillReceiveProps(nextProps, nextState) {
     if (this.text && nextProps.value !== this.text.value) {
       this.text.value = nextProps.value || '';
     }
   }
+
+  onFocus = e => {
+    this.setState({ originValue: e.target.value.trim() });
+  };
 
   onChange = event => {
     const value = event.target.value;
@@ -28,6 +37,7 @@ export default class Widgets extends Component {
 
   render() {
     const { disabled, hint, value, onBlur, onChange, from } = this.props;
+    const { originValue } = this.state;
 
     return (
       <Fragment>
@@ -41,12 +51,13 @@ export default class Widgets extends Component {
           disabled={disabled}
           defaultValue={value}
           onChange={this.onChange}
+          onFocus={this.onFocus}
           onBlur={event => {
             if (event.target.value.trim() !== value) {
               onChange(event.target.value.trim());
             }
 
-            onBlur();
+            onBlur(originValue);
           }}
         />
 

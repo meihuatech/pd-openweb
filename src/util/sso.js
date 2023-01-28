@@ -1,4 +1,4 @@
-
+import _ from 'lodash';
 import { getPssId } from 'src/util/pssId';
 
 export const browserIsMobile = () => {
@@ -37,6 +37,7 @@ export const ajax = {
     if (window.md && window.md.global.Account && window.md.global.Account.accountId) {
       xhr.setRequestHeader('AccountId', md.global.Account.accountId);
     }
+    xhr.withCredentials = 'withCredentials' in params ? params.withCredentials : true;
     xhr.onreadystatechange = function () {
       if (xhr.readyState == 4 && (xhr.status == 200 || xhr.status == 304)) {
         var result = JSON.parse(xhr.responseText);
@@ -88,25 +89,25 @@ export const replenishRet = (ret, pc_slide) => {
   const isPcSlide = pc_slide.includes('true');
   const add = url => {
     return url.includes('?') ? `${url}&pc_slide=true` : `${url}?pc_slide=true`;
-  }
+  };
 
   if (!isPcSlide) {
     return url;
   }
 
   if (isHash) {
-    const [ page, hash ] = url.split('#');
+    const [page, hash] = url.split('#');
     const newUrl = add(page);
     return `${newUrl}#${hash}`;
   } else {
     return add(url);
   }
-}
+};
 
 export const checkLogin = () => {
   let isLoing = false;
   ajax.post({
-    url: __api_server__ + 'Login/CheckLogin',
+    url: __api_server__.main + 'Login/CheckLogin',
     data: {},
     async: false,
     succees: result => {
@@ -120,7 +121,7 @@ export const checkLogin = () => {
 
 export const getGlobalMeta = cb => {
   ajax.post({
-    url: __api_server__ + 'Global/GetGlobalMeta',
+    url: __api_server__.main + 'Global/GetGlobalMeta',
     data: {},
     async: true,
     succees: result => {

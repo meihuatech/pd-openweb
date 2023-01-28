@@ -2,11 +2,11 @@ import React, { Component } from 'react';
 import PropTypes from 'prop-types';
 import { autobind } from 'core-decorators';
 import cx from 'classnames';
-import { Dropdown, Icon, Tooltip, Input } from 'ming-ui';
+import { Dropdown, Icon, Input } from 'ming-ui';
 import renderConditionValue from './contents';
 import { getConditionOverrideValue, getFilterTypes } from '../util';
 import { FILTER_RELATION_TYPE, CONTROL_FILTER_WHITELIST, FILTER_CONDITION_TYPE, API_ENUM_TO_TYPE } from '../enum';
-import { Select } from 'antd';
+import { Select, Tooltip } from 'antd';
 import { conditionTypeListData } from 'src/pages/FormSet/components/columnRules/config';
 import { isCustomOptions } from 'src/pages/widgetConfig/widgetSetting/components/DynamicDefaultValue/util';
 import _ from 'lodash';
@@ -79,7 +79,11 @@ export default class Condition extends Component {
     {
       /* // 附件 检查框 地区 地区 地区 为空 不为空  在范围内 不在范围内没有动态筛选 */
     }
-    return from === 'relateSheet' && !_.includes(listType, type) && !_.includes(listControlType, controlType);
+    return (
+      from === 'relateSheet' &&
+      !(!_.includes([27], condition.controlType) && _.includes(listType, type)) &&
+      !_.includes(listControlType, controlType)
+    );
   };
 
   @autobind
@@ -88,7 +92,7 @@ export default class Condition extends Component {
     const overrideValue = getConditionOverrideValue(type, condition);
     onChange(overrideValue);
 
-    if (_.includes(listType, type)) {
+    if (_.includes(listType, type) && !_.includes([27], condition.controlType)) {
       this.setState({ isDynamicsource: false });
     }
   }
@@ -157,8 +161,11 @@ export default class Condition extends Component {
       relateSheetList,
       sourceControlId = '',
       filterDept,
+      isSheetFieldError,
+      filterResigned = true,
+      conditionItemForDynamicStyle,
     } = this.props;
-    let conditionFilterTypes = getFilterTypes(condition.controlType, control, condition.type);
+    let conditionFilterTypes = getFilterTypes(control, condition.type, from);
     if (isRules && control) {
       if (control.type === 29 && control.enumDefault === 2) {
         conditionFilterTypes = conditionFilterTypes.filter(
@@ -195,18 +202,23 @@ export default class Condition extends Component {
     }
     const isDynamicStyle = from === 'relateSheet'; // 动态值选择的特定样式
     const isDynamicValue =
-      !_.includes(listType, condition.type) &&
+      !(!_.includes([27], condition.controlType) && _.includes(listType, condition.type)) &&
       !_.includes(listControlType, condition.controlType) &&
       !isCustomOptions(control);
     return (
-      <div className={cx('conditionItem', { readonly: !canEdit, conditionItemForDynamicStyle: isDynamicStyle })}>
+      <div
+        className={cx('conditionItem', {
+          readonly: !canEdit,
+          conditionItemForDynamicStyle: isDynamicStyle,
+        })}
+      >
         <div
           className={cx('conditionItemHeader', { isbool: conditionGroupType === CONTROL_FILTER_WHITELIST.BOOL.value })}
         >
           {control ? (
             <React.Fragment>
-              <span className="columnName ellipsis" title={control.controlName}>
-                {control.controlName}
+              <span className={cx('columnName ellipsis', { errorName: isSheetFieldError })} title={control.controlName}>
+                {isSheetFieldError ? _l('%0(无效数据)', control.controlName) : control.controlName}
               </span>
               {conditionGroupType !== CONTROL_FILTER_WHITELIST.BOOL.value && (
                 <span className="relation">
@@ -232,7 +244,14 @@ export default class Condition extends Component {
           ) : (
             <div className="deletedColumn">
               <i className="icon icon-info"></i>
-              {_l('该字段已删除')}
+              <Tooltip
+                overlayClassName="deleteHoverTips"
+                overlayInnerStyle={{ padding: '8px 10px' }}
+                title={<span>{_l('ID: %0', condition.controlId)}</span>}
+                placement="bottom"
+              >
+                <span className="Hand">{_l('该字段已删除')}</span>
+              </Tooltip>
               <span
                 className="deleteBtn ThemeHoverColor3"
                 onClick={() => {
@@ -262,6 +281,7 @@ export default class Condition extends Component {
                   () => {
                     onChange({
                       isDynamicsource: value === 1 ? false : true,
+                      ...(value === 1 ? { dynamicSource: [] } : {}), // 切换固定值时清空字段值
                     });
                   },
                 );
@@ -283,6 +303,7 @@ export default class Condition extends Component {
                 appId,
                 sourceControlId,
                 from,
+                filterResigned: filterResigned,
                 conditionType: condition.controlType,
                 isDynamicsource: this.state.isDynamicsource,
                 globalSheetControls: this.props.globalSheetControls,

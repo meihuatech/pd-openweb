@@ -1,13 +1,15 @@
 var Calendar = {};
 
-Calendar.Comm = require('../comm/comm');
-// calendar.CalendarEdit = require('../calendarEdit/calendarEdit.js');
-var calendarEdit = require('../calendarDetail').default;
-var afterRefreshOp = require('../calendarDetail/lib/afterRefreshOp').default;
-var recurCalendarUpdate = require('../calendarDetail/lib/recurCalendarUpdateDialog').default;
+import Comm from '../comm/comm';
+Calendar.Comm = Comm;
+import calendarEdit from '../calendarDetail';
+import afterRefreshOp from '../calendarDetail/lib/afterRefreshOp';
+import recurCalendarUpdate from '../calendarDetail/lib/recurCalendarUpdateDialog';
 import './calendar.less';
-import 'createCalendar';
-var moment = require('moment');
+import 'src/components/createCalendar/createCalendar';
+import listHtml from './tpl/list.html';
+import calendarAjax from 'src/api/calendar';
+import moment from 'moment';
 var CurrentDate;
 
 const eventLimitNum = () => {
@@ -79,7 +81,7 @@ Calendar.Method = {
         day: '', //
       },
       events: {
-        url: Calendar.Comm.ajaxRequest.getCalendars,
+        url: calendarAjax.getCalendars,
         data: {
           isWorkCalendar: Calendar.Comm.settings.isWorkCalendar,
           isTaskCalendar: Calendar.Comm.settings.isTaskCalendar,
@@ -140,7 +142,7 @@ Calendar.Method = {
         } else {
           var taskID = event.eventID;
           $fcTitle.prepend(
-            '<span class="icon-calendartask" data-endtime="'+ moment(event.end._i).format('HH:mm') +'" style="width:14px;display: inline-block;height:14px;margin: 1px 3px -2px 0;font-size: 16px;vertical-align: top;"> </span>'
+            '<span class="icon-calendartask" data-endtime="' + moment(event.end._i).format('HH:mm') + '" style="width:14px;display: inline-block;height:14px;margin: 1px 3px -2px 0;font-size: 16px;vertical-align: top;"> </span>'
           );
           $(element)
             .find('.fc-resizer')
@@ -309,7 +311,7 @@ Calendar.Method = {
 
         if ($(this).hasClass('fc-list-button')) {
           // 点击的是列表选项
-          window.localStorage.setItem('lastView', 'list');
+          safeLocalStorageSetItem('lastView', 'list');
         } else {
           // 点击的不是列表选项
           $('#calendar').fullCalendar('render');
@@ -324,17 +326,17 @@ Calendar.Method = {
 
         if ($(this).hasClass('fc-agendaDay-button')) {
           $('#calendar').fullCalendar('changeView', 'agendaDay');
-          window.localStorage.setItem('lastView', 'agendaDay');
+          safeLocalStorageSetItem('lastView', 'agendaDay');
         }
 
         if ($(this).hasClass('fc-agendaWeek-button')) {
           $('#calendar').fullCalendar('changeView', 'agendaWeek');
-          window.localStorage.setItem('lastView', 'agendaWeek');
+          safeLocalStorageSetItem('lastView', 'agendaWeek');
         }
 
         if ($(this).hasClass('fc-month-button')) {
           $('#calendar').fullCalendar('changeView', 'month');
-          window.localStorage.setItem('lastView', 'month');
+          safeLocalStorageSetItem('lastView', 'month');
         }
 
         $(this)
@@ -527,7 +529,7 @@ Calendar.Method = {
     } else {
       if (['agendaDay', 'agendaWeek', 'month'].indexOf(lastView) == -1) {
         lastView = 'agendaDay';
-        window.localStorage.setItem('lastView', 'agendaDay');
+        safeLocalStorageSetItem('lastView', 'agendaDay');
       }
 
       parameter.currentView = lastView;
@@ -555,13 +557,13 @@ Calendar.Method = {
 
       $('.fc-toolbar .fc-left h2').append(
         ' <span class="fewWeeks">' +
-          _l(
-            '第%0周',
-            $('#calendar')
-              .fullCalendar('getDate')
-              .weeks()
-          ) +
-          '</span>'
+        _l(
+          '第%0周',
+          $('#calendar')
+            .fullCalendar('getDate')
+            .weeks()
+        ) +
+        '</span>'
       );
     }
 
@@ -675,52 +677,6 @@ Calendar.Method = {
     }
   },
 
-  // 拖拽日程后是否重新发送邀请
-  // afterRefreshOp: function (event, delta, revertFunc) {
-  //   require.async('./../calendarEdit/tpl/ReInvited.html', function (html) {
-  //     var data = {
-  //       cancel: true,
-  //     };
-
-  //     data.isMembers = true;
-
-  //     var dialog = $.DialogLayer({
-  //       dialogBoxID: 'calendarReInviteDialog',
-  //       width: 458,
-  //       container: {
-  //         header: _l('提示'),
-  //         content: Calendar.Comm.doT.template(html)(data),
-  //         noText: '',
-  //         yesText: '',
-  //         noFn: function () {
-  //           revertFunc();
-  //           Calendar.Method.editViewStyle();
-  //         },
-  //       },
-  //       readyFn: function () {
-  //         // 取消
-  //         $('#dropCancel').on('click', function () {
-  //           dialog.closeDialog();
-  //           revertFunc();
-  //           Calendar.editViewStyle();
-  //         });
-
-  //         // 保存
-  //         $('#canelJoinGrop').click(function () {
-  //           Calendar.Method.ajaxAfterDrop(event, delta, revertFunc, false, true);
-  //           dialog.closeDialog();
-  //         });
-
-  //         // 保存并发送
-  //         $('#enterJoinGroup').click(function () {
-  //           Calendar.Method.ajaxAfterDrop(event, delta, revertFunc, true, true);
-  //           dialog.closeDialog();
-  //         });
-  //       },
-  //     });
-  //   });
-  // },
-
   /**
    * 编辑日程时间
    * @param  {Object} event  拖拽事件
@@ -752,7 +708,7 @@ Calendar.Method = {
           .format('YYYY-MM-DD');
       }
 
-      Calendar.Comm.ajaxRequest
+      calendarAjax
         .editCalendarTime({
           calendarID: calendarID,
           start: moment(starDate).toISOString(),
@@ -940,7 +896,7 @@ Calendar.Method = {
 
   // 日程列表加载
   calendarList: function (startDate2, endDate2, isFirst, scrollTop) {
-    Calendar.Comm.ajaxRequest
+    calendarAjax
       .getCalendarList2({
         memberIDs: Calendar.Comm.settings.otherUsers.join(','),
         isPrivateCalendar: Calendar.Comm.settings.isPrivateCalendar,
@@ -953,44 +909,42 @@ Calendar.Method = {
       })
       .then(function (resource) {
         if (resource.msg == '操作成功') {
-          require(['./tpl/list.html'], function (html) {
-            var data = resource.data;
-            data.isFirst = isFirst;
-            data.colorClass = Calendar.Method.colorClass;
-            var queryend = moment(endDate2)
-              .add(1, 'M')
-              .format('YYYY-MM-DD');
-            if (isFirst) {
-              data.queryEnd = queryend;
-              var nowDate = CurrentDate;
-              data.dateTime = _l(' %0年%1月%2日', nowDate.getFullYear(), nowDate.getMonth() + 1, nowDate.getDate());
-              var days = [0, 1, 2, 3, 4, 5, 6].map(function (item) {
-                return moment()
-                  .day(item)
-                  .format('dddd');
-              });
-              data.dateWeek = days[nowDate.getDay()];
-              $('#calendar')
-                .find('.fc-center h2')
-                .html(data.dateTime + ' ' + data.dateWeek);
-              var listHeihgt = $(window).height() - $('.nativeHeaderWrap').height() - 118;
-              $('#calendarList')
-                .html(Calendar.Comm.doT.template(html)(data))
-                .find('.calendarList')
-                .css('height', listHeihgt); // 往页面添加列表元素
-              $('#calendarList .calendarNoList').css('height', listHeihgt + 45);
-              $('.calendarList').scrollTop(scrollTop);
-            } else if (!isFirst) {
-              $('#calendarListMore').attr({ queryend: queryend, restCalCount: data.restCalCount });
-              if (parseInt(data.restCalCount, 10) == 0) {
-                $('.calendarListMore').hide();
-              }
-              $('#calendarListMoreData').html(queryend);
-              if (data.calendars) {
-                $('#calendarList .calendarListMore').before(Calendar.Comm.doT.template(html)(data));
-              }
+          var data = resource.data;
+          data.isFirst = isFirst;
+          data.colorClass = Calendar.Method.colorClass;
+          var queryend = moment(endDate2)
+            .add(1, 'M')
+            .format('YYYY-MM-DD');
+          if (isFirst) {
+            data.queryEnd = queryend;
+            var nowDate = CurrentDate;
+            data.dateTime = _l(' %0年%1月%2日', nowDate.getFullYear(), nowDate.getMonth() + 1, nowDate.getDate());
+            var days = [0, 1, 2, 3, 4, 5, 6].map(function (item) {
+              return moment()
+                .day(item)
+                .format('dddd');
+            });
+            data.dateWeek = days[nowDate.getDay()];
+            $('#calendar')
+              .find('.fc-center h2')
+              .html(data.dateTime + ' ' + data.dateWeek);
+            var listHeihgt = $(window).height() - $('.nativeHeaderWrap').height() - 118;
+            $('#calendarList')
+              .html(Calendar.Comm.doT.template(listHtml)(Object.assign({}, data, { moment })))
+              .find('.calendarList')
+              .css('height', listHeihgt); // 往页面添加列表元素
+            $('#calendarList .calendarNoList').css('height', listHeihgt + 45);
+            $('.calendarList').scrollTop(scrollTop);
+          } else if (!isFirst) {
+            $('#calendarListMore').attr({ queryend: queryend, restCalCount: data.restCalCount });
+            if (parseInt(data.restCalCount, 10) == 0) {
+              $('.calendarListMore').hide();
             }
-          });
+            $('#calendarListMoreData').html(queryend);
+            if (data.calendars) {
+              $('#calendarList .calendarListMore').before(Calendar.Comm.doT.template(listHtml)(Object.assign({}, data, { moment })));
+            }
+          }
         }
       });
   },
@@ -1101,4 +1055,4 @@ Calendar.Export = {
   rememberClickRefresh: Calendar.Method.rememberClickRefresh,
 };
 
-module.exports = Calendar.Export;
+export default Calendar.Export;

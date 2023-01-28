@@ -3,13 +3,15 @@ import account from 'src/api/account';
 import { LoadDiv } from 'ming-ui';
 import EnterpriseCard from './modules/EnterpriseCard';
 import cx from 'classnames';
-import DialogLayer from 'mdDialog';
+import DialogLayer from 'src/components/mdDialog/dialog';
 import ReactDom from 'react-dom';
 import InvitationList from './modules/InvitationList';
 import bindAccount from '../bindAccount/bindAccount';
 import './index.less';
 import ReportRelation from './reportRelation';
 import { getRequest } from 'src/util';
+import registerAjax from 'src/api/register';
+import { upgradeVersionDialog } from 'src/util';
 
 export default class AccountChart extends React.Component {
   constructor(props) {
@@ -31,16 +33,20 @@ export default class AccountChart extends React.Component {
   }
 
   getData() {
-    this.setState({ loading: true });
-    $.when(this.getList(), this.getUntreatAuthList()).then((project, auth) => {
-      this.setState({
-        list: project.list,
-        count: project.allCount,
-        isEnterprise: project.allCount > 0,
-        authCount: auth.count,
-        loading: false,
+    if (getRequest().type === 'enterprise') {
+      this.setState({ loading: true });
+      $.when(this.getList(), this.getUntreatAuthList()).then((project, auth) => {
+        this.setState({
+          list: project.list,
+          count: project.allCount,
+          isEnterprise: project.allCount > 0,
+          authCount: auth.count,
+          loading: false,
+        });
       });
-    });
+    } else {
+      this.setState({ isEnterprise: getRequest().type });
+    }
   }
 
   //列表
@@ -133,7 +139,11 @@ export default class AccountChart extends React.Component {
 
   //创建
   handleCreate() {
-    window.open('/enterpriseRegister.htm?type=create');
+    if ((md.global.Account.superAdmin || (md.global.Config.IsPlatformLocal && md.global.SysSettings.enableCreateProject))) {
+      window.open('/enterpriseRegister.htm?type=create');
+    } else {
+      alert('权限不足，无法创建组织', 3);
+    }
   }
 
   renderContent() {
@@ -187,18 +197,22 @@ export default class AccountChart extends React.Component {
                     {authCount > 99 ? '99+' : authCount}
                   </span>
                 </span>
-                <span className="mRight30 mLeft30 Hand MyInvitation" onClick={() => this.handleCreate()}>{_l('创建组织')}</span>
-                <span className="addBtn Hand" onClick={() => this.handleAdd()}>{_l('加入组织')}</span>
+                <span
+                  className="Font14 Hand mLeft40 mRight30 itemCreat InlineBlock"
+                  onClick={() => this.handleCreate()}
+                >
+                  {_l('创建组织')}
+                </span>
+                <span className="addBtn Hand" onClick={() => this.handleAdd()}>
+                  {_l('加入组织')}
+                </span>
               </span>
             </div>
             <div className="withoutEnterpriseTopBox TxtCenter clearfix">
               <span className="icon-business1 mBottom40 Font56"></span>
               <span>
                 {_l('您还没有加入任何组织，请')}
-                <span
-                  className="Hand mLeft5 mRight5 highLight InlineBlock"
-                  onClick={() => this.handleCreate()}
-                >
+                <span className="Hand mLeft5 mRight5 highLight InlineBlock" onClick={() => this.handleCreate()}>
                   {_l('创建')}
                 </span>
                 {_l('或')}

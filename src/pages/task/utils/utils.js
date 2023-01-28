@@ -1,4 +1,6 @@
+import _ from 'lodash';
 import config from '../config/config';
+import moment from 'moment';
 
 // 请求错误处理
 export const errorMessage = (error) => {
@@ -25,7 +27,7 @@ export const getTaskStorage = (key) => {
 
 // 写入storage
 export const setTaskStorage = (key, data) => {
-  window.localStorage.setItem(md.global.Account.accountId + key, JSON.stringify(data));
+  safeLocalStorageSetItem(md.global.Account.accountId + key, JSON.stringify(data));
 };
 
 // 获取任务状态

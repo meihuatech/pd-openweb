@@ -1,5 +1,5 @@
 import React, { Component } from 'react';
-import Commenter from 'commenter';
+import Commenter from 'src/components/comment/commenter';
 import UserHead from 'src/pages/feed/components/userHead';
 
 export default class WorkSheetCommenter extends Component {
@@ -12,11 +12,13 @@ export default class WorkSheetCommenter extends Component {
       addCallback,
       projectId,
       forReacordDiscussion,
+      entityType,
       atData,
     } = this.props;
     const id = rowId ? worksheetId + '|' + rowId : worksheetId;
     const props = {
       forReacordDiscussion,
+      entityType,
       atData,
       placeholder: window.isPublicApp ? _l('预览模式下，不能参与讨论') : _l('发表评论'),
       activePlaceholder: _l('输入@成员，按Ctrl+Enter快速发布'),

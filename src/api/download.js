@@ -1,4 +1,4 @@
-module.exports = {
+export default {
   /**
   * 获取 外部用户导入模板
   * @param {Object} args 请求参数
@@ -79,6 +79,10 @@ module.exports = {
   /**
   * 导出公司员工列表
   * @param {Object} args 请求参数
+  * @param {string} args.projectId 网络id
+  * @param {string} args.accountIds 账号id
+  * @param {string} args.departmentIds 部门ids
+  * @param {} args.userStatus 用户状态
   * @param {Object} options 配置参数
   * @param {Boolean} options.silent 是否禁止错误弹层
   * @returns {Promise<Boolean, ErrorModel>}
@@ -86,6 +90,72 @@ module.exports = {
    exportProjectUserList: function (args, options = {}) {
      
      return $.api('Download', 'ExportProjectUserList', args, options);
+   },
+  /**
+  * 导出导入用户错误列表
+  * @param {Object} args 请求参数
+  * @param {string} args.projectId 网络id
+  * @param {string} args.dowloadId 下载Id
+  * @param {integer} args.type 下载类型 1 是职位 2是部门
+  * @param {Object} options 配置参数
+  * @param {Boolean} options.silent 是否禁止错误弹层
+  * @returns {Promise<Boolean, ErrorModel>}
+  **/
+   exportImportUserFailList: function (args, options = {}) {
+     
+     return $.api('Download', 'ExportImportUserFailList', args, options);
+   },
+  /**
+  * 编辑导入用户错误列表
+  * @param {Object} args 请求参数
+  * @param {string} args.projectId 网络id
+  * @param {string} args.dowloadId 下载Id
+  * @param {integer} args.type 下载类型 1 是职位 2是部门
+  * @param {Object} options 配置参数
+  * @param {Boolean} options.silent 是否禁止错误弹层
+  * @returns {Promise<Boolean, ErrorModel>}
+  **/
+   exportImportEditUserFailList: function (args, options = {}) {
+     
+     return $.api('Download', 'ExportImportEditUserFailList', args, options);
+   },
+  /**
+  * 导入职位或者部门错误列表
+  * @param {Object} args 请求参数
+  * @param {string} args.projectId 网络id
+  * @param {string} args.dowloadId 下载Id
+  * @param {integer} args.type 下载类型 1 是职位 2是部门
+  * @param {Object} options 配置参数
+  * @param {Boolean} options.silent 是否禁止错误弹层
+  * @returns {Promise<Boolean, ErrorModel>}
+  **/
+   exportFailJobOrDepartmentErrorList: function (args, options = {}) {
+     
+     return $.api('Download', 'ExportFailJobOrDepartmentErrorList', args, options);
+   },
+  /**
+  * 导出公司职位列表
+  * @param {Object} args 请求参数
+  * @param {string} args.projectId 网络id
+  * @param {Object} options 配置参数
+  * @param {Boolean} options.silent 是否禁止错误弹层
+  * @returns {Promise<Boolean, ErrorModel>}
+  **/
+   exportProjectJobList: function (args, options = {}) {
+     
+     return $.api('Download', 'ExportProjectJobList', args, options);
+   },
+  /**
+  * 导出公司部门列表
+  * @param {Object} args 请求参数
+  * @param {string} args.projectId 网络id
+  * @param {Object} options 配置参数
+  * @param {Boolean} options.silent 是否禁止错误弹层
+  * @returns {Promise<Boolean, ErrorModel>}
+  **/
+   exportProjectDepartmentList: function (args, options = {}) {
+     
+     return $.api('Download', 'ExportProjectDepartmentList', args, options);
    },
   /**
   * 下载银行信息
@@ -132,5 +202,49 @@ module.exports = {
    worksheetExcel: function (args, options = {}) {
      options.ajaxOptions = Object.assign({}, options.ajaxOptions, { type: 'GET' }); 
      return $.api('Download', 'WorksheetExcel', args, options);
+   },
+  /**
+  * 导出登录日志
+  * @param {Object} args 请求参数
+  * @param {Object} options 配置参数
+  * @param {Boolean} options.silent 是否禁止错误弹层
+  * @returns {Promise<Boolean, ErrorModel>}
+  **/
+   exportLoginLog: function (args, options = {}) {
+     options.ajaxOptions = Object.assign({}, options.ajaxOptions, { type: 'GET' }); 
+     return $.api('Download', 'ExportLoginLog', args, options);
+   },
+  /**
+  * 下载应用备份文件
+  * @param {Object} args 请求参数
+  * @param {Object} options 配置参数
+  * @param {Boolean} options.silent 是否禁止错误弹层
+  * @returns {Promise<Boolean, ErrorModel>}
+  **/
+   downloadBackupFile: function (args, options = {}) {
+     options.ajaxOptions = Object.assign({}, options.ajaxOptions, { type: 'GET' }); 
+     return $.api('Download', 'DownloadBackupFile', args, options);
+   },
+  /**
+  * 批量下载行记录附件
+  * @param {Object} args 请求参数
+  * @param {string} args.controlId 附件控件id
+  * @param {string} args.worksheetId 工作表id
+  * @param {string} args.rowId 行id
+  * @param {} args.getType
+  * @param {string} args.viewId 视图Id
+  * @param {string} args.appId 应用Id
+  * @param {string} args.instanceId 流程实例id
+  * @param {string} args.workId 运行节点id
+  * @param {boolean} args.getTemplate 是否获取模板
+  * @param {string} args.shareId 分享页获取关联记录iD
+  * @param {boolean} args.checkView 是否验证视图
+  * @param {Object} options 配置参数
+  * @param {Boolean} options.silent 是否禁止错误弹层
+  * @returns {Promise<Boolean, ErrorModel>}
+  **/
+   rowAttachments: function (args, options = {}) {
+     
+     return $.api('Download', 'RowAttachments', args, options);
    },
 };

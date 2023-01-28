@@ -15,6 +15,7 @@ import { getFilter } from 'src/pages/worksheet/common/WorkSheetFilter/util';
 import { WIDGETS_TO_API_TYPE_ENUM } from 'src/pages/widgetConfig/config/widget';
 import Header from './Header';
 import './recordCardListDialog.less';
+import _ from 'lodash';
 
 function getSearchConfig(control) {
   try {
@@ -96,6 +97,12 @@ export default class RecordCardListDialog extends Component {
       (window.isPublicWorksheet ? publicWorksheetAjax : sheetAjax)
         .getWorksheetInfo({ worksheetId: control.dataSource, getTemplate: true })
         .then(data => {
+          window.worksheetControlsCache = {};
+          data.template.controls.forEach(c => {
+            if (c.type === 29) {
+              window.worksheetControlsCache[c.dataSource] = c.relationControls;
+            }
+          });
           this.setState(
             {
               allowAdd: data.allowAdd,
@@ -160,24 +167,17 @@ export default class RecordCardListDialog extends Component {
       sortControls,
       filterControls: filterControls || [],
       fastFilters: quickFilters.map(f =>
-        _.pick(
-          {
-            ...f,
-            values: (f.values || []).map(v => {
-              if (f.dataType === WIDGETS_TO_API_TYPE_ENUM.RELATE_SHEET) {
-                return v.rowid;
-              }
-              if (f.dataType === WIDGETS_TO_API_TYPE_ENUM.USER_PICKER) {
-                return v.accountId;
-              }
-              if (f.dataType === WIDGETS_TO_API_TYPE_ENUM.DEPARTMENT) {
-                return v.departmentId;
-              }
-              return v;
-            }),
-          },
-          ['controlId', 'dataType', 'spliceType', 'filterType', 'dateRange', 'value', 'values', 'minValue', 'maxValue'],
-        ),
+        _.pick(f, [
+          'controlId',
+          'dataType',
+          'spliceType',
+          'filterType',
+          'dateRange',
+          'value',
+          'values',
+          'minValue',
+          'maxValue',
+        ]),
       ),
     };
     if (filterForControlSearch) {
@@ -200,16 +200,24 @@ export default class RecordCardListDialog extends Component {
     this.searchAjax = getFilterRowsPromise(args);
     this.searchAjax.then(res => {
       if (res.resultCode === 1) {
-        this.setState({
-          list: _.uniqBy(
-            list.concat(res.data.filter(record => !_.find(filterRowIds, fid => record.rowid === fid))),
-            'rowid',
-          ),
-          loading: false,
-          loadouted: res.data.length < pageSize,
-          controls: res.template ? res.template.controls : [],
-          worksheet: res.worksheet || {},
-        });
+        const filteredList = _.uniqBy(
+          list.concat(res.data.filter(record => !_.find(filterRowIds, fid => record.rowid === fid))),
+          'rowid',
+        );
+        this.setState(
+          {
+            list: filteredList,
+            loading: false,
+            loadouted: res.data.length < pageSize,
+            controls: res.template ? res.template.controls : [],
+            worksheet: res.worksheet || {},
+          },
+          () => {
+            if (!this.state.loadouted && filteredList.length < 8) {
+              this.loadNext();
+            }
+          },
+        );
       } else {
         this.setState({
           loading: false,
@@ -324,7 +332,7 @@ export default class RecordCardListDialog extends Component {
     const titleControl = _.find(controls, c => c.attribute === 1);
     const allControls = [
       { controlId: 'ownerid', controlName: _l('拥有者'), type: 26 },
-      { controlId: 'caid', controlName: _l('创建人'), type: 26 },
+      { controlId: 'caid', controlName: _l('创建者'), type: 26 },
       { controlId: 'ctime', controlName: _l('创建时间'), type: 16 },
       { controlId: 'utime', controlName: _l('最近修改时间'), type: 16 },
     ].concat(controls);
@@ -352,12 +360,13 @@ export default class RecordCardListDialog extends Component {
       visible,
       multiple,
       allowNewRecord,
-      coverCid,
       defaultRelatedSheet,
       onOk,
       onClose,
       singleConfirm,
       onText,
+      masterRecordRowId,
+      isCharge,
     } = this.props;
     const {
       loading,
@@ -378,9 +387,11 @@ export default class RecordCardListDialog extends Component {
     const searchConfig = control ? getSearchConfig(control) : {};
     const { clickSearch, searchControl } = searchConfig;
     const showList = !control || !(clickSearch && !keyWords);
+    const coverCid = this.props.coverCid || (control && control.coverCid);
     return (
       <Dialog
         className="recordCardListDialog"
+        overlayClosable={false}
         anim={false}
         visible={visible}
         width={window.innerWidth - 20 > 960 ? 960 : window.innerWidth - 20}
@@ -405,7 +416,7 @@ export default class RecordCardListDialog extends Component {
           )}
           {showList ? (
             <React.Fragment>
-              <div className="recordCardListHeader flexRow">
+              <div className="recordCardListHeader flexRow" style={{ padding: coverCid ? '6px 94px 6px 6px' : '6px' }}>
                 {cardControls.slice(0, 7).map((control, i) => {
                   const canSort = this.canSort(control);
                   const isAsc = this.getControlSortStatus(control);
@@ -449,7 +460,8 @@ export default class RecordCardListDialog extends Component {
                         <RecordCard
                           key={i}
                           from={2}
-                          coverCid={coverCid || (control && control.coverCid)}
+                          coverCid={coverCid}
+                          isCharge={isCharge}
                           showControls={cardControls.map(c => c.controlId)}
                           controls={controls}
                           data={record}
@@ -505,6 +517,7 @@ export default class RecordCardListDialog extends Component {
                   viewId={viewId}
                   worksheetId={relateSheetId}
                   projectId={worksheet.projectId}
+                  masterRecordRowId={masterRecordRowId}
                   addType={2}
                   entityName={worksheet.entityName}
                   filterRelateSheetIds={[relateSheetId]}

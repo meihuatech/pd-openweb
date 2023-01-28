@@ -16,56 +16,60 @@ import {
   formatWeekDay,
   sortGrouping
 } from 'src/pages/worksheet/views/GunterView/util';
-import { viewConfig, PERIOD_TYPE } from 'src/pages/worksheet/views/GunterView/config';
+import { PERIOD_TYPE } from 'src/pages/worksheet/views/GunterView/config';
 import { getRequest } from 'src/util';
+import _ from 'lodash';
+import moment from 'moment';
 
 const updatePeriodList = ({ result, parent }) => {
   return (dispatch, getState) => {
     const { gunterView } = getState().sheet;
-    groupingTimeBlock(gunterView.grouping, result);
+    groupingTimeBlock(gunterView.grouping, result, gunterView.viewConfig);
     dispatch({ type: 'CHANGE_GUNTER_GROUPING', data: gunterView.grouping });
     dispatch({ type: 'CHANGE_GUNTER_PERIOD_LIST', data: result });
     dispatch({ type: 'CHANGE_GUNTER_PERIOD_PARENT_LIST', data: parent });
   };
 }
 
-const getExportPeriodList = (type, onlyWorkDay, { startTime, endTime }) => {
+const getExportPeriodList = (type, { startTime, endTime }, viewConfig) => {
+  const { onlyWorkDay } = viewConfig;
   startTime = moment(startTime);
   endTime = moment(endTime);
   if (type === PERIOD_TYPE.day) {
-    return onlyWorkDay ? getWorkDays(startTime.add(-5, 'd'), endTime.add(14, 'd'), null) : getDays(startTime.add(-5, 'd'), endTime.add(14, 'd'), null);
+    return onlyWorkDay ? getWorkDays(startTime.add(-5, 'd'), endTime.add(14, 'd'), null, viewConfig) : getDays(startTime.add(-5, 'd'), endTime.add(14, 'd'), null, viewConfig);
   } else if (type === PERIOD_TYPE.week) {
-    return getWeeks(startTime.startOf('w'), endTime.endOf('w').add(onlyWorkDay ? 4 : 2, 'w'), null);
+    return getWeeks(startTime.startOf('w'), endTime.endOf('w').add(onlyWorkDay ? 4 : 2, 'w'), null, viewConfig);
   } else if (type === PERIOD_TYPE.month) {
-    return getMonths(startTime.startOf('M'), endTime.endOf('M').add(onlyWorkDay ? 4 : 2, 'M'), null);
+    return getMonths(startTime.startOf('M'), endTime.endOf('M').add(onlyWorkDay ? 4 : 2, 'M'), null, viewConfig);
   } else if (type === PERIOD_TYPE.quarter) {
-    return getQuarters(startTime.startOf('Q'), endTime.endOf('Q').add(onlyWorkDay ? 4 : 2, 'Q'), null);
+    return getQuarters(startTime.startOf('Q'), endTime.endOf('Q').add(onlyWorkDay ? 4 : 2, 'Q'), null, viewConfig);
   } else if (type === PERIOD_TYPE.year) {
-    return getYears(startTime.startOf('Y'), endTime.endOf('Y').add(onlyWorkDay ? 2 : 1, 'Y'), null);
+    return getYears(startTime.startOf('Y'), endTime.endOf('Y').add(onlyWorkDay ? 2 : 1, 'Y'), null, viewConfig);
   }
 }
 
 export const fetchRows = () => {
   return (dispatch, getState) => {
-    const { base, controls, views } = getState().sheet;
+    const { base, controls, views, filters } = getState().sheet;
     const { access_token } = getRequest();
     const headersConfig = {
       Authorization: `access_token ${access_token}`
     }
     const view = base.viewId ? _.find(views, { viewId: base.viewId }) : views[0];
-    const selectControl = _.find(controls, item => item.controlId === view.viewControl);
+    const selectControl = _.find(controls, item => item.controlId === (view || {}).viewControl);
     dispatch({ type: 'CHANGE_GUNTER_LOADINNG', data: true });
     sheetAjax.getFilterRows({
       appId: base.appId,
       viewId: base.viewId,
       worksheetId: base.worksheetId,
-      relationWorksheetId: selectControl && selectControl.type === 29 ? selectControl.dataSource : null
-    }, access_token ? { headersConfig } : {}).then(({data, count, resultCode}) => {
+      relationWorksheetId: selectControl && selectControl.type === 29 ? selectControl.dataSource : null,
+      ...filters,
+    }, access_token ? { headersConfig } : {}).then(({ data, count, resultCode }) => {
       const isLocalhost = location.href.includes('localhost');
       const isGunterExport = location.href.includes('gunterExport');
       setTimeout(() => {
         const { base, gunterView } = getState().sheet;
-        const { colorId, onlyWorkDay } = gunterView.viewConfig;
+        const { colorId } = gunterView.viewConfig;
         const grouping = sortGrouping(data.map(item => {
           const rows = (item.rows || []).map(row => {
             return {
@@ -87,16 +91,16 @@ export const fetchRows = () => {
           const gunterViewType = localStorage.getItem('gunterViewType');
           const type = gunterViewType ? Number(gunterViewType) : (calendartype ? Number(calendartype) : PERIOD_TYPE.day);
           dispatch({ type: 'CHANGE_GUNTER_PERIOD_TYPE', data: type });
-          dispatch({ type: 'CHANGE_GUNTER_VIEW_CONFIG', data: changeViewConfig(type) });
-          const periodList = getExportPeriodList(type, onlyWorkDay, getRowsTime(grouping));
-          groupingTimeBlock(grouping, periodList.result);
+          dispatch({ type: 'CHANGE_GUNTER_VIEW_CONFIG', data: changeViewConfig(type, gunterView.viewConfig) });
+          const periodList = getExportPeriodList(type, getRowsTime(grouping), gunterView.viewConfig);
+          groupingTimeBlock(grouping, periodList.result, gunterView.viewConfig);
           dispatch(updatePeriodList(periodList));
         } else {
-          groupingTimeBlock(grouping, gunterView.periodList);
+          groupingTimeBlock(grouping, gunterView.periodList, gunterView.viewConfig);
         }
         dispatch(updateGroupingData(fillRecordsTimeBlockColor(grouping, _.find(controls, { controlId: colorId }))));
         dispatch({ type: 'CHANGE_GUNTER_LOADINNG', data: false });
-        gunterView.chartScroll.enable();
+        gunterView.chartScroll.enable && gunterView.chartScroll.enable();
       }, (isLocalhost || isGunterExport) ? 1000 : 0);
     });
   }
@@ -148,7 +152,7 @@ export const updateGroupingVisible = () => {
   return (dispatch, getState) => {
     const { gunterView } = getState().sheet;
     const value = !gunterView.groupingVisible;
-    localStorage.setItem('gunterGroupingVisible', value);
+    safeLocalStorageSetItem('gunterGroupingVisible', value);
     dispatch({ type: 'CHANGE_GUNTER_GROUPING_VISIBLE', data: value });
   }
 }
@@ -178,7 +182,7 @@ export const destroyGunterView = () => {
 export const refreshGunterView = (time) => {
   return (dispatch, getState) => {
     const { gunterView } = getState().sheet;
-    dispatch(updataPeriodType(gunterView.periodType, time));
+    dispatch(updataPeriodType(gunterView.periodType || PERIOD_TYPE.day, time));
     dispatch({ type: 'CHANGE_GUNTER_IS_REFRESH', data: !gunterView.isRefresh });
   };
 }
@@ -205,22 +209,23 @@ export const zoomGunterView = () => {
 
 export const updataPeriodType = (value, time) => {
   return (dispatch, getState) => {
+    const { gunterView } = getState().sheet;
+    const { viewConfig } = gunterView;
     dispatch({ type: 'CHANGE_GUNTER_PERIOD_TYPE', data: value });
-    dispatch({ type: 'CHANGE_GUNTER_VIEW_CONFIG', data: changeViewConfig(value) });
-    localStorage.setItem('gunterViewType', value);
+    dispatch({ type: 'CHANGE_GUNTER_VIEW_CONFIG', data: changeViewConfig(value, viewConfig) });
+    safeLocalStorageSetItem('gunterViewType', value);
     let data = {};
     if (value === PERIOD_TYPE.day) {
-      const { gunterView } = getState().sheet;
-      const { onlyWorkDay } = gunterView.viewConfig;
-      data = onlyWorkDay ? getWorkDays(null, null, time) : getDays(null, null, time);
+      const { onlyWorkDay } = viewConfig;
+      data = onlyWorkDay ? getWorkDays(null, null, time, viewConfig) : getDays(null, null, time, viewConfig);
     } else if (value === PERIOD_TYPE.week) {
-      data = getWeeks(null, null, time);
+      data = getWeeks(null, null, time, viewConfig);
     } else if (value === PERIOD_TYPE.month) {
-      data = getMonths(null, null, time);
+      data = getMonths(null, null, time, viewConfig);
     } else if (value === PERIOD_TYPE.quarter) {
-      data = getQuarters(null, null, time);
+      data = getQuarters(null, null, time, viewConfig);
     } else if (value === PERIOD_TYPE.year) {
-      data = getYears(null, null, time);
+      data = getYears(null, null, time, viewConfig);
     }
     dispatch(updatePeriodList(data));
   };
@@ -231,9 +236,9 @@ export const updateViewConfig = (view) => {
     const { base, views, gunterView, controls } = getState().sheet;
     const { advancedSetting, viewControl } = base.viewId ? _.find(views, { viewId: base.viewId }) : views[0];
     const { unweekday, begindate, enddate, colorid, calendartype, milepost } = advancedSetting;
-    const titleControl = _.find(controls, { attribute: 1 });
-    const startControl = _.find(controls, { controlId: begindate });
-    const endControl = _.find(controls, { controlId: enddate });
+    const titleControl = _.find(controls, { attribute: 1 }) || {};
+    const startControl = _.find(controls, { controlId: begindate }) || {};
+    const endControl = _.find(controls, { controlId: enddate }) || {};
     const newConfig = {
       ...gunterView.viewConfig,
       periodType: calendartype ? Number(calendartype) : PERIOD_TYPE.day,
@@ -249,11 +254,10 @@ export const updateViewConfig = (view) => {
       endZeroFormat: endControl.type === 16 ? 'YYYY-MM-DD 00:00' : 'YYYY-MM-DD',
       startType: startControl.type,
       endType: endControl.type,
-      startDisable: startControl.fieldPermission === '101',
-      endDisable: endControl.fieldPermission === '101',
-      titleDisable: titleControl.fieldPermission === '101'
+      startDisable: (startControl.fieldPermission || '').split('')[1] === '0' || begindate.includes('time'),
+      endDisable: (endControl.fieldPermission || '').split('')[1] === '0' || enddate.includes('time'),
+      titleDisable: (titleControl.fieldPermission || '').split('')[1] === '0'
     }
-    Object.assign(viewConfig, newConfig);
     dispatch({ type: 'CHANGE_GUNTER_VIEW_CONFIG', data: newConfig });
   }
 }
@@ -291,7 +295,7 @@ export const createRecord = (id, isMilepost = false) => {
       }
       return group;
     });
-    groupingTimeBlock(newGrouping, periodList);
+    groupingTimeBlock(newGrouping, periodList, viewConfig);
     dispatch(updateEditIndex(editIndex));
     dispatch(updateGroupingData(newGrouping));
   }
@@ -313,12 +317,12 @@ export const addRecord = (cell, row) => {
       type: startControl.type,
       value: moment().format('YYYY-MM-DD'),
     }, {
-      controlId: endId,
-      controlName: endControl.controlName,
-      dot: endControl.dot,
-      type: endControl.type,
-      value: moment().format('YYYY-MM-DD'),
-    }];
+        controlId: endId,
+        controlName: endControl.controlName,
+        dot: endControl.dot,
+        type: endControl.type,
+        value: moment().format('YYYY-MM-DD'),
+      }];
 
     if (viewControl && row.groupId !== '-1') {
       const groupControl = _.find(controls, { controlId: viewControl });
@@ -401,10 +405,38 @@ export const removeRecord = (id) => {
             rows: newRows
           };
         });
-        groupingTimeBlock(newGrouping, gunterView.periodList);
+        groupingTimeBlock(newGrouping, gunterView.periodList, gunterView.viewConfig);
         dispatch(updateGroupingData(newGrouping));
       }
     });
+  }
+}
+
+export const updateRecord = (row, updateControls, newItem) => {
+  return (dispatch, getState) => {
+    const { gunterView, controls } = getState().sheet;
+    const { viewConfig } = gunterView;
+
+    const viewControl = updateControls[viewConfig.viewControl];
+    const colorControl = _.find(controls, { controlId: viewConfig.colorId });
+    const record = fillRecordTimeBlockColor({ ...row, ...formatRecordTime(newItem, viewConfig) }, colorControl);
+
+    if (_.isString(viewControl)) {
+      const groupControl = _.find(controls, { controlId: viewConfig.viewControl });
+      let newKey = '';
+      if ([29].includes(groupControl.type)) {
+        const data = JSON.parse(viewControl)[0];
+        newKey = data ? data.sid : '-1';
+      }
+      if ([9, 11].includes(groupControl.type)) {
+        const data = viewControl ? JSON.parse(viewControl)[0] : '-1';
+        newKey = data;
+      }
+      dispatch(moveGroupingRow(record, newKey, row.groupId));
+      dispatch(updateEditIndex(null));
+    } else {
+      dispatch(updateGroupingRow(record, newItem.rowid));
+    }
   }
 }
 
@@ -469,7 +501,7 @@ export const updateRecordTime = (row, start, end) => {
       worksheetId: base.worksheetId,
       newOldControl: newOldControl
     }).then(({ data, resultCode }) => {
-      if (resultCode) {}
+      if (resultCode) { }
     });
   }
 }
@@ -542,7 +574,7 @@ export const updateRecordTitle = (control, record) => {
 export const updateGroupingRow = (data, id) => {
   return (dispatch, getState) => {
     const { gunterView } = getState().sheet;
-    const { grouping, periodList } = gunterView;
+    const { grouping, periodList, viewConfig } = gunterView;
     const { groupId } = data;
     const newGrouping = grouping.map(item => {
       if (groupId && item.key !== groupId) {
@@ -564,7 +596,7 @@ export const updateGroupingRow = (data, id) => {
         rows: newRows
       };
     });
-    groupingTimeBlock(newGrouping, periodList);
+    groupingTimeBlock(newGrouping, periodList, viewConfig);
     dispatch({ type: 'CHANGE_GUNTER_GROUPING', data: newGrouping });
   }
 }
@@ -572,7 +604,7 @@ export const updateGroupingRow = (data, id) => {
 export const moveGroupingRow = (data, newKey, oldKey) => {
   return (dispatch, getState) => {
     const { gunterView } = getState().sheet;
-    const { grouping, periodList } = gunterView;
+    const { grouping, periodList, viewConfig } = gunterView;
     const newGrouping = grouping.map(item => {
       let newRows = item.rows;
       if (item.key === oldKey) {
@@ -590,7 +622,7 @@ export const moveGroupingRow = (data, newKey, oldKey) => {
         rows: newRows
       };
     });
-    groupingTimeBlock(newGrouping, periodList);
+    groupingTimeBlock(newGrouping, periodList, viewConfig);
     dispatch(updateGroupingData(newGrouping));
   }
 }
@@ -624,7 +656,7 @@ export const addNewRecord = (record, addIndex) => {
       }
       return item;
     });
-    groupingTimeBlock(newGrouping, periodList);
+    groupingTimeBlock(newGrouping, periodList, viewConfig);
     dispatch(updateGroupingData(newGrouping));
   }
 }
@@ -675,7 +707,7 @@ export const updateGroupSubVisible = (id) => {
         const subVisible = !item.subVisible;
         const key = `gunter-sub-visible-${id}`;
         if (subVisible) {
-          localStorage.setItem(key, true);
+          safeLocalStorageSetItem(key, true);
         } else {
           localStorage.removeItem(key);
         }
@@ -735,23 +767,23 @@ export const loadLeftPeriodList = () => {
     if (periodType === PERIOD_TYPE.day) {
       const start = moment(startValue).add(-movePeriodCount, 'd');
       const end = moment(endValue);
-      data = onlyWorkDay ? getWorkDays(startValue, null) : getDays(start, end);
+      data = onlyWorkDay ? getWorkDays(startValue, null, null, viewConfig) : getDays(start, end, null, viewConfig);
     } else if (periodType === PERIOD_TYPE.week) {
       const start = moment(startValue).add(-movePeriodCount, 'w');
       const end = moment(endValue);
-      data = getWeeks(start, end);
+      data = getWeeks(start, end, null, viewConfig);
     } else if (periodType === PERIOD_TYPE.month) {
       const start = moment(startValue).add(-movePeriodCount, 'M');
       const end = moment(endValue);
-      data = getMonths(start, end);
+      data = getMonths(start, end, null, viewConfig);
     } else if (periodType === PERIOD_TYPE.quarter) {
       const start = moment(startValue).add(-movePeriodCount, 'Q');
       const end = moment(endValue);
-      data = getQuarters(start, end);
+      data = getQuarters(start, end, null, viewConfig);
     } else if (periodType === PERIOD_TYPE.year) {
       const start = moment(startValue).add(-(movePeriodCount / 2), 'Y');
       const end = moment(endValue);
-      data = getYears(start, end);
+      data = getYears(start, end, null, viewConfig);
     }
 
     dispatch(updatePeriodList(data));
@@ -771,23 +803,23 @@ export const loadRightPeriodList = () => {
     if (periodType === PERIOD_TYPE.day) {
       const start = moment(startValue);
       const end = moment(endValue).add(movePeriodCount, 'd');
-      data = onlyWorkDay ? getWorkDays(null, endValue) : getDays(start, end);
+      data = onlyWorkDay ? getWorkDays(null, endValue, null, viewConfig) : getDays(start, end, null, viewConfig);
     } else if (periodType === PERIOD_TYPE.week) {
       const start = moment(startValue);
       const end = moment(endValue).add(movePeriodCount, 'w');
-      data = getWeeks(start, end);
+      data = getWeeks(start, end, null, viewConfig);
     } else if (periodType === PERIOD_TYPE.month) {
       const start = moment(startValue);
       const end = moment(endValue).add(movePeriodCount, 'M');
-      data = getMonths(start, end);
+      data = getMonths(start, end, null, viewConfig);
     } else if (periodType === PERIOD_TYPE.quarter) {
       const start = moment(startValue);
       const end = moment(endValue).add(movePeriodCount, 'Q');
-      data = getQuarters(start, end);
+      data = getQuarters(start, end, null, viewConfig);
     } else if (periodType === PERIOD_TYPE.year) {
       const start = moment(startValue);
       const end = moment(endValue).add((movePeriodCount / 2), 'Y');
-      data = getYears(start, end);
+      data = getYears(start, end, null, viewConfig);
     }
 
     dispatch(updatePeriodList(data));

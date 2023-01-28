@@ -6,6 +6,7 @@ import Amap from 'ming-ui/components/amap/Amap';
 import MDMap from 'ming-ui/components/amap/MDMap';
 import { FROM } from '../../tools/config';
 import { browserIsMobile } from 'src/util';
+import _ from 'lodash';
 
 const LocationWrap = styled.div`
   .location {
@@ -70,9 +71,10 @@ export default class Widgets extends Component {
   };
 
   render() {
-    const { disabled, value, enumDefault, enumDefault2, advancedSetting, onChange, from } = this.props;
+    const { disabled, value, enumDefault, enumDefault2, advancedSetting, onChange, from, strDefault } = this.props;
     const { visible } = this.state;
     const isMobile = browserIsMobile();
+    const onlyCanAppUse = (typeof strDefault === 'string' ? strDefault : '00')[0] === '1';
     let location = null;
 
     if (value) {
@@ -81,6 +83,18 @@ export default class Widgets extends Component {
       } catch (error) {
         console.log(error);
       }
+    }
+
+    if (onlyCanAppUse && !value) {
+      return (
+        <div className="customLocationDisabled">
+          <span>{_l('请在app中获取当前位置')}</span>
+          <Icon
+            icon={_.includes([FROM.H5_ADD, FROM.H5_EDIT], from) ? 'arrow-right-border' : 'location'}
+            className="Font16"
+          />
+        </div>
+      );
     }
 
     return (
@@ -109,7 +123,7 @@ export default class Widgets extends Component {
             }}
           >
             <div className="location">
-              {!disabled && (
+              {!disabled && !onlyCanAppUse && (
                 <Icon
                   icon="minus-square"
                   className="Font20 pointer Absolute"
@@ -122,7 +136,7 @@ export default class Widgets extends Component {
 
               <div className="flexRow">
                 <div className="flex">
-                  <div className="title">{location.title}</div>
+                  <div className="title">{location.title || _l('位置')}</div>
                   <div className="address">{location.address}</div>
                   {(advancedSetting.showxy === '1' || (!location.title && !location.address)) && (
                     <div className="xy">
@@ -131,7 +145,7 @@ export default class Widgets extends Component {
                     </div>
                   )}
                 </div>
-                {!disabled && !isMobile && (
+                {!disabled && !isMobile && !onlyCanAppUse && (
                   <div className="locationIcon">
                     <span data-tip={_l('重新定位')}>
                       <Icon
@@ -171,7 +185,7 @@ export default class Widgets extends Component {
           <MDMap
             isMobile={isMobile}
             distance={!!enumDefault2 ? parseInt(advancedSetting.distance) : 0}
-            defaultAddress={location ? { lng: location.x, lat: location.y } : null}
+            defaultAddress={location || null}
             onAddressChange={({ lng, lat, address, name }) => {
               onChange(JSON.stringify({ x: lng, y: lat, address, title: name }));
               this.setState({ visible: false });

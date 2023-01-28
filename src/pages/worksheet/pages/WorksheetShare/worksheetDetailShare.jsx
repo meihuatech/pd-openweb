@@ -6,6 +6,7 @@ import EmptyCon from './noData';
 import './worksheetDetailShare.less';
 import { SHARE_TYPE } from './config';
 import { SYS } from 'src/pages/widgetConfig/config/widget.js';
+import _ from 'lodash';
 class WorksheetDetailShare extends React.Component {
   static propTypes = {
     worksheetId: PropTypes.string,
@@ -41,9 +42,28 @@ class WorksheetDetailShare extends React.Component {
       printId,
       getRowRelationRowDetailData,
       viewSet = {},
+      sheetSwitchPermit = [],
+      viewIdForPermit,
     } = this.props;
     const Controls = rowDetail.filter(
-      item => !_.find(viewSet.controls || [], hidedControlId => item.controlId === hidedControlId), // || item.attribute === 1,
+      item =>
+        !_.find(viewSet.controls || [], hidedControlId => item.controlId === hidedControlId) &&
+        !_.includes(
+          [
+            'wfname',
+            'wfstatus',
+            'wfcuaids',
+            'wfrtime',
+            'wfftime',
+            'wfdtime',
+            'wfcaid',
+            'wfctime',
+            'wfcotime',
+            'rowid',
+            'uaid',
+          ],
+          item.controlId,
+        ), // || item.attribute === 1,
     );
     let noRight = relationRowDetailResultCode === 7 && step === SHARE_TYPE.WORKSHEETDRELATIONDETAIL;
     if (!rowDetail) {
@@ -68,6 +88,8 @@ class WorksheetDetailShare extends React.Component {
             <React.Fragment>
               <h1>{titleName || _l('未命名')}</h1>
               <CustomFields
+                sheetSwitchPermit={sheetSwitchPermit}
+                viewId={viewIdForPermit}
                 from={1}
                 data={Controls.filter(
                   o => ![43].includes(o.type) && !['uaid', 'daid'].concat(SYS).includes(o.controlId),

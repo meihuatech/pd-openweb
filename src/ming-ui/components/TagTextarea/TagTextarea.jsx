@@ -5,8 +5,10 @@ import { autobind } from 'core-decorators';
 import CodeMirror from 'codemirror';
 import cx from 'classnames';
 import 'codemirror/lib/codemirror.css';
+import 'codemirror/addon/display/placeholder';
 import { MODE } from './enum';
 import './TagTextarea.less';
+import _ from 'lodash';
 
 export default class TagTextarea extends React.Component {
   static propTypes = {
@@ -48,7 +50,7 @@ export default class TagTextarea extends React.Component {
   }
 
   componentDidMount() {
-    const { defaultValue, height, onFocus, onBlur, getRef, readonly, noCursor } = this.props;
+    const { defaultValue, height, onFocus, onBlur, getRef, readonly, noCursor, placeholder } = this.props;
     getRef(this);
     if (this.cmcon) {
       this.cmObj = CodeMirror(this.cmcon, {
@@ -56,13 +58,14 @@ export default class TagTextarea extends React.Component {
         mode: null,
         lineWrapping: true,
         cursorHeight: noCursor || readonly ? 0 : 1,
+        placeholder: placeholder || null,
       });
       if (height) {
         this.cmObj.setSize('100%', typeof height === 'number' ? `${height}px` : height);
       }
       if (defaultValue) {
         this.updateTextareaView();
-        this.cmObj.execCommand('goDocEnd');
+        // this.cmObj.execCommand('goDocEnd');
       }
       this.cmObj.on('change', this.handleCMChange);
       this.cmObj.on('beforeChange', (cm, obj) => {
@@ -255,7 +258,7 @@ export default class TagTextarea extends React.Component {
 /**
  * getRePosFromStr 正则匹配字段返回位置信息
  * */
-export function getRePosFromStr(text = '', re = /\$.+?\$/g) {
+export function getRePosFromStr(text = '', re = /\$[^ \r\n]+?\$/g) {
   const lines = text.split('\n');
   const positions = [];
   let m;

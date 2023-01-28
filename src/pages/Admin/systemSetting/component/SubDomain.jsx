@@ -4,8 +4,8 @@ import { Dialog, Icon, LoadDiv } from 'ming-ui';
 import projectSettingController from 'src/api/projectSetting';
 import Config from '../../config';
 import './index.less';
-import cx from 'classnames'
-const { admin: {commonInfo: {subDomainName}} } = window.private
+import 'src/components/uploadAttachment/uploadAttachment';
+import _ from 'lodash';
 
 export default class SubDomain extends Component {
   constructor(props) {
@@ -28,7 +28,7 @@ export default class SubDomain extends Component {
     this.setState({ isLoading: true });
     $.when(this.getSubDomainInfo(), this.getSysColor()).then((res, { homeImage }) => {
       const attUrl = `${md.global.FileStoreConfig.pictureHost}ProjectLogo/`;
-      this.images = new Array(5).fill(1).map(function (item, index) {
+      this.images = new Array(5).fill(1).map(function(item, index) {
         return `${attUrl}HomeImage_1${index + 1}.jpg?imageView2/2/w/194/h/52/q/90`;
       });
       console.log(this.images);
@@ -55,35 +55,33 @@ export default class SubDomain extends Component {
     if (_this.state.isUploading) {
       return;
     }
-    require(['uploadAttachment'], function () {
-      $(_this.upload).uploadAttachment({
-        filterExtensions: 'gif,png,jpg,jpeg,bmp',
-        pluploadID: '#upload_file',
-        multiSelection: false,
-        maxTotalSize: 2,
-        folder: 'ProjectLogo',
-        fileNamePrefix: 'HomeImage_',
-        onlyFolder: true,
-        onlyOne: true,
-        styleType: '0',
-        tokenType: 4, //网络logo
-        checkProjectLimitFileSizeUrl: '',
-        filesAdded: function () {
-          _this.setState({ isUploading: true });
-        },
-        callback: function (attachments) {
-          if (attachments.length > 0) {
-            var attachment = attachments[0];
-            var fullFilePath = attachment.serverName + attachment.filePath + attachment.fileName + attachment.fileExt;
-            _this.setState({
-              homeImage: attachment.fileName + attachment.fileExt,
-              currentHomeImage: `${fullFilePath}?imageView2/2/w/192/h/50/q/90`,
-              isCustomImage: _this.testHomeImage(attachment.fileName),
-              isUploading: false,
-            });
-          }
-        },
-      });
+    $(_this.upload).uploadAttachment({
+      filterExtensions: 'gif,png,jpg,jpeg,bmp',
+      pluploadID: '#upload_file',
+      multiSelection: false,
+      maxTotalSize: 2,
+      folder: 'ProjectLogo',
+      fileNamePrefix: 'HomeImage_',
+      onlyFolder: true,
+      onlyOne: true,
+      styleType: '0',
+      tokenType: 4, //网络logo
+      checkProjectLimitFileSizeUrl: '',
+      filesAdded: function () {
+        _this.setState({ isUploading: true });
+      },
+      callback: function (attachments) {
+        if (attachments.length > 0) {
+          var attachment = attachments[0];
+          var fullFilePath = attachment.serverName + attachment.filePath + attachment.fileName + attachment.fileExt;
+          _this.setState({
+            homeImage: attachment.fileName + attachment.fileExt,
+            currentHomeImage: `${fullFilePath}?imageView2/2/w/192/h/50/q/90`,
+            isCustomImage: _this.testHomeImage(attachment.fileName),
+            isUploading: false,
+          });
+        }
+      },
     });
   }
 
@@ -174,7 +172,7 @@ export default class SubDomain extends Component {
             icon="backspace"
             className="Hand mRight18 TxtMiddle Font24 adminHeaderIconColor"
             onClick={() => this.props.setLevel(1)}
-          ></Icon>
+          />
           <span className="Font17">{_l('扩展信息设置')}</span>
         </div>
         <div className="system-set-content">
@@ -202,12 +200,12 @@ export default class SubDomain extends Component {
                 />
               </Dialog>
 
-              <div className={cx("common-info-row", {Hidden: subDomainName})}>
+              <div className="common-info-row">
                 <div className="common-info-row-label">{_l('组织别名')}</div>
                 <div className="common-info-row-content">
                   <div>
                     {domainName ? (
-                      <span className="color_b">{ domainName }</span>
+                      <span className="color_b">{domainName}</span>
                     ) : (
                       <span className="domain-describe">{_l('可通过设置组织别名来实现更多的使用场景（如：LDAP 登录时指定组织）。')}</span>
                     )}
@@ -222,7 +220,7 @@ export default class SubDomain extends Component {
                 </div>
               </div>
 
-              {!subDomainName&&<div className="split-line"></div>}
+              <div className="split-line" />
 
               <div className="common-info-row Font14 Bold">{_l('登录背景图片')}</div>
               <div className="common-info-row mTop40">
@@ -253,13 +251,11 @@ export default class SubDomain extends Component {
                       <span className="icon-upload_pictures Font16 TxtMiddle" />
                     )}
                   </div>
-                  <div className="domain-describe mTop16">
-                    {_l('推荐尺寸 1920*900，2 M以内')}
-                  </div>
+                  <div className="domain-describe mTop16">{_l('推荐尺寸 1920*900，2 M以内')}</div>
                 </div>
               </div>
               <div className="common-info-row pTop54">
-                <div className="common-info-row-label"></div>
+                <div className="common-info-row-label" />
                 <button
                   className="ming Button Button--primary Button--small"
                   type="button"

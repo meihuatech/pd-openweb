@@ -2,29 +2,11 @@ import React, { Component, Fragment } from 'react';
 import { bindActionCreators } from 'redux';
 import { connect } from 'react-redux';
 import GalleryView from 'src/pages/worksheet/views/GalleryView';
-import * as actions from 'src/pages/Mobile/RecordList/redux/actions';
+import * as actions from 'mobile/RecordList/redux/actions';
 import * as galleryActions from 'src/pages/worksheet/redux/actions/galleryview.js';
-import Search from 'src/pages/Mobile/RecordList/QuickFilter/Search';
+import QuickFilterSearch from 'mobile/RecordList/QuickFilter/QuickFilterSearch';
 import { getAdvanceSetting } from 'src/util';
 import { TextTypes } from 'src/pages/worksheet/common/Sheet/QuickFilter/Inputs';
-import styled from 'styled-components';
-import cx from 'classnames';
-import { Icon } from 'ming-ui';
-
-const FilterWrapper = styled.div`
-  background-color: #fff;
-  padding: 10px;
-  border-radius: 50%;
-  width: 34px;
-  height: 34px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-left: 10px;
-  .active {
-    color: #33a3f4 !important;
-  }
-`;
 
 class MobileGalleryView extends Component {
   constructor(props) {
@@ -48,8 +30,10 @@ class MobileGalleryView extends Component {
       this.props.fetch(1);
     }
   };
+
   render() {
-    const { view, worksheetInfo, quickFilter, updateFilters } = this.props;
+    const { view, worksheetInfo, quickFilter, updateFilters, appDetail = {} } = this.props;
+    const { detail } = appDetail;
     let hasGroupFilter = !_.isEmpty(view.navGroup) && view.navGroup.length > 0; // 是否存在分组列表
     const sheetControls = _.get(worksheetInfo, ['template', 'controls']);
     const filters = view.fastFilters
@@ -61,23 +45,20 @@ class MobileGalleryView extends Component {
     const excludeTextFilter = filters.filter(item => !TextTypes.includes(item.dataType));
     const textFilters = filters.filter(item => TextTypes.includes(item.dataType));
     const isFilter = quickFilter.filter(item => !TextTypes.includes(item.dataType)).length;
+
     return (
       <Fragment>
-        <div className="flexRow valignWrapper pLeft12 pRight12 pTop15 pBottom5">
-          <Search textFilters={textFilters} />
-          {!_.isEmpty(excludeTextFilter) && (
-            <FilterWrapper>
-              <Icon
-                icon="filter"
-                className={cx('Font20 Gray_9e', { active: isFilter })}
-                onClick={() => {
-                  const { filters } = this.props;
-                  updateFilters({ visible: !filters.visible });
-                }}
-              />
-            </FilterWrapper>
-          )}
-        </div>
+        <QuickFilterSearch
+          textFilters={textFilters}
+          excludeTextFilter={excludeTextFilter}
+          isFilter={isFilter}
+          filters={this.props.filters}
+          detail={detail}
+          view={view}
+          worksheetInfo={worksheetInfo}
+          sheetControls={sheetControls}
+          updateFilters={updateFilters}
+        />
         <GalleryView {...this.props} hasGroupFilter={hasGroupFilter} />
       </Fragment>
     );
@@ -90,6 +71,7 @@ export default connect(
     quickFilter: state.mobile.quickFilter,
     worksheetInfo: state.mobile.worksheetInfo,
     filters: state.mobile.filters,
+    appDetail: state.mobile.appDetail,
   }),
   dispatch =>
     bindActionCreators(_.pick({ ...actions, ...galleryActions }, ['changeIndex', 'fetch', 'updateFilters']), dispatch),

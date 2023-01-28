@@ -3,7 +3,8 @@ import PropTypes from 'prop-types';
 import Trigger from 'rc-trigger';
 import { Menu, MenuItem, Icon, Dialog } from 'ming-ui';
 import styled from 'styled-components';
-import { copyRow, getWorksheetBtns } from 'src/api/worksheet';
+import worksheetAjax from 'src/api/worksheet';
+import { copyRow } from 'worksheet/controllers/record';
 import { RECORD_INFO_FROM } from 'worksheet/constants/enum';
 import {
   handleShare,
@@ -16,6 +17,7 @@ import CustomButtons from 'worksheet/common/recordInfo/RecordForm/CustomButtons'
 import PrintList from 'worksheet/common/recordInfo/RecordForm/PrintList';
 import { isOpenPermit } from 'src/pages/FormSet/util.js';
 import { permitList } from 'src/pages/FormSet/config.js';
+import _ from 'lodash';
 
 // TODO 完善菜单关闭交互
 
@@ -116,6 +118,7 @@ export default function RecordOperate(props) {
     preMenuItems = [],
     popupContainer,
     from,
+    relateRecordControlId,
     isCharge,
     projectId,
     appId,
@@ -136,16 +139,14 @@ export default function RecordOperate(props) {
     onUpdate = () => {},
     onRemoveRelation = () => {},
     onPopupVisibleChange = () => {},
+    hideRecordInfo = () => {},
   } = props;
   const showShare =
     _.includes(shows, 'share') &&
     isOpenPermit(permitList.recordShareSwitch, sheetSwitchPermit, viewId) &&
     !md.global.Account.isPortal;
   const showCopy =
-    _.includes(shows, 'copy') &&
-    allowCopy &&
-    isOpenPermit(permitList.createButtonSwitch, sheetSwitchPermit) &&
-    isOpenPermit(permitList.recordCopySwitch, sheetSwitchPermit, viewId);
+    _.includes(shows, 'copy') && allowCopy && isOpenPermit(permitList.recordCopySwitch, sheetSwitchPermit, viewId);
   const showPrint = _.includes(shows, 'print');
   const showTask = _.includes(shows, 'task') && !md.global.Account.isPortal;
   const showRemoveRelation = _.includes(shows, 'removeRelation');
@@ -169,7 +170,7 @@ export default function RecordOperate(props) {
   async function loadButtons() {
     try {
       setCustomButtonLoading(true);
-      const newButtons = await getWorksheetBtns({
+      const newButtons = await worksheetAjax.getWorksheetBtns({
         appId,
         worksheetId,
         viewId,
@@ -311,28 +312,17 @@ export default function RecordOperate(props) {
                   Dialog.confirm({
                     title: _l('您确认复制这条记录吗？'),
                     onOk: () => {
-                      copyRow({
-                        worksheetId,
-                        viewId,
-                        rowIds: [recordId],
-                      })
-                        .then(res => {
-                          if (res && res.resultCode === 1) {
-                            alert(_l('复制成功'));
-                            onCopySuccess(res.data, recordId);
-                          } else if (res && res.resultCode === 7) {
-                            alert(_l('复制失败，权限不足！'), 3);
-                          } else if (res && res.resultCode === 9) {
-                            alert(_l('复制失败，超过最大数量！'), 3);
-                          } else if (res && res.resultCode === 11) {
-                            alert(_l('复制失败，当前表存在唯一字段'), 3);
-                          } else {
-                            alert(_l('复制失败！'), 3);
-                          }
-                        })
-                        .fail(err => {
-                          alert(_l('复制失败！'), 3);
-                        });
+                      copyRow(
+                        {
+                          worksheetId,
+                          viewId,
+                          rowIds: [recordId],
+                          relateRecordControlId,
+                        },
+                        newRows => {
+                          onCopySuccess(newRows[0], recordId);
+                        },
+                      );
                     },
                   });
                 }
@@ -397,7 +387,7 @@ export default function RecordOperate(props) {
                     onDelete();
                   } else {
                     try {
-                      await deleteRecord({ worksheetId, recordId });
+                      await deleteRecord({ worksheetId, recordId, deleteType: from });
                       alert(_l('删除成功'));
                       onDeleteSuccess({ appId, worksheetId, viewId, recordId });
                     } catch (err) {
@@ -439,7 +429,10 @@ export default function RecordOperate(props) {
             <MenuItemWrap
               className="openCustomWidget"
               icon={<Icon icon="settings" className="Font17 mLeft5" />}
-              onClick={() => handleCustomWidget(worksheetId)}
+              onClick={() => {
+                hideRecordInfo();
+                handleCustomWidget(worksheetId);
+              }}
             >
               {_l('编辑表单')}
             </MenuItemWrap>

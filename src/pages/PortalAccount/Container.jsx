@@ -2,23 +2,27 @@ import React, { useState, useEffect, useRef } from 'react';
 import styled from 'styled-components';
 import cx from 'classnames';
 import { browserIsMobile } from 'src/util';
-import { LoadDiv, Icon } from 'ming-ui';
-import { sendVerifyCode, login } from 'src/api/externalPortal';
-import { statusList, accountResultAction } from './util';
-import Message from 'src/pages/account/components/message';
-import captcha from 'src/components/captcha';
+import { Icon } from 'ming-ui';
+import { statusList } from './util';
 import SvgIcon from 'src/components/SvgIcon';
+import LoginContainer from './LoginContainer';
+import { FixedContent } from 'src/pages/PortalAccount/style';
 
 const Wrap = styled.div`
   .Hide {
     display: none;
+  }
+  .back {
+    &:hover {
+      color: #2196f3 !important;
+    }
   }
   img {
     max-width: 100%;
     object-fit: contain;
   }
   border-radius: 4px;
-  padding: 64px 48px;
+  padding: 64px;
   box-sizing: border-box;
   width: 50%;
   max-width: 840px;
@@ -94,7 +98,7 @@ const Wrap = styled.div`
     text-align: center;
   }
   .pageTitle {
-    margin-bottom: 32px;
+    margin-bottom: 24px;
     display: -webkit-box;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
@@ -114,8 +118,12 @@ const Wrap = styled.div`
     &:hover {
       background: #42a5f5;
     }
-    &.sending {
-      background: #f5f5f5;
+    // &.sending {
+    //   background: #f5f5f5;
+    // }
+    &.disable {
+      cursor: default;
+      background: #bdbdbd !important;
     }
   }
   &.isR {
@@ -127,116 +135,19 @@ const Wrap = styled.div`
     }
   }
 `;
+
 export default function Container(props) {
   const {
     logoImageUrl,
     pageMode = 3,
     pageTitle = '',
-    appId = '',
-    state,
-    setState,
-    setAccount,
-    projectId,
     status,
-    setStatus,
-    allowUserType,
     appColor = '#00bcd4',
     appLogoUrl = 'https://fp1.mingdaoyun.cn/customIcon/0_lego.svg',
     isErrUrl,
-    setAccountId,
+    noticeScope = {},
+    fixInfo = {},
   } = props;
-  const [sending, setSending] = useState(false); //点击登录
-  const [paramLogin, setParam] = useState({
-    account: '',
-    verifyCodeType: '',
-    ticket: '',
-    randStr: '',
-    captchaType: md.staticglobal.getCaptchaType(),
-  });
-  const [dataLogin, setData] = useState({
-    dialCode: '',
-    warnningData: [],
-    emailOrTel: '', // 邮箱或手机
-    verifyCode: '', // 验证码
-  });
-
-  //确认逻辑
-  const sendCode = () => {
-    if (sending) {
-      return;
-    }
-    const { dialCode, emailOrTel, verifyCode } = dataLogin;
-    if (!emailOrTel) {
-      setData({
-        ...dataLogin,
-        warnningData: [{ tipDom: '#txtMobilePhone', warnningText: _l('请输入手机号！') }],
-      });
-      return;
-    }
-    if (!verifyCode) {
-      setData({
-        ...dataLogin,
-        warnningData: [{ tipDom: '.txtLoginCode', warnningText: _l('请输入验证码！') }],
-      });
-      return;
-    }
-    setSending(true);
-    loginFn();
-  };
-
-  const doCaptchaFn = () => {
-    let callback = (res = {}) => {
-      if (res.ret !== 0) {
-        return;
-      }
-      loginFn(
-        Object.assign({}, res, {
-          captchaType: md.staticglobal.getCaptchaType(),
-        }),
-      );
-    };
-    if (md.staticglobal.getCaptchaType() === 1) {
-      new captcha(callback);
-    } else {
-      new TencentCaptcha(md.global.Config.CaptchaAppId.toString(), callback).show();
-    }
-  };
-
-  const loginFn = (resRet = {}) => {
-    if (sending) {
-      return;
-    }
-    const { dialCode, emailOrTel, verifyCode } = dataLogin;
-    const { ticket, randstr } = resRet;
-    login({
-      ...paramLogin,
-      account: dialCode + emailOrTel,
-      verifyCode,
-      captchaType: md.staticglobal.getCaptchaType(),
-      ticket,
-      randStr: randstr,
-      appId, //应用ID
-      state, // 微信登录成功之后返回的临时状态码 用于反向存储微信相关信息，具备有效期
-    }).then(res => {
-      const { accountResult, sessionId, accountId, appId, projectId, state } = res;
-      setState(res.state);
-      accountId && setAccountId(accountId);
-      setAccount(dialCode + emailOrTel);
-      setSending(false);
-      if ([21, 22].includes(accountResult)) {
-        //频繁登录或者图形验证码错误需要重新验证
-        //需要图形验证
-        doCaptchaFn();
-      } else {
-        if (statusList.includes(accountResult)) {
-          // _l('需要收集信息');
-          setStatus(accountResult);
-        } else {
-          accountResultAction(res);
-        }
-      }
-    });
-  };
 
   const getWaring = status => {
     switch (status) {
@@ -258,8 +169,6 @@ export default function Container(props) {
         return _l('你访问的链接错误!');
       case 10:
         return _l('当前应用不存在');
-      case 14:
-        return _l('当前应用维护中');
     }
   };
 
@@ -271,8 +180,12 @@ export default function Container(props) {
         isCenterCon: pageMode !== 6,
         isR: pageMode === 6 && !browserIsMobile(),
         isM: browserIsMobile(),
-        isTipCon: statusList.includes(status),
+        isTipCon: statusList.filter(o => o !== 14).includes(status),
       })}
+      style={{
+        maxHeight: pageMode === 3 && [14].includes(status) ? document.documentElement.clientHeight - 64 : 'auto',
+        overflow: pageMode === 3 && [14].includes(status) ? 'auto' : 'initial',
+      }}
     >
       <div>
         {logoImageUrl ? (
@@ -285,7 +198,6 @@ export default function Container(props) {
           ''
         )}
         <p className="Font26 Gray mAll0 mTop20 Bold pageTitle" style={{ WebkitBoxOrient: 'vertical' }}>
-          {/* {[10000, 20000].includes(status) ? '' : pageTitle} */}
           {pageTitle}
         </p>
         {status === 3 ? (
@@ -295,7 +207,9 @@ export default function Container(props) {
             </div>
             <p className="txtConsole">{_l('注册成功')}</p>
             <p className="txtConsole Font15 mTop6">{_l('请耐心等待运营方审核')}</p>
-            <p className="txtConsole Font15">{_l('会通过短信告知您审核结果')}</p>
+            {noticeScope.exAccountSmsNotice && (
+              <p className="txtConsole Font15">{_l('会通过短信/邮件告知您审核结果')}</p>
+            )}
           </div>
         ) : status === 4 ? (
           <div className="tipConBox" style={tipStyle}>
@@ -303,17 +217,25 @@ export default function Container(props) {
               <Icon type="knowledge-message" className="Red" />
             </div>
             <p className="txtConsole">{_l('审核未通过')}</p>
-            {/* <p className="ThemeColor3 TxtCenter Hand mTop10" onClick={() => {}}>
-                {_l('重新审核')}
-              </p> */}
           </div>
-        ) : [2, 10, 11, 12, 13, 14, 10000, 20000].includes(status) ? (
+        ) : [2, 10, 11, 12, 13, 10000, 20000].includes(status) ? (
           <div className="tipConBox" style={tipStyle}>
             <div className="txtIcon">
               <Icon type="knowledge-message" className="Red" />
             </div>
             <p className="txtConsole">{getWaring(status)}</p>
           </div>
+        ) : [14].includes(status) ? (
+          <FixedContent>
+            <div className="iconInfo mBottom25">
+              <Icon className="Font48" icon="setting" style={{ color: '#fd7558' }} />
+            </div>
+            <div className="Font18 mBottom20 fixeding">{_l('应用维护中...')}</div>
+            <div className="fixedInfo mBottom20">
+              {_l('该应用被%0设置为维护中状态,暂停访问', (fixInfo.fixAccount || {}).fullName || '')}
+            </div>
+            <div className="fixRemark">{fixInfo.fixRemark}</div>
+          </FixedContent>
         ) : (
           <div
             className="messageConBox"
@@ -321,36 +243,7 @@ export default function Container(props) {
               pageMode === 6 && !browserIsMobile() ? { marginTop: document.documentElement.clientHeight / 5 - 32 } : {}
             }
           >
-            <Message
-              type="portalLogin"
-              keys={['tel', 'code']}
-              openLDAP={false}
-              dataList={dataLogin}
-              isNetwork={false}
-              setDataFn={data => {
-                setData({ ...dataLogin, ...data });
-              }}
-              appId={appId}
-              sendVerifyCode={sendVerifyCode}
-              nextHtml={isValid => {
-                return (
-                  <React.Fragment>
-                    <div
-                      className={cx('loginBtn mTop32 TxtCenter Hand', sending)}
-                      onClick={() => {
-                        if (isValid()) {
-                          sendCode();
-                        }
-                      }}
-                    >
-                      {allowUserType === 9 ? _l('登录') : _l('登录/注册')}
-                      {sending ? '...' : ''}
-                    </div>
-                    <p className="txt mTop30 TxtCenter Gray">{allowUserType === 9 && _l('本应用不开放注册')}</p>
-                  </React.Fragment>
-                );
-              }}
-            />
+            <LoginContainer {...props} />
           </div>
         )}
       </div>

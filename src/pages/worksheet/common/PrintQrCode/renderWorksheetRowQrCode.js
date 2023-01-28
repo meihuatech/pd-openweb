@@ -2,8 +2,8 @@ import PDFObject from 'pdfobject';
 import { autobind } from 'core-decorators';
 import genQrDataurl, { QRErrorCorrectLevel } from './genQrDataurl';
 import { A4_OPTS, QRPRINT_OPTS, A4_SIZE, QRPRINT_SIZES } from './printConfig';
-
-const jsPDF = require('jspdf');
+import jsPDF from 'jspdf';
+import _ from 'lodash';
 
 function cutText(text, fontSize, width) {
   fontSize = fontSize || 12;
@@ -102,6 +102,10 @@ function genTextCanvas({
       ctx.fillText(t, isCenter ? width / 2 : 0, fontSize * lineHeight * i + 2);
     }
   });
+  if (_.isEmpty(texts)) {
+    // canvas 为空时 添加到 pdf 会报错
+    canvas.height = 1;
+  }
   return canvas;
 }
 function getQrDataurl(

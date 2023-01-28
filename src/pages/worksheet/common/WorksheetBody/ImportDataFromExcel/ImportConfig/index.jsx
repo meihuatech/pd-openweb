@@ -5,6 +5,7 @@ import { Button, Icon, Radio, Dialog, ScrollView, Tooltip } from 'ming-ui';
 import createDecoratedComponent from 'ming-ui/decorators/createDecoratedComponent';
 import withClickAway from 'ming-ui/decorators/withClickAway';
 import './index.less';
+import _ from 'lodash';
 
 const titleLineArr = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 const ClickAwayable = createDecoratedComponent(withClickAway);
@@ -39,11 +40,7 @@ export default class ImportConfig extends Component {
       if (rowItem.rowNumber < 10) {
         let validCells = rowItem.cells;
         if (_.findIndex(rowItem.cells, item => !item.value) > -1) {
-          validCells = _.slice(
-            rowItem.cells,
-            0,
-            _.findIndex(rowItem.cells, item => !item.value),
-          );
+          validCells = _.slice(rowItem.cells, 0, _.findIndex(rowItem.cells, item => !item.value));
         }
         if (rowItem.cells[0].value && validCells.length > maxValidColumn) {
           maxValidColumn = validCells.length;
@@ -51,18 +48,29 @@ export default class ImportConfig extends Component {
         }
       }
     });
-    const selectRow = Object.assign({}, this.props.fileList[0].rows[maxColumnNumber]);
-    if (_.findIndex(this.props.fileList[0].rows[maxColumnNumber].cells, item => !item.value) > -1) {
+
+    const defaultSelectImportSheetIndex = _.findIndex(
+      this.props.fileList,
+      item => item.state && item.total <= md.global.SysSettings.worksheetExcelImportDataLimitCount,
+    );
+    const selectRow = Object.assign(
+      {},
+      defaultSelectImportSheetIndex !== -1
+        ? this.props.fileList[defaultSelectImportSheetIndex].rows[maxColumnNumber]
+        : {},
+    );
+
+    if (
+      defaultSelectImportSheetIndex !== -1 &&
+      _.findIndex(this.props.fileList[defaultSelectImportSheetIndex].rows[maxColumnNumber].cells, item => !item.value) >
+        -1
+    ) {
       selectRow.cells = _.slice(
         selectRow.cells,
         0,
         _.findIndex(this.props.fileList[0].rows[maxColumnNumber].cells, item => !item.value),
-      );
+      ).filter(item => item.value);
     }
-    const defaultSelectImportSheetIndex = _.findIndex(
-      this.props.fileList,
-      item => item.state && item.total < md.global.SysSettings.worksheetExcelImportDataLimitCount,
-    );
     this.state = {
       fileList: props.fileList || [],
       titleLine: maxColumnNumber + 1,
@@ -83,11 +91,7 @@ export default class ImportConfig extends Component {
       if (rowItem.rowNumber < 10) {
         let validCells = rowItem.cells;
         if (_.findIndex(rowItem.cells, item => !item.value) > -1) {
-          validCells = _.slice(
-            rowItem.cells,
-            0,
-            _.findIndex(rowItem.cells, item => !item.value),
-          );
+          validCells = _.slice(rowItem.cells, 0, _.findIndex(rowItem.cells, item => !item.value));
         }
         if (rowItem.cells[0].value && validCells.length > maxValidColumn) {
           maxValidColumn = validCells.length;
@@ -122,11 +126,7 @@ export default class ImportConfig extends Component {
               const rowItem = selectSheet.rows[item - 1];
               let selectCells = Object.assign({}, rowItem).cells;
               if (_.findIndex(rowItem.cells, item => !item.value) > -1) {
-                selectCells = _.slice(
-                  rowItem.cells,
-                  0,
-                  _.findIndex(rowItem.cells, item => !item.value),
-                );
+                selectCells = _.slice(rowItem.cells, 0, _.findIndex(rowItem.cells, item => !item.value));
               }
               const selectRow = {
                 ...rowItem,
@@ -145,11 +145,7 @@ export default class ImportConfig extends Component {
   selectLine(rowItem, rowIndex) {
     let selectCells = Object.assign({}, rowItem).cells;
     if (_.findIndex(rowItem.cells, item => !item.value) > -1) {
-      selectCells = _.slice(
-        rowItem.cells,
-        0,
-        _.findIndex(rowItem.cells, item => !item.value),
-      );
+      selectCells = _.slice(rowItem.cells, 0, _.findIndex(rowItem.cells, item => !item.value));
     }
     const selectRow = {
       ...rowItem,
@@ -174,7 +170,7 @@ export default class ImportConfig extends Component {
         }
         popupPlacement="bottom"
       >
-        <span className="icon-info_outline Font18 Gray_bd"></span>
+        <span className="icon-info_outline Font18 Gray_bd" />
       </Tooltip>
     );
   }
@@ -182,7 +178,7 @@ export default class ImportConfig extends Component {
   render() {
     const { fileName, fileList, hideImportConfig } = this.props;
     const { importSheetIndex, titleLine, selectRow, showCancelDialog, hoverIndex } = this.state;
-    const selectSheet = _.find(fileList, item => item.sheetNumber === importSheetIndex);
+    const selectSheet = _.find(fileList, item => item.sheetNumber === importSheetIndex) || {};
 
     // 过滤掉空行
     const emptyRows = (selectSheet.rows || []).filter(item => !(item.cells || []).some(cell => cell.value));
@@ -227,7 +223,7 @@ export default class ImportConfig extends Component {
                         disabled={disabled}
                         size="small"
                         onClick={this.onChange}
-                      ></Radio>
+                      />
                     );
                   })}
                 </ScrollView>

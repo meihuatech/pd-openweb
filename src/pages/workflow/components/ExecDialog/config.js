@@ -2,7 +2,7 @@ export const ACTION_TYPES = {
   0: {
     id: 'default',
     icon: {
-      1: 'worksheet',
+      1: 'table',
       5: 'hr_surplus',
       6: 'hr_time',
       7: 'workflow_webhook',
@@ -23,10 +23,15 @@ export const ACTION_TYPES = {
 };
 
 export const ACTION_LIST = {
-  3: { id: 'revoke', text: _l('撤回') },
-  4: { id: 'pass', text: _l('通过') },
-  5: { id: 'overrule', text: _l('否决') },
-  9: { id: 'submit', text: _l('提交') },
+  3: { id: 'revoke', text: _l('撤回'), sort: 0 },
+  4: { id: 'pass', text: _l('通过'), sort: 1 },
+  5: { id: 'overrule', text: _l('否决'), sort: 2 },
+  6: { id: 'transferApprove', text: _l('转审'), sort: 3 },
+  7: { id: 'sign', text: _l('加签'), sort: 4 },
+  9: { id: 'submit', text: _l('提交'), sort: 5 },
+  10: { id: 'transfer', text: _l('转交'), sort: 6 },
+  13: { id: 'stash', text: _l('暂存'), icon: 'save1', sort: -1 },
+  18: { id: 'urge', text: _l('催办'), sort: 7 },
 };
 
 export const OPERATION_TYPE = {
@@ -34,10 +39,14 @@ export const OPERATION_TYPE = {
 };
 
 export const OPERATION_LIST = {
+  12: { id: 'print', text: _l('打印'), icon: 'print' },
+  16: { id: 'addApprove', text: _l('添加审批人'), icon: 'group_add1' },
+};
+
+export const MOBILE_OPERATION_LIST = {
   6: { id: 'transferApprove', text: _l('转审'), icon: 'swap_horiz' },
   7: { id: 'sign', text: _l('加签'), icon: 'countersign' },
   10: { id: 'transfer', text: _l('转交'), icon: 'sp_post_exchange_white' },
-  12: { id: 'print', text: _l('打印'), icon: 'print' },
   16: { id: 'addApprove', text: _l('添加审批人'), icon: 'group_add1' },
 };
 
@@ -85,6 +94,7 @@ export const STATUS_ERROR_MESSAGE = {
   30002: _l('当前流程已关闭'),
   30003: _l('当前内容已失效'),
   30004: _l('当前节点已删除'),
+  30006: _l('当前用户无权限查看'),
   40007: _l('被发起人撤回'),
 };
 

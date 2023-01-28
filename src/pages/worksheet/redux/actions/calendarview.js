@@ -1,16 +1,20 @@
 import sheetAjax from 'src/api/worksheet';
 import { getAdvanceSetting, browserIsMobile } from 'src/util';
-import { setDataFormat } from 'src/pages/worksheet/views/CalendarView/util';
+import { setDataFormat, getShowExternalData } from 'src/pages/worksheet/views/CalendarView/util';
 import { getCalendarViewType } from 'src/pages/worksheet/views/CalendarView/util';
-import { isTimeStyle, getTimeControls } from 'src/pages/worksheet/views/CalendarView/util';
+import { isTimeStyle, getTimeControls, getCalendartypeData } from 'src/pages/worksheet/views/CalendarView/util';
+import _ from 'lodash';
+import moment from 'moment';
 let getRows;
+let getRowsIds = [];
 export const fetch = searchArgs => {
   return (dispatch, getState) => {
     const { base, filters } = getState().sheet;
     const { worksheetId, viewId, appId, chartId } = base;
-    if (getRows) {
+    if (getRows && getRowsIds.includes(viewId)) {
       getRows.abort();
     }
+    getRowsIds.push(viewId);
     getRows = sheetAjax.getFilterRows({
       appId,
       viewId: viewId,
@@ -24,6 +28,7 @@ export const fetch = searchArgs => {
         'keyWords',
         'searchType',
         'filterControls',
+        'filtersGroup',
         'isUnRead',
         'kanbanKey',
         'layer',
@@ -32,6 +37,7 @@ export const fetch = searchArgs => {
       ]),
     });
     getRows.then(res => {
+      getRowsIds = getFilterRowsIds.filter(o => o !== viewId);
       dispatch({ type: 'CHANGE_CALENDARLIST', data: res.data, resultCode: res.resultCode });
       dispatch(updataEditable(true));
       dispatch(updateFormatData());
@@ -44,16 +50,19 @@ export function updateFormatData() {
     const { views = [], base = {}, controls, calendarview = {} } = getState().sheet;
     const { viewId } = base;
     const { calendar = [], calendarData = {} } = calendarview;
-    let list = calendar.map(item => {
-      return setDataFormat({
+    let list = [];
+    calendar.map(item => {
+      let data = setDataFormat({
         ...item,
+        // allowNoBegin: true, //允许开始时间为空的数据
         worksheetControls: controls,
         currentView: views.find(o => o.viewId === viewId) || {},
         calendarData,
       });
+      list.push(...data);
     });
     dispatch({ type: 'CHANGE_CALENDAR_FORMAT', data: list });
-    dispatch({ type: 'CHANGE_MOBILE_CURRENTDATA', data: list})
+    dispatch({ type: 'CHANGE_MOBILE_CURRENTDATA', data: list });
   };
 }
 
@@ -74,13 +83,18 @@ export const refresh = () => {
 
 export const fetchExternal = () => {
   return (dispatch, getState) => {
-    let show = !!window.localStorage.getItem('CalendarShowExternal');
-    let isMobile = browserIsMobile()
-    if (!show && !isMobile) {
+    const { base = {} } = getState().sheet;
+    const { worksheetId, viewId } = base;
+    let isMobile = browserIsMobile();
+    const initType = dispatch(getInitType());
+    if (
+      !(getShowExternalData() || []).includes(`${worksheetId}-${viewId}`) &&
+      !isMobile &&
+      'eventNoScheduled' !== initType
+    ) {
       dispatch(getEventScheduledData('eventNoScheduled'));
-    } else {
-      dispatch(getEventScheduledData(dispatch(getInitType())));
     }
+    dispatch(getEventScheduledData(initType));
   };
 };
 
@@ -105,7 +119,7 @@ const formatData = arr => {
       let res = [];
       res.push(oldData);
       newArr.push({
-        date: oldData.start,
+        date: moment(oldData.start).format('YYYY-MM-DD'),
         res: res,
       });
     } else {
@@ -115,20 +129,18 @@ const formatData = arr => {
   return newArr;
 };
 
-// 新数据的时间和老数据的时间重合的情况下，合并该重合的时间数据，否则直接拼接数据
-const getSameDay = (arrB = [], arrT = []) => {
-  if (arrT.length > 0 && moment((arrB[0] || []).date).isSame((_.last(arrT) || []).date, 'day')) {
-    return _.dropRight(arrT)
-      .concat([
-        {
-          date: arrB[0].date,
-          res: arrB[0].res.concat(arrT[arrT.length - 1].res),
-        },
-      ])
-      .concat(_.drop(arrB));
-  } else {
-    return arrT.concat(arrB);
-  }
+//整合两组已排期的数据
+const getCardByDays = (arrB = [], arrT = []) => {
+  let newList = arrT.concat(arrB);
+  let newListKeys = _.uniq(newList.map(o => o.date));
+  let list = [];
+  newListKeys.map(o => {
+    list.push({
+      date: o,
+      res: _.flatMap(newList.filter(item => item.date === o).map(o => o.res)),
+    });
+  });
+  return list;
 };
 
 const dataResort = obj => {
@@ -157,9 +169,9 @@ const dataResort = obj => {
       newArr = arr;
     }
     if (isUp) {
-      newArr = getSameDay(arr, formatData(addData));
+      newArr = getCardByDays(arr, formatData(addData));
     } else {
-      newArr = getSameDay(formatData(addData), arr);
+      newArr = getCardByDays(formatData(addData), arr);
     }
   } else {
     newArr = formatData(addData);
@@ -174,6 +186,9 @@ const dataResort = obj => {
     });
     newArr = T.concat(B);
   }
+  newArr = newArr.sort((a, b) => {
+    return Date.parse(a.date) - Date.parse(b.date);
+  });
   return newArr;
 };
 
@@ -187,32 +202,47 @@ export function changeCalendarTime(start, end) {
 export function getCalendarData() {
   return (dispatch, getState) => {
     const { controls, base, views } = getState().sheet;
-    const { viewId = '' } = base;
+    const { viewId = '', worksheetId } = base;
     const currentView = views.find(o => o.viewId === viewId) || {};
-    const {
+    let {
       calendarType = '0',
       unweekday = '',
       colorid = '',
       begindate = '',
       enddate = '',
+      calendarcids = '[]',
     } = getAdvanceSetting(currentView);
+    try {
+      calendarcids = JSON.parse(calendarcids);
+    } catch (error) {
+      calendarcids = [];
+    }
     let colorList = colorid ? controls.find(it => it.controlId === colorid) || [] : [];
     let timeControls = getTimeControls(controls);
-    let startData = begindate ? timeControls.find(it => it.controlId === begindate) || {} : timeControls[0] || {};
-
-    const btnList = isTimeStyle(startData)
+    if (calendarcids.length <= 0) {
+      calendarcids = [{ begin: begindate ? begindate : (timeControls[0] || {}).controlId, end: enddate }]; //兼容老数据
+    }
+    let calendarInfo = calendarcids.map(o => {
+      const startData = o.begin ? timeControls.find(it => it.controlId === o.begin) || {} : {};
+      const endData = o.end ? timeControls.find(it => it.controlId === o.end) || {} : {};
+      return {
+        ...o,
+        startData,
+        startFormat: isTimeStyle(startData) ? 'YYYY-MM-DD HH:mm' : 'YYYY-MM-DD',
+        endData,
+        endFormat: isTimeStyle(endData) ? 'YYYY-MM-DD HH:mm' : 'YYYY-MM-DD',
+      };
+    });
+    const btnList = isTimeStyle(calendarInfo[0].startData)
       ? 'today prev,next dayGridMonth,timeGridWeek,timeGridDay'
       : 'today prev,next dayGridMonth,dayGridWeek,dayGridDay';
-    let startFormat = isTimeStyle(startData) ? 'YYYY-MM-DD HH:mm' : 'YYYY-MM-DD';
-    let endData = enddate ? timeControls.find(it => it.controlId === enddate) || {} : {};
-    let endFormat = isTimeStyle(endData) ? 'YYYY-MM-DD HH:mm' : 'YYYY-MM-DD';
-    let viewType = window.localStorage.getItem('CalendarViewType');
+    let viewType = getCalendartypeData()[`${worksheetId}-${viewId}`];
     let typeStr = '';
     if (viewType) {
       if (['dayGridWeek', 'timeGridWeek'].includes(viewType)) {
-        typeStr = isTimeStyle(startData) ? 'timeGridWeek' : 'dayGridWeek';
+        typeStr = isTimeStyle(calendarInfo[0].startData) ? 'timeGridWeek' : 'dayGridWeek';
       } else if (['timeGridDay', 'dayGridDay'].includes(viewType)) {
-        typeStr = isTimeStyle(startData) ? 'timeGridDay' : 'dayGridDay';
+        typeStr = isTimeStyle(calendarInfo[0].startData) ? 'timeGridDay' : 'dayGridDay';
       } else {
         typeStr = viewType;
       }
@@ -220,14 +250,11 @@ export function getCalendarData() {
     dispatch({
       type: 'CHANGE_CALENDAR_DATA',
       data: {
-        startFormat,
-        endFormat,
-        startData,
-        endData,
+        calendarInfo,
         unweekday,
         colorOptions: colorList.options || [],
         btnList,
-        initialView: typeStr ? typeStr : getCalendarViewType(calendarType, startData),
+        initialView: typeStr ? typeStr : getCalendarViewType(calendarType, calendarInfo[0].startData),
       },
     });
   };
@@ -237,7 +264,7 @@ export const getInitType = () => {
   return (dispatch, getState) => {
     let type = window.localStorage.getItem('CalendarShowExternalTypeEvent');
     if (!type) {
-      window.localStorage.setItem('CalendarShowExternalTypeEvent', 'eventNoScheduled');
+      safeLocalStorageSetItem('CalendarShowExternalTypeEvent', 'eventNoScheduled');
     }
     return type || 'eventNoScheduled';
   };
@@ -273,6 +300,7 @@ export const getEventScheduledData = type => {
 };
 
 let getFilterRows;
+let getFilterRowsIds = [];
 export function getEventList({
   pageIndex = 1,
   typeEvent = 'eventNoScheduled',
@@ -282,19 +310,18 @@ export function getEventList({
   cb = null,
 }) {
   return (dispatch, getState) => {
-    const { calendarview, controls, views, base } = getState().sheet;
+    const { calendarview, controls, views, base, filters } = getState().sheet;
     const { calendarData, calenderEventList = {} } = calendarview;
     const { appId, worksheetId, viewId } = base;
     const currentView = views.find(o => o.viewId === viewId) || {};
-    const { begindate = '' } = getAdvanceSetting(currentView);
-    const { startData = {} } = calendarData;
+    const { calendarInfo = [] } = calendarData;
     if (isUp && [`${typeEvent}UpIndex`] === pageIndex) {
       return;
     }
     if ([`${typeEvent}Index`] === pageIndex) {
       return;
     }
-    if (getFilterRows) {
+    if (getFilterRows && getFilterRowsIds.includes(viewId)) {
       getFilterRows.abort();
     }
     dispatch({ type: 'CHANGE_CALENDAR_ISOVER', data: true });
@@ -306,106 +333,138 @@ export function getEventList({
       pageIndex,
       pageSize: keyWords ? 10000 : 20,
       keyWords,
+      filtersGroup: filters.filtersGroup,
     };
-    let obj = {
-      controlId: begindate,
-      datatype: startData.type,
-      spliceType: 1,
-      dateRangeType: 1,
-      values: [],
-    };
+    getFilterRowsIds.push(viewId);
+    let list = [];
+    calendarInfo.map(o => {
+      list.push({
+        controlId: o.begin,
+        datatype: o.startData.type,
+        spliceType: 2, //或
+        dateRangeType: 1,
+        values: [],
+      });
+    });
     if (typeEvent === 'eventScheduled') {
-      let filterControls = [
-        //开始时间不为空
-        {
-          ...obj,
-          filterType: 8,
-          dateRange: 0,
-        },
-      ];
+      let filterControls = [];
       if (!keyWords) {
         if (isUp) {
-          filterControls = filterControls.concat(
-            //早于今天
-            [
-              {
-                ...obj,
-                filterType: 15,
-                dateRange: 1,
-              },
-            ],
-          );
+          //早于今天
+          list.map(o => {
+            filterControls.push({
+              ...o,
+              filterType: 15,
+              dateRange: 1,
+            });
+          });
         } else {
-          filterControls = filterControls.concat(
-            //晚于昨天
-            [
-              {
-                ...obj,
-                filterType: 13,
-                dateRange: 2,
-              },
-            ],
-          );
+          //晚于昨天
+          list.map(o => {
+            filterControls.push({
+              ...o,
+              filterType: 13,
+              dateRange: 2,
+            });
+          });
         }
+      } else {
+        list.map(o => {
+          filterControls.push({
+            ...o,
+            spliceType: 2, //或
+            filterType: 8,
+            dateRange: 0,
+          });
+        });
       }
       //已排期
       prams = {
         ...prams,
-        sortControls: [
-          //按时间排序, isAsc: true 旧的在前
-          {
-            controlId: begindate,
-            datatype: startData.type,
-            isAsc: !isUp, //向前获取 是新的在前
-          },
-        ],
+        sortControls:
+          calendarInfo.map(o => {
+            //按时间排序, isAsc: true 旧的在前
+            return {
+              controlId: o.begin,
+              datatype: o.startData.type,
+              isAsc: !isUp, //向前获取 是新的在前
+            };
+          }) || [],
         filterControls,
       };
     } else if (typeEvent === 'eventNoScheduled') {
+      let filterControls = [];
+      //开始时间为空
+      list.map(o => {
+        filterControls.push({
+          ...o,
+          spliceType: 1, //且
+          filterType: 7,
+          dateRange: 0,
+        });
+      });
       //未排期
       prams = {
         ...prams,
         beginTime: '',
         endTime: '',
-        filterControls: [
-          //开始时间为空
-          {
-            ...obj,
-            filterType: 7,
-            dateRange: 0,
-          },
-        ],
+        filterControls,
       };
     }
-    getFilterRows = sheetAjax.getFilterRows(prams);
+    getFilterRows = sheetAjax.getFilterRows({
+      ...prams,
+      filterControls: [...(filters.filterControls || []), ...(prams.filterControls || [])],
+    });
     let l = calenderEventList[`${typeEvent}Dt`] || [];
     getFilterRows.then(rowsData => {
+      getFilterRowsIds = getFilterRowsIds.filter(o => o !== viewId);
       let s = rowsData.data;
       if (keyWords) {
-        let seachData = s.sort((a, b) => {
-          return a[begindate] && b[begindate] && new Date(a[begindate].replace(/-/g, '/')) - new Date(b[begindate].replace(/-/g, '/'));
+        let seachDataList = [];
+        s.map(it => {
+          seachDataList.push(
+            ...setDataFormat({
+              ...it,
+              worksheetControls: controls,
+              currentView,
+              calendarData,
+              byRowId: true, //根据rowId返回一条
+            }),
+          );
         });
         dispatch({
           type: 'CHANGE_CALENDAR_LIST',
           data: {
             ...calenderEventList,
             keyWords,
-            seachData: seachData.map(it =>
-              setDataFormat({ ...it, worksheetControls: controls, currentView, calendarData }),
-            ),
+            seachData: seachDataList,
           },
         });
         dispatch({ type: 'CHANGE_CALENDAR_LOADING', data: false });
       } else {
-        s = s.sort((a, b) => {
-          return a[begindate] && b[begindate] && new Date(a[begindate].replace(/-/g, '/')) - new Date(b[begindate].replace(/-/g, '/'));
-        });
         if (isAdd) {
           l = isUp ? s.concat(l) : l.concat(s);
         } else {
           l = s;
         }
-        let events = s.map(it => setDataFormat({ ...it, worksheetControls: controls, currentView, calendarData }));
+        let events = [];
+        s.map(it => {
+          events.push(
+            ...setDataFormat({
+              ...it,
+              worksheetControls: controls,
+              byRowId: typeEvent !== 'eventScheduled', //根据rowId
+              currentView,
+              calendarData,
+            }),
+          );
+        });
+        //已排期需要排序
+        if (typeEvent === 'eventScheduled') {
+          events = events.sort((a, b) => {
+            return Date.parse(a.start) - Date.parse(b.start);
+          });
+        }
         let dts = {
           ...calenderEventList,
           [typeEvent]: !isAdd
@@ -544,16 +603,20 @@ export function updateEventData(rowId, data, time) {
     const typeEvent = dispatch(getInitType());
     if (keyWords) {
       // 搜索状态 直接更新卡片数据
-      let da = seachData.map((it, i) => {
+      let da = [];
+      seachData.map((it, i) => {
         if (it.extendedProps.rowid === rowId) {
-          return setDataFormat({
-            ..._.omit(data, ['allowedit', 'allowdelete']),
-            worksheetControls: controls,
-            currentView,
-            calendarData,
-          });
+          da.push(
+            ...setDataFormat({
+              ..._.omit(data, ['allowedit', 'allowdelete']),
+              worksheetControls: controls,
+              currentView,
+              calendarData,
+              byRowId: true, //根据rowId
+            }),
+          );
         } else {
-          return it;
+          da.push(it);
         }
       });
       dispatch({
@@ -600,11 +663,22 @@ export function updateEventData(rowId, data, time) {
             }
           });
         }
-        let events = da.map(it => setDataFormat({ ...it, worksheetControls: controls, currentView, calendarData }));
+        let events = [];
+        da.map(it => {
+          events.push(
+            ...setDataFormat({
+              ...it,
+              worksheetControls: controls,
+              byRowId: typeEvent !== 'eventScheduled', //根据rowId
+              currentView,
+              calendarData,
+            }),
+          );
+        });
         events =
           typeEvent === 'eventScheduled' //非排期数据不需要重新根据时间排序
             ? events.sort((a, b) => {
-                return a.start && b.start && new Date(a.start.replace(/-/g, '/')) - new Date(b.start.replace(/-/g, '/'));
+                return Date.parse(a.start) - Date.parse(b.start);
               })
             : events;
         updataRowIds = add
@@ -630,23 +704,23 @@ export function updateEventData(rowId, data, time) {
   };
 }
 
-export const mobileIsShowMoreClick = (flag) => (dispatch, getState) => {
+export const mobileIsShowMoreClick = flag => (dispatch, getState) => {
   dispatch({
     type: 'SHOW_MOBILE_MORE_CLICK',
     flag,
-  })
-}
+  });
+};
 
-export const changeMobileCurrentData = (data) => (dispatch, getState) => {
+export const changeMobileCurrentData = data => (dispatch, getState) => {
   dispatch({
     type: 'CHANGE_MOBILE_CURRENTDATA',
-    data
-  })
-}
+    data,
+  });
+};
 
-export const changeMobileCurrentDate = (date) => (dispatch, getState) => {
+export const changeMobileCurrentDate = date => (dispatch, getState) => {
   dispatch({
     type: 'CHANGE_MOBILE_CURRENTDATE',
-    date
-  })
-}
+    date,
+  });
+};

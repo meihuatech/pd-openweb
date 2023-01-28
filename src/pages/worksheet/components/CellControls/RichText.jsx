@@ -4,6 +4,7 @@ import { autobind } from 'core-decorators';
 import cx from 'classnames';
 import { Dialog } from 'ming-ui';
 import EditableCellCon from '../EditableCellCon';
+import { regexFilterHtmlScript } from 'worksheet/util';
 import renderText from './renderText';
 import { RichText } from 'ming-ui';
 export default class Text extends React.Component {
@@ -33,14 +34,26 @@ export default class Text extends React.Component {
   }
 
   @autobind
-  handleChange(value) {
-    const { updateCell, updateEditingStatus } = this.props;
+  handleTableKeyDown(e) {
+    const { updateEditingStatus } = this.props;
+    switch (e.key) {
+      case 'Escape':
+        this.handleChange();
+        updateEditingStatus(false);
+        break;
+      default:
+        break;
+    }
+  }
+
+  @autobind
+  handleChange() {
+    const { cell, updateCell } = this.props;
+    if ((cell.value || '') === this.state.value) {
+      return;
+    }
     updateCell({
-      value,
-    });
-    // updateEditingStatus(false);
-    this.setState({
-      value,
+      value: this.state.value,
     });
   }
 
@@ -53,11 +66,19 @@ export default class Text extends React.Component {
         width={800}
         footer={null}
         anim={false}
-        onCancel={() => updateEditingStatus(false)}
+        onCancel={() => {
+          this.handleChange();
+          updateEditingStatus(false);
+        }}
       >
         <RichText
+          autoFocus
           data={this.state.value || ''}
-          onSave={this.handleChange}
+          onSave={value => {
+            this.setState({
+              value,
+            });
+          }}
           className={cx('cellControlRichTextDialog')}
         />
       </Dialog>
@@ -80,7 +101,10 @@ export default class Text extends React.Component {
       >
         {isediting && this.renderEditDialog()}
         {!!value && (
-          <div className={cx('worksheetCellPureString', { linelimit: needLineLimit })}>
+          <div
+            className={cx('worksheetCellPureString', { linelimit: needLineLimit })}
+            title={regexFilterHtmlScript(value)}
+          >
             {renderText({ ...cell, value })}
           </div>
         )}

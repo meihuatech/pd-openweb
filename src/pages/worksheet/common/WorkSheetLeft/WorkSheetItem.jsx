@@ -2,15 +2,13 @@ import React, { Component } from 'react';
 import Tooltip from 'ming-ui/components/Tooltip';
 import PropTypes from 'prop-types';
 import cx from 'classnames';
-import Menu from 'ming-ui/components/Menu';
-import MenuItem from 'ming-ui/components/MenuItem';
-import Icon from 'ming-ui/components/Icon';
-import { navigateTo } from 'src/router/navigateTo';
+import { Menu, MenuItem, Icon, MdLink } from 'ming-ui';
 import { SelectIcon, SheetMove } from '../../common';
 import Trigger from 'rc-trigger';
 import { withRouter } from 'react-router-dom';
-import { setWorksheetStatus } from 'src/api/homeApp';
+import homeAppAjax from 'src/api/homeApp';
 import SvgIcon from 'src/components/SvgIcon';
+import _ from 'lodash';
 
 @withRouter
 export default class WorkSheetItem extends Component {
@@ -42,40 +40,29 @@ export default class WorkSheetItem extends Component {
   componentWillUnmount() {
     clearTimeout(this.timer);
   }
-  handleClick(appId, groupId, workSheetId, event) {
-    if (this.timer || $(event.target).closest('.moreBtn,.worksheetItemOperate,.sheetSelectIconWrap').length) return;
-    this.timer = setTimeout(() => {
-      clearTimeout(this.timer);
-      this.timer = null;
-
-      const storage = JSON.parse(localStorage.getItem(`mdAppCache_${md.global.Account.accountId}_${appId}`)) || {};
-      const viewId =
-        (_.find(storage.worksheets || [], item => item.groupId === groupId && item.worksheetId === workSheetId) || {})
-          .viewId || '';
-      let url = `/app/${appId}/${groupId}/${workSheetId}${viewId ? `/${viewId}` : ''}`;
-      if (this.props.isActive) {
-        url += `?flag=${new Date().getTime()}`;
-      }
-      navigateTo(url);
-    }, 200);
+  getNavigateUrl(appId, groupId, workSheetId) {
+    const storage = JSON.parse(localStorage.getItem(`mdAppCache_${md.global.Account.accountId}_${appId}`)) || {};
+    const viewId =
+      (_.find(storage.worksheets || [], item => item.groupId === groupId && item.worksheetId === workSheetId) || {})
+        .viewId || '';
+    let url = `/app/${appId}/${groupId}/${workSheetId}${viewId ? `/${viewId}` : ''}`;
+    if (this.props.isActive) {
+      url += `?flag=${new Date().getTime()}`;
+    }
+    return url;
   }
-  handleDbClick() {
-    this.setState({ selectIconVisible: true });
-    clearTimeout(this.timer);
-    this.timer = null;
-  }
-
   setWorksheetStatus() {
     const { sheetInfo, updateSheetInfo, updateSheetList } = this.props;
     const status = sheetInfo.status === 1 ? 2 : 1;
-
-    setWorksheetStatus({ appId: this.props.match.params.appId, worksheetId: sheetInfo.workSheetId, status }).then(
-      result => {
-        if (result.data) {
-          updateSheetList(sheetInfo.workSheetId, { status });
-        }
-      },
-    );
+    let appId = this.props.match.params.appId;
+    if (md.global.Account.isPortal) {
+      appId = md.global.Account.appId;
+    }
+    homeAppAjax.setWorksheetStatus({ appId, worksheetId: sheetInfo.workSheetId, status }).then(result => {
+      if (result.data) {
+        updateSheetList(sheetInfo.workSheetId, { status });
+      }
+    });
   }
 
   renderMenu({ appId, groupId, type }) {
@@ -144,7 +131,7 @@ export default class WorkSheetItem extends Component {
 
         {
           <MenuItem
-            icon={<Icon icon="public-folder-hidden" className="Font14" />}
+            icon={<Icon icon="visibility_off" className="Font16" />}
             onClick={() => {
               this.setWorksheetStatus();
               this.setState({ menuIsVisible: false });
@@ -187,7 +174,10 @@ export default class WorkSheetItem extends Component {
     const { sheetInfo, match, isCharge, appPkg, sheetListVisible, projectId } = this.props;
     const { workSheetId, workSheetName, icon, iconUrl, status, type } = sheetInfo;
     const { iconColor } = appPkg;
-    const { appId, groupId } = match.params;
+    let { appId, groupId } = match.params;
+    if (md.global.Account.isPortal) {
+      appId = md.global.Account.appId;
+    }
     return (
       <Tooltip
         popupAlign={{ offset: [-10, 0] }}
@@ -203,10 +193,8 @@ export default class WorkSheetItem extends Component {
             this.props.className,
           )}
           data-id={workSheetId}
-          onClick={this.handleClick.bind(this, appId, groupId, workSheetId)}
-          onDoubleClick={sheetListVisible && isCharge ? this.handleDbClick.bind(this) : _.noop}
         >
-          <div className="NoUnderline valignWrapper ThemeColor10 h100 nameWrap">
+          <MdLink className="NoUnderline valignWrapper pLeft20 ThemeColor10 h100 nameWrap" to={this.getNavigateUrl(appId, groupId, workSheetId)}>
             <div className="iconWrap">
               <SvgIcon url={iconUrl} fill={iconColor} size={22} />
             </div>
@@ -215,11 +203,11 @@ export default class WorkSheetItem extends Component {
             </span>
             {status === 2 && (
               <Tooltip popupPlacement="bottom" text={<span>{_l('仅管理员可见')}</span>}>
-                <Icon className="Font14 mRight10" icon={'public-folder-hidden'} style={{ color: '#ee6f09' }} />
+                <Icon className="Font16 mRight10" icon={'visibility_off'} style={{ color: '#ee6f09' }} />
               </Tooltip>
             )}
             <div className="flex" />
-          </div>
+          </MdLink>
           {isCharge && (
             <Trigger
               popupVisible={this.state.menuIsVisible}

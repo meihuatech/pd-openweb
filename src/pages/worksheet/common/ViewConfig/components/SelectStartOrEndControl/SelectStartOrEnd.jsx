@@ -4,26 +4,25 @@ import { Select } from 'antd';
 import cx from 'classnames';
 import './SelectStartOrEnd.less';
 import { getIconByType } from 'src/pages/widgetConfig/util';
-import { isTimeStyle } from 'src/pages/worksheet/views/CalendarView/util';
+import { isTimeStyle, isIllegal } from 'src/pages/worksheet/views/CalendarView/util';
 import AddControlDiaLog from './AddControlDiaLog';
 import { SYS } from '../../../../../widgetConfig/config/widget';
 export default function SelectStartOrEnd(props) {
   const {
-    view = {},
     handleChange,
     timeControls = [],
     canAddTimeControl, //能否添加新的时间控件
     mustSameType, //必须同类型
     begindateOrFirst, //begindate为空时可以以第一个控件为begindate
-    controls,
+    controls = [],
     worksheetId,
     updateWorksheetControls,
+    allowClear,
+    i,
   } = props;
-  const { advancedSetting = {} } = view;
-  const setDataFn = () => {
-    let begindate =
-      _.get(view, ['advancedSetting', 'begindate']) || (begindateOrFirst ? (timeControls[0] || {}).controlId : '');
-    let enddate = _.get(view, ['advancedSetting', 'enddate']);
+  const getData = () => {
+    let begindate = props.begindate;
+    let enddate = props.enddate;
     let startData = begindate ? timeControls.find((it, i) => it.controlId === begindate) || {} : [];
     let endData = enddate ? timeControls.find(it => it.controlId === enddate) || {} : {};
     return {
@@ -45,132 +44,151 @@ export default function SelectStartOrEnd(props) {
       ),
     };
   };
-  const [{ begindate, startControls, enddate, endControls, startData = {}, endData = {} }, setSetting] =
-    useState(setDataFn);
-  const [isError, setIsError] = useState(props.isDelete);
+  const [{ begindate, startControls, enddate, endControls, startData = {}, endData = {} }, setSetting] = useState(
+    getData(),
+  );
   const [visible, setVisible] = useState(false);
   const [addName, setAddName] = useState('');
   const [addKey, setAddKey] = useState('');
   useEffect(() => {
-    setSetting(setDataFn);
-  }, [controls, timeControls]);
-  useEffect(() => {
-    setSetting(setDataFn);
-  }, [advancedSetting.begindate, advancedSetting.enddate]);
-  useEffect(() => {
-    setIsError(props.isDelete);
-  }, [props.isDelete]);
-
+    setSetting(getData());
+  }, [timeControls, props.begindate, props.enddate]);
   return (
     <React.Fragment>
-      <div className="settingContent">
-        <div className="selectBox selectStartOrEndCon">
-          <div className="startCom">
+      <div className={cx(`settingContent ${props.classNames}`)}>
+        <div className="selectBox selectStartOrEndCon ">
+          <div className="startCom flexRow">
             <span className="tag"></span>
             <span className="txt">{_l('开始')}</span>
-            <Select
-              className={cx('dropCon', { isDelete: isError })}
-              value={
-                isError ? (
-                  <span className="Red">
-                    <Icon icon="error_outline" className={cx('Font14 Red mRight8')} />
-                    {_l('该字段已删除')}
+            <div className="con Relative flex">
+              <Select
+                className={cx('dropCon', { isDelete: props.beginIsDel || isIllegal(startData) })}
+                allowClear={false}
+                value={[startData.controlId]}
+                placeholder={_l('请选择')}
+                optionLabelProp="label"
+                suffixIcon={<Icon icon="arrow-down-border Font14" />}
+                dropdownClassName="dropConOption"
+                onChange={value => {
+                  if (value === begindate) {
+                    return;
+                  }
+                  if (value === 'add') {
+                    setAddName(_l('开始时间'));
+                    setAddKey('begindate');
+                    setVisible(true);
+                    return;
+                  }
+                  handleChange({ begindate: value, enddate: enddate });
+                }}
+              >
+                {startControls.map((item, i) => {
+                  const labelNode = (
+                    <div>
+                      <i className={cx('icon Gray_9e mRight12 Font16', 'icon-' + getIconByType(item.type))}></i>
+                      {item.controlName}
+                    </div>
+                  );
+                  return (
+                    <Select.Option value={item.controlId} key={i} className="" label={labelNode}>
+                      {labelNode}
+                    </Select.Option>
+                  );
+                })}
+                {canAddTimeControl && (
+                  <Select.Option className="addControl" value={'add'}>
+                    <i className={cx('icon mRight12 Font16', 'icon-plus')}></i>
+                    {_l('添加日期字段')}
+                  </Select.Option>
+                )}
+              </Select>
+              {props.beginIsDel ||
+                (isIllegal(startData) ? (
+                  <span className="breakAll overflow_ellipsis Red err">
+                    <Icon icon="error1" className={cx('Font14 Red mRight8')} />
+                    {isIllegal(startData) ? _l('不支持使用年、年月的字段类型') : _l('该字段已删除')}
                   </span>
                 ) : (
-                  <span className={cx({ Gray: startData.controlName, Gray_bd: !startData.controlName })}>
+                  <span
+                    className={cx('txtCon breakAll overflow_ellipsis', {
+                      Gray: startData.controlName,
+                      Gray_bd: !startData.controlName,
+                    })}
+                  >
                     {startData.controlName || _l('请选择')}
                   </span>
-                )
-              }
-              suffixIcon={<Icon icon="arrow-down-border Font14" />}
-              dropdownClassName="dropConOption"
-              onChange={value => {
-                if (value === begindate) {
-                  return;
-                }
-                if (value === 'add') {
-                  setAddName(_l('开始时间'));
-                  setAddKey('begindate');
-                  setVisible(true);
-                  return;
-                }
-                handleChange({ begindate: value });
-                setIsError(false);
-              }}
-            >
-              {startControls.map((item, i) => {
-                return (
-                  <Select.Option value={item.controlId} key={i} className="">
-                    <i className={cx('icon Gray_9e mRight12 Font16', 'icon-' + getIconByType(item.type))}></i>
-                    {item.controlName}
-                  </Select.Option>
-                );
-              })}
-              {canAddTimeControl && (
-                <Select.Option className="addControl" value={'add'}>
-                  <i className={cx('icon mRight12 Font16', 'icon-plus')}></i>
-                  {_l('添加日期字段')}
-                </Select.Option>
-              )}
-            </Select>
-            {isError && <span className="Red errorTxtOption">{_l('点击下拉框显示下拉菜单')}</span>}
+                ))}
+            </div>
           </div>
-          <div className="startCom end mTop16">
+          <div className="startCom end mTop16 flexRow">
             <span className={cx('tag', { has: enddate })}></span>
             <span className="txt">{_l('结束')}</span>
-            <Select
-              className={cx('dropCon', { isDelete: enddate && !endData.controlId })}
-              value={
-                enddate ? (
-                  enddate && !endData.controlId ? (
-                    <span className="Red">
-                      <Icon icon="error_outline" className={cx('Font14 Red mRight8')} />
-                      {_l('该字段已删除')}
-                    </span>
-                  ) : (
-                    <span className="Gray">{(endData || {}).controlName || ''}</span>
-                  )
-                ) : (
-                  <span className="Gray_bd">{_l('请选择')}</span>
-                )
-              }
-              suffixIcon={<Icon icon="arrow-down-border Font14" />}
-              allowClear={enddate}
-              dropdownClassName="dropConOption"
-              onChange={value => {
-                if (value === enddate) {
-                  return;
-                }
-                if (value === 'add') {
-                  setAddName(_l('结束时间'));
-                  setAddKey('enddate');
-                  setVisible(true);
-                  return;
-                }
-                handleChange({
-                  begindate: begindate,
-                  enddate: value,
-                });
-              }}
-            >
-              {endControls.map((item, i) => {
-                return (
-                  <Select.Option value={item.controlId} key={i}>
-                    <i className={cx('icon Gray_9e mRight12 Font16', 'icon-' + getIconByType(item.type))}></i>
-                    {item.controlName}
+            <div className="con Relative flex">
+              <Select
+                className={cx('dropCon', { isDelete: props.endIsDel || isIllegal(endData) })}
+                allowClear={allowClear}
+                value={[endData.controlId]}
+                placeholder={_l('请选择')}
+                optionLabelProp="label"
+                suffixIcon={<Icon icon="arrow-down-border Font14" />}
+                dropdownClassName="dropConOption"
+                onChange={value => {
+                  if (value === enddate) {
+                    return;
+                  }
+                  if (value === 'add') {
+                    setAddName(_l('结束时间'));
+                    setAddKey('enddate');
+                    setVisible(true);
+                    return;
+                  }
+                  handleChange({
+                    begindate: begindate,
+                    enddate: value,
+                  });
+                }}
+              >
+                {endControls.map((item, i) => {
+                  const labelNode = (
+                    <div>
+                      <i className={cx('icon Gray_9e mRight12 Font16', 'icon-' + getIconByType(item.type))}></i>
+                      {item.controlName}
+                    </div>
+                  );
+                  return (
+                    <Select.Option value={item.controlId} key={i} label={labelNode}>
+                      {labelNode}
+                    </Select.Option>
+                  );
+                })}
+                {canAddTimeControl && (
+                  <Select.Option className="addControl" value={'add'}>
+                    <i className={cx('icon mRight12 Font16', 'icon-plus')}></i>
+                    {_l('添加日期字段')}
                   </Select.Option>
-                );
-              })}
-              {canAddTimeControl && (
-                <Select.Option className="addControl" value={'add'}>
-                  <i className={cx('icon mRight12 Font16', 'icon-plus')}></i>
-                  {_l('添加日期字段')}
-                </Select.Option>
-              )}
-            </Select>
+                )}
+              </Select>
+              {(enddate && !endData.controlId) ||
+                (isIllegal(endData) ? (
+                  <span className="breakAll overflow_ellipsis Red err">
+                    <Icon icon="error1" className={cx('Font14 Red mRight8')} />
+                    {!isIllegal(endData) ? _l('该字段已删除') : _l('不支持使用年、年月的字段类型')}
+                  </span>
+                ) : (
+                  <span
+                    className={cx('txtCon breakAll overflow_ellipsis', {
+                      Gray: endData.controlName,
+                      Gray_bd: !endData.controlName,
+                    })}
+                  >
+                    {endData.controlName || _l('请选择')}
+                  </span>
+                ))}
+            </div>
           </div>
         </div>
-        {begindate &&
+        {mustSameType &&
+          begindate &&
           enddate &&
           startData &&
           isTimeStyle(startData) !== isTimeStyle(endData) &&
@@ -197,11 +215,17 @@ export default function SelectStartOrEnd(props) {
           addName={addName}
           controls={controls}
           onAdd={data => {
-            let sys = controls.filter(o => SYS.includes(o.controlId));
-            updateWorksheetControls(data.concat(sys));
+            let constrolInfo = data;
+            if (data.filter(o => SYS.includes(o.controlId)).length <= 0) {
+              let sys = controls.filter(o => SYS.includes(o.controlId));
+              constrolInfo = constrolInfo.concat(sys);
+            }
+            updateWorksheetControls(constrolInfo);
           }}
           onChange={value => {
             handleChange({
+              begindate: begindate,
+              enddate: enddate,
               [addKey]: value,
             });
           }}

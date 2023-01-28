@@ -3,10 +3,7 @@ import { withRouter } from 'react-router-dom';
 import cx from 'classnames';
 import { Icon } from 'ming-ui';
 import './index.less';
-import 'src/pages/Mobile/MyHome/index.less';
-const {
-  app: { appManagementHeader },
-} = window.private;
+import 'mobile/MyHome/index.less';
 
 @withRouter
 export default class TabBar extends Component {

@@ -2,25 +2,27 @@ import React, { Component } from 'react';
 import PropTypes from 'prop-types';
 import { autobind } from 'core-decorators';
 import cx from 'classnames';
-import 'dialogSelectUser';
+import 'src/components/dialogSelectUser/dialogSelectUser';
 import UserHead from 'src/pages/feed/components/userHead';
 import { getTabTypeBySelectUser } from 'src/pages/worksheet/common/WorkSheetFilter/util';
+import { FILTER_CONDITION_TYPE } from '../../enum';
+import _ from 'lodash';
 
 export default class Users extends Component {
   static propTypes = {
     disabled: PropTypes.bool,
     projectId: PropTypes.string,
     onChange: PropTypes.func,
-    originValues: PropTypes.arrayOf(PropTypes.string),
+    fullValues: PropTypes.arrayOf(PropTypes.string),
     from: PropTypes.string, // rule显示规则不出现 当前用户 当前用户的下属 未指定
   };
   static defaultProps = {
-    originValues: [],
+    fullValues: [],
   };
   constructor(props) {
     super(props);
     this.state = {
-      users: (props.originValues || [])
+      users: (props.fullValues || [])
         .map(value => {
           let user = {};
           try {
@@ -36,6 +38,12 @@ export default class Users extends Component {
         })
         .filter(_.identity),
     };
+  }
+  get selectSingle() {
+    return (
+      _.get(this.props, 'control.enumDefault') === 0 &&
+      _.includes([FILTER_CONDITION_TYPE.ARREQ, FILTER_CONDITION_TYPE.ARRNE], this.props.type)
+    );
   }
   selectUser(title, projectId, options, callback) {
     $().dialogSelectUser({
@@ -55,7 +63,7 @@ export default class Users extends Component {
   }
   @autobind
   addUser() {
-    const { projectId, from = '', control = {}, appId } = this.props;
+    const { projectId, from = '', control = {}, appId, filterResigned } = this.props;
     const tabType = getTabTypeBySelectUser(control);
     const _this = this;
     if (this.props.disabled) {
@@ -65,8 +73,9 @@ export default class Users extends Component {
       showQuickInvite: false,
       showMoreInvite: false,
       isTask: false,
-      includeUndefinedAndMySelf: from !== 'rule',
-      includeSystemField: from !== 'rule' && from !== 'subTotal',
+      includeUndefinedAndMySelf: !_.includes(['rule', 'portal'], from),
+      includeSystemField: !_.includes(['rule', 'portal', 'subTotal'], from),
+      isHidAddUser: md.global.Account.isPortal,
       tabType,
       offset: {
         top: 0,
@@ -74,9 +83,10 @@ export default class Users extends Component {
       },
       zIndex: 10001,
       appId,
-      filterAccountIds: from === 'rule' || from === 'subTotal' ? [] : [md.global.Account.accountId],
       SelectUserSettings: {
+        unique: this.selectSingle,
         projectId,
+        filterResigned: filterResigned,
         callback(users) {
           _this.addUsers(users);
         },
@@ -90,6 +100,10 @@ export default class Users extends Component {
   addUsers(selectusers) {
     const { users } = this.state;
     const newUsers = users.concat(selectusers);
+    if (this.selectSingle) {
+      this.changeUsers(selectusers.slice(0, 1));
+      return;
+    }
     if (!selectusers[0] || _.find(users, option => option.accountId === selectusers[0].accountId)) {
       alert(_l('该用户已存在'), 3);
       return;

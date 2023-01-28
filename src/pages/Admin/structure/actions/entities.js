@@ -1,12 +1,13 @@
 ﻿import { CALL_API } from '../middleware/api';
 import { PAGE_SIZE, COMPANY_DEPARMENTID } from '../constant';
-import { getProjectInfo } from '../../config';
+import Config from '../../config';
+import departmentController from 'src/api/department';
+import _ from 'lodash';
 
 // async actions and action creator
 export const DEPARTMENT_REQUEST = 'DEPARTMENT_REQUEST';
 export const DEPARTMENT_SUCCESS = 'DEPARTMENT_SUCCESS';
 export const DEPARTMENT_FAILURE = 'DEPARTMENT_FAILURE';
-
 /**
  * fetch departments
  * relies on middleware `api`
@@ -88,7 +89,7 @@ export const INIT_ROOT = 'INIT_ROOT';
  */
 export const initRoot = departmentId => {
   // 获取网络信息
-  const departmentName = getProjectInfo().companyName;
+  const departmentName = Config.getProjectInfo().companyName;
   return {
     type: INIT_ROOT,
     response: [
@@ -120,10 +121,23 @@ export const DELETE_DEPARTMENT = 'DELETE_DEPARTMENT';
  * @param departmentId
  * @param parentId
  */
-export const deleteDepartment = ({ departmentId, parentId }) => ({
+export const deleteDepartment = ({ departmentId, parentId, expandedKeys }) => ({
   type: DELETE_DEPARTMENT,
   departmentId,
   parentId,
+  expandedKeys,
+});
+
+export const EDIT_DEPARTMENT = 'EDIT_DEPARTMENT';
+/**
+ * eidt department
+ * @param departmentId
+ * @param departmentName
+ */
+export const editDepartment = ({ newDepartments, expandedKeys }) => ({
+  type: EDIT_DEPARTMENT,
+  newDepartments,
+  expandedKeys,
 });
 
 export const FULL_TREE_REQUEST = 'FULL_TREE_REQUEST';
@@ -273,4 +287,38 @@ const fetchAllUser = (projectId, pageIndex) => {
 export const loadAllUsers = (projectId, pageIndex) => dispatch => {
   // TODO: check fields if necessary
   return dispatch(fetchAllUser(projectId, pageIndex || 1));
+};
+
+export const updateShowExport = isShowExport => ({
+  type: 'UPDATE_SHOW_EXPORT',
+  isShowExport,
+});
+export const updateImportType = importExportType => ({
+  type: 'UPDATE_IMPORT_EXPORT_TYPE',
+  importExportType,
+});
+export const updateImportExportResult = importExportResult => ({
+  type: 'UPDATE_IMPORT_EXPORT_RESULT',
+  importExportResult,
+});
+export const updateFullDepartmentInfo = (projectId, departmentIds) => (dispatch, getState) => {
+  const { fullDepartmentInfo = {} } = getState().entities;
+  departmentIds = departmentIds.filter(it => !fullDepartmentInfo[it]);
+  if (_.isEmpty(departmentIds)) {
+    return;
+  }
+  departmentController
+    .getDepartmentFullNameByIds({
+      projectId,
+      departmentIds,
+    })
+    .then(res => {
+      (res || []).forEach(it => {
+        fullDepartmentInfo[it.id] = it.name;
+      });
+      dispatch({
+        type: 'UPDATE_FULL_DEPARTMENT_INFO',
+        fullDepartmentInfo,
+      });
+    });
 };

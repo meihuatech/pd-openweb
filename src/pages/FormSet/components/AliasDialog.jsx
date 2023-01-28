@@ -3,7 +3,8 @@ import { Dialog, Icon } from 'ming-ui';
 import sheetAjax from 'src/api/worksheet';
 import cx from 'classnames';
 import './AliasDialog.less';
-import { SYS } from 'src/pages/widgetConfig/config/widget.js';
+import { ALL_SYS } from 'src/pages/widgetConfig/config/widget.js';
+import _ from 'lodash';
 export default class AliasDialog extends React.Component {
   constructor(props) {
     super(props);
@@ -12,10 +13,11 @@ export default class AliasDialog extends React.Component {
       controls: [],
       isChange: false,
       controlsOriginal: [],
+      loading: false,
     };
   }
   componentWillMount() {
-    const { controls = [], worksheetId, appId, list = [] } = this.props;
+    const { controls = [], worksheetId, appId, controlTypeList = [] } = this.props;
     if (controls.length <= 0) {
       //控件列表
       sheetAjax
@@ -27,20 +29,20 @@ export default class AliasDialog extends React.Component {
         .then(res => {
           const { template = [] } = res;
           const { controls = [] } = template;
-          let controlsList = controls.filter(item => !_.includes(SYS, item.controlId));
+          let controlsList = controls.filter(item => !_.includes(ALL_SYS, item.controlId));
           this.setState({
             controls: controlsList,
             controlsOriginal: controlsList,
           });
         });
     } else {
-      let controlsList = controls.filter(item => !_.includes(SYS, item.controlId));
+      let controlsList = controls.filter(item => !_.includes(ALL_SYS, item.controlId));
       this.setState({
         controls: controlsList,
         controlsOriginal: controlsList,
       });
     }
-    if (list.length <= 0) {
+    if (controlTypeList.length <= 0) {
       //获取类型
       sheetAjax
         .getWorksheetApiInfo({
@@ -49,18 +51,18 @@ export default class AliasDialog extends React.Component {
         })
         .then(res => {
           this.setState({
-            list: res[0].controls,
+            controlTypeList: res[0].controls,
           });
         });
     } else {
       this.setState({
-        list,
+        controlTypeList,
       });
     }
   }
   render() {
     const { showAliasDialog, setFn, worksheetId, appId } = this.props;
-    const { focusId, controls = [], isChange, controlsOriginal = [], list = [] } = this.state;
+    const { focusId, controls = [], isChange, controlsOriginal = [], controlTypeList = [] } = this.state;
     return (
       <Dialog
         className="aliasDialog"
@@ -71,31 +73,59 @@ export default class AliasDialog extends React.Component {
         title={_l('设置字段别名')}
       >
         <p className="text">
-          {_l('注：字段别名仅允许使用字母（不区分大小写）、数字和下划线组合，且必须以字母开头，不可重复。')}
+          {_l('字段别名仅允许使用字母（不区分大小写）、数字和下划线组合，且必须以字母开头，不可重复。')}
         </p>
-        {/* <div className="btnAlias">
-          <Icon icon="workflow_update" className="" />
-          {_l('批量生成默认别名')}
-        </div> */}
         <div className="tableAlias">
           <div className="topDiv">
             <span className="">{_l('字段名称')}</span>
             <span className="">{_l('类型')}</span>
-            <span className="">{_l('字段别名')}</span>
+            <span className="">
+              {_l('字段别名')}
+              <i
+                className="batchAlias mLeft10 InlineBlock Hand"
+                onClick={() => {
+                  if (this.state.loading) {
+                    return;
+                  }
+                  Dialog.confirm({
+                    title: _l('确定批量生成字段别名？'),
+                    description: (
+                      <React.Fragment>
+                        {_l(
+                          '根据字段名的拼音自动生成别名，若字段名为英文则直接取字段名作为别名，此操作不会影响已设置的别名。',
+                        )}
+                      </React.Fragment>
+                    ),
+                    onOk: () => {
+                      this.setState({
+                        loading: true,
+                      });
+                      sheetAjax
+                        .editGenerateControlsDefaultAlias({
+                          worksheetId: worksheetId,
+                          appId,
+                        })
+                        .then(res => {
+                          this.setState({
+                            // controlTypeList: res.data.controls,
+                            controls: res.data.controls,
+                            loading: false,
+                          });
+                        });
+                    },
+                  });
+                }}
+              >
+                {_l('批量生成')}
+              </i>
+            </span>
           </div>
           {controls.map((it, i) => {
             return (
               <div className="listDiv">
-                <span className="">{it.controlName}</span>
+                <span className="breakAll">{it.controlName}</span>
                 <span className="">
-                  {list.length > 0
-                    ? // ? list.find(o => o.controlId === it.controlId || o.controlId === it.alias)
-                      //   ? list.find(o => o.controlId === it.controlId || o.controlId === it.alias).type
-                      // :
-                      list[i]
-                      ? list[i].type
-                      : ''
-                    : ''}
+                  {controlTypeList.length > 0 ? (controlTypeList[i] ? controlTypeList[i].type : '') : ''}
                 </span>
                 <span
                   className={cx('aliasBox', { onFocusSpan: focusId === it.controlId, isError: this.state.isError })}
@@ -163,7 +193,7 @@ export default class AliasDialog extends React.Component {
                         }
                         if (
                           it.alias &&
-                          (controls.filter(o => it.alias === o.alias).length > 1 || SYS.includes(it.alias))
+                          (controls.filter(o => it.alias === o.alias).length > 1 || ALL_SYS.includes(it.alias))
                         ) {
                           this.setState({
                             isChange: false,
@@ -171,7 +201,9 @@ export default class AliasDialog extends React.Component {
                             isError: false,
                           });
                           alert(
-                            SYS.includes(it.alias) ? _l('该别名与系统字段的别名相同，请重新输入') : _l('该别名已存在'),
+                            ALL_SYS.includes(it.alias)
+                              ? _l('该别名与系统字段的别名相同，请重新输入')
+                              : _l('该别名已存在'),
                             2,
                           );
                           return;
@@ -199,10 +231,19 @@ export default class AliasDialog extends React.Component {
                             ],
                           })
                           .then(data => {
-                            // alert(_l('修改成功'));
-                            this.setState({
-                              controlsOriginal: controls,
-                            });
+                            if (data.code === 15) {
+                              this.setState({
+                                isChange: false,
+                                controls: controlsOriginal,
+                                isError: false,
+                              });
+                              alert(_l('该别名与系统字段的别名相同，请重新输入'), 2);
+                            } else {
+                              // alert(_l('修改成功'));
+                              this.setState({
+                                controlsOriginal: controls,
+                              });
+                            }
                           })
                           .fail(err => {
                             alert(_l('修改失败'), 2);

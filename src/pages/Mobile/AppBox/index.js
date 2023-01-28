@@ -3,6 +3,7 @@ import { withRouter } from 'react-router-dom';
 import TabBar from '../components/TabBar';
 import './index.less';
 import AppWarehouse from 'src/pages/AppHomepage/AppLib';
+import _ from 'lodash';
 @withRouter
 export default class AddBox extends Component {
   constructor(props) {
@@ -10,7 +11,7 @@ export default class AddBox extends Component {
     this.state = {
       data: [],
       loading: true,
-    }
+    };
   }
   componentDidMount() {
     // this.getlibraryByCategory();
@@ -19,7 +20,7 @@ export default class AddBox extends Component {
   //   this.setState({
   //     loading: true,
   //   });
-  //   axios.post(`${__api_server__}AppManagement/GetAppsCategoryInfo`, {}).then(result => {
+  //   axios.post(`${__api_server__.main}AppManagement/GetAppsCategoryInfo`, {}).then(result => {
   //     const { data } = result.data;
   //     if (data) {
   //       this.setState({
@@ -54,7 +55,7 @@ export default class AddBox extends Component {
     return (
       <div className="appBox h100">
         <div className="content">
-          <AppWarehouse/>
+          <AppWarehouse />
         </div>
         <TabBar action="appBox" />
       </div>

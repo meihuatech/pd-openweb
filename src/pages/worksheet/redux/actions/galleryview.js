@@ -1,19 +1,17 @@
-import { getFilterRows, updateWorksheetRow } from 'src/api/worksheet';
-import { getAdvanceSetting } from 'src/util';
+import worksheetAjax from 'src/api/worksheet';
 import { getNavGroupCount } from './index';
-import { wrapAjax } from './util';
-const wrappedGetFilterRows = wrapAjax(getFilterRows);
+import _ from 'lodash';
 export const fetch = index => {
   return (dispatch, getState) => {
     const { base, filters, galleryview, quickFilter, navGroupFilters } = getState().sheet;
-    const { appId, viewId, worksheetId, chartId } = base;
+    const { appId, viewId, worksheetId, chartId, maxCount } = base;
     let { galleryIndex, gallery } = galleryview;
     if (index <= 1) {
       dispatch({ type: 'CHANGE_GALLERY_VIEW_LOADING', loading: true });
     } else {
       dispatch({ type: 'CHANGE_GALLERY_LOADING', loading: true });
     }
-    wrappedGetFilterRows({
+    const args = {
       worksheetId,
       pageSize: 50,
       pageIndex: index,
@@ -36,7 +34,12 @@ export const fetch = index => {
         ]),
       ),
       navGroupFilters,
-    }).then(res => {
+    };
+    if (maxCount) {
+      args.pageIndex = 1;
+      args.pageSize = maxCount;
+    }
+    worksheetAjax.getFilterRows(args).then(res => {
       dispatch({
         type: 'CHANGE_GALLERY_VIEW_DATA',
         list: index > 1 ? gallery.concat(res.data) : res.data,
@@ -86,7 +89,7 @@ export const updateRow = data => {
         type: 'CHANGE_GALLERY_VIEW_DATA',
         list: gallery.map(o => {
           if (o.rowid === data.rowid) {
-            return data;
+            return { ..._.pick(o, ['allowedit', 'allowdelete']), ...data }; //接口返回'allowedit', 'allowdelete' 不对，沿用更改前
           } else {
             return o;
           }

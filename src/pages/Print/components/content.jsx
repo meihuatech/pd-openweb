@@ -1,6 +1,6 @@
 import React from 'react';
 import sheetAjax from 'src/api/worksheet';
-import { renderCellText } from 'worksheet/components/CellControls';
+import renderCellText from 'src/pages/worksheet/components/CellControls/renderText';
 import './content.less';
 import cx from 'classnames';
 import { getPrintContent, sortByShowControls, getVisibleControls, isRelation } from '../util';
@@ -17,8 +17,11 @@ import {
   UNPRINTCONTROL,
 } from '../config';
 import { putControlByOrder, replaceHalfWithSizeControls } from 'src/pages/widgetConfig/util';
-import { SYS } from 'src/pages/widgetConfig/config/widget';
 import { SYSTOPRINTTXT } from '../config';
+import { permitList } from 'src/pages/FormSet/config.js';
+import { isOpenPermit } from 'src/pages/FormSet/util.js';
+import _ from 'lodash';
+import moment from 'moment';
 
 export default class Con extends React.Component {
   constructor(props) {
@@ -41,39 +44,62 @@ export default class Con extends React.Component {
       fontSize: printData.font || DEFAULT_FONT_SIZE,
     });
   }
-  loadWorksheetShortUrl = () => {
-    const { appId, worksheetId, viewId, rowId, printId, type, from, printType, isDefault, projectId } =
-      this.props.params;
-    sheetAjax
-      .getWorksheetShareUrl({
-        worksheetId,
-        appId,
-        viewId,
-        rowId,
-        objectType: 2,
-      })
-      .then(shareUrl => {
-        let url = shareUrl;
-        if (
-          from === fromType.PRINT &&
-          type === typeForCon.PREVIEW &&
-          isDefault &&
-          printId &&
-          printType === 'worksheet'
-        ) {
-          url = shareUrl.replace(/worksheetshare/, 'printshare');
-          url = `${url}&&${printId}&&${projectId}`;
-        }
-        this.setState({
-          shareUrl: `${__api_server__}code/CreateQrCodeImage?url=${encodeURIComponent(url)}`,
+  componentWillReceiveProps(nextProps, nextState) {
+    if (_.get(this.props, ['printData', 'shareType']) !== _.get(nextProps, ['printData', 'shareType'])) {
+      this.loadWorksheetShortUrl(nextProps);
+    }
+  }
+  loadWorksheetShortUrl = props => {
+    let { appId, worksheetId, viewId, rowId, printId, type, from, printType, isDefault, projectId } = this.props.params;
+    const { printData } = props || this.props;
+    const { shareType = 0, rowIdForQr } = printData;
+    // shareType 0 普通=>记录分享 1 对内=>记录详情
+    if (shareType === 0) {
+      sheetAjax
+        .getWorksheetShareUrl({
+          worksheetId,
+          appId,
+          viewId,
+          rowId: rowId || rowIdForQr,
+          objectType: 2,
+        })
+        .then(({ shareLink }) => {
+          let url = shareLink;
+          if (
+            from === fromType.PRINT &&
+            type === typeForCon.PREVIEW &&
+            isDefault &&
+            printId &&
+            printType === 'worksheet'
+          ) {
+            url = url.replace('public/record', 'public/print');
+            url = `${url}&&${printId}&&${projectId}`;
+          }
+          this.setState({
+            shareUrl: `${__api_server__.main}code/CreateQrCodeImage?url=${encodeURIComponent(url)}`,
+          });
         });
+    } else {
+      viewId = !viewId ? undefined : viewId;
+      let url = `${location.origin}${window.subPath || ''}/app/${appId}/${worksheetId}/${viewId}/row/${rowId ||
+        rowIdForQr}`;
+      this.setState({
+        shareUrl: `${__api_server__.main}code/CreateQrCodeImage?url=${encodeURIComponent(url)}`,
       });
+    }
   };
 
   renderControls() {
     const { params, printData, controls = [] } = this.props;
-    const { type, from } = this.props.params;
-    const { showData, printOption } = printData;
+    let { appId, worksheetId, viewId, rowId, type, from } = this.props.params;
+    const { showData, printOption, rowIdForQr } = printData;
+    let dataInfo = {
+      recordId: rowId || rowIdForQr,
+      appId,
+      worksheetId,
+      viewIdForPermit: viewId,
+      controls,
+    };
     const controlData = putControlByOrder(
       replaceHalfWithSizeControls(getVisibleControls(controls).filter(o => !UNPRINTCONTROL.includes(o.type))),
     );
@@ -102,7 +128,10 @@ export default class Con extends React.Component {
               }
             }
             if (
-              (!this.isShow(getPrintContent({ ...item[0], showData: isHideNull, noUnit: true }), item[0].checked) &&
+              (!this.isShow(
+                getPrintContent({ ...item[0], showData: isHideNull, noUnit: true, ...dataInfo }),
+                item[0].checked,
+              ) &&
                 item[0].type !== 22) ||
               (item[0].type === 22 && !item[0].checked)
             ) {
@@ -121,7 +150,7 @@ export default class Con extends React.Component {
                   {/* 分段不计算value 走特殊显示方式 */}
                   {item[0].type !== 22 && (
                     <span className={cx('value', { value2: item[0].type === 2 })}>
-                      {getPrintContent({ ...item[0], showUnit: true, showData: isHideNull, printOption })}
+                      {getPrintContent({ ...item[0], showUnit: true, showData: isHideNull, printOption, ...dataInfo })}
                     </span>
                   )}
                 </div>
@@ -130,7 +159,7 @@ export default class Con extends React.Component {
           } else {
             //一行多个控件的显示
             let data = item.filter(it =>
-              this.isShow(getPrintContent({ ...it, showData: isHideNull, noUnit: true }), it.checked),
+              this.isShow(getPrintContent({ ...it, showData: isHideNull, noUnit: true, ...dataInfo }), it.checked),
             );
             if (data.length > 0) {
               return (
@@ -145,7 +174,7 @@ export default class Con extends React.Component {
                       >
                         <span className="title">{it.controlName || _l('未命名')}</span>
                         <span className={cx('value', { value2: it.type === 2 })}>
-                          {getPrintContent({ ...it, showUnit: true, printOption })}
+                          {getPrintContent({ ...it, showUnit: true, printOption, ...dataInfo })}
                         </span>
                       </div>
                     );
@@ -206,9 +235,9 @@ export default class Con extends React.Component {
         }
       });
     }
-    //关联表富文本不不显示 分段不显示
+    //关联表富文本不不显示 分段 嵌入不显示 扫码47暂不支持关联表显示(表单配置处隐藏了)
     controls = controls.filter(
-      it => it.type !== 41 && it.type !== 22 && !(it.type === 30 && it.sourceControlType === 41),
+      it => ![41, 22, 45, 47].includes(it.type) && !(it.type === 30 && it.sourceControlType === 41),
     );
     let relationStyleNum = relationStyle.find(it => it.controlId === tableList.controlId) || [];
     let setStyle = type => {
@@ -237,6 +266,13 @@ export default class Con extends React.Component {
         relationStyle: data,
       });
     };
+    // let dataInfo = {
+    //   recordId: rowId,
+    //   appId,
+    //   worksheetId,
+    //   viewIdForPermit: viewId,
+    //   controls,
+    // };
     return (
       <React.Fragment>
         <p className={cx('relationsTitle Font15', { tableP: !relationStyleNum.type || relationStyleNum.type === 1 })}>
@@ -296,6 +332,12 @@ export default class Con extends React.Component {
                         isRelateMultipleSheet: true,
                         showUnit: true,
                       };
+                      if ([29].includes(it.type)) {
+                        let list = (it.relationControls || []).find(o => o.attribute === 1) || {};
+                        if (list.type && ![29, 30].includes(list.type)) {
+                          data = { ...data, sourceControlType: list.type, advancedSetting: list.advancedSetting };
+                        }
+                      }
                       if (
                         !this.isShow(
                           getPrintContent({
@@ -311,7 +353,20 @@ export default class Con extends React.Component {
                       return (
                         <div className={cx('relationsListLi', {})}>
                           <span className="title">{it.controlName || _l('未命名')}</span>
-                          <span className="value">{getPrintContent({ ...data })}</span>
+                          <span className="value">
+                            {getPrintContent({
+                              ...data,
+                              // ...{
+                              //   controls: relationControls.map(it => {
+                              //     return { ...it, value: o[it.controlId] };
+                              //   }),
+                              //   recordId: it.rowid,
+                              //   worksheetId: it.wsid,
+
+                              //   // viewIdForPermit: viewId,
+                              // },
+                            })}
+                          </span>
                         </div>
                       );
                     })}
@@ -325,14 +380,16 @@ export default class Con extends React.Component {
     );
   };
 
-  renderWorks = () => {
+  renderWorks = (_works = undefined, _name) => {
     const { printData } = this.props;
     const { workflow = [], processName } = printData;
-    const visibleItemLength = workflow.filter(item => item.checked).length;
+    let works = _works ? _works : workflow;
+    const visibleItemLength = works.filter(item => item.checked).length;
+    let name = _works ? _name : processName;
     return (
       <div className="worksTable">
-        {visibleItemLength ? <div className="Font15 bold mBottom12">{processName}</div> : null}
-        {workflow.map((item, index) => (
+        {visibleItemLength ? <div className="Font15 bold mBottom12">{name}</div> : null}
+        {works.map((item, index) => (
           <div
             className="workDetail clearfix "
             key={index}
@@ -389,10 +446,44 @@ export default class Con extends React.Component {
     );
   };
 
+  renderApproval = () => {
+    const { printData, sheetSwitchPermit, params } = this.props;
+    const { viewId } = params;
+    const { approval = [] } = printData;
+
+    const visibleItem = approval.filter(item => item.child.some(l => l.checked));
+    if (!isOpenPermit(permitList.approveDetailsSwitch, sheetSwitchPermit, viewId)) {
+      return null;
+    }
+    return (
+      <React.Fragment>
+        {visibleItem.length > 0 && (
+          <React.Fragment>
+            {visibleItem.map((item, index) => {
+              return (
+                <div className="approval">
+                  {item.child.map(l => {
+                    let _workList = l.processInfo.works.map(m => {
+                      return {
+                        ...m,
+                        checked: l.checked,
+                      };
+                    });
+                    return this.renderWorks(_workList, l.processInfo.processName);
+                  })}
+                </div>
+              );
+            })}
+          </React.Fragment>
+        )}
+      </React.Fragment>
+    );
+  };
+
   getNumSys = () => {
     const { printData } = this.props;
     let num = 0;
-    ['createTime', 'ownerAccount', 'createAccount', 'updateTime'].map(o => {
+    ['createTime', 'ownerAccount', 'createAccount', 'updateAccount', 'updateTime'].map(o => {
       if (this.isShow(printData[o], printData[o + 'Checked'])) {
         num = num + 1;
       }
@@ -412,14 +503,29 @@ export default class Con extends React.Component {
     return (!isHideNull || (data && isHideNull)) && checked;
   };
 
+  createByNeedWrap = () => {
+    const { printData } = this.props;
+    let createSign =
+      this.isShow(printData.createAccount, printData.createAccountChecked) &&
+      this.isShow(printData.createTime, printData.createTimeChecked);
+    let updateSign =
+      this.isShow(printData.updateAccount, printData.updateAccountChecked) &&
+      this.isShow(printData.updateTime, printData.updateTimeChecked);
+    if (createSign && updateSign) {
+      return false;
+    } else if (createSign && this.isShow(printData.ownerAccount, printData.ownerAccountChecked)) {
+      return true;
+    } else if (updateSign && this.getNumSys() % 2 === 1) {
+      return true;
+    }
+    return false;
+  };
+
   render() {
     const { loading, shareUrl } = this.state;
     const { params, printData, controls, signature } = this.props;
-    const { receiveControls = [], workflow = [], showData } = printData;
-    let dta = [];
-    if (receiveControls.length > 0) {
-      dta = receiveControls.find(it => it.attribute === 1);
-    }
+    const { receiveControls = [], workflow = [], showData, approval = [], attributeName } = printData;
+    let wrap = false;
     return (
       <div className="flex">
         {loading ? (
@@ -451,38 +557,49 @@ export default class Con extends React.Component {
               )}
               <div className="createBy">
                 {/* 标题 */}
-                <h6 className="Font18">{printData.titleChecked && dta && renderCellText(dta)}</h6>
+                <h6 className="Font18">{printData.titleChecked && attributeName}</h6>
                 {this.getNumSys() > 0 && (
                   <div className="mTop10 sysBox">
-                    {this.getNumSys() >= 4 ? (
+                    {this.getNumSys() >= 5 ? (
                       <React.Fragment>
                         <span className="mBottom10 TxtLeft">
                           {_l('拥有者：')}
                           {printData.ownerAccount}
                         </span>
-                        <div className="clear"></div>
-                        <span className="TxtLeft">
+                        <div className="clear" />
+                        <span className="TxtLeft mBottom10">
                           {_l('创建者：')}
                           {printData.createAccount}
                         </span>
-                        <span className="TxtCenter ">
+                        <span className="TxtLeft mBottom10">
                           {_l('创建时间：')}
                           {printData.createTime}
                         </span>
-                        <span className="TxtRight">
+                        <span className="TxtLeft mBottom10">
+                          {_l('最近修改人：')}
+                          {printData.updateAccount}
+                        </span>
+                        <span className="TxtLeft mBottom10">
                           {_l('最近修改时间：')}
                           {printData.updateTime}
                         </span>
                       </React.Fragment>
                     ) : (
-                      <div className={`sysBox${this.getNumSys()}`}>
-                        {['ownerAccount', 'createAccount', 'createTime', 'updateTime'].map(o => {
+                      <div className={`sysBox${this.getNumSys() === 1 ? '' : 2}`}>
+                        {['ownerAccount', 'createAccount', 'createTime', 'updateAccount', 'updateTime'].map(o => {
                           if (this.isShow(printData[o], printData[o + 'Checked'])) {
+                            let _wrap = wrap;
+                            if (!wrap) {
+                              wrap = true;
+                            }
                             return (
-                              <span>
-                                {SYSTOPRINTTXT[o]}
-                                {printData[o]}
-                              </span>
+                              <React.Fragment>
+                                <span className="mBottom10">
+                                  {SYSTOPRINTTXT[o]}
+                                  {printData[o]}
+                                </span>
+                                {this.createByNeedWrap() && !_wrap && <div className="clear" />}
+                              </React.Fragment>
                             );
                           }
                         })}
@@ -494,6 +611,7 @@ export default class Con extends React.Component {
               {_.isEmpty(controls) ? undefined : this.renderControls()}
               {/* 工作流 */}
               {workflow.length > 0 && this.renderWorks()}
+              {approval.length > 0 && this.renderApproval()}
               {/* 签名字段 */}
               {signature.length > 0 && signature.filter(item => item.checked).length > 0 ? (
                 <div className="flexRow mTop50 pBottom30 signatureContentWrapper">

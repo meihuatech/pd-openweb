@@ -1,14 +1,11 @@
-﻿/**
- * @module mdBusinesscard
- * @author puck
- * @desc new mdBusinesscard inspired by bootstrap-tooltip
- * @example
- * require.async('mdBusinessCard',function(){ $('').mdBusinessCard(); });
- */
-
-import store from 'redux/configureStore';
+﻿import store from 'redux/configureStore';
 import * as actions from 'src/pages/chat/redux/actions';
 import * as utils from 'src/pages/chat/utils';
+import departmentController from 'src/api/department';
+import doT from '@mdfe/dot';
+import userController from 'src/api/user';
+import groupController from 'src/api/group';
+import cardTpl from './tpl/mdBusinessCard.html';
 
 var BusinessCard = function (element, options) {
   this.type = null;
@@ -23,10 +20,6 @@ var BusinessCard = function (element, options) {
   this.init('businesscard', element, options);
 };
 
-var doT = require('dot');
-var userController = require('src/api/user');
-var groupController = require('src/api/group');
-var cardTpl = require('./tpl/mdBusinessCard.html');
 /**
  * @typedef {object} cardTypeEnum
  * @type {{USER: number, GROUP: number, SECRET: number}}
@@ -39,6 +32,7 @@ var TYPES = {
 };
 
 import './css/mdBusinessCard.less';
+import _ from 'lodash';
 
 BusinessCard.DEFAULTS = {
   id: 'businessCard',
@@ -72,6 +66,7 @@ BusinessCard.DEFAULTS = {
     currentJobNumber: '', //工号
     orgName: '', //本组织（部门+职位）
   },
+  fullDepartmentPath: {},
   reset: false,
   force: false,
   opHtml: null,
@@ -295,18 +290,29 @@ BusinessCard.prototype.bindEvent = function () {
     } else if (options.type === TYPES.GROUP) {
       isWindow ? utils.windowOpen(sourceId, fullname, true) : store.dispatch(actions.addGroupSession(sourceId));
     }
-    // } else {
-    // require(['addFriendConfirm'], function (dialog) {
-    //   dialog({
-    //     accountId: options.sourceId,
-    //   });
-    // });
-    // }
   });
 
   // 飞入效果
   $dialog.on('webkitAnimationEnd animationend', function () {
     $(this).removeClass('animationsUp animationsDown');
+  });
+
+  $dialog.on('hover', '.orgName', function () {
+    const { departmentId } = options.data || {};
+    if (!departmentId || options.fullDepartmentPath[departmentId]) {
+      const fullPath = options.fullDepartmentPath[departmentId];
+      $(this).attr('title', fullPath);
+      return;
+    }
+    departmentController
+      .getDepartmentFullNameByIds({
+        projectId: options.projectId,
+        departmentIds: [JSON.parse(JSON.stringify(departmentId))],
+      })
+      .then(res => {
+        options.fullDepartmentPath[departmentId] = res[0].name.split('/').join('/');
+        $(this).attr('title', options.fullDepartmentPath[departmentId]);
+      });
   });
 };
 
@@ -373,7 +379,7 @@ BusinessCard.prototype.applyPlacement = function () {
 BusinessCard.prototype.formatData = function (result) {
   var type = this.options.type;
   var data = {};
-  if (this.options.accountId.indexOf('#') > -1) {
+  if (md.global.Account.isPortal || (_.get(this.options, ['accountId']) || '').indexOf('#') > -1) {
     data.status = 3;
     data.isPortal = true;
     data.fullname = result.fullname;
@@ -393,11 +399,10 @@ BusinessCard.prototype.formatData = function (result) {
     data.sameProjectIds = result.sameProjectIds || [];
     data.currentProjectName = this.options.projectId ? !!result.currentProjectName : true;
     data.currentJobNumber = result.currentJobNumber;
-    data.orgName =
-      result.currentDepartmentName && result.profession
-        ? [result.currentDepartmentName, result.profession].join('/')
-        : result.currentDepartmentName || result.profession;
+    data.orgName = result.currentDepartmentName;
+    data.profession = result.profession;
     data.nodata = !!data.currentProjectName ? data.orgName && data.currentJobNumber : data.companyName;
+    data.departmentId = result.currentDepartmentId;
   } else if (type === TYPES.GROUP) {
     data.groupName = result.name;
     data.avatar = result.avatar;

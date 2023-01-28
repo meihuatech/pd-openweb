@@ -3,12 +3,13 @@ import { string } from 'prop-types';
 import { Checkbox, Dialog, Input, Dropdown, RadioGroup } from 'ming-ui';
 import styled from 'styled-components';
 import { useSetState } from 'react-use';
-import { getWorksheetControlsQuantity } from 'src/api/worksheet';
+import worksheetAjax from 'src/api/worksheet';
 import { SettingItem } from '../../../styled';
 import { RELATE_COUNT, RELATE_COUNT_TEXT, DISPLAY_TYPE_TEXT } from '../../../config/setting';
 import { getDisplayType } from '../../../util/setting';
 import { toEditWidgetPage } from '../../../util';
 import { useSheetInfo } from '../../../hooks';
+import _ from 'lodash';
 
 const ConfigWrap = styled.div`
   padding-bottom: 10px;
@@ -59,10 +60,10 @@ const RelateInfo = styled.div`
 `;
 
 export default function BothWayRelate(props) {
-  const { data, worksheetInfo, globalSheetInfo, onOk } = props;
-  const { sourceControl = {} } = data;
+  const { data, worksheetInfo, globalSheetInfo = {}, onOk } = props;
+  const { sourceControl = {}, controlId } = data;
   const { controlId: sourceControlId, controlName, enumDefault = 2, advancedSetting = {} } = sourceControl;
-  const { name: sourceName } = globalSheetInfo;
+  const [sourceName, setSourceName] = useState(globalSheetInfo.name);
   const { name: sheetName, worksheetId, roleType } = worksheetInfo;
   const [{ name, count, displayType, configVisible }, setConfig] = useSetState({
     configVisible: false,
@@ -71,8 +72,13 @@ export default function BothWayRelate(props) {
     displayType: advancedSetting.showtype || '2',
   });
 
+  useEffect(() => {
+    setSourceName(globalSheetInfo.name);
+    setConfig({ name: controlName || sourceName });
+  }, [controlId]);
+
   const handleClick = () => {
-    // getWorksheetControlsQuantity({ worksheetId }).then(({ data }) => {
+    // worksheetAjax.getWorksheetControlsQuantity({ worksheetId }).then(({ data }) => {
     //   const { totalNum, relationNum } = data;
     //   if (totalNum > 200) {
     //     alert(_l('关联表超过200个控件，无法关联'));
@@ -109,7 +115,8 @@ export default function BothWayRelate(props) {
               className="sourceName pointer Bold"
               onClick={() =>
                 toEditWidgetPage({ sourceId: worksheetId, targetControl: sourceControlId, fromURL: 'newPage' })
-              }>
+              }
+            >
               {name || sourceName}
             </span>
           </div>
@@ -125,13 +132,18 @@ export default function BothWayRelate(props) {
           title={_l('添加双向关联')}
           onCancel={() => setConfig({ configVisible: false })}
           onOk={() => {
+            if (!name) {
+              alert(_l('字段名称不能为空'), 3);
+              return;
+            }
             onOk({
               controlName: name,
               enumDefault: count,
               advancedSetting: { showtype: displayType },
             });
             setConfig({ configVisible: false });
-          }}>
+          }}
+        >
           <div className="hint Gray_75">
             {_l('在 “%0”中添加关联字段“%1” ，双向同步关联的数据。', sheetName, sourceName)}
           </div>

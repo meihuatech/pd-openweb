@@ -3,6 +3,7 @@ import { string, arrayOf, shape, func } from 'prop-types';
 import RecordCardListDialog from 'src/components/recordCardListDialog';
 import { OtherFieldList, SelectOtherField, DynamicInput } from '../components';
 import { DynamicValueInputWrap } from '../styled';
+import _ from 'lodash';
 
 export default class RelateSheet extends Component {
   static propTypes = {
@@ -46,8 +47,9 @@ export default class RelateSheet extends Component {
     const multiple = data.enumDefault === 2;
     const filterRowIds = dynamicValue.reduce((total, item) => {
       if (!item.cid) {
-        return total.concat(this.getRowId(item.staticValue));
+        total = total.concat(this.getRowId(item.staticValue));
       }
+      return total;
     }, []);
     return (
       <DynamicValueInputWrap>
@@ -80,7 +82,8 @@ export default class RelateSheet extends Component {
                 };
               });
               if (multiple) {
-                onDynamicValueChange(dynamicValue.concat(newValue));
+                const filterDynamicValue = (dynamicValue || []).filter(i => i.staticValue);
+                onDynamicValueChange(filterDynamicValue.concat(newValue));
               } else {
                 onDynamicValueChange(newValue);
               }

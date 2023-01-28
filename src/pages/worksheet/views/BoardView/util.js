@@ -1,6 +1,6 @@
 import { isEmpty } from 'lodash';
 import { getAdvanceSetting } from 'src/util';
-import { renderCellText } from 'worksheet/components/CellControls';
+import renderCellText from 'src/pages/worksheet/components/CellControls/renderText';
 import { RENDER_RECORD_NECESSARY_ATTR, filterAndFormatterControls, getRecordAttachments } from '../util';
 import { CAN_AS_BOARD_OPTION } from './config';
 // 处理从后端获取的看板数据
@@ -69,6 +69,9 @@ export const dealBoardViewData = props => {
                   value: parsedRow[abstract],
                 })
               : '',
+            formData: controls.map(o => {
+              return { ...o, value: parsedRow[o.controlId] };
+            }),
           };
         } catch (error) {
           console.log(error);
@@ -80,6 +83,7 @@ export const dealBoardViewData = props => {
         ...item,
         ...extraPara,
         ..._.pick(control, ['required', 'fieldPermission']),
+        name: key === '-1' ? view.advancedSetting.emptyname || _l('未指定') : item.name,
         // 未分类
         noGroup: key === '-1',
         data: itemData,
@@ -89,7 +93,7 @@ export const dealBoardViewData = props => {
   }
 };
 
-export const getTargetName = (value, controls = {}, { type, enumDefault }) => {
+export const getTargetName = (value, controls = {}, { type }) => {
   if (type === 26) {
     return value;
   } else if ([9, 11].includes(type)) {
@@ -98,6 +102,6 @@ export const getTargetName = (value, controls = {}, { type, enumDefault }) => {
   } else if (type === 29) {
     return JSON.parse(value || {}).name;
   } else if (type === 28) {
-    return value + `${enumDefault === 2 ? _l('级') : _l('星')}`;
+    return _l('%0 级', value);
   }
 };

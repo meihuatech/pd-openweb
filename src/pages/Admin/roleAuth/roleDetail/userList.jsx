@@ -4,6 +4,8 @@ import LoadDiv from 'ming-ui/components/LoadDiv';
 import UserHead from 'src/pages/feed/components/userHead';
 
 import RoleController from 'src/api/role';
+import cx from 'classnames';
+import _ from 'lodash';
 
 class RoleUserList extends React.Component {
   static propTypes = {
@@ -31,7 +33,7 @@ class RoleUserList extends React.Component {
       isLoading: false,
       users: null,
       allCount: null,
-      keywords: ''
+      keywords: '',
     };
 
     this.getUserList = this.getUserList.bind(this);
@@ -46,13 +48,16 @@ class RoleUserList extends React.Component {
   }
 
   componentWillReceiveProps(nextProps) {
-    if(nextProps.keywords !== this.props.keywords) {
-      this.setState({
-        keywords: nextProps.keywords,
-        pageIndex: 1
-      }, () => {
-        this.getUserList()
-      })
+    if (nextProps.keywords !== this.props.keywords) {
+      this.setState(
+        {
+          keywords: nextProps.keywords,
+          pageIndex: 1,
+        },
+        () => {
+          this.getUserList();
+        },
+      );
     }
   }
 
@@ -83,14 +88,11 @@ class RoleUserList extends React.Component {
       pageSize,
       projectId,
       roleId,
-      keywords
+      keywords,
     })
       .done(({ allCount, list } = {}) => {
         if (allCount === undefined) {
-          return $
-            .Deferred()
-            .reject()
-            .promise();
+          return $.Deferred().reject().promise();
         }
         this.setState({
           isLoading: false,
@@ -119,21 +121,24 @@ class RoleUserList extends React.Component {
         </tr>
       );
     }
-
     if (users && users.length) {
       return (
         <React.Fragment>
           {_.map(users, user => {
             return (
               <tr key={user.accountId} className="tdHover">
-                <td className="avatarBox ">
+                <td className="avatarBox LineHeight48">
                   <UserHead user={{ userHead: user.avatar, accountId: user.accountId }} lazy={'false'} size={32} />
                 </td>
                 <td className="userName">{user.fullName}</td>
                 <td className="userProfession">{user.profession}</td>
-                <td className="userDepartment">{user.departName}</td>
+                <td className="userDepartment">{(user.departName || '').replace(/;/g, '；')}</td>
                 {!isApply ? (
-                  <td className="userOperation ThemeHoverColor3">
+                  <td
+                    className={cx('userOperation ThemeHoverColor3', {
+                      pLeft8: this.roleUserList.clientHeight > this.roleAuthDetailScroll.clientHeight,
+                    })}
+                  >
                     {userOpAuth && !(user.accountId === md.global.Account.accountId && isSuperAdmin) ? (
                       <span
                         className="adminHoverDeleteColor"
@@ -192,9 +197,11 @@ class RoleUserList extends React.Component {
             </tr>
           </thead>
         </table>
-        <div className="roleAuthDetailScroll">
+        <div className="roleAuthDetailScroll" ref={node => (this.roleAuthDetailScroll = node)}>
           <table className="w100">
-            <tbody className="roleUserList">{this.renderUserList()}</tbody>
+            <tbody className="roleUserList roleUserListEmpty" ref={node => (this.roleUserList = node)}>
+              {this.renderUserList()}
+            </tbody>
           </table>
         </div>
         {!isLoading && users && allCount > pageSize ? (

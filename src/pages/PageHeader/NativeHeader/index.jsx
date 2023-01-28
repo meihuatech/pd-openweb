@@ -10,6 +10,7 @@ import IndexSide from '../components/IndexSide';
 import HomepageIcon from '../components/HomepageIcon';
 import './index.less';
 import { compareProps } from '../util';
+import _ from 'lodash';
 
 export default class NativeHeader extends Component {
   static propTypes = {
@@ -56,7 +57,13 @@ export default class NativeHeader extends Component {
         <ul className="nativeTabsWrap">
           {NATIVE_MODULES.map(({ id, href, urlMatch, text }) =>
             id === 'hr' && !_.get(md, ['global', 'Account', 'hrVisible']) ? null : (
-              <li key={id} className={cx('tab-item', { active: urlMatch.test(path) })} onClick={() => navigateTo(href)}>
+              <li
+                key={id}
+                className={cx('tab-item', { active: urlMatch.test(path) })}
+                onClick={() => {
+                  id === 'hr' ? window.open(href) : navigateTo(href);
+                }}
+              >
                 {text}
               </li>
             ),

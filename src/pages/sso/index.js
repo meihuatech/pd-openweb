@@ -1,5 +1,6 @@
 import { ajax, login, browserIsMobile, getRequest, checkLogin, isBefore, replenishRet } from 'src/util/sso';
 import { setPssId } from 'src/util/pssId';
+import _ from 'lodash';
 
 const { t, i, ret, url, code, p, pc_slide = '' } = getRequest();
 const isPcSlide = pc_slide.includes('true');
@@ -16,11 +17,12 @@ function start() {
       }
     } else {
       ajax.post({
-        url: __api_server__ + 'Login/WorkWeiXinMiniProgramLogin',
+        url: __api_server__.main + 'Login/WorkWeiXinMiniProgramLogin',
         data: {
           code,
         },
         async: true,
+        withCredentials: false,
         succees: result => {
           const { accountResult, sessionId } = result.data;
           if (accountResult === 1) {
@@ -48,7 +50,7 @@ function start() {
     } else {
       // 企业微信
       ajax.post({
-        url: __api_server__ + 'Login/GetWorkWeiXinCorpInfo',
+        url: __api_server__.main + 'Login/GetWorkWeiXinCorpInfo',
         data: {
           apkId: i,
         },
@@ -88,7 +90,7 @@ function start() {
 
       // 钉钉
       ajax.post({
-        url: __api_server__ + 'Login/GetDingDingCorpInfo',
+        url: __api_server__.main + 'Login/GetDingDingCorpInfo',
         data: {
           projectId,
         },
@@ -101,7 +103,7 @@ function start() {
                 corpId: corpId,
                 onSuccess: function (result) {
                   const { code } = result;
-                  const isDingDingSidebar = (ret || '').includes('#noredirect');
+                  const isDingDingSidebar = (ret || '').includes('#noredirect') || isPcSlide;
                   const dingdingLoginUrl = `/sso/dingding?state=${state}&ret=${encodeURIComponent(ret || '')}&i=${
                     i || ''
                   }&code=${code}&pc_slide=${pc_slide}`;

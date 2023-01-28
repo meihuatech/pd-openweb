@@ -12,7 +12,8 @@ import MoreOption from '../components/MoreOption';
 import { redefineComplexControl, formatValuesOfOriginConditions } from 'worksheet/common/WorkSheetFilter/util';
 import cx from 'classnames';
 import { RangeDrop } from 'src/pages/FormSet/components/RangeDrop';
-
+import { refreshBtnData } from 'src/pages/FormSet/util';
+import _ from 'lodash';
 const Con = styled.div`
   width: 100%;
   height: 100%;
@@ -62,10 +63,13 @@ function CustomBtnFormSet(props) {
   const [isEdit, setIsEdit] = useState();
   const [showMoreOption, setShowMoreOption] = useState();
   const [showDropOption, setShowDropOption] = useState();
-  useEffect(() => {
-    if (!worksheetId) return;
-    getdata();
-  }, [worksheetId]);
+  useEffect(
+    () => {
+      if (!worksheetId) return;
+      getdata();
+    },
+    [worksheetId],
+  );
   let ajaxFn = null;
   const getdata = () => {
     if (ajaxFn) {
@@ -80,27 +84,17 @@ function CustomBtnFormSet(props) {
   };
 
   const updateCustomButtons = (btns, isAdd) => {
-    const refreshData = data => {
-      if (isAdd) {
-        data.push(btns);
-        return data;
-      }
-      return data.map(o => {
-        if (o.btnId === btns.btnId) {
-          return btns;
-        } else {
-          return o;
-        }
-      });
-    };
-    setBtnList(refreshData(btnList));
+    setBtnList(refreshBtnData(_.cloneDeep(btnList), btns, isAdd));
   };
 
-  useEffect(() => {
-    if (isRename) {
-      input.current.focus();
-    }
-  }, [isRename]);
+  useEffect(
+    () => {
+      if (isRename) {
+        input.current.focus();
+      }
+    },
+    [isRename],
+  );
   const optionWorksheetBtn = ({ btnId, appId, viewId, optionType, callback }) => {
     sheetAjax
       .optionWorksheetBtn({
@@ -163,7 +157,7 @@ function CustomBtnFormSet(props) {
                   return (
                     <div className={cx('templates')} key={it.btnId}>
                       <div className={cx('topBox')}>
-                        <div className="bg" style={{ background: it.color ? it.color : '#2196f3', opacity: 0.1 }}></div>
+                        <div className="bg" style={{ background: it.color ? it.color : '#2196f3', opacity: 0.1 }} />
                         <Icon
                           icon={it.icon || 'custom_actions'}
                           style={{ color: it.color ? it.color : '#2196f3' }}
@@ -307,7 +301,6 @@ function CustomBtnFormSet(props) {
                                 setShowDropOption(false);
                               }}
                               setData={data => {
-                                console.log(data);
                                 const { printData = {} } = data;
                                 const isAllView = printData.range === 3 ? 0 : 1;
                                 const views =
@@ -366,6 +359,7 @@ function CustomBtnFormSet(props) {
               isClickAway={true}
               from="formset"
               onClickAwayExceptions={[
+                '.ant-modal-root',
                 '.ChooseWidgetDialogWrap',
                 '.showBtnFilterDialog',
                 '.doubleConfirmDialog',
@@ -385,6 +379,11 @@ function CustomBtnFormSet(props) {
                 '.mdAlertDialog',
                 '.ant-cascader-menus',
                 '.ant-tree-select-dropdown',
+                '.ant-tooltip',
+                '.CodeMirror-hints',
+                '.ck',
+                '.ant-picker-dropdown',
+                '.Tooltip',
               ]}
               onClickAway={() => setShowCreateCustomBtn(false)}
               isEdit={isEdit}
@@ -401,7 +400,7 @@ function CustomBtnFormSet(props) {
               btnDataInfo={btnId ? _.find(btnList, item => item.btnId === btnId) : []}
               projectId={worksheetInfo.projectId}
               worksheetControls={worksheetControls}
-              currentSheetInfo={{ template: { controls: worksheetControls } }}
+              currentSheetInfo={{ ...worksheetInfo, template: { controls: worksheetControls } }}
               viewId={''}
               appId={worksheetInfo.appId}
               worksheetId={worksheetId}
@@ -420,4 +419,7 @@ function CustomBtnFormSet(props) {
 const mapStateToProps = state => state.formSet;
 const mapDispatchToProps = dispatch => bindActionCreators(actions, dispatch);
 
-export default connect(mapStateToProps, mapDispatchToProps)(CustomBtnFormSet);
+export default connect(
+  mapStateToProps,
+  mapDispatchToProps,
+)(CustomBtnFormSet);

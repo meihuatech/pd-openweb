@@ -1,14 +1,18 @@
 import React, { Fragment, Component } from 'react';
 import { Icon, Button } from 'ming-ui';
+import cx from 'classnames';
+import { Checkbox } from 'antd-mobile';
 import { FLOW_FAIL_REASON } from 'src/pages/workflow/WorkflowSettings/History/config';
-import { FLOW_NODE_TYPE_STATUS, INSTANCELOG_STATUS } from 'src/pages/workflow/MyProcess/config';
+import { covertTime, FLOW_NODE_TYPE_STATUS, INSTANCELOG_STATUS } from 'src/pages/workflow/MyProcess/config';
 import { ACTION_TO_METHOD } from 'src/pages/workflow/components/ExecDialog/config';
 import './index.less';
 import SvgIcon from 'src/components/SvgIcon';
-import OtherAction from 'src/pages/Mobile/ProcessRecord/OtherAction';
+import OtherAction from 'mobile/ProcessRecord/OtherAction';
 import instanceVersion from 'src/pages/workflow/api/instanceVersion';
 import instance from 'src/pages/workflow/api/instance';
-import { processInformTabs } from 'src/pages/Mobile/Process/ProcessInform';
+import { processInformTabs } from 'mobile/Process/ProcessInform';
+import _ from 'lodash';
+import moment from 'moment';
 
 const TABS = {
   WAITING_DISPOSE: 1, // 待处理
@@ -55,8 +59,109 @@ export default class Card extends Component {
           alert(_l('操作成功'));
           onApproveDone(item);
         }
+        if (_.get(window, 'JSBridgeAdapter.approvalEvent')) {
+          window.JSBridgeAdapter.approvalEvent({
+            type: action === 'pass' ? 1 : 2,
+            enterType: 1,
+            result: data,
+            workData: this.props.item
+          });
+        }
       });
     }
+  }
+  renderTimeConsuming() {
+    const { workItem = {} } = this.props.item;
+
+    const workItems = (workItem.workId ? [workItem] : []).filter(
+      item => _.includes([3, 4], item.type) && item.operationTime,
+    );
+    const timeConsuming = [];
+    const endTimeConsuming = [];
+
+    if (!workItems.length) return null;
+
+    workItems.forEach(item => {
+      // 截止时间
+      if (item.dueTime) {
+        endTimeConsuming.push(moment(item.operationTime) - moment(item.dueTime));
+      }
+
+      timeConsuming.push(moment(item.operationTime) - moment(item.receiveTime));
+    });
+
+    const maxTimeConsuming = _.max(timeConsuming) || 0;
+    let maxEndTimeConsuming = _.max(endTimeConsuming) || 0;
+
+    if (
+      (workItems[0].opinion || '').indexOf('限时自动通过') > -1 ||
+      (workItems[0].opinion || '').indexOf('限时自动填写') > -1
+    ) {
+      maxEndTimeConsuming = 1;
+    }
+
+    if (!maxEndTimeConsuming) {
+      const time = covertTime(maxTimeConsuming);
+      return time ? <span className="overflow_ellipsis Gray_9e mLeft10">{_l('耗时：%0', time)}</span> : null;
+    }
+
+    return (
+      <span
+        className="stepTimeConsuming flexRow"
+        style={{
+          color: maxEndTimeConsuming > 0 ? '#F44336' : '#4CAF50'
+        }}
+      >
+        <Icon icon={maxEndTimeConsuming > 0 ? 'overdue_network' : 'task'} className="Font14 mRight2" />
+        <div className="overflow_ellipsis">{_l('耗时：%0', covertTime(maxTimeConsuming))}</div>
+      </span>
+    );
+  }
+  renderSurplusTime() {
+    const { workItem = {} } = this.props.item;
+    let currentAccountNotified = false;
+    const workItems = (workItem.workId ? [workItem] : []).filter(item => {
+      if (item.executeTime) {
+        currentAccountNotified = true;
+      }
+      return _.includes([3, 4], item.type) && !item.operationTime && item.dueTime;
+    });
+
+    if (!workItems.length) return null;
+
+    const time = moment() - moment(workItems[0].dueTime) || 0;
+
+    return (
+      <span
+        className="stepTimeConsuming flexRow"
+        style={{
+          color: time > 0 ? '#F44336' : currentAccountNotified ? '#FF9800' : '#2196f3',
+        }}
+      >
+        <Icon icon={time > 0 ? 'error1' : 'hourglass'} className="Font14 mRight2" />
+        <div className="overflow_ellipsis">
+          {time > 0 ? _l('已超时%0', covertTime(time)) : _l('剩余%0', covertTime(time))}
+        </div>
+      </span>
+    );
+  }
+  renderTime() {
+    const { workItem = {} } = this.props.item;
+    const consumingWorkItems = (workItem.workId ? [workItem] : []).filter(
+      item => _.includes([3, 4], item.type) && item.operationTime,
+    );
+    const surplusTimeWorkItems = (workItem.workId ? [workItem] : []).filter(item => {
+      return _.includes([3, 4], item.type) && !item.operationTime && item.dueTime;
+    });
+
+    if (consumingWorkItems.length) {
+      return this.renderTimeConsuming();
+    }
+    if (surplusTimeWorkItems.length) {
+      return this.renderSurplusTime();
+    }
+
+    return <div className="Gray_9e ellipsis time">{this.props.time}</div>
   }
   renderHeader() {
     const { currentTab, item, time } = this.props;
@@ -77,20 +182,23 @@ export default class Card extends Component {
     }
 
     return (
-      <div className="mobileProcessCardHeader valignWrapper">
+      <div className="mobileProcessCardHeader valignWrapper overflow_ellipsis">
         <div className="stateWrapper valignWrapper flex">
           {RenderState}
         </div>
-        <div className="Gray_9e ellipsis time">{time}</div>
+        {this.renderTime()}
       </div>
     );
   }
   renderInfo() {
-    const { currentTab, item } = this.props;
+    const { currentTab, item, batchApproval } = this.props;
     const { flowNode, flowNodeType, workItem } = item;
     const { passBatchType, overruleBatchType, btnMap } = flowNode;
     const { operationType } = workItem;
     if (currentTab === 'waitingApproval') {
+      if (batchApproval) {
+        return null;
+      }
       return (
         <div className="valignWrapper mLeft10 approveBtnWrapper">
           {passBatchType === -1 && (
@@ -99,12 +207,12 @@ export default class Card extends Component {
               type="ghostgray"
               size="small"
             >
-              {_l('待办')}
+              {_l('办理')}
             </Button>
           )}
           {passBatchType !== -1 && (
             <Button
-              className="pass mRight5"
+              className="ellipsis pass mRight5"
               type="ghostgray"
               size="small"
               onClick={(event) => {
@@ -116,7 +224,7 @@ export default class Card extends Component {
           )}
           {overruleBatchType !== -1 && (
             <Button
-              className="overrule"
+              className="ellipsis overrule"
               type="ghostgray"
               size="small"
               onClick={(event) => {
@@ -217,13 +325,34 @@ export default class Card extends Component {
   }
   render() {
     const { otherActionVisible, action, instance } = this.state;
-    const { onClick } = this.props;
+    const { item, approveChecked, onClick, onChangeApproveCards, batchApproval } = this.props;
+    const { batchType } = item.flowNode || {};
+    const disabled = [-1, -2].includes(batchType);
     return (
       <Fragment>
-        <div className="mobileProcessCardWrapper" onClick={onClick}>
-          {this.renderHeader()}
-          {this.renderBody()}
-          {this.renderFooter()}
+        <div className={cx('mobileProcessCardWrapper flexRow', { batchApproval, approveChecked })}>
+          {batchApproval && (
+            <Checkbox
+              className="mRight5"
+              disabled={disabled}
+              checked={approveChecked}
+              onChange={onChangeApproveCards}
+            />
+          )}
+          <div
+            className="mobileProcessCardContent flexColumn flex"
+            onClick={() => {
+              if (batchApproval) {
+                !disabled && onChangeApproveCards({ target: { checked: !approveChecked } });
+              } else {
+                onClick();
+              }
+            }}
+          >
+            {this.renderHeader()}
+            {this.renderBody()}
+            {this.renderFooter()}
+          </div>
         </div>
         {otherActionVisible && (
           <OtherAction

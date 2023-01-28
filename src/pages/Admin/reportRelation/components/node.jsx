@@ -4,13 +4,29 @@ import cx from 'classnames';
 import { connect } from 'react-redux';
 import shallowEqual from 'react-redux/lib/utils/shallowEqual';
 
-import { fetchNode, updateCollapse, addSubordinates, replaceStructure, removeStructure } from '../actions';
+import {
+  updateCollapse,
+  addSubordinates,
+  replaceStructure,
+  removeStructure,
+  loadMore,
+  fetchSubordinates,
+} from '../actions';
 import { selectUser } from '../common';
-import Confirm from 'confirm';
 
-import Icon from 'ming-ui/components/Icon';
+import { Icon, LoadDiv, Dialog } from 'ming-ui';
 import Item from './item';
 import NoData from './noData';
+import styled from 'styled-components';
+import _ from 'lodash';
+
+const LoadWrap = styled.div`
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+`;
 
 const arrayEqual = function (arr1, arr2) {
   var length = arr1.length;
@@ -32,9 +48,9 @@ class Node extends Component {
   };
 
   renderChilds() {
-    const { subordinates, collapsed, id, auth } = this.props;
-    const len = subordinates && subordinates.length;
-    if (subordinates && len && !collapsed) {
+    const { subordinates, collapsed, id, auth, pageIndex, dispatch, moreLoading, subTotalCount, firstLevelLoading } =
+      this.props;
+    if (subordinates && !collapsed) {
       return (
         <div className="childNodeList">
           {subordinates.map((child, index) => {
@@ -43,11 +59,22 @@ class Node extends Component {
               parentId: id,
               level: this.props.level + 1,
               isFirst: index === 0,
-              isLast: index === len - 1,
+              isLast: index === subordinates.length - 1,
               auth,
             };
             return <ConnectedNode {..._props} key={_props.id} />;
           })}
+          {subTotalCount > subordinates.length && (
+            <div
+              className="loadMore Hand"
+              onClick={() => {
+                if (moreLoading) return;
+                dispatch(loadMore(id, pageIndex + 1));
+              }}
+            >
+              {(!id && firstLevelLoading) || (id && moreLoading) ? _l('加载中') : _l('更多')}
+            </div>
+          )}
         </div>
       );
     }
@@ -57,12 +84,12 @@ class Node extends Component {
     const { dispatch, id, collapsed, subordinates } = this.props;
     dispatch(updateCollapse(id, collapsed));
     if (collapsed && subordinates) {
-      dispatch(fetchNode(subordinates));
+      dispatch(fetchSubordinates(id));
     }
   }
 
   renderToggleButton() {
-    const { subordinates, collapsed } = this.props;
+    const { subordinates, collapsed, id } = this.props;
     const len = subordinates && subordinates.length;
     if (subordinates && len) {
       const font = collapsed ? 'plus' : 'minus';
@@ -88,7 +115,7 @@ class Node extends Component {
           addSubordinates({
             id,
             accounts,
-          })
+          }),
         );
       },
     });
@@ -106,7 +133,7 @@ class Node extends Component {
             parentId,
             account: accounts[0],
             replacedAccountId: id,
-          })
+          }),
         );
       },
     });
@@ -114,26 +141,23 @@ class Node extends Component {
 
   remove() {
     const { id, parentId, fullname, dispatch } = this.props;
-    const confirm = new Confirm(
-      {
-        title: _l('确认移除 %0 ?', fullname),
-        content: '移除后，其下属成员也将从汇报关系中移除',
-        cancel: _l('取消'),
-        confirm: _l('确认'),
-      },
-      function () {
+    Dialog.confirm({
+      title: _l('确认移除 %0 ?', fullname),
+      description: _l('移除后，其下属成员也将从汇报关系中移除'),
+      onOk: () => {
         dispatch(
           removeStructure({
             parentId,
             accountId: id,
-          })
+          }),
         );
-      }
-    );
+      },
+    });
   }
 
   renderItem() {
-    const { auth, id, fullname, avatar, department, job, status, subordinates, isHighLight, dispatch } = this.props;
+    const { auth, id, fullname, avatar, department, job, status, subordinates, isHighLight, subTotalCount } =
+      this.props;
     const itemProps = {
       id,
       fullname,
@@ -144,6 +168,7 @@ class Node extends Component {
       status,
       isHighLight,
       auth,
+      subTotalCount,
       add: this.add.bind(this),
       replace: this.replace.bind(this),
       remove: this.remove.bind(this),
@@ -160,10 +185,10 @@ class Node extends Component {
   }
 
   componentDidMount() {
-    const { level } = this.props;
+    const { level, dispatch, id, collapsed } = this.props;
     if (level === 1) {
       // 默认打开公司下第一层节点
-      this.toggle();
+      dispatch(updateCollapse(id, collapsed));
     }
     this.handleSearchHighLight();
   }
@@ -179,7 +204,14 @@ class Node extends Component {
   }
 
   render() {
-    const { isFirst, isLast, id, subordinates, auth } = this.props;
+    const { isFirst, isLast, id, subordinates, auth, isLoading, pageIndex } = this.props;
+    if (isLoading && !id && pageIndex === 1) {
+      return (
+        <LoadWrap>
+          <LoadDiv />
+        </LoadWrap>
+      );
+    }
     if (!id) {
       return (
         <div className="rootNodeItem">
@@ -218,12 +250,16 @@ const ConnectedNode = connect((state, ownProps) => {
   const {
     entities: { users },
     highLightId,
+    isLoading,
+    firstLevelLoading,
   } = state;
   const user = users[ownProps.id];
   return {
     ...user,
     level: ownProps.level,
     isHighLight: highLightId === ownProps.id,
+    isLoading,
+    firstLevelLoading,
   };
 })(Node);
 

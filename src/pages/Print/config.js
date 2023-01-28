@@ -4,7 +4,7 @@ export const fromType = {
 };
 
 export const printType = {
-  WORKFLOW: 'workflow', // 工作流
+  WORKFLOW: 'flow', // 工作流
   WORKSHEET: 'worksheet', //
 };
 
@@ -47,6 +47,8 @@ export const MAX_FONT_SIZE = 18;
 export const PRINT_TYPE = {
   SYS_PRINT: 0, // 系统打印
   WORD_PRINT: 2, // word模版打印
+  QR_CODE_PRINT: 3, // 二维码打印
+  BAR_CODE_PRINT: 4, // 条码打印
 };
 
 export const SYSTOPRINT = {
@@ -54,6 +56,7 @@ export const SYSTOPRINT = {
   caid: 'createAccountChecked',
   ctime: 'createTimeChecked',
   utime: 'updateTimeChecked',
+  uaid: 'updateAccountChecked',
 };
 
 export const SYSTOPRINTTXT = {
@@ -61,6 +64,24 @@ export const SYSTOPRINTTXT = {
   createAccount: _l('创建者：'),
   createTime: _l('创建时间：'),
   updateTime: _l('最近修改时间：'),
+  updateAccount: _l('最近修改人：')
 };
 
-export const UNPRINTCONTROL = [43, 45]; //不支持打印的type 文本识别 43 45嵌入
+export const UNPRINTCONTROL = [43]; //不支持打印的type 文本识别 43
+
+//打印不支持的系统字段
+export const FILTER_SYS = [
+  'rowid',
+  // 'ownerid',
+  // 'caid',
+  // 'ctime',
+  // 'utime',
+  'uaid',
+  'wfname',
+  'wfcuaids',
+  'wfcaid',
+  'wfctime',
+  'wfrtime',
+  'wfftime',
+  'wfstatus',
+];

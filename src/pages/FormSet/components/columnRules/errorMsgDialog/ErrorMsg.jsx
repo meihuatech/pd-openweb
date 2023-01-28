@@ -4,6 +4,7 @@ import { Input } from 'antd';
 import { Dialog } from 'ming-ui';
 import cx from 'classnames';
 import './ErrorMsg.less';
+import _ from 'lodash';
 const { TextArea } = Input;
 
 class ErrorMsg extends Component {
@@ -28,7 +29,7 @@ class ErrorMsg extends Component {
         onCancel={() => onClose()}
       >
         <div className="ruleErrorDialog">
-          <span className="Gray_9e">{_l('在提交表单的时候进行错误校验并以弹窗的形式显示提示内容')}</span>
+          <span className="Gray_9e">{_l('在输入或提交记录时校验并提示错误，错误时不允许提交')}</span>
           <span className="Gray Bold mTop24 mBottom12 Block">{_l('提示内容')}</span>
           <TextArea
             value={errorMsg}

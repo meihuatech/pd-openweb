@@ -4,24 +4,25 @@ import cx from 'classnames';
 import { autobind } from 'core-decorators';
 import CascaderDropdown from 'src/components/newCustomFields/widgets/Cascader';
 import { FILTER_CONDITION_TYPE } from '../../enum';
+import _ from 'lodash';
 
 export default class RelateRecord extends React.Component {
   static propTypes = {
     disabled: PropTypes.bool,
     onChange: PropTypes.func,
     control: PropTypes.shape({}),
-    originValues: PropTypes.arrayOf(PropTypes.string),
+    fullValues: PropTypes.arrayOf(PropTypes.string),
   };
 
   static defaultProps = {
-    originValues: [],
+    fullValues: [],
   };
 
   constructor(props) {
     super(props);
-    let { originValues = [] } = props;
+    let { fullValues = [] } = props;
     this.state = {
-      records: _.map(originValues, r => safeParse(r)),
+      records: _.map(fullValues, r => safeParse(r)),
       selectRecordVisible: false,
     };
   }
@@ -137,23 +138,18 @@ export default class RelateRecord extends React.Component {
         </div>
         <div onClick={e => e.stopPropagation()}>
           {selectRecordVisible && (
-            <div className="cascaderDropdown">
+            <div
+              className="cascaderDropdown"
+              style={
+                isTree
+                  ? {
+                      marginTop: 14,
+                    }
+                  : {}
+              }
+            >
               <CascaderDropdown
                 popupClassName="worksheetFilterCascaderPopup"
-                popupAlign={{
-                  offset: [8, 0],
-                  overflow: {
-                    adjustX: true,
-                    adjustY: true,
-                  },
-                }}
-                treePopupAlign={{
-                  offset: [16, 0],
-                  overflow: {
-                    adjustX: true,
-                    adjustY: true,
-                  },
-                }}
                 visible={selectRecordVisible}
                 disabled={disabled}
                 onChange={this.handleChange}

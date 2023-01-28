@@ -42,14 +42,22 @@ function generate() {
   fs.readdirSync(htmlTemplatesPath).forEach(filename => {
     let html = fs.readFileSync(path.join(htmlTemplatesPath, filename)).toString();
     const entry = getEntryFromHtml(filename);
-    let publicPath = getPublicPath();
+    const apiMap = {
+      main: isProduction ? apiServer : '/api/',
+    };
     if (entry) {
       const moduleName = getEntryName(entry.src, filename);
-      if (isProduction && entry.type === 'single') {
-        publicPath = publicPath.replace('/dist/pack/', '/dist/single/pack/');
+      let publicPath = getPublicPath();
+      if (isProduction && entry.type !== 'index') {
+        publicPath = publicPath.replace('/dist/pack/', `/dist/${entry.type}/pack/`);
+      }
+      if (!isProduction) {
+        apiMap.workflow = '/workflow_api';
+        apiMap.report = '/report_api';
+        apiMap.integration = '/integration_api';
       }
       html = ejs.compile(html)({
-        apiServer: isProduction ? apiServer : '/api/',
+        apiServer: JSON.stringify(apiMap),
         releaseDate: moment().format('YYYY/MM/DD HH:mm:SS'),
         publicPath,
       });
@@ -62,6 +70,7 @@ function generate() {
           ) {
             location.href = '/browserupgrade';
           }
+          this.globalThis || (this.globalThis = this)
         </script>
         </head>`,
       );
@@ -82,13 +91,14 @@ function generate() {
         );
       } else {
         // 发布模式
-        const manifestData = JSON.parse(
+        let manifestData;
+        manifestData = JSON.parse(
           fs
             .readFileSync(path.join(buildPath, `dist/${entry.type === 'index' ? '' : `${entry.type}/`}manifest.json`))
             .toString(),
         );
         const baseEntry =
-          entry.type === 'single' ? ['vendors', 'globals'] : ['nodemodules', 'common', 'vendors', 'globals'];
+          entry.type !== 'index' ? ['vendors', 'globals'] : ['nodemodules', 'common', 'vendors', 'globals'];
         $entryScript.replaceWith(
           [...baseEntry, moduleName]
             .filter(key => !!manifestData[key] && manifestData[key].js)
@@ -105,7 +115,7 @@ function generate() {
       destHtml(filename, $.html());
     } else {
       html = ejs.compile(html)({
-        apiServer: isProduction ? apiServer : '/api/',
+        apiServer: JSON.stringify(apiMap),
       });
       destHtml(filename, html);
     }

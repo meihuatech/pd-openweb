@@ -21,24 +21,35 @@ rewrite (?i)^(/|/portal/)mobileChart /mobileChart.html break;
 rewrite (?i)^(/|/portal/)mobileGunter /mobileGunter.html break;
 rewrite (?i)^(/|/portal/)mobile /mobile.html break;
 rewrite (?i)^(/|/portal/)worksheetshare /worksheetshare.html break;
+rewrite (?i)^(/|/portal/)public/view /viewshare.html break;
+rewrite (?i)^(/|/portal/)public/record /recordshare.html break;
 rewrite (?i)^(/|/portal/)public/query /worksheetshare.html break;
-rewrite (?i)^(/|/portal/)printshare /worksheetshare.html break;
-rewrite (?i)^(/|/portal/)form/ /publicworksheet.html break;
-rewrite (?i)^(/|/portal/)recordshare /recordshare.html break;
+rewrite (?i)^(/|/portal/)public/print /worksheetshare.html break;
+rewrite (?i)^(/|/portal/)public/form/ /publicworksheet.html break;
+rewrite (?i)^(/|/portal/)recordfile /kcshare.html break;
+rewrite (?i)^(/|/portal/)public/workflow /workflowrecordshare.html break;
 rewrite (?i)^(/|/portal/)excelfile /excelfile.html break;
+rewrite (?i)^(/|/portal/)privacy /privacyOrAgreen.html break;
+rewrite (?i)^(/|/portal/)agreen /privacyOrAgreen.html break;
 
 rewrite (?i)^(/|/portal/)login /portalLogin.html break;
 rewrite (?i)^(/|/portal/)network /portalLogin.html break;
+rewrite (?i)^(/|/portal/)findPwd /portalFindPassWord.html break;
 rewrite (?i)^(/|/portal/)logout /logout.html break;
 
 # auth
 rewrite (?i)^(/|/portal/)tpauth /portalLogin.html break;
+rewrite (?i)^(/|/portal/)wxscanauth /portalLogin.html break;
 rewrite (?i)^(/|/portal/)portalTpauth /portalLogin.html break;
 rewrite (?i)^(/|/portal/)wxauth(.*) /portalLogin.html break;
 
 # 主站
 rewrite (?i)^(/|/portal/)app /index.html break;
+rewrite (?i)^(/|/portal/)worksheet /index.html break;
+rewrite (?i)^(/|/portal/)ExcelErrorPage /index.html break;
 rewrite (?i)^(/|/portal/)print /index.html break;
 rewrite (?i)^(/|/portal/)workflow /index.html break;
 rewrite (?i)^(/|/portal/)gunterExport /index.html break;
 rewrite (?i)^(/|/portal/)printForm /index.html break;
+rewrite (?i)^(/|/portal/)404 /404-portal.html break;
+rewrite (?i)^(/|/portal/) /index.html break;

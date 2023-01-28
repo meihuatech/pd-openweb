@@ -4,6 +4,7 @@ import styled from 'styled-components';
 import cx from 'classnames';
 import RelateRecordTableNav from './RelateRecordTableNav';
 import RelateRecordTable from './RelateRecordTable';
+import _ from 'lodash';
 
 const Con = styled.div`
   margin-top: -2px;
@@ -38,7 +39,7 @@ export default function RelateRecordBlock(props) {
     sheetSwitchPermit,
     controls,
     activeId,
-    registeRefreshEvents,
+    addRefreshEvents,
     scrollToBottom,
     relateNumOfControl,
     navScrollLeft,
@@ -46,6 +47,7 @@ export default function RelateRecordBlock(props) {
     onScrollLeftChange,
     onRelateRecordsChange = () => {},
     onActiveIdChange = () => {},
+    from,
   } = props;
   const { recordId } = recordbase;
   const [loading, setLoading] = useState(true);
@@ -120,17 +122,10 @@ export default function RelateRecordBlock(props) {
         control={activeControl}
         loading={loading}
         controls={activeControl.relationControls}
-        registeRefreshEvents={registeRefreshEvents}
+        addRefreshEvents={addRefreshEvents}
+        from={from}
         setRelateNumOfControl={num => {
-          setRelateNumOfControl(
-            {
-              ...relateNumOfControl,
-              [activeControl.controlId]: _.isFunction(num)
-                ? num(relateNumOfControl[activeControl.controlId] || activeControl.value)
-                : num,
-            },
-            activeControl.controlId,
-          );
+          setRelateNumOfControl(num, activeControl.controlId, activeControl);
         }}
         setLoading={setLoading}
         onRelateRecordsChange={records => {
@@ -155,6 +150,6 @@ RelateRecordBlock.propTypes = {
   relateRecordData: PropTypes.shape({}),
   sheetSwitchPermit: PropTypes.arrayOf(PropTypes.shape({})),
   onRelateRecordsChange: PropTypes.func,
-  registeRefreshEvents: PropTypes.func,
+  addRefreshEvents: PropTypes.func,
   scrollToBottom: PropTypes.func,
 };

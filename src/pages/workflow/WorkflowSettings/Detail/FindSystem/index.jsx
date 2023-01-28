@@ -9,9 +9,10 @@ import {
   SelectNodeObject,
   FindResult,
 } from '../components';
-import { APP_TYPE, TRIGGER_ID_TYPE, NODE_TYPE } from '../../enum';
-import { checkConditionsIsNull } from '../../utils';
+import { APP_TYPE, ACTION_ID, NODE_TYPE } from '../../enum';
+import { checkConditionsIsNull, getIcons } from '../../utils';
 import cx from 'classnames';
+import _ from 'lodash';
 
 export default class FindSystem extends Component {
   constructor(props) {
@@ -67,7 +68,7 @@ export default class FindSystem extends Component {
    */
   onSave = () => {
     const { data, saveRequest } = this.state;
-    const { appId, appType, name, actionId, selectNodeId, fields, conditions, executeType, random } = data;
+    const { appId, appType, name, actionId, selectNodeId, fields, conditions, executeType, random, relation } = data;
 
     if (saveRequest) {
       return;
@@ -78,7 +79,7 @@ export default class FindSystem extends Component {
       return;
     }
 
-    if (!_.includes([TRIGGER_ID_TYPE.FROM_WORKSHEET, TRIGGER_ID_TYPE.WORKSHEET_FIND], actionId)) {
+    if (!_.includes([ACTION_ID.FROM_WORKSHEET, ACTION_ID.WORKSHEET_FIND], actionId)) {
       if (!selectNodeId) {
         alert(_l('必须选择对象'), 2);
         return;
@@ -102,6 +103,7 @@ export default class FindSystem extends Component {
         operateCondition: conditions,
         executeType,
         random,
+        relation,
       })
       .then(result => {
         this.props.updateNodeData(result);
@@ -116,68 +118,94 @@ export default class FindSystem extends Component {
     const { data } = this.state;
     const TEXT = {
       [APP_TYPE.USER]: {
-        [TRIGGER_ID_TYPE.RELATION]: {
+        [ACTION_ID.RELATION]: {
           title: _l('从人员字段获取'),
           filterText: _l('设置筛选条件，获得满足条件的数据。如果未添加筛选条件，则只从字段中获得第一名人员的相关信息'),
         },
-        [TRIGGER_ID_TYPE.WORKSHEET_FIND]: {
+        [ACTION_ID.WORKSHEET_FIND]: {
           title: _l('从组织人员中获取'),
           filterText: _l(
             '设置筛选条件，获得满足条件的数据。如果未添加筛选条件，则只从当前组织的所有人员中获得第一名（最新入职）人员的相关信息',
           ),
         },
-        [TRIGGER_ID_TYPE.FROM_RECORD]: {
+        [ACTION_ID.FROM_RECORD]: {
           title: _l('从人员字段获取'),
           filterText: _l('设置筛选条件，获得满足条件的数据。如果未添加筛选条件，则获得所有来自该字段的人员的相关信息'),
         },
-        [TRIGGER_ID_TYPE.FROM_WORKSHEET]: {
+        [ACTION_ID.FROM_WORKSHEET]: {
           title: _l('从组织人员中获取'),
           filterText: _l('设置筛选条件，获得满足条件的数据。如果未添加筛选条件，则获得当前组织的所有人员的相关信息'),
         },
       },
       [APP_TYPE.DEPARTMENT]: {
-        [TRIGGER_ID_TYPE.RELATION]: {
+        [ACTION_ID.RELATION]: {
           title: _l('从部门字段获取'),
           filterText: _l('设置筛选条件，获得满足条件的数据。如果未添加筛选条件，则只从字段中获得第一个部门的相关信息'),
         },
-        [TRIGGER_ID_TYPE.WORKSHEET_FIND]: {
+        [ACTION_ID.WORKSHEET_FIND]: {
           title: _l('从组织部门中获取'),
           filterText: _l(
             '设置筛选条件，获得满足条件的数据。如果未添加筛选条件，则只从当前组织的所有部门中获得第一个（最新创建）部门的相关信息',
           ),
         },
-        [TRIGGER_ID_TYPE.FROM_RECORD]: {
+        [ACTION_ID.FROM_RECORD]: {
           title: _l('从部门字段获取'),
           filterText: _l('设置筛选条件，获得满足条件的数据。如果未添加筛选条件，则获得所有来自该字段的部门的相关信息'),
         },
-        [TRIGGER_ID_TYPE.FROM_WORKSHEET]: {
+        [ACTION_ID.FROM_WORKSHEET]: {
           title: _l('从组织部门中获取'),
           filterText: _l('设置筛选条件，获得满足条件的数据。如果未添加筛选条件，则获得当前组织的所有部门的相关信息'),
         },
       },
       [APP_TYPE.EXTERNAL_USER]: {
-        [TRIGGER_ID_TYPE.RELATION]: {
+        [ACTION_ID.RELATION]: {
           title: _l('从外部用户字段获取'),
           filterText: _l(
             '设置筛选条件，获得满足条件的数据。如果未添加筛选条件，则只从字段中获得第一名外部用户的相关信息',
           ),
         },
-        [TRIGGER_ID_TYPE.WORKSHEET_FIND]: {
+        [ACTION_ID.WORKSHEET_FIND]: {
           title: _l('从外部门户中获取'),
           filterText: _l(
             '设置筛选条件，获得满足条件的数据。如果未添加筛选条件，则只从当前应用的所有外部用户中获得第一名（最新注册）人员的相关信息',
           ),
         },
-        [TRIGGER_ID_TYPE.FROM_RECORD]: {
+        [ACTION_ID.FROM_RECORD]: {
           title: _l('从外部用户字段获取'),
           filterText: _l(
             '设置筛选条件，获得满足条件的数据。如果未添加筛选条件，则获得所有来自该字段的外部用户的相关信息',
           ),
         },
-        [TRIGGER_ID_TYPE.FROM_WORKSHEET]: {
+        [ACTION_ID.FROM_WORKSHEET]: {
           title: _l('从外部门户中获取'),
           filterText: _l(
             '设置筛选条件，获得满足条件的数据。如果未添加筛选条件，则获得当前应用的所有外部用户的相关信息',
+          ),
+        },
+      },
+      [APP_TYPE.ORGANIZATION_ROLE]: {
+        [ACTION_ID.RELATION]: {
+          title: _l('从组织角色字段获取'),
+          filterText: _l(
+            '设置筛选条件，获得满足条件的数据。如果未添加筛选条件，则只从字段中获得第一个组织角色的相关信息',
+          ),
+        },
+        [ACTION_ID.WORKSHEET_FIND]: {
+          title: _l('从组织角色中获取'),
+          filterText: _l(
+            '设置筛选条件，获得满足条件的数据。如果未添加筛选条件，则只从当前组织的所有组织角色中获得第一个（最新创建）角色的相关信息',
+          ),
+        },
+        [ACTION_ID.FROM_RECORD]: {
+          title: _l('从组织角色字段获取'),
+          filterText: _l(
+            '设置筛选条件，获得满足条件的数据。如果未添加筛选条件，则获得所有来自该字段的组织角色的相关信息',
+          ),
+        },
+        [ACTION_ID.FROM_WORKSHEET]: {
+          title: _l('从组织角色中获取'),
+          filterText: _l(
+            '设置筛选条件，获得满足条件的数据。如果未添加筛选条件，则获得当前组织的所有组织角色的相关信息',
           ),
         },
       },
@@ -185,7 +213,7 @@ export default class FindSystem extends Component {
     const DESC_TEXT = {
       [NODE_TYPE.FIND_SINGLE_MESSAGE]: {
         [APP_TYPE.USER]: _l(
-          '获取一名人员的相关信息，包含个人信息（姓名、性别、生日、手机、邮箱）和组织信息（部门、职位、工号、上下级），供流程中的其他节点使用。',
+          '获取一名人员的相关信息，包含个人信息（姓名、性别、生日、手机、邮箱）和组织信息（部门、职位、工号、上下级（可选）），供流程中的其他节点使用。',
         ),
         [APP_TYPE.DEPARTMENT]: _l(
           '获取一个部门的相关信息，包含部门名称、部门负责人、部门人员及上下级部门，供流程中的其他节点使用。',
@@ -193,16 +221,22 @@ export default class FindSystem extends Component {
         [APP_TYPE.EXTERNAL_USER]: _l(
           '获取一名外部用户的相关信息，包含用户名、手机号、角色、用户状态、openid和自定义字段，供流程中的其他节点使用。',
         ),
+        [APP_TYPE.ORGANIZATION_ROLE]: _l(
+          '获取一个组织角色的相关信息，包含角色名称、备注、角色下人员，供流程中的其他节点使用。',
+        ),
       },
       [NODE_TYPE.FIND_MORE_MESSAGE]: {
         [APP_TYPE.USER]: _l(
-          '获取多名人员的相关信息，包含个人信息（姓名、性别、生日、手机、邮箱）和组织信息（部门、职位、工号、上下级），供流程中的其他节点使用。',
+          '获取多名人员的相关信息，包含个人信息（姓名、性别、生日、手机、邮箱）和组织信息（部门、职位、工号、上下级（可选）），供流程中的其他节点使用。',
         ),
         [APP_TYPE.DEPARTMENT]: _l(
           '获取多个部门的相关信息，包含部门名称、部门负责人、部门人员及上下级部门，供流程中的其他节点使用。',
         ),
         [APP_TYPE.EXTERNAL_USER]: _l(
           '获取多名外部用户的相关信息，包含用户名、手机号、角色、用户状态、openid和自定义字段，供流程中的其他节点使用。',
+        ),
+        [APP_TYPE.ORGANIZATION_ROLE]: _l(
+          '获取多个组织角色的相关信息，包含角色名称、备注、角色下人员，供流程中的其他节点使用。',
         ),
       },
     };
@@ -214,7 +248,7 @@ export default class FindSystem extends Component {
           {(DESC_TEXT[selectNodeType] || {})[data.appType]}
         </div>
 
-        {_.includes([TRIGGER_ID_TYPE.FROM_RECORD, TRIGGER_ID_TYPE.RELATION], data.actionId) && (
+        {_.includes([ACTION_ID.FROM_RECORD, ACTION_ID.RELATION], data.actionId) && (
           <Fragment>
             <div className="mTop20 bold">{_l('选择查找对象')}</div>
             <div className="Gray_75 mTop5">{_l('当前流程中的节点对象')}</div>
@@ -227,7 +261,7 @@ export default class FindSystem extends Component {
 
             <div className="mTop20 bold">{_l('选择字段')}</div>
             <SelectFields
-              controls={data.actionId === TRIGGER_ID_TYPE.RELATION ? data.controls : data.relationControls}
+              controls={data.actionId === ACTION_ID.RELATION ? data.controls : data.relationControls}
               selectedIds={data.fields.map(item => item.fieldId)}
               updateSource={ids =>
                 this.getNodeDetail(this.props, data.selectNodeId, JSON.stringify(ids.map(id => ({ fieldId: id }))))
@@ -244,28 +278,49 @@ export default class FindSystem extends Component {
           <TriggerCondition
             processId={this.props.processId}
             selectNodeId={this.props.selectNodeId}
-            controls={data.actionId === TRIGGER_ID_TYPE.RELATION ? data.relationControls : data.controls}
+            controls={data.actionId === ACTION_ID.RELATION ? data.relationControls : data.controls}
             data={data.conditions}
             updateSource={data => this.updateSource({ conditions: data })}
             projectId={this.props.companyId}
+            singleCondition={data.appType === APP_TYPE.EXTERNAL_USER}
           />
         )}
 
         {selectNodeType === NODE_TYPE.FIND_SINGLE_MESSAGE && (
+          <div className="mTop20">
+            <Checkbox
+              className="InlineFlex"
+              text={_l('在筛选条件的基础上，随机获取一个')}
+              checked={data.random}
+              onClick={checked => this.updateSource({ random: !checked })}
+            />
+          </div>
+        )}
+
+        {data.appType === APP_TYPE.USER && (
           <Fragment>
-            <div className="mTop20">
+            <div className="mTop20 bold">{_l('获取汇报关系')}</div>
+            <div className="mTop15" style={{ height: 23 }}>
               <Checkbox
                 className="InlineFlex"
-                text={_l('在筛选条件的基础上，随机获取一个')}
-                checked={data.random}
-                onClick={checked => this.updateSource({ random: !checked })}
+                text={_l('同时获取人员的汇报关系信息')}
+                checked={data.relation}
+                onClick={checked => this.updateSource({ relation: !checked })}
               />
             </div>
-            <FindResult
-              executeType={data.executeType}
-              switchExecuteType={executeType => this.updateSource({ executeType })}
-            />
+            <div className="mLeft25 Gray_9e">
+              {_l(
+                '包含人员的直属上司、直接下属、所有下属；如果您的使用场景无需汇报关系相关信息，推荐不勾选以提升您的查询效率',
+              )}
+            </div>
           </Fragment>
+        )}
+
+        {selectNodeType === NODE_TYPE.FIND_SINGLE_MESSAGE && (
+          <FindResult
+            executeType={data.executeType}
+            switchExecuteType={executeType => this.updateSource({ executeType })}
+          />
         )}
       </Fragment>
     );
@@ -305,10 +360,10 @@ export default class FindSystem extends Component {
     return (
       <Fragment>
         <DetailHeader
-          data={{ ...data, selectNodeType: this.props.selectNodeType }}
-          icon={selectNodeType === NODE_TYPE.FIND_SINGLE_MESSAGE ? 'icon-person_search' : 'icon-group-members'}
+          {...this.props}
+          data={{ ...data }}
+          icon={getIcons(selectNodeType, data.appType)}
           bg="BGBlue"
-          closeDetail={this.props.closeDetail}
           updateSource={this.updateSource}
         />
         <div className="flex mTop20">
@@ -317,12 +372,12 @@ export default class FindSystem extends Component {
           </ScrollView>
         </div>
         <DetailFooter
+          {...this.props}
           isCorrect={
-            _.includes([TRIGGER_ID_TYPE.FROM_WORKSHEET, TRIGGER_ID_TYPE.WORKSHEET_FIND], data.actionId) ||
+            _.includes([ACTION_ID.FROM_WORKSHEET, ACTION_ID.WORKSHEET_FIND], data.actionId) ||
             (!!data.selectNodeId && !!data.fields.length)
           }
           onSave={this.onSave}
-          closeDetail={this.props.closeDetail}
         />
       </Fragment>
     );

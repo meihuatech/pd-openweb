@@ -16,8 +16,9 @@ import moment from 'moment';
 import html2canvas from 'html2canvas';
 import qiniuAjax from 'src/api/qiniu';
 import { Base64 } from 'js-base64';
-import { addToken, getToken } from 'src/util';
+import { downloadFile, getToken } from 'src/util';
 import axios from 'axios';
+import _ from 'lodash';
 
 export default class GanttDialog extends Component {
   static propTypes = {
@@ -361,7 +362,7 @@ export default class GanttDialog extends Component {
     const { buildImgSuccess, url } = this.state;
 
     if (buildImgSuccess) {
-      window.open(addToken(url, !window.isDingTalk));
+      window.open(downloadFile(url));
       this.setState({ showExportDialog: false });
     }
   };

@@ -6,9 +6,10 @@ import './login.less';
 import { getRequest } from 'src/util';
 import { LoadDiv } from 'ming-ui';
 import cx from 'classnames';
-import { sendTwofactorVerifyCode } from 'src/api/login';
+import loginAjax from 'src/api/login';
 import captcha from 'src/components/captcha';
 import preall from 'src/common/preall';
+import _ from 'lodash';
 
 let request = getRequest();
 let ActionResult = {
@@ -59,7 +60,7 @@ class TwofactorContainer extends React.Component {
         captchaType,
       };
     }
-    sendTwofactorVerifyCode({
+    loginAjax.sendTwofactorVerifyCode({
       state,
       type, //1为手机号，2为邮箱,
       ...info,
@@ -197,10 +198,6 @@ class TwofactorContainer extends React.Component {
     );
   };
 
-  showLangChang = () => {
-    $('.showLangChangeBottom').removeClass('Hidden');
-  };
-
   render() {
     if (!this.state.hasSend) {
       return <LoadDiv className="" style={{ margin: '50px auto' }} />;
@@ -212,7 +209,6 @@ class TwofactorContainer extends React.Component {
             </div>
             {this.renderCon()}
             {this.renderFooter()}
-            {this.showLangChang()}
           </div>
           <ChangeLang />
         </div>

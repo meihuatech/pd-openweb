@@ -1,4 +1,4 @@
-module.exports = {
+export default {
   /**
   * 添加角色
   * @param {Object} args 请求参数
@@ -10,6 +10,14 @@ module.exports = {
   * @param {array} args.sheets 工作表权限集合
   * @param {array} args.userIds 角色成员id集合
   * @param {array} args.pages 自定义页面
+  * @param {} args.generalAdd 是否启用 通用新增
+  * @param {} args.gneralShare 是否启用 通用分享
+  * @param {} args.generalImport 是否启用 通用导入
+  * @param {} args.generalExport 是否启用 通用导出
+  * @param {} args.generalDiscussion 是否启用 通用讨论
+  * @param {} args.generalSystemPrinting 是否启用 通用系统打印
+  * @param {} args.generalAttachmentDownload 是否启用 通用附件下载
+  * @param {} args.generalLogging 是否启用 通用日志
   * @param {Object} options 配置参数
   * @param {Boolean} options.silent 是否禁止错误弹层
   * @returns {Promise<Boolean, ErrorModel>}
@@ -40,8 +48,18 @@ module.exports = {
   * @param {string} args.roleId 角色id
   * @param {array} args.userIds 用户
   * @param {array} args.departmentIds 部门
+  * @param {array} args.departmentTreeIds 部门树
+  * @param {array} args.projectOrganizeIds 网络角色
   * @param {array} args.jobIds 职位ids
   * @param {string} args.projectId 网络id
+  * @param {} args.enableGeneralAdd 是否启用 通用新增
+  * @param {} args.enableGneralShare 是否启用 通用分享
+  * @param {} args.enableGeneralImport 是否启用 通用导入
+  * @param {} args.enableGeneralExport 是否启用 通用导出
+  * @param {} args.enableGeneralDiscussion 是否启用 通用讨论
+  * @param {} args.enableGeneralSystemPrinting 是否启用 通用系统打印
+  * @param {} args.enableGeneralAttachmentDownload 是否启用 通用附件下载
+  * @param {} args.enableGeneralLogging 是否启用 通用日志
   * @param {Object} options 配置参数
   * @param {Boolean} options.silent 是否禁止错误弹层
   * @returns {Promise<Boolean, ErrorModel>}
@@ -55,9 +73,12 @@ module.exports = {
   * @param {Object} args 请求参数
   * @param {string} args.appId 应用id
   * @param {string} args.roleId 角色id
+  * @param {boolean} args.selectAll 是否全选
   * @param {array} args.userIds 用户
   * @param {array} args.departmentIds 部门
   * @param {array} args.jobIds 职位
+  * @param {array} args.departmentTreeIds 部门树
+  * @param {array} args.projectOrganizeIds 网络角色
   * @param {string} args.projectId 网络id
   * @param {Object} options 配置参数
   * @param {Boolean} options.silent 是否禁止错误弹层
@@ -113,11 +134,14 @@ module.exports = {
   * @param {Object} args 请求参数
   * @param {string} args.appId 应用id
   * @param {string} args.sourceAppRoleId 来源角色id
-  * @param {string} args.resultAppRoleId 目标角色id
+  * @param {array} args.resultAppRoleIds 目标角色id
+  * @param {boolean} args.selectAll 是否全选
   * @param {array} args.userIds 用户id集合
   * @param {array} args.departmentIds 部门id集合
   * @param {array} args.jobIds 职位id集合
   * @param {string} args.projectId 网络id
+  * @param {array} args.departmentTreeIds 部门树
+  * @param {array} args.projectOrganizeIds 网络角色
   * @param {Object} options 配置参数
   * @param {Boolean} options.silent 是否禁止错误弹层
   * @returns {Promise<Boolean, ErrorModel>}
@@ -156,6 +180,19 @@ module.exports = {
      return $.api('AppManagement', 'UpdateMemberStatus', args, options);
    },
   /**
+  * 更新 应用角色通知
+  * @param {Object} args 请求参数
+  * @param {string} args.appId 应用 Id
+  * @param {boolean} args.notify 通知
+  * @param {Object} options 配置参数
+  * @param {Boolean} options.silent 是否禁止错误弹层
+  * @returns {Promise<Boolean, ErrorModel>}
+  **/
+   updateAppRoleNotify: function (args, options = {}) {
+     
+     return $.api('AppManagement', 'UpdateAppRoleNotify', args, options);
+   },
+  /**
   * 复制角色
   * @param {Object} args 请求参数
   * @param {string} args.appId 应用id
@@ -168,6 +205,34 @@ module.exports = {
    copyRole: function (args, options = {}) {
      
      return $.api('AppManagement', 'CopyRole', args, options);
+   },
+  /**
+  * 复制角色到外部门户
+  * @param {Object} args 请求参数
+  * @param {string} args.appId 应用id
+  * @param {string} args.roleId 角色Id
+  * @param {string} args.roleName 角色名称
+  * @param {Object} options 配置参数
+  * @param {Boolean} options.silent 是否禁止错误弹层
+  * @returns {Promise<Boolean, ErrorModel>}
+  **/
+   copyRoleToExternalPortal: function (args, options = {}) {
+     
+     return $.api('AppManagement', 'CopyRoleToExternalPortal', args, options);
+   },
+  /**
+  * 复制外部门户角色到内部
+  * @param {Object} args 请求参数
+  * @param {string} args.appId 应用id
+  * @param {string} args.roleId 角色Id
+  * @param {string} args.roleName 角色名称
+  * @param {Object} options 配置参数
+  * @param {Boolean} options.silent 是否禁止错误弹层
+  * @returns {Promise<Boolean, ErrorModel>}
+  **/
+   copyExternalRolesToInternal: function (args, options = {}) {
+     
+     return $.api('AppManagement', 'CopyExternalRolesToInternal', args, options);
    },
   /**
   * 角色排序
@@ -183,16 +248,16 @@ module.exports = {
      return $.api('AppManagement', 'SortRoles', args, options);
    },
   /**
-  * 获取成员是否可角色见列表状态
+  * 获取 应用角色设置
   * @param {Object} args 请求参数
   * @param {string} args.appId 应用id
   * @param {Object} options 配置参数
   * @param {Boolean} options.silent 是否禁止错误弹层
   * @returns {Promise<Boolean, ErrorModel>}
   **/
-   getMemberStatus: function (args, options = {}) {
+   getAppRoleSetting: function (args, options = {}) {
      
-     return $.api('AppManagement', 'GetMemberStatus', args, options);
+     return $.api('AppManagement', 'GetAppRoleSetting', args, options);
    },
   /**
   * 获取应用下所用角色基本信息（不含具体权限）
@@ -205,6 +270,87 @@ module.exports = {
    getRolesWithUsers: function (args, options = {}) {
      
      return $.api('AppManagement', 'GetRolesWithUsers', args, options);
+   },
+  /**
+  * 分页获取 全部成员
+  * @param {Object} args 请求参数
+  * @param {string} args.appId 应用Id
+  * @param {} args.appRolePagingModel 应用角色分页模型
+  * @param {Object} options 配置参数
+  * @param {Boolean} options.silent 是否禁止错误弹层
+  * @returns {Promise<Boolean, ErrorModel>}
+  **/
+   getTotalMemrber: function (args, options = {}) {
+     
+     return $.api('AppManagement', 'GetTotalMemrber', args, options);
+   },
+  /**
+  * 分页获取 外协成员
+  * @param {Object} args 请求参数
+  * @param {string} args.appId 应用Id
+  * @param {} args.appRolePagingModel 应用角色 分页模型
+  * @param {Object} options 配置参数
+  * @param {Boolean} options.silent 是否禁止错误弹层
+  * @returns {Promise<Boolean, ErrorModel>}
+  **/
+   getOutsourcingMembers: function (args, options = {}) {
+     
+     return $.api('AppManagement', 'GetOutsourcingMembers', args, options);
+   },
+  /**
+  * 获取 应用角色概要
+  * @param {Object} args 请求参数
+  * @param {string} args.appId 应用Id
+  * @param {Object} options 配置参数
+  * @param {Boolean} options.silent 是否禁止错误弹层
+  * @returns {Promise<Boolean, ErrorModel>}
+  **/
+   getAppRoleSummary: function (args, options = {}) {
+     
+     return $.api('AppManagement', 'GetAppRoleSummary', args, options);
+   },
+  /**
+  * 根据角色 分页获取 角色下的用户集
+  * @param {Object} args 请求参数
+  * @param {string} args.appId 应用Id
+  * @param {string} args.roleId 角色Id
+  * @param {} args.appRolePagingModel 应用角色分页模型
+  * @param {Object} options 配置参数
+  * @param {Boolean} options.silent 是否禁止错误弹层
+  * @returns {Promise<Boolean, ErrorModel>}
+  **/
+   getMembersByRole: function (args, options = {}) {
+     
+     return $.api('AppManagement', 'GetMembersByRole', args, options);
+   },
+  /**
+  * 批量编辑用户角色
+  * @param {Object} args 请求参数
+  * @param {string} args.appId 应用Id
+  * @param {array} args.dstRoleIds 目标角色Ids
+  * @param {} args.selectMember 选中的角色成员
+  * @param {boolean} args.selectAll 是否全选
+  * @param {boolean} args.isOutsourcing 是否全选外协
+  * @param {Object} options 配置参数
+  * @param {Boolean} options.silent 是否禁止错误弹层
+  * @returns {Promise<Boolean, ErrorModel>}
+  **/
+   batchEditMemberRole: function (args, options = {}) {
+     
+     return $.api('AppManagement', 'BatchEditMemberRole', args, options);
+   },
+  /**
+  * 批量成员退出应用
+  * @param {Object} args 请求参数
+  * @param {string} args.appId 应用Id
+  * @param {} args.selectMember 选中的角色成员
+  * @param {Object} options 配置参数
+  * @param {Boolean} options.silent 是否禁止错误弹层
+  * @returns {Promise<Boolean, ErrorModel>}
+  **/
+   batchMemberQuitApp: function (args, options = {}) {
+     
+     return $.api('AppManagement', 'BatchMemberQuitApp', args, options);
    },
   /**
   * 获取应用下某个角色的具体权限信息
@@ -312,10 +458,12 @@ module.exports = {
      return $.api('AppManagement', 'GetAppForSheetIds', args, options);
    },
   /**
-  * 
+  * 获取导出相关功能模块token
   * @param {Object} args 请求参数
+  * @param {} args.tokenType 功能模块 token枚举，3 = 导出excel，4 = 导入excel生成表，5= word打印
   * @param {string} args.worksheetId
   * @param {string} args.viewId
+  * @param {string} args.projectId 网络id ，TokenType = 4或6时，这个必穿
   * @param {Object} options 配置参数
   * @param {Boolean} options.silent 是否禁止错误弹层
   * @returns {Promise<Boolean, ErrorModel>}
@@ -394,9 +542,11 @@ module.exports = {
   * 删除应用分组下项(工作表，自定义页面)
   * @param {Object} args 请求参数
   * @param {string} args.appId 应用id
+  * @param {string} args.projectId 组织id
   * @param {string} args.appSectionId 应用分组id
   * @param {string} args.workSheetId id
   * @param {integer} args.type 类型 0=工作表，1=自定义页面
+  * @param {boolean} args.isPermanentlyDelete 是否永久删除 true-表示永久删除 false-表示到回收站
   * @param {Object} options 配置参数
   * @param {Boolean} options.silent 是否禁止错误弹层
   * @returns {Promise<Boolean, ErrorModel>}
@@ -404,6 +554,36 @@ module.exports = {
    removeWorkSheetForApp: function (args, options = {}) {
      
      return $.api('AppManagement', 'RemoveWorkSheetForApp', args, options);
+   },
+  /**
+  * 分页获取应用项回收站列表
+  * @param {Object} args 请求参数
+  * @param {integer} args.pageIndex 当前页
+  * @param {integer} args.pageSize 页大小
+  * @param {string} args.projectId 组织id
+  * @param {string} args.appId 应用id
+  * @param {string} args.keyword 关键字搜索
+  * @param {Object} options 配置参数
+  * @param {Boolean} options.silent 是否禁止错误弹层
+  * @returns {Promise<Boolean, ErrorModel>}
+  **/
+   getAppItemRecoveryList: function (args, options = {}) {
+     
+     return $.api('AppManagement', 'GetAppItemRecoveryList', args, options);
+   },
+  /**
+  * 
+  * @param {Object} args 请求参数
+  * @param {string} args.id 应用项回收站记录id
+  * @param {string} args.projectId 组织id
+  * @param {string} args.appId 应用id
+  * @param {Object} options 配置参数
+  * @param {Boolean} options.silent 是否禁止错误弹层
+  * @returns {Promise<Boolean, ErrorModel>}
+  **/
+   appItemRecovery: function (args, options = {}) {
+     
+     return $.api('AppManagement', 'AppItemRecovery', args, options);
    },
   /**
   * 修改分组下实体名称和图标
@@ -499,6 +679,8 @@ module.exports = {
   * 新增应用授权
   * @param {Object} args 请求参数
   * @param {string} args.appId 应用id
+  * @param {integer} args.type 权限范围类型 1=全部，2=只读
+  * @param {boolean} args.viewNull 不传视图id不返回数据配置
   * @param {Object} options 配置参数
   * @param {Boolean} options.silent 是否禁止错误弹层
   * @returns {Promise<Boolean, ErrorModel>}
@@ -523,15 +705,30 @@ module.exports = {
   * 编辑应用授权类型
   * @param {Object} args 请求参数
   * @param {string} args.appId 应用id
-  * @param {string} args.appKey
-  * @param {} args.displayType 类型  1=删除，2=取消授权，3=全部，4=只读
+  * @param {string} args.appKey 应用key
+  * @param {integer} args.type 权限范围类型 1=全部，2=只读
+  * @param {boolean} args.viewNull 不传视图id不返回数据配置
+  * @param {integer} args.status 授权状态 1-开启 2-关闭 3-删除
   * @param {Object} options 配置参数
   * @param {Boolean} options.silent 是否禁止错误弹层
   * @returns {Promise<Boolean, ErrorModel>}
   **/
-   eiitAuthorizeStatus: function (args, options = {}) {
+   editAuthorizeStatus: function (args, options = {}) {
      
-     return $.api('AppManagement', 'EiitAuthorizeStatus', args, options);
+     return $.api('AppManagement', 'EditAuthorizeStatus', args, options);
+   },
+  /**
+  * 删除应用授权类型
+  * @param {Object} args 请求参数
+  * @param {string} args.appId 应用id
+  * @param {string} args.appKey 应用key
+  * @param {Object} options 配置参数
+  * @param {Boolean} options.silent 是否禁止错误弹层
+  * @returns {Promise<Boolean, ErrorModel>}
+  **/
+   deleteAuthorizeStatus: function (args, options = {}) {
+     
+     return $.api('AppManagement', 'DeleteAuthorizeStatus', args, options);
    },
   /**
   * 编辑备注
@@ -577,7 +774,7 @@ module.exports = {
   /**
   * 更新应用申请状态
   * @param {Object} args 请求参数
-  * @param {string} args.id 申请信息的id
+  * @param {array} args.ids 申请信息的id
   * @param {string} args.appId 应用id
   * @param {integer} args.status 状态 2=通过，3=拒绝
   * @param {string} args.roleId 角色id（拒绝时可空）
@@ -770,6 +967,7 @@ module.exports = {
   * @param {Object} args 请求参数
   * @param {string} args.sourceId 分享来源id （页面id，图标id等）
   * @param {integer} args.sourceType 分享类型  21 =自定义页面，31 = 图表
+  * @param {string} args.appId 应用id
   * @param {Object} options 配置参数
   * @param {Boolean} options.silent 是否禁止错误弹层
   * @returns {Promise<Boolean, ErrorModel>}
@@ -784,6 +982,8 @@ module.exports = {
   * @param {string} args.sourceId 分享来源id （页面id，图标id等）
   * @param {integer} args.sourceType 分享类型  21 =自定义页面，31 = 图表
   * @param {integer} args.status 状态  0 = 关闭，1 =启用
+  * @param {string} args.password 密码
+  * @param {string} args.validTime 有效时间
   * @param {Object} options 配置参数
   * @param {Boolean} options.silent 是否禁止错误弹层
   * @returns {Promise<Boolean, ErrorModel>}
@@ -796,6 +996,10 @@ module.exports = {
   * 获取分享基础信息
   * @param {Object} args 请求参数
   * @param {string} args.id 分享id
+  * @param {string} args.password 密码
+  * @param {string} args.ticket 验证码返票据
+  * @param {string} args.randStr 票据随机字符串
+  * @param {} args.captchaType 验证码类型（默认腾讯云）
   * @param {Object} options 配置参数
   * @param {Boolean} options.silent 是否禁止错误弹层
   * @returns {Promise<Boolean, ErrorModel>}
@@ -803,5 +1007,137 @@ module.exports = {
    getEntityShareById: function (args, options = {}) {
      
      return $.api('AppManagement', 'GetEntityShareById', args, options);
+   },
+  /**
+  * 删除应用备份文件
+  * @param {Object} args 请求参数
+  * @param {string} args.projectId
+  * @param {string} args.appId 应用id
+  * @param {string} args.id 应用备份操作日志Id
+  * @param {string} args.fileName 应用备份的文件名
+  * @param {Object} options 配置参数
+  * @param {Boolean} options.silent 是否禁止错误弹层
+  * @returns {Promise<Boolean, ErrorModel>}
+  **/
+   deleteBackupFile: function (args, options = {}) {
+     
+     return $.api('AppManagement', 'DeleteBackupFile', args, options);
+   },
+  /**
+  * 分页获取应用备份还原操作日志
+  * @param {Object} args 请求参数
+  * @param {integer} args.pageIndex 当前页
+  * @param {integer} args.pageSize 页大小
+  * @param {string} args.projectId 组织id
+  * @param {string} args.appId 应用Id
+  * @param {boolean} args.isBackup 是否为获取备份文件列表，true表示获取备份文件列表，false表示获取操作日志列表
+  * @param {Object} options 配置参数
+  * @param {Boolean} options.silent 是否禁止错误弹层
+  * @returns {Promise<Boolean, ErrorModel>}
+  **/
+   pageGetBackupRestoreOperationLog: function (args, options = {}) {
+     
+     return $.api('AppManagement', 'PageGetBackupRestoreOperationLog', args, options);
+   },
+  /**
+  * 重命名应用备份文件
+  * @param {Object} args 请求参数
+  * @param {string} args.projectId
+  * @param {string} args.appId 应用id
+  * @param {string} args.id 应用备份操作日志Id
+  * @param {string} args.fileName 备份新名称
+  * @param {string} args.fileOldName 备份新名称
+  * @param {Object} options 配置参数
+  * @param {Boolean} options.silent 是否禁止错误弹层
+  * @returns {Promise<Boolean, ErrorModel>}
+  **/
+   renameBackupFileName: function (args, options = {}) {
+     
+     return $.api('AppManagement', 'RenameBackupFileName', args, options);
+   },
+  /**
+  * 获取有效备份文件信息
+  * @param {Object} args 请求参数
+  * @param {string} args.projectId
+  * @param {string} args.appId 应用id
+  * @param {Object} options 配置参数
+  * @param {Boolean} options.silent 是否禁止错误弹层
+  * @returns {Promise<Boolean, ErrorModel>}
+  **/
+   getValidBackupFileInfo: function (args, options = {}) {
+     
+     return $.api('AppManagement', 'GetValidBackupFileInfo', args, options);
+   },
+  /**
+  * 还原应用
+  * @param {Object} args 请求参数
+  * @param {string} args.projectId 组织id
+  * @param {string} args.appId 应用id
+  * @param {string} args.id 备份还原操作日志id
+  * @param {boolean} args.autoEndMaintain 是否自动结束应用维护状态
+  * @param {boolean} args.backupCurrentVersion 备份当前版本
+  * @param {boolean} args.isRestoreNew 是否还原为新应用
+  * @param {Object} options 配置参数
+  * @param {Boolean} options.silent 是否禁止错误弹层
+  * @returns {Promise<Boolean, ErrorModel>}
+  **/
+   restore: function (args, options = {}) {
+     
+     return $.api('AppManagement', 'Restore', args, options);
+   },
+  /**
+  * 使用情况统计分析
+  * @param {Object} args 请求参数
+  * @param {string} args.projectId 组织id
+  * @param {string} args.departmentId 部门id
+  * @param {boolean} args.depFlag true表示仅当强部门，false表示部门树
+  * @param {string} args.appId 应用id
+  * @param {integer} args.dayRange 天数范围 0 = 最近7天，1 = 最近一个月，2=最近一个季度，3=最近半年，4=最近一年
+  * @param {string} args.dateDemension &#34;1h&#34;:1小时 &#34;1d&#34;:1天 &#34;1w&#34;:1周 &#34;1M&#34;:1月 &#34;1q&#34;:1季度 &#34;1y&#34;:1年
+  * @param {Object} options 配置参数
+  * @param {Boolean} options.silent 是否禁止错误弹层
+  * @returns {Promise<Boolean, ErrorModel>}
+  **/
+   allUsageOverviewStatistics: function (args, options = {}) {
+     
+     return $.api('AppManagement', 'AllUsageOverviewStatistics', args, options);
+   },
+  /**
+  * 应用汇总概览
+  * @param {Object} args 请求参数
+  * @param {string} args.projectId 组织id
+  * @param {string} args.keyWord 关键字搜索
+  * @param {integer} args.pageIndex 当前页
+  * @param {integer} args.pageSize 页大小
+  * @param {string} args.sortFiled 排序字段
+  * @param {boolean} args.sorted 排序方式 true--asc false--desc
+  * @param {string} args.appId 应用id
+  * @param {Object} options 配置参数
+  * @param {Boolean} options.silent 是否禁止错误弹层
+  * @returns {Promise<Boolean, ErrorModel>}
+  **/
+   appUsageOverviewStatistics: function (args, options = {}) {
+     
+     return $.api('AppManagement', 'AppUsageOverviewStatistics', args, options);
+   },
+  /**
+  * 不同维度使用情况统计(按应用，按成员)
+  * @param {Object} args 请求参数
+  * @param {string} args.projectId 组织id
+  * @param {integer} args.dayRange 天数范围 0 = 最近7天，1 = 最近一个月，2=最近一个季度，3=最近半年，4=最近一年
+  * @param {integer} args.pageIndex 当前页
+  * @param {integer} args.pageSize 页大小
+  * @param {integer} args.dimension 维度 1-应用 2-用户
+  * @param {string} args.sortFiled 排序字段（返回结果的列名，例如:appAccess）
+  * @param {boolean} args.sorted 排序方式
+  * @param {string} args.keyword 关键词查询
+  * @param {string} args.appId 应用id
+  * @param {Object} options 配置参数
+  * @param {Boolean} options.silent 是否禁止错误弹层
+  * @returns {Promise<Boolean, ErrorModel>}
+  **/
+   usageStatisticsForDimension: function (args, options = {}) {
+     
+     return $.api('AppManagement', 'UsageStatisticsForDimension', args, options);
    },
 };

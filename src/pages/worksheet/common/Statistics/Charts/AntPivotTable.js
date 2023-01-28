@@ -341,7 +341,7 @@ export default class extends Component {
         <div style={{ wordWrap: 'break-word', wordBreak: 'break-word' }}>{data}</div>
       );
     }
-    
+
     const linesChildren = linesData.map(item => {
       return {
         title: item.name,
@@ -352,6 +352,7 @@ export default class extends Component {
         render
       }
     });
+
     for(let i = columns.length - 1; i >= 0; i--) {
       const column = columns[i];
       const next = columns[i + 1];
@@ -370,58 +371,20 @@ export default class extends Component {
     const { columnSummary = {} } = pivotTable || reportData;
     const dataList = [];
 
-    
-    const maxYearQuarter = result.reduce((max, item) => {
-      return max > item.y[0] ? max : item.y[0]
-    }, '')
-    // console.log('result', result, maxYearQuarter)
-
     const getTitle = (id, value) => {
-      // const resVal = valueMap[id] ? valueMap[id][value] : value
-      // return isFullYear(resVal) ? <Tag color={'#F50'}>{resVal}</Tag> : resVal
       return valueMap[id] ? valueMap[id][value] : value;
     }
-    
-    // console.log('getColumnsContent reportData', data)
 
     const getYaxisList = (index) => {
       const yaxisColumn = yaxisList.map((item, i) => {
         const { rename, controlName } = item;
         const name = rename || controlName;
-
-        // console.log('yaxisList idx', data.data[index].y[0], isFullYear(data.data[index].y[0]))
-        let className = displaySetup.showRowList && isViewOriginalData ? 'contentValue' : undefined
-        if (isFullYear(data.data[index].y[0])) {
-          className = className ? className + ' column-head' : 'column-head'
-        }
-
         return {
           title: name,
           dataIndex: `${item.controlId}-${index + i}`,
           colSpan: 1,
-          // className: displaySetup.showRowList && isViewOriginalData ? 'contentValue' : undefined,
-          className,
+          className: displaySetup.showRowList && isViewOriginalData ? 'contentValue' : undefined,
           width: this.columnWidth,
-          render: (txt) => {
-            // 对Evol列加标签显示处理
-            if (['Evol','Evol%','%','Value'].includes(name)) {
-              const txtNum = parseFloat(txt)
-              // let tagClass = isNaN(txt) ? '' : txtNum > 0 ? 'green' : txtNum < 0 ? 'red' : ''
-              // let valueView = isNaN(txt) ? txt : `${!txtNum ? txtNum : txt}%`
-              let tagClass = ''
-              let valueView = isNaN(txt) ? txt : (!txtNum ? '--' : `${txt}%`)
-
-              if (name === 'Value') {
-                tagClass = isNaN(txtNum) ? '' : txtNum > 0 ? 'blue' : txtNum < 0 ? 'red' : ''
-              } else {
-                tagClass = isNaN(txtNum) ? '' : txtNum > 0 ? 'green' : txtNum < 0 ? 'red' : ''
-              }
-
-              
-              return <span className={cx(['cell-tag',tagClass])}>{valueView}</span>
-            }
-            return txt
-          },
           onCell: (record) => {
             return {
               onClick: (event) => {
@@ -457,13 +420,10 @@ export default class extends Component {
         const isObject = _.isObject(data);
         const colSpan = isObject ? data.length : 1;
         const id = columns[columnIndex].cid;
-        const title = getTitle(id, isObject ? data.value : data);
         return {
-          // title: getTitle(id, isObject ? data.value : data),
-          title,
+          title: getTitle(id, isObject ? data.value : data),
           key: id,
           colSpan,
-          className: isFullYear(title) ? 'column-head' : undefined,
           children: nextIndex < columns.length ? getChildren(nextIndex, index, colSpan) : getYaxisList(index)
         }
       });
@@ -477,13 +437,10 @@ export default class extends Component {
           const isObject = _.isObject(firstItem);
           const colSpan = isObject ? firstItem.length : 1;
           const id = columns[0].cid;
-          const title = getTitle(id, isObject ? firstItem.value : firstItem);
           const obj = {
-            // title: getTitle(id, isObject ? firstItem.value : firstItem),
-            title: title === maxYearQuarter ? <div className='column-title-wrap'>{title}<img src={newImgBase} alt="" /></div> : title,
+            title: getTitle(id, isObject ? firstItem.value : firstItem),
             key: id,
             colSpan,
-            className: isFullYear(title) ? 'column-head' : undefined,
             children: item.y.length > 1 ? getChildren(1, index, colSpan) : getYaxisList(index)
           }
           dataList.push(obj);
@@ -634,12 +591,6 @@ export default class extends Component {
     const dataSource = this.getDataSource(result, linesData);
     const scrollConfig = this.getScrollConfig();
 
-    // console.log('controlContent', controlContent)
-    // 判断隐藏表头第二行
-    const ctrlChild = (controlName[0] || {}).children || []
-    const ctrlTitle = (ctrlChild[0] || {}).title
-    const ctrlClassName = ['Division666','Companies666'].includes(ctrlTitle) ? 'table-hide-second-head' : ''
-
     const tableColumns = [
       ...controlName,
       ...controlContent
@@ -656,7 +607,6 @@ export default class extends Component {
       >
         <Table
           bordered
-          className={ctrlClassName}
           size="small"
           pagination={false}
           columns={tableColumns}

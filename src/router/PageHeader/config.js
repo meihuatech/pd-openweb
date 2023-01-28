@@ -1,11 +1,11 @@
 export const PAGE_HEADER_ROUTE_CONFIG = {
   my: {
-    path: '/app/my',
-    component: () => import('src/pages/PageHeader/AppManagementHeader'),
+    path: '/app/my/(group)?/:projectId?/:groupType?/:groupId?',
+    component: () => import('src/pages/PageHeader/AppCenterHeader'),
   },
   lib: {
     path: '/app/lib',
-    component: () => import('src/pages/PageHeader/AppManagementHeader'),
+    component: () => import('src/pages/PageHeader/AppCenterHeader'),
   },
   appPkg: {
     path: '/app/:appId/:groupId?/:worksheetId?/:viewId?',
@@ -64,7 +64,7 @@ export const PAGE_HEADER_ROUTE_CONFIG = {
     component: () => import('src/pages/PageHeader/NetManageHeader'),
   },
   privateDeployment: {
-    path: '/privateDeployment',
+    path: '/privateDeployment/:routeType?',
     component: () => import('src/pages/PageHeader/NetManageHeader'),
   },
   appInstallSetting: {
@@ -103,9 +103,13 @@ export const PAGE_HEADER_ROUTE_CONFIG = {
     path: '/search',
     component: () => import('src/pages/PageHeader/NetManageHeader'),
   },
+  integration: {
+    path: '/integration',
+    component: () => import('src/pages/PageHeader/HubHeader'),
+  },
   app: {
     path: '/app/?',
     isExact: true,
-    component: () => import('src/pages/PageHeader/AppManagementHeader'),
+    component: () => import('src/pages/PageHeader/AppCenterHeader'),
   },
 };

@@ -1,4 +1,4 @@
-﻿import React, { useRef, useEffect } from 'react';
+﻿import React, { useRef, useEffect, Fragment } from 'react';
 import styled from 'styled-components';
 import { LoadDiv, Icon } from 'ming-ui';
 import { every, isEmpty } from 'lodash';
@@ -7,27 +7,43 @@ import { bindActionCreators } from 'redux';
 import { DndProvider, useDrop } from 'react-dnd-latest';
 import { HTML5Backend } from 'react-dnd-html5-backend-latest';
 import { getIconByType } from 'src/pages/widgetConfig/util';
-import { updateWorksheetRow } from 'src/api/worksheet';
+import worksheetAjax from 'src/api/worksheet';
 import * as boardActions from 'src/pages/worksheet/redux/actions/boardView';
 import * as baseAction from 'src/pages/worksheet/redux/actions';
-import { getAdvanceSetting } from 'src/util';
+import { getAdvanceSetting, browserIsMobile } from 'src/util';
 import { filterAndFormatterControls } from '../util';
 import SelectField from '../components/SelectField';
 import ViewEmpty from '../components/ViewEmpty';
 import Board from './RecordList';
 import { ITEM_TYPE } from './config';
 import { dealBoardViewData } from './util';
+import cx from 'classnames';
 import './index.less';
 
 export const RecordBoardWrap = styled.div`
   height: 100%;
   padding-right: 14px;
+  display: flex;
+  .boardFixedWrap {
+    margin-left: 14px;
+    position: relative;
+    display: flex;
+    &::before {
+      position: absolute;
+      top: -20px;
+      right: 0;
+      width: 1px;
+      bottom: 0;
+      content: '';
+      background: #ddd;
+    }
+  }
   .boardListWrap {
+    flex: 1;
     overflow-x: auto;
     display: flex;
     flex-wrap: nowrap;
     padding: 0 14px;
-    height: 100%;
   }
 `;
 
@@ -131,7 +147,14 @@ function BoardView(props) {
 
   useEffect(() => {
     initBoardViewData();
-  }, [viewId, view.viewControl]);
+  }, [
+    viewId,
+    view.viewControl,
+    view.advancedSetting.navshow,
+    view.advancedSetting.navfilters,
+    view.advancedSetting.freezenav,
+    view.advancedSetting.navempty,
+  ]);
 
   const handleSelectField = obj => {
     if (!isCharge) return;
@@ -158,7 +181,7 @@ function BoardView(props) {
     };
     if (Reflect.has(obj, 'rawRow')) {
       const originData = JSON.parse(rawRow) || {};
-      updateWorksheetRow(para).then(res => {
+      worksheetAjax.updateWorksheetRow(para).then(res => {
         if (!isEmpty(res.data)) {
           // 后端更新后返回的权限不准 使用获取时候的权限
           const originAuth = _.pick(originData, ['allowedit', 'allowdelete']);
@@ -184,7 +207,7 @@ function BoardView(props) {
     const { boardViewLoading, boardData } = boardView;
     const { viewControl } = view;
     const viewData = dealBoardViewData({ view, controls, data: boardData });
-    const { hidenone } = getAdvanceSetting(view);
+    const { navshow, freezenav } = getAdvanceSetting(view);
     // 选择了控件作为看板且控件没有被删除
     const isHaveSelectControl = viewControl && _.find(controls, item => item.controlId === viewControl);
     if (!isHaveSelectControl) {
@@ -205,15 +228,20 @@ function BoardView(props) {
       );
     }
 
-    const renderBoard = () => {
-      return every(viewData, item => isEmpty(item.rows)) ? (
-        <ViewEmpty filters={filters} viewFilter={view.filters || []} />
-      ) : (
-        (viewData || []).map((board, index) => {
-          if (!(_.get(board, 'rows') || []).length) {
+    const renderBoard = (fixFirst = false) => {
+      // 显示指定项 不做空数据的判断
+      if (every(viewData, item => isEmpty(item.rows)) && view.advancedSetting.navshow !== '2' && !fixFirst) {
+        return <ViewEmpty filters={filters} viewFilter={view.filters || []} />;
+      }
+
+      return (viewData || [])
+        .slice(freezenav === '1' && !fixFirst ? 1 : 0, fixFirst ? 1 : undefined)
+        .map((board, index) => {
+          if (!(_.get(board, 'rows') || []).length && !fixFirst) {
             // 看板无数据时 当配置隐藏无数据看板或看板本身是未分类时 看板不显示
-            if (board.noGroup || hidenone === '1') return null;
+            if (board.noGroup || navshow === '1') return null;
           }
+
           return (
             <Board
               {...boardView}
@@ -238,14 +266,21 @@ function BoardView(props) {
               {...rest}
             />
           );
-        })
-      );
+        });
     };
 
     return (
-      <div className="boardListWrap" ref={$listWrapRef}>
-        {boardViewLoading ? <LoadDiv /> : renderBoard()}
-      </div>
+      <Fragment>
+        {!boardViewLoading && freezenav === '1' && <div className="boardFixedWrap">{renderBoard(true)}</div>}
+
+        <div
+          className={cx('boardListWrap', { pLeft0: browserIsMobile() })}
+          ref={$listWrapRef}
+          style={{ paddingLeft: freezenav === '1' ? 0 : 14 }}
+        >
+          {boardViewLoading ? <LoadDiv /> : renderBoard()}
+        </div>
+      </Fragment>
     );
   };
 

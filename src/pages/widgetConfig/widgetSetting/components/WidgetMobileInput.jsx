@@ -1,17 +1,18 @@
-import React, { Fragment } from 'react';
+import React, { Fragment, useEffect } from 'react';
 import { Checkbox } from 'ming-ui';
 import { Tooltip } from 'antd';
 import SheetDealDataType from './SheetDealDataType';
 import { SettingItem } from '../../styled';
 import { updateConfig, handleAdvancedSettingChange } from '../../util/setting';
+import _ from 'lodash';
 
 const SCAN_CODE_CONFIG = [
   {
-    text: _l('扫描条形码'),
+    text: _l('允许扫描条形码'),
     value: '1',
   },
   {
-    text: _l('扫描二维码'),
+    text: _l('允许扫描二维码'),
     value: '2',
   },
 ];
@@ -19,8 +20,20 @@ const SCAN_CODE_CONFIG = [
 export default ({ data, onChange }) => {
   let { strDefault, advancedSetting = {} } = data;
   strDefault = strDefault || '00';
-  const { scantype, dismanual = 0 } = advancedSetting;
+  const { scantype, dismanual = 0, getinput, getsave } = advancedSetting;
   const [disableAlbum] = strDefault.split('');
+
+  useEffect(() => {
+    if (!_.includes(['0', '1', '2'], scantype)) {
+      onChange({
+        ...(dismanual || getinput || getsave
+          ? handleAdvancedSettingChange(data, { dismanual: '0', getinput: '0', getsave: '0' })
+          : {}),
+        strDefault: data.strDefault ? updateConfig({ config: strDefault, value: 0, index: 0 }) : data.strDefault,
+      });
+    }
+  }, [data.controlId]);
+
   return (
     <Fragment>
       <SettingItem className="withSplitLine">
@@ -28,9 +41,7 @@ export default ({ data, onChange }) => {
           {_l('限制移动端输入')}
           <Tooltip
             placement={'bottom'}
-            title={_l(
-              '支持移动app和在钉钉，微信，welink中使用的web移动端应用；暂不支持企业微信，和其他方式使用的web移动端应用',
-            )}
+            title={_l('通过启用设备摄像头实现扫码输入。仅移动app中扫码支持区分条形码、二维码，其他平台扫码不做区分。')}
           >
             <i className="icon-help Gray_9e Font16 pointer"></i>
           </Tooltip>

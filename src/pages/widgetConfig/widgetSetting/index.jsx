@@ -13,6 +13,8 @@ import {
   HAS_DYNAMIC_DEFAULT_VALUE_CONTROL,
   HAS_EXPLAIN_CONTROL,
   HAVE_CONFIG_CONTROL,
+  HAS_WARNING_CONTROL,
+  HAVE_MASK_WIDGET,
 } from '../config';
 import DynamicDefaultValue from './components/DynamicDefaultValue';
 import { enumWidgetType } from '../util';
@@ -20,10 +22,20 @@ import { changeWidgetSize } from '../util/widgets';
 import { canAdjustWidth } from '../util/setting';
 import WidgetVerify from './components/WidgetVerify';
 import ControlSetting from './components/ControlSetting';
+import ControlMask from './components/ControlMask';
 import components from './components';
 import errorBoundary from 'ming-ui/decorators/errorBoundary';
-const { WidgetIntro, WidgetExplain, WidgetDes, WidgetPermission, WidgetName, WidgetWidth, WidgetMobileInput } =
-  components;
+const {
+  WidgetIntro,
+  WidgetExplain,
+  WidgetOtherExplain,
+  WidgetDes,
+  WidgetPermission,
+  WidgetName,
+  WidgetWidth,
+  WidgetMobileInput,
+  WidgetWarning,
+} = components;
 
 const SettingWrap = styled.div`
   position: relative;
@@ -53,7 +65,7 @@ function WidgetSetting(props) {
     setWidgets,
     ...rest
   } = props;
-  const { type, controlId, advancedSetting = {} } = data;
+  const { type, controlId, advancedSetting = {}, options = [], enumDefault } = data;
   const ENUM_TYPE = enumWidgetType[type];
   const info = DEFAULT_CONFIG[ENUM_TYPE] || {};
   const queryConfig = _.find(queryConfigs, item => item.controlId === controlId) || {};
@@ -80,8 +92,8 @@ function WidgetSetting(props) {
           {!includes([34], type) && (
             <Fragment>
               {!rest.withoutIntro && <WidgetIntro {...allProps} />}
-              {/* // 备注字段没名字 */}
-              {type !== 10010 && <WidgetName {...allProps} />}
+              {HAS_WARNING_CONTROL.includes(type) && <WidgetWarning {...allProps} />}
+              <WidgetName {...allProps} />
             </Fragment>
           )}
           {/* rest.type 已指定类型的情况下不可更改 */}
@@ -89,17 +101,23 @@ function WidgetSetting(props) {
           {/* 快速创建字段暂时隐藏更多内容 */}
           {!rest.quickAddControl && (
             <Fragment>
-              {(HAS_DYNAMIC_DEFAULT_VALUE_CONTROL.includes(type) ||
-                (type === 26 && advancedSetting.usertype !== '2')) && <DynamicDefaultValue {...allProps} />}
+              {HAS_DYNAMIC_DEFAULT_VALUE_CONTROL.includes(type) && <DynamicDefaultValue {...allProps} />}
               {!NO_VERIFY_WIDGET.includes(type) && <WidgetVerify {...allProps} />}
-              {(HAVE_CONFIG_CONTROL.includes(type) ||
-                (type === 10 && advancedSetting.checktype === '1') ||
-                (type === 26 && advancedSetting.usertype !== '2')) && <ControlSetting {...allProps} />}
+              {HAVE_CONFIG_CONTROL.includes(type) && <ControlSetting {...allProps} />}
+              {/**掩码设置 */}
+              {(HAVE_MASK_WIDGET.includes(type) ||
+                (type === 2 && enumDefault === 2) ||
+                (type === 6 && advancedSetting.showtype !== '2')) && <ControlMask {...allProps} />}
               {!NO_PERMISSION_WIDGET.includes(type) && <WidgetPermission {...allProps} />}
               {/* // 文本控件移动端输入 */}
               {includes([2], type) && <WidgetMobileInput {...allProps} />}
               {canAdjustWidth(widgets, data) && <WidgetWidth {...allProps} handleClick={handleAdjustWidthClick} />}
-              {HAS_EXPLAIN_CONTROL.includes(type) && <WidgetExplain {...allProps} />}
+              {(HAS_EXPLAIN_CONTROL.includes(type) ||
+                (type === 11 && advancedSetting.showtype !== '2') ||
+                (type === 10 && advancedSetting.checktype === '1')) && <WidgetExplain {...allProps} />}
+              {includes([9, 10, 11], type) && _.find(options, i => i.key === 'other' && !i.isDeleted) && (
+                <WidgetOtherExplain {...allProps} />
+              )}
               {!NO_DES_WIDGET.includes(type) && <WidgetDes {...allProps} />}
             </Fragment>
           )}

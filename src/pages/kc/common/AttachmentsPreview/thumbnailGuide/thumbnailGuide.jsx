@@ -6,6 +6,7 @@ import cx from 'classnames';
 import { PREVIEW_TYPE } from '../constant/enum';
 import * as Actions from '../actions/action';
 import ThumbnailItem from '../thumbnailItem';
+import _ from 'lodash';
 
 class ThumbnailGuide extends React.Component {
   static propTypes = {
@@ -214,4 +215,4 @@ function mapDispatchToProps(dispatch) {
   };
 }
 
-module.exports = connect(mapStateToProps, mapDispatchToProps)(ThumbnailGuide);
+export default connect(mapStateToProps, mapDispatchToProps)(ThumbnailGuide);

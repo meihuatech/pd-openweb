@@ -4,7 +4,7 @@ import { Tooltip, Button } from 'antd';
 import styled from 'styled-components';
 import { useSetState } from 'react-use';
 import { includes, isEmpty } from 'lodash';
-import { editWorksheetControls } from 'src/api/worksheet';
+import worksheetAjax from 'src/api/worksheet';
 import { canSetAsTitle } from '../../util';
 import DeleteConfirm from './DeleteConfirm';
 import { NOT_NEED_DELETE_CONFIRM } from '../../config';
@@ -62,7 +62,7 @@ const OperationWrap = styled.div`
 `;
 
 export default function WidgetOperation(props) {
-  const { isActive, fromType, data = {}, parentRef, handleOperate, queryConfig, globalSheetInfo, ...rest } = props;
+  const { isActive, fromType, data = {}, parentRef, handleOperate, queryConfig, globalSheetInfo = {}, ...rest } = props;
   const { type, controlId, attribute, showControls = [], dataSource, sourceControl } = data;
 
   const getActualControls = () => {
@@ -77,6 +77,12 @@ export default function WidgetOperation(props) {
     resizeWidthVisible: false,
     deleteConfirmVisible: false,
   });
+
+  const isFree =
+    _.get(
+      _.find(md.global.Account.projects, item => item.projectId === globalSheetInfo.projectId),
+      'licenseType',
+    ) === 0;
 
   // 公共表单 只有一个隐藏配置
   if (fromType === 'public') {
@@ -124,7 +130,7 @@ export default function WidgetOperation(props) {
 
     const deleteRelateControl = e => {
       e.stopPropagation();
-      editWorksheetControls({
+      worksheetAjax.editWorksheetControls({
         worksheetId: dataSource,
         controls: [handleAdvancedSettingChange(sourceControl, { hide: '1' })],
       }).then(res => {});
@@ -170,6 +176,7 @@ export default function WidgetOperation(props) {
         visible={deleteConfirmVisible}
         onVisibleChange={visible => setVisible({ deleteConfirmVisible: visible })}
         // getPopupContainer={() => parentRef.current}
+        hint={isFree ? _l('删除后可在字段回收站保留60天（免费版删除后无法恢复）') : _l('删除后可在字段回收站保留60天')}
         onCancel={() => setVisible({ deleteConfirmVisible: false })}
         onOk={handleDelete}
       >

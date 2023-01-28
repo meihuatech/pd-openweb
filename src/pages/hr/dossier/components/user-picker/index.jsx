@@ -4,10 +4,11 @@ import cx from 'classnames';
 import Icon from 'ming-ui/components/Icon';
 import UserHead from 'src/pages/feed/components/userHead';
 import Structure from 'src/api/structure';
-import 'dialogSelectUser';
+import 'src/components/dialogSelectUser/dialogSelectUser';
 import './style.less';
 import SelectUser from '../../../approval/components/SelectUser/SelectUser';
 import { FormError } from '../lib';
+import _ from 'lodash';
 
 class UserPicker extends Component {
   constructor(props) {

@@ -1,10 +1,12 @@
 ﻿import { formatShowTime } from '../common';
 import ajaxRequest from 'src/api/message';
 import './css/postMessage.less';
+import 'src/components/mdDialog/dialog';
+import tpl from './template/postMessage.html';
+import doT from '@mdfe/dot';
+import _ from 'lodash';
 
 export default function({ createUser, members, address, description, allDay, start, end, title }) {
-  const tplFunc = require('./template/postMessage.tpl');
-  require('mdDialog');
   var data = _.map(members, m => ({
     ...m,
     name: m.memberName,
@@ -27,7 +29,7 @@ export default function({ createUser, members, address, description, allDay, sta
     isSameClose: false,
     container: {
       header: '',
-      content: tplFunc({
+      content: doT.template(tpl)({
         data: data,
         defaultContent,
       }),

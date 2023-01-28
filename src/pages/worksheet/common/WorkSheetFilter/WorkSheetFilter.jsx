@@ -10,15 +10,8 @@ import { emitter } from 'worksheet/util';
 import sheetAjax from 'src/api/worksheet';
 import SaveWorksheetFilter from '../SaveWorksheetFilter';
 import FilterItem from './components/FilterItem';
+import { FILTER_TYPE, FILTER_RELATION_TYPE, CONTROL_FILTER_WHITELIST } from './enum';
 import {
-  FILTER_TYPE,
-  FILTER_RELATION_TYPE,
-  CONTROL_FILTER_WHITELIST,
-  FILTER_CONDITION_TYPE,
-  getFilterTypeLabel,
-} from './enum';
-import {
-  getTypeKey,
   checkConditionAvailable,
   formatOriginFilterValue,
   getDefaultCondition,
@@ -26,6 +19,7 @@ import {
   formatConditionForSave,
 } from './util';
 import './WorkSheetFilter.less';
+import _ from 'lodash';
 
 const ClickAwayable = createDecoratedComponent(withClickAway);
 @withClickAway
@@ -108,6 +102,10 @@ export default class WorkSheetFilter extends Component {
     sheetAjax
       .getWorksheetFilters({ worksheetId })
       .then(data => {
+        let filters = data.map(item => formatOriginFilterValue(item));
+        if (md.global.Account.isPortal) {
+          filters = filters.filter(o => o.type !== 2); //外部门户 排除公共筛选
+        }
         this.setState(
           {
             loaded: true,
@@ -116,7 +114,7 @@ export default class WorkSheetFilter extends Component {
             editingFilter: null,
             saveAsFilter: null,
             filterExpandedId: null,
-            filters: data.map(item => formatOriginFilterValue(item)),
+            filters,
           },
           cb,
         );
@@ -124,29 +122,6 @@ export default class WorkSheetFilter extends Component {
       .fail(err => {
         alert(_l('获取筛选列表失败'), 2);
       });
-  }
-  @autobind
-  getFilterTypes(type) {
-    let types = [];
-    const typeKey = getTypeKey(type);
-    if (typeKey) {
-      types = CONTROL_FILTER_WHITELIST[typeKey].types.map(filterType => ({
-        value: filterType,
-        text: getFilterTypeLabel(typeKey, filterType),
-      }));
-    }
-    if (type === 29) {
-      types = [
-        FILTER_CONDITION_TYPE.LIKE,
-        FILTER_CONDITION_TYPE.NCONTAIN,
-        FILTER_CONDITION_TYPE.ISNULL,
-        FILTER_CONDITION_TYPE.HASVALUE,
-      ].map(filterType => ({
-        value: filterType,
-        text: getFilterTypeLabel(typeKey, filterType),
-      }));
-    }
-    return types;
   }
   @autobind
   deleteFilter(filter) {
@@ -248,7 +223,7 @@ export default class WorkSheetFilter extends Component {
           const ownerControl = _.find(columns, c => c.controlId === 'ownerid');
           const ownerCondition = getDefaultCondition(ownerControl);
           ownerCondition.values = [md.global.Account.accountId];
-          ownerCondition.originValues = [
+          ownerCondition.fullValues = [
             JSON.stringify({
               accountId: md.global.Account.accountId,
               name: md.global.Account.fullname,
@@ -411,7 +386,6 @@ export default class WorkSheetFilter extends Component {
       () => {
         if (
           condition.conditionGroupType === CONTROL_FILTER_WHITELIST.BOOL.value ||
-          condition.conditionGroupType === CONTROL_FILTER_WHITELIST.DATE.value ||
           condition.controlType === 29 ||
           condition.conditionGroupType === CONTROL_FILTER_WHITELIST.SUBLIST.value
         ) {
@@ -517,7 +491,7 @@ export default class WorkSheetFilter extends Component {
     const filterWhiteKeys = _.flatten(
       Object.keys(CONTROL_FILTER_WHITELIST).map(key => CONTROL_FILTER_WHITELIST[key].keys),
     );
-    columns = columns.map(redefineComplexControl);
+    columns = columns.filter(c => (c.controlPermissions || '111')[0] === '1').map(redefineComplexControl);
     columns = columns
       .filter(c => _.includes(filterWhiteKeys, c.type))
       .filter(c => !(c.type === 38 && c.enumDefault === 3));

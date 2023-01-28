@@ -9,10 +9,13 @@ const Con = styled.div`
   padding: 10px 0;
   .fnTitle {
     font-weight: bold;
-    margin-left: 18px;
   }
   .ant-collapse-header {
     padding: 12px 14px !important;
+  }
+  .ant-collapse > .ant-collapse-item > .ant-collapse-header .ant-collapse-arrow {
+    margin-right: 4px;
+    vertical-align: middle;
   }
   .ant-collapse-item {
     border-bottom: none !important;
@@ -78,20 +81,24 @@ export default function ControlList(props) {
         >
           {controlGroups.map(group => (
             <Collapse.Panel key={group.id} header={<span className="fnTitle">{group.name}</span>}>
-              {group.controls.map((c, i) => (
-                <ControlItem
-                  key={i}
-                  onClick={() => {
-                    insertTagToEditor({
-                      value: c.controlId + '-' + group.id,
-                      text: c.controlName,
-                    });
-                  }}
-                >
-                  <Icon className={`icon icon-${getIconByType(c.type || 6)}`} />
-                  {c.controlName}
-                </ControlItem>
-              ))}
+              {group.controls
+                .filter(c => new RegExp(keywords).test(c.controlName))
+                .map((c, i) => (
+                  <ControlItem
+                    key={i}
+                    onClick={() => {
+                      insertTagToEditor({
+                        value: group.id + '-' + c.controlId,
+                        text: c.controlName,
+                      });
+                    }}
+                  >
+                    <Icon className={`icon icon-${getIconByType(c.type || 6)}`} />
+                    <span className="ellipsis" title={c.controlName}>
+                      {c.controlName}
+                    </span>
+                  </ControlItem>
+                ))}
             </Collapse.Panel>
           ))}
         </Collapse>
@@ -112,7 +119,9 @@ export default function ControlList(props) {
               }}
             >
               <Icon className={`icon icon-${getIconByType(c.type || 6)}`} />
-              {c.controlName}
+              <span className="ellipsis" title={c.controlName}>
+                {c.controlName}
+              </span>
             </ControlItem>
           ),
         )}

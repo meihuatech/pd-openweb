@@ -1,7 +1,8 @@
 import React, { Component } from 'react';
 import cx from 'classnames';
 import PropTypes, { string } from 'prop-types';
-import 'selectize';
+import '@mdfe/selectize';
+import filterXSS from 'xss';
 
 export default class Text extends Component {
   static propTypes = {
@@ -21,7 +22,9 @@ export default class Text extends Component {
     const comp = this;
     if (this.input) {
       this.selectize = $(this.input).selectize({
+        dropdownClass: 'selectize-dropdown zIndex99 pAll10 dropdownTrigger',
         plugins: ['remove_button'],
+        dropdownParent: 'body',
         placeholder: _l('请输入'),
         delimiter: ',',
         persist: false,
@@ -35,7 +38,7 @@ export default class Text extends Component {
         },
         render: {
           option_create(data, escape) {
-            return `<div class="create ThemeColor3">${_l('使用"%0"', data.input)}</div>`;
+            return `<div class="create ThemeColor3">${_l('使用"%0"', filterXSS(data.input))}</div>`;
           },
         },
         onInitialize: function () {

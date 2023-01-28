@@ -2,14 +2,21 @@ import React from 'react';
 import { connect } from 'react-redux';
 import TreeView from '../departmentView';
 import CreateBtn from '../departmentView/createBtn';
-import { Icon, LoadDiv } from 'ming-ui';
-import { loadAllUsers, loadDepartments, loadUsers, loadInactiveUsers, loadApprovalUsers } from '../../actions/entities';
-import { updateCursor, updateTypeCursor } from '../../actions/current';
-import { loadJobList, loadJobUsers, updateCursorJobId } from '../../actions/jobs';
-import DialogCreatePosition from '../../modules/dialogCreatePosition';
+import { Icon } from 'ming-ui';
+import { Dropdown, Menu } from 'antd';
+import {
+  loadAllUsers,
+  loadDepartments,
+  loadUsers,
+  loadInactiveUsers,
+  loadApprovalUsers,
+  updateShowExport,
+  updateImportType,
+} from '../../actions/entities';
+import { updateCursor, updateTypeCursor, fetchInActive, fetchApproval } from '../../actions/current';
+import projectSettingAjax from 'src/api/projectSetting';
 import './index.less';
 import cx from 'classnames';
-import * as jobController from 'src/api/job';
 
 const shouldLoadDepartments = props => {
   const { haveSubDepartment, subDepartments, isLoading, isExpired } = props;
@@ -19,211 +26,100 @@ const shouldLoadDepartments = props => {
 class TabList extends React.Component {
   constructor(props) {
     super(props);
+    const { projectId, fetchInActive = () => {}, fetchApproval = () => {} } = props;
     this.state = {
       showPositionDialog: false,
       isNew: true,
-      jobId: '',
-      jobName: '',
     };
+    fetchInActive(projectId);
+    fetchApproval(projectId);
   }
 
   handleClick = typeCursor => {
-    const { dispatch, projectId } = this.props;
-    dispatch(updateCursor(''));
-    dispatch(updateTypeCursor(typeCursor));
+    const {
+      projectId,
+      updateCursor = () => {},
+      updateTypeCursor = () => {},
+      loadAllUsers = () => {},
+      loadDepartments = () => {},
+      loadUsers = () => {},
+      loadInactiveUsers = () => {},
+      loadApprovalUsers = () => {},
+    } = this.props;
+    updateCursor('');
+    updateTypeCursor(typeCursor);
     switch (typeCursor) {
       case 0:
-        dispatch(loadAllUsers(projectId, 1));
+        loadAllUsers(projectId, 1);
         break;
       case 1:
         if (shouldLoadDepartments(this.props)) {
-          dispatch(loadDepartments('', 1));
+          loadDepartments('', 1);
         }
-        dispatch(loadUsers(''));
+        loadUsers('');
         break;
       case 2:
-        dispatch(loadInactiveUsers(projectId, 1));
+        loadInactiveUsers(projectId, 1);
         break;
       case 3:
-        dispatch(loadApprovalUsers(projectId, 1));
+        loadApprovalUsers(projectId, 1);
         break;
     }
   };
 
-  closeFn = () => {
-    this.setState({
-      showPositionDialog: false,
+  // 刷新缓存
+  clearCache = () => {
+    const { projectId } = this.props;
+    Promise.all([
+      projectSettingAjax.projectClearCache({ projectId, processType: 10 }),
+      projectSettingAjax.projectClearCache({ projectId, processType: 20 }),
+    ]).then(([data1, data2]) => {
+      if (data1 && data2) {
+        alert(_l('刷新成功'));
+      } else {
+        alert(_l('刷新失败'), 2);
+      }
     });
   };
 
   render() {
-    const {
-      typeNum = 0,
-      typeCursor = 0,
-      projectId,
-      approveNumber,
-      inActiveNumber,
-      root,
-      cursor,
-      departmentName,
-      jobList = [],
-      dispatch,
-      jobId,
-      isLoading,
-    } = this.props;
-    if (typeNum !== 0) {
-      return (
-        <div className="jobListBox">
-          <div className="ThemeColor3 pTop10 pBottom10">
-            <span className="Hand mLeft24 creatDepartment">
-              <span
-                className="creatDepartmentTxt"
-                onClick={() => {
-                  this.setState({
-                    showPositionDialog: !this.state.showPositionDialog,
-                    isNew: true,
-                    jobName: '',
-                    jobId: '',
-                  });
-                }}
-              >
-                <span className="mRight3 icon-add Font20 TxtMiddle" />
-                {_l('创建职位')}
-              </span>
-            </span>
-          </div>
-          <ul
-            className="pBottom20 jobListUl box-sizing"
-            style={{ height: document.documentElement.clientHeight - 300 }}
-          >
-            {isLoading ? (
-              <LoadDiv />
-            ) : (
-              jobList.map(item => {
-                return (
-                  <li
-                    className={cx({ current: jobId === item.jobId })}
-                    onClick={() => {
-                      dispatch(updateCursorJobId(item.jobId));
-                    }}
-                  >
-                    <Icon className="Font16 Gray_9e mRight10" icon="limit-principal" />
-                    <span className={cx('overflow_ellipsis WordBreak jobNameLi')}>{item.jobName}</span>
-                    <Icon
-                      className="Font16 Gray_9e Right editIcon"
-                      icon="edit_17"
-                      onClick={e => {
-                        this.setState({
-                          showPositionDialog: !this.state.showPositionDialog,
-                          isNew: false,
-                          jobId: item.jobId,
-                          jobName: item.jobName,
-                        });
-                      }}
-                    />
-                  </li>
-                );
-              })
-            )}
-          </ul>
-          {this.state.showPositionDialog && (
-            <DialogCreatePosition
-              showPositionDialog={this.state.showPositionDialog}
-              jobList={jobList}
-              setValue={data => {
-                let isShow = data.showPositionDialog;
-                let name = data.jobName;
-                let id = data.jobId;
-                let isOk = data.isOk;
-                if (!isOk) {
-                  this.setState({
-                    showPositionDialog: false,
-                  });
-                }
-                if (isOk && this.state.isNew) {
-                  // 创建职位
-                  jobController
-                    .addJob({
-                      jobName: name,
-                      projectId,
-                    })
-                    .then(data => {
-                      if (data == 1) {
-                        alert(_l('创建成功'));
-                        dispatch(loadJobList(projectId));
-                      } else if (data == 2) {
-                        alert(_l('创建失败，相同职位名称已经存在'), 3);
-                      } else {
-                        alert(_l('创建失败'), 3);
-                      }
-                      this.closeFn();
-                    });
-                } else if (isOk && !this.state.isNew) {
-                  if (!name) {
-                    alert(_l('请输入职位名称'), 3);
-                  }
-                  // 创建职位
-                  jobController
-                    .editJobName({
-                      jobId: id,
-                      jobName: name,
-                      projectId,
-                    })
-                    .then(data => {
-                      if (data === 1) {
-                        alert(_l('编辑成功'));
-                        dispatch(loadJobList(projectId, id));
-                      } else if (data == 2) {
-                        JobList.showMsg(_l('编辑失败，相同职位名称已经存在'));
-                      } else {
-                        JobList.showMsg(_l('操作失败'));
-                      }
-                      this.closeFn();
-                    });
-                }
-              }}
-              delFn={() => {
-                jobController
-                  .deleteJobs({
-                    jobIds: [this.state.jobId],
-                    projectId,
-                  })
-                  .then(data => {
-                    if (data) {
-                      alert(_l('删除成功'));
-                      dispatch(loadJobList(projectId));
-                    } else {
-                      alert(_l('职位存在成员，无法删除'), 2);
-                    }
-                    this.closeFn();
-                  });
-              }}
-              jobName={this.state.jobName}
-              isNew={this.state.isNew}
-              jobId={this.state.jobId}
-            />
-          )}
-        </div>
-      );
-    }
+    const { typeCursor = 0, approveNumber, inActiveNumber, root, cursor } = this.props;
     return (
       <React.Fragment>
-        <div className="departmentTop">
+        <div className="departmentTop mRight24">
           <ul>
-            <li
-              onClick={() => {
-                this.handleClick(0);
-              }}
-              className={cx({ current: cursor === root && (typeCursor === 1 || typeCursor === 0) })}
-            >
-              <Icon className={cx('Font16 Gray_9e listName mRight10')} icon="person" />
-              <span>{_l('全组织')}</span>
+            <li className={cx('Hand flexRow', { current: cursor === root && (typeCursor === 1 || typeCursor === 0) })}>
+              <div
+                className="flex"
+                onClick={() => {
+                  this.handleClick(0);
+                }}
+              >
+                <Icon className={cx('Font16 Gray_9e listName mRight10')} icon="person" />
+                <span>{_l('全组织')}</span>
+              </div>
+              <Dropdown
+                overlayStyle={{ width: 150 }}
+                trigger={['click']}
+                placement="bottomLeft"
+                overlay={
+                  <Menu>
+                    <Menu.Item key="0" onClick={this.clearCache}>
+                      {_l('刷新所有成员信息')}
+                    </Menu.Item>
+                  </Menu>
+                }
+              >
+                <div style={{ width: 24 }} onClick={e => e.stopPropagation()}>
+                  <Icon icon="moreop" />
+                </div>
+              </Dropdown>
             </li>
             <li
               onClick={() => {
                 this.handleClick(2);
               }}
-              className={cx({ current: cursor === root && typeCursor === 2 })}
+              className={cx('Hand', { current: cursor === root && typeCursor === 2 })}
             >
               <Icon className="Font16 Gray_9e listName mRight10" icon="check_circle" />
               <span>
@@ -237,7 +133,7 @@ class TabList extends React.Component {
               onClick={() => {
                 this.handleClick(3);
               }}
-              className={cx({ current: cursor === root && typeCursor === 3 })}
+              className={cx('Hand', { current: cursor === root && typeCursor === 3 })}
             >
               <Icon className="Font16 Gray_9e listName mRight10" icon="access_time_filled" />
               <span>
@@ -249,8 +145,15 @@ class TabList extends React.Component {
             </li>
           </ul>
         </div>
-        <div className="w100">
-          <CreateBtn />
+        <CreateBtn />
+        <div
+          className="w100 flex"
+          style={{
+            position: 'relative',
+            zIndex: 0,
+            minHeight: 0,
+          }}
+        >
           <TreeView />
         </div>
       </React.Fragment>
@@ -272,13 +175,8 @@ const mapStateToProps = state => {
       root,
     },
     pagination,
-    jobs: {
-      jobList,
-      jobId = '', //当前的职位ID
-      isLoading,
-    },
   } = state;
-  const { departments } = state.entities;
+  const { departments, isLoading } = state.entities;
   const department = departments[''];
   return {
     pagination,
@@ -294,10 +192,20 @@ const mapStateToProps = state => {
     root,
     cursor: departmentId,
     departmentName: department ? department.departmentName : '',
-    jobList,
-    jobId,
     isLoading,
   };
 };
 
-export default connect(mapStateToProps)(TabList);
+export default connect(mapStateToProps, {
+  loadAllUsers,
+  loadDepartments,
+  loadUsers,
+  loadInactiveUsers,
+  loadApprovalUsers,
+  updateShowExport,
+  updateCursor,
+  updateTypeCursor,
+  fetchInActive,
+  fetchApproval,
+  updateImportType,
+})(TabList);

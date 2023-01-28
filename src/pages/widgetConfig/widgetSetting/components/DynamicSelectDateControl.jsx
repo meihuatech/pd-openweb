@@ -8,6 +8,8 @@ import 'moment/locale/zh-cn';
 import { ControlTag } from '../../styled';
 import { SYSTEM_DATE_CONTROL } from '../../config/widget';
 import SelectControl from './SelectControl';
+import { filterOnlyShowField } from 'src/pages/widgetConfig/util';
+import moment from 'moment';
 
 const DateInfoWrap = styled.div`
   display: flex;
@@ -50,22 +52,27 @@ const DateInfoWrap = styled.div`
   }
 `;
 
-export default function DynamicSelectDateControl({ value, onChange, allControls }) {
+export default function DynamicSelectDateControl({ value, onChange, allControls, disableTimeControl = false }) {
   const [{ dateControlVisible }, setVisible] = useSetState({
     dateControlVisible: false,
   });
   const availableControls = allControls.concat(SYSTEM_DATE_CONTROL);
+  const types = disableTimeControl ? [15, 16] : [15, 16, 46];
   const filteredControls = _.filter(
     availableControls,
     item =>
-      includes([15, 16], item.type) ||
+      includes(types, item.type) ||
       // 汇总日期
-      includes([15, 16], item.enumDefault2) ||
+      includes(types, item.enumDefault2) ||
       // 关联记录和他表字段为日期
-      (includes([29, 30], item.type) && includes([15, 16], item.sourceControlType)),
+      (includes([29, 30], item.type) && includes(types, item.sourceControlType)),
   );
 
   const isSelectPlainTime = !value || /(\/|:)/.test(value);
+
+  const originControl = find(filteredControls, item => item.controlId === value);
+  const controlName = get(originControl, 'controlName');
+  const invalidError = originControl && originControl.type === 30 && (originControl.strDefault || '')[0] === '1';
 
   return (
     <Fragment>
@@ -89,15 +96,13 @@ export default function DynamicSelectDateControl({ value, onChange, allControls 
                   }}
                   onClear={() => {
                     onChange('');
-                  }}>
+                  }}
+                >
                   <div className="selectedDate">{value && moment(value).format('YYYY-MM-DD HH:mm')}</div>
                 </DatePicker>
               ) : (
-                <ControlTag>
-                  {get(
-                    find(filteredControls, item => item.controlId === value),
-                    'controlName',
-                  )}
+                <ControlTag className={cx({ invalid: !controlName || invalidError })}>
+                  {controlName ? (invalidError ? _l('%0(无效类型)', controlName) : controlName) : _l('已删除')}
                 </ControlTag>
               )}
             </Fragment>
@@ -117,7 +122,7 @@ export default function DynamicSelectDateControl({ value, onChange, allControls 
         <SelectControl
           searchable={false}
           className={'isolate'}
-          list={filteredControls}
+          list={filterOnlyShowField(filteredControls)}
           onClickAway={() => setVisible({ dateControlVisible: false })}
           onClick={item => {
             onChange(`$${item.controlId}$`);

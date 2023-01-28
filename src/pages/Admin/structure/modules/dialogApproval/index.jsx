@@ -3,9 +3,10 @@ import './index.less';
 import { Dialog, LoadDiv, Icon } from 'ming-ui';
 import userController from 'src/api/user';
 import Act from '../dialogInviteUser/act';
-import DialogSelectDept from 'dialogSelectDept';
-import DialogSelectJob from 'src/components/DialogSelectJob';
-import 'md.select';
+import DialogSelectDept from 'src/components/dialogSelectDept';
+import { selectJob } from 'src/components/DialogSelectJob';
+import 'src/components/select/select';
+import _ from 'lodash';
 
 class Approval extends React.Component {
   constructor(props) {
@@ -108,7 +109,7 @@ class Approval extends React.Component {
             });
             alert(_l('批准成功'));
           } else if (result === 4) {
-            alert(_l('当前用户数已超出人数限制'), 3, false);
+            alert(_l('当前用户数已超出人数限制'), 3);
           } else {
             alert(_l('操作失败'), 2);
           }
@@ -128,6 +129,7 @@ class Approval extends React.Component {
     new DialogSelectDept({
       projectId,
       unique: false,
+      fromAdmin: true,
       selectedDepartment: departmentInfos,
       showCreateBtn: false,
       selectFn(departments) {
@@ -141,7 +143,7 @@ class Approval extends React.Component {
   dialogSelectJobFn = e => {
     const { projectId } = this.props;
     const { jobInfos } = this.state;
-    new DialogSelectJob({
+    selectJob({
       projectId,
       onSave: data => {
         const jobIds = jobInfos.map(job => job.jobId);
@@ -170,7 +172,8 @@ class Approval extends React.Component {
         onOk={() => {
           this.saveFn(this.props.setValue);
         }}
-        visible={this.props.showDialog}>
+        visible={this.props.showDialog}
+      >
         {isLoading ? (
           <LoadDiv />
         ) : (
@@ -183,7 +186,7 @@ class Approval extends React.Component {
               <span className="formLabel mTop5">{_l('手机')}</span>
               <div className="formControl Gray_75">{mobilePhone}</div>
             </div>
-            <div className="formGroup">
+            <div className="formGroup mBottom24">
               <span className="formLabel">{_l('部门')}</span>
               {departmentInfos.map((item, i) => {
                 return (

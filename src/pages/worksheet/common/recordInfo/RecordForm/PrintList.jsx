@@ -1,16 +1,18 @@
-import React from 'react';
+import React, { Fragment } from 'react';
 import { Component } from 'react';
 import PropTypes from 'prop-types';
 import cx from 'classnames';
 import Trigger from 'rc-trigger';
 import { MenuItem, Icon } from 'ming-ui';
 import styled from 'styled-components';
-import { getPrintList } from 'src/api/worksheet';
-import { add } from 'src/api/webCache';
-import { upgradeVersionDialog } from 'src/util';
-import { getProjectLicenseInfo } from 'src/api/project';
+import worksheetAjax from 'src/api/worksheet';
+import webCacheAjax from 'src/api/webCache';
+import { generatePdf } from 'worksheet/common/PrintQrBarCode';
+import { getPrintCardInfoOfTemplate } from 'worksheet/common/PrintQrBarCode/enum';
+import { getFeatureStatus, buriedUpgradeVersionDialog } from 'src/util';
 import { isOpenPermit } from 'src/pages/FormSet/util.js';
 import { permitList } from 'src/pages/FormSet/config.js';
+import _ from 'lodash';
 const MenuItemWrap = styled(MenuItem)`
   &.active,
   &.hover {
@@ -26,6 +28,15 @@ const MenuItemWrap = styled(MenuItem)`
     }
   }
 `;
+
+const SecTitle = styled.div`
+  color: #999;
+  font-size: 12px;
+  margin: 12px 16px 4px;
+`;
+
+const FEATURE_ID = 20;
+
 export default class PrintList extends Component {
   static propTypes = {
     viewId: PropTypes.string,
@@ -44,28 +55,19 @@ export default class PrintList extends Component {
     this.state = {
       showPrintGroup: false,
       tempList: [],
-      isNo: false,
-      isFree: false,
     };
   }
 
   componentDidMount() {
-    const { viewId, worksheetId, projectId } = this.props;
+    const { viewId, worksheetId } = this.props;
     if (worksheetId) {
-      getPrintList({
+      worksheetAjax.getPrintList({
         worksheetId,
         viewId,
       }).then(tempList => {
         let list = !viewId ? tempList.filter(o => o.range === 1) : tempList;
-        this.setState({ tempList: list, tempListLoaded: true });
-        this.projectLicenseInfo(projectId);
+        this.setState({ tempList: list.sort((a, b) => a.type - b.type), tempListLoaded: true });
       });
-    }
-  }
-
-  componentWillReceiveProps(nextProps) {
-    if (nextProps.projectId != this.props.projectId && nextProps.projectId) {
-      this.projectLicenseInfo(nextProps.projectId);
     }
   }
 
@@ -89,61 +91,13 @@ export default class PrintList extends Component {
         id: instanceId,
       };
       let printKey = Math.random().toString(36).substring(2);
-      add({
+      webCacheAjax.add({
         key: `${printKey}`,
         value: JSON.stringify(printData),
       });
-      window.open(
-        `${window.subPath || ''}/printForm/${appId}/${workId ? 'workflow' : 'worksheet'}/new/print/${printKey}`,
-      );
+      window.open(`${window.subPath || ''}/printForm/${appId}/${workId ? 'flow' : 'worksheet'}/new/print/${printKey}`);
     });
   }
-
-  projectLicenseInfo = projectId => {
-    const { tempList } = this.state;
-    // 有word模版数据 请求权限
-    if (!(tempList.length > 0 && tempList.filter(it => it.type === 2).length > 0)) {
-      return;
-    }
-    if (!projectId) {
-      this.setState({
-        isNo: true,
-      });
-      return;
-    } else {
-      this.setState({
-        isNo: false,
-      });
-    }
-    let projects = (_.get(md, ['global', 'Account', 'projects']) || []).filter(it => it.projectId === projectId);
-    if (projects.length <= 0) {
-      // 外部协作
-      getProjectLicenseInfo({
-        projectId: projectId,
-      }).then(data => {
-        let { version = [], licenseType } = data;
-        let { versionId } = version;
-        this.setState({
-          /**
-           * licenseType
-           * 0: 过期
-           * 1: 正式版
-           * 2: 体验版
-           */
-          // 只有旗舰版/专业版可用
-          isNo: !_.includes([2, 3], versionId) || licenseType === 0,
-          isFree: licenseType === 0,
-        });
-      });
-    } else {
-      let { version = [], licenseType } = projects[0];
-      let { versionId } = version;
-      this.setState({
-        isNo: !_.includes([2, 3], versionId) || licenseType === 0,
-        isFree: licenseType === 0,
-      });
-    }
-  };
 
   render() {
     const {
@@ -156,8 +110,9 @@ export default class PrintList extends Component {
       sheetSwitchPermit,
       onItemClick = () => {},
     } = this.props;
-    const { tempList, showPrintGroup, isNo, isFree } = this.state;
+    const { tempList, showPrintGroup } = this.state;
     let attriData = controls.filter(it => it.attribute === 1);
+    const featureType = getFeatureStatus(projectId, FEATURE_ID);
     if (tempList.length <= 0) {
       return isOpenPermit(permitList.recordPrintSwitch, sheetSwitchPermit, viewId) ? (
         <MenuItemWrap
@@ -197,45 +152,67 @@ export default class PrintList extends Component {
                     return (
                       <MenuItemWrap
                         className=""
-                        onClick={() => {
+                        icon={<Icon icon={getPrintCardInfoOfTemplate(it).icon} className="Font18" />}
+                        onClick={async () => {
                           onItemClick();
                           if (window.isPublicApp) {
                             alert(_l('预览模式下，不能操作'), 3);
                             return;
                           }
-                          let printId = it.id;
-                          let isDefault = it.type === 0;
-                          if (isNo && !isDefault) {
-                            upgradeVersionDialog({
-                              projectId,
-                              explainText: _l('Word批量打印是高级功能，请升级至付费版解锁开启'),
-                              isFree,
+                          if (_.includes([3, 4], it.type)) {
+                            const data = await worksheetAjax.getRowDetail({
+                              appId,
+                              viewId,
+                              worksheetId,
+                              rowId: recordId,
+                              getTemplate: true,
                             });
-                            return;
+                            generatePdf({
+                              templateId: it.id,
+                              appId,
+                              worksheetId,
+                              viewId,
+                              projectId,
+                              selectedRows: [safeParse(data.rowData)],
+                              controls: data.templateControls,
+                              zIndex: 9999,
+                            });
+                          } else {
+                            if (it.type !== 0 && featureType === '2') {
+                              buriedUpgradeVersionDialog(projectId, FEATURE_ID);
+                              return;
+                            }
+                            let printId = it.id;
+                            let isDefault = it.type === 0;
+                            let printData = {
+                              printId,
+                              isDefault, // 系统打印模板
+                              worksheetId,
+                              projectId: projectId,
+                              rowId: recordId,
+                              getType: 1,
+                              viewId,
+                              appId,
+                              name: it.name,
+                              attriData: attriData[0],
+                            };
+                            let printKey = Math.random().toString(36).substring(2);
+                            webCacheAjax.add({
+                              key: `${printKey}`,
+                              value: JSON.stringify(printData),
+                            });
+                            window.open(
+                              `${window.subPath || ''}/printForm/${appId}/worksheet/preview/print/${printKey}`,
+                            );
                           }
-                          let printData = {
-                            printId,
-                            isDefault, // 系统打印模板
-                            worksheetId,
-                            projectId: projectId,
-                            rowId: recordId,
-                            getType: 1,
-                            viewId,
-                            appId,
-                            name: it.name,
-                            attriData: attriData[0],
-                          };
-                          let printKey = Math.random().toString(36).substring(2);
-                          add({
-                            key: `${printKey}`,
-                            value: JSON.stringify(printData),
-                          });
-                          window.open(`${window.subPath || ''}/printForm/${appId}/worksheet/preview/print/${printKey}`);
                         }}
                       >
-                        <span title={it.name} className="Block overflow_ellipsis WordBreak">
+                        <div title={it.name} className="ellipsis templateName">
                           {it.name}
-                        </span>
+                        </div>
+                        {_.includes([3, 4], it.type) && (
+                          <span className="detail">{getPrintCardInfoOfTemplate(it).text}</span>
+                        )}
                       </MenuItemWrap>
                     );
                   })}
@@ -243,15 +220,18 @@ export default class PrintList extends Component {
               )}
               {/* 系统打印权限 */}
               {isOpenPermit(permitList.recordPrintSwitch, sheetSwitchPermit, viewId) && (
-                <MenuItemWrap
-                  className={cx({ defaultPrint: tempList.length > 0 })}
-                  onClick={() => {
-                    onItemClick();
-                    this.menuPrint();
-                  }}
-                >
-                  {_l('系统打印')}
-                </MenuItemWrap>
+                <Fragment>
+                  <SecTitle>{_l('系统默认打印')}</SecTitle>
+                  <MenuItemWrap
+                    className={cx({ defaultPrint: tempList.length > 0 })}
+                    onClick={() => {
+                      onItemClick();
+                      this.menuPrint();
+                    }}
+                  >
+                    {_l('打印记录')}
+                  </MenuItemWrap>
+                </Fragment>
               )}
             </div>
           }

@@ -1,9 +1,42 @@
-﻿export const sameParameters = [
+﻿export const AddWorksheetParam = [
   {
     name: 'appKey',
     required: _l('是'),
     type: 'string',
-    desc: _l('AppKey'),
+    desc: 'AppKey',
+  },
+  {
+    name: 'sign',
+    required: _l('是'),
+    type: 'string',
+    desc: _l('签名'),
+  },
+  {
+    name: 'name',
+    required: _l('是'),
+    type: 'string',
+    desc: _l('工作表名称'),
+  },
+  {
+    name: 'alias',
+    required: _l('否'),
+    type: 'string',
+    desc: _l('别名'),
+  },
+  {
+    name: 'controls',
+    required: _l('是'),
+    type: 'list',
+    desc: _l('控件数据'),
+  },
+];
+
+export const sameParameters = [
+  {
+    name: 'appKey',
+    required: _l('是'),
+    type: 'string',
+    desc: 'AppKey',
   },
   {
     name: 'sign',
@@ -24,7 +57,7 @@ export const appInfoParameters = [
     name: 'appKey',
     required: _l('是'),
     type: 'string',
-    desc: _l('AppKey'),
+    desc: 'AppKey',
   },
   {
     name: 'sign',
@@ -87,6 +120,18 @@ export const MENU_LIST = [
         type: 'boolean',
         desc: _l('是否不统计总行数以提高性能'),
       },
+      {
+        name: 'useControlId',
+        required: _l('否'),
+        type: 'boolean',
+        desc: _l('是否只返回controlId，默认false'),
+      },
+      {
+        name: 'getSystemControl',
+        required: _l('否'),
+        type: 'boolean',
+        desc: _l('是否获取系统字段，默认false'),
+      },
     ]),
   },
   {
@@ -138,6 +183,12 @@ export const MENU_LIST = [
         type: 'string',
         desc: _l('行记录ID'),
       },
+      {
+        name: 'getSystemControl',
+        required: _l('否'),
+        type: 'boolean',
+        desc: _l('是否获取系统字段，默认false'),
+      },
     ]),
   },
   {
@@ -150,6 +201,12 @@ export const MENU_LIST = [
         required: _l('是'),
         type: 'string',
         desc: _l('行记录ID'),
+      },
+      {
+        name: 'getSystemControl',
+        required: _l('否'),
+        type: 'boolean',
+        desc: _l('是否获取系统字段，默认false'),
       },
     ]),
   },
@@ -237,7 +294,7 @@ export const MENU_LIST = [
         name: 'controlId',
         required: _l('是'),
         type: 'string',
-        desc: _l('控件ID'),
+        desc: _l('字段ID'),
       },
       {
         name: 'pageSize',
@@ -250,6 +307,44 @@ export const MENU_LIST = [
         required: _l('是'),
         type: 'number',
         desc: _l('页码'),
+      },
+      {
+        name: 'getSystemControl',
+        required: _l('否'),
+        type: 'boolean',
+        desc: _l('是否获取系统字段，默认false'),
+      },
+    ]),
+  },
+  {
+    id: 'GetRowShareLink',
+    title: _l('获取记录分享链接 GET'),
+    apiName: 'worksheet/getRowShareLink',
+    data: sameParameters.concat([
+      {
+        name: 'rowId',
+        required: _l('是'),
+        type: 'string',
+        desc: _l('行记录ID'),
+      },
+      {
+        name: 'visibleFields',
+        required: _l('否'),
+        type: 'list[string]',
+        desc: _l('可见字段ID集合'),
+      },
+      {
+        name: 'validTime',
+        required: _l('否'),
+        type: 'number',
+        desc: _l('单位s,为空表示永久有效'),
+
+      },
+      {
+        name: 'password',
+        required: _l('否'),
+        type: 'string',
+        desc: _l('为空表示不需要密码'),
       },
     ]),
   },
@@ -398,26 +493,33 @@ const sameAppRoleParams = [
     type: 'list[string]',
     desc: _l('职位Id合集'),
   },
+  {
+    name: 'orgRoleIds',
+    required: _l('否'),
+    type: 'list[string]',
+    desc: _l('组织角色Id合集'),
+  },
 ];
 
 export const appSuccessData = {
   data: {
-    projectId: '网络id',
-    appId: '应用id',
-    name: '应用名称',
-    iconUrl: '图标地址',
-    color: '图标颜色',
-    desc: '应用描述',
+    projectId: _l('网络id'),
+    appId: _l('应用id'),
+    name: _l('应用名称'),
+    iconUrl: _l('图标地址'),
+    color: _l('图标颜色'),
+    desc: _l('应用描述'),
     sections: [
       {
-        sectionId: '应用分组id',
-        name: '分组名称',
+        sectionId: _l('应用分组id'),
+        name: _l('分组名称'),
         items: [
           {
-            id: '分组下应用项id',
-            name: '应用项名称',
+            id: _l('分组下应用项id'),
+            name: _l('应用项名称'),
             type: 0,
-            iconUrl: '应用项图标地址',
+            iconUrl: _l('应用项图标地址'),
+            alias: _l('工作表别名'),
             status: 1,
           },
         ],
@@ -431,29 +533,30 @@ export const appSuccessData = {
 const appRoleSuccessData = {
   data: [
     {
-      roleId: '角色Id',
-      name: '角色名称',
-      roleType: '角色类型',
-      desc: '角色描述',
+      roleId: _l('角色Id'),
+      name: _l('角色名称'),
+      roleType: _l('角色类型'),
+      desc: _l('角色描述'),
       users: [
         {
-          accountId: '账号Id',
-          name: '用户名',
-          avatar: '用户头像链接',
+          accountId: _l('账号Id'),
+          name: _l('用户名'),
+          avatar: _l('用户头像链接'),
         },
       ],
       departments: [
         {
-          departmentId: '部门Id',
-          departmentName: '部门名称',
+          departmentId: _l('部门Id'),
+          departmentName: _l('部门名称'),
         },
       ],
       jobs: [
         {
-          jobId: '职位Id',
-          jobName: '职位名称',
+          jobId: _l('职位Id'),
+          jobName: _l('职位名称'),
         },
       ],
+      projectOrganizes: ["组织角色ID"]
     },
   ],
   error_code: 1,
@@ -461,7 +564,7 @@ const appRoleSuccessData = {
 };
 
 export const appRoleErrorData = {
-  error_msg: '具体错误信息',
+  error_msg: _l('具体错误信息'),
   error_code: 10101,
   success: false,
 };
@@ -572,7 +675,7 @@ export const MENU_LIST_APPENDIX = [
         name: 'controlId',
         required: _l('是'),
         type: 'string',
-        desc: _l('控件ID'),
+        desc: _l('字段ID'),
       },
       {
         name: 'dataType',
@@ -638,6 +741,18 @@ export const MENU_LIST_APPENDIX = [
         required: _l('否'),
         type: 'boolean',
         desc: _l('是否升序（false：降序）'),
+      },
+      {
+        name: 'isGroup',
+        required: _l('否'),
+        type: 'boolean',
+        desc: _l('当前筛选条件是否是筛选组，为true时需要传 groupFilters 参数，只支持一层筛选组'),
+      },
+      {
+        name: 'groupFilters',
+        required: _l('否'),
+        type: 'list[object]',
+        desc: _l('筛选组列表，对象为筛选器对象'),
       },
     ],
   },
@@ -1254,15 +1369,16 @@ export const OPTIONS_FUNCTION_LIST = [
     requestData: {
       appKey: 'appKey',
       sign: 'sign',
-      name: '选项集1',
+      name: _l('选项集1'),
       options: [
         {
-          value: '选项值，不允许重复',
-          index: '选项排序值: 必须为整数，越小越靠前',
-          isDeleted: '该选项是否已被删除',
-          color:
+          value: _l('选项值，不允许重复'),
+          index: _l('选项排序值: 必须为整数，越小越靠前'),
+          isDeleted: _l('该选项是否已被删除'),
+          color: _l(
             '颜色值: colorful为true时生效，参考值 #C0E6FC , #C3F2F2 , #00C345 , #FAD714 , #FF9300 , #F52222 , #EB2F96 , #7500EA , #2D46C4 , #484848 , #C9E6FC , #C3F2F2',
-          score: '分值，enableScore为true时生效，允许小数和正负值',
+          ),
+          score: _l('分值，enableScore为true时生效，允许小数和正负值'),
         },
         {
           value: 'value02',
@@ -1276,12 +1392,12 @@ export const OPTIONS_FUNCTION_LIST = [
       enableScore: false,
     },
     successData: {
-      code: 0,
+      code: 1,
       msg: 'string',
       data: true,
     },
     errorData: {
-      error_msg: '具体错误信息',
+      error_msg: _l('具体错误信息'),
       error_code: 10001,
       success: false,
     },
@@ -1296,24 +1412,24 @@ export const OPTIONS_FUNCTION_LIST = [
       sign: 'sign',
     },
     successData: {
-      code: 0,
+      code: 1,
       msg: 'string',
       data: [
         {
           appId: 'appId',
           projectId: 'projectId',
-          collectionId: '选项集ID',
-          name: '选项集名称',
+          collectionId: _l('选项集ID'),
+          name: _l('选项集名称'),
           accountId: 'accountId',
           worksheetIds: ['worksheetId'],
           options: [
             {
-              key: '选项id',
-              value: '选项值，不允许重复',
-              index: '选项排序值: 必须为整数，越小越靠前',
-              isDeleted: '该选项是否已被删除',
-              color: '颜色值',
-              score: '选项分值',
+              key: _l('选项id'),
+              value: _l('选项值，不允许重复'),
+              index: _l('选项排序值: 必须为整数，越小越靠前'),
+              isDeleted: _l('该选项是否已被删除'),
+              color: _l('颜色值'),
+              score: _l('选项分值'),
             },
             {
               key: 'key01',
@@ -1330,7 +1446,7 @@ export const OPTIONS_FUNCTION_LIST = [
       ],
     },
     errorData: {
-      error_msg: '具体错误信息',
+      error_msg: _l('具体错误信息'),
       error_code: 10001,
       success: false,
     },
@@ -1345,13 +1461,14 @@ export const OPTIONS_FUNCTION_LIST = [
       sign: 'sign',
       options: [
         {
-          key: '需要编辑的选项id，如果为空则表示新增选项',
-          value: '选项值，不允许重复',
-          index: '选项排序值: 必须为整数，越小越靠前',
-          isDeleted: '该选项是否已被删除',
-          color:
+          key: _l('需要编辑的选项id，如果为空则表示新增选项'),
+          value: _l('选项值，不允许重复'),
+          index: _l('选项排序值: 必须为整数，越小越靠前'),
+          isDeleted: _l('该选项是否已被删除'),
+          color: _l(
             '颜色值: colorful为true时生效，参考值 #C0E6FC , #C3F2F2 , #00C345 , #FAD714 , #FF9300 , #F52222 , #EB2F96 , #7500EA , #2D46C4 , #484848 , #C9E6FC , #C3F2F2',
-          score: '分值，enableScore为true时生效，允许小数和正负值',
+          ),
+          score: _l('分值，enableScore为true时生效，允许小数和正负值'),
         },
         {
           key: 'key02',
@@ -1362,17 +1479,17 @@ export const OPTIONS_FUNCTION_LIST = [
           score: 1.5,
         },
       ],
-      name: 'test选项集01',
+      name: _l('test选项集01'),
       colorful: true,
       enableScore: false,
     },
     successData: {
-      code: 0,
+      code: 1,
       msg: 'string',
       data: true,
     },
     errorData: {
-      error_msg: '具体错误信息',
+      error_msg: _l('具体错误信息'),
       error_code: 10001,
       success: false,
     },
@@ -1393,7 +1510,103 @@ export const SIDEBAR_LIST = [
     title: _l('授权管理'),
   },
   {
+    key: 'whiteList',
+    title: _l('IP 白名单'),
+  },
+  {
     key: 'appInfo',
     title: _l('获取应用信息'),
   },
 ];
+
+export const ADD_API_CONTROLS = [
+  {
+    controlName: _l('文本'), //控件名称
+    alias: _l('字段别名'),
+    type: 2, //控件编号 2:文本,3:手机,4:座机,5:邮箱,15:日期,16:日期时间,19:地区—省,23:地区—省—市,24:地区—省—市—县
+    required: true, //true：必填,false：非必填
+  },
+  {
+    controlName: _l('数值'), //控件名称
+    alias: _l('字段别名'),
+    type: 6, // 6:数值,8:金额
+    dot: 2, //保留小数位（0-14）
+    required: true, //true：必填,false：非必填
+  },
+  {
+    controlName: _l('单选'), //控件名称
+    alias: _l('字段别名'),
+    type: 11, //控件编号 11:单选,10:多选
+    options: [
+      {
+        value: _l('选项名称1'),
+        index: 1, //排序
+      },
+      {
+        value: _l('选项名称2'),
+        index: 2, //排序
+      },
+    ],
+    required: true, //true：必填,false：非必填
+  },
+  {
+    controlName: _l('多选'), //控件名称
+    alias: _l('字段别名'),
+    type: 10, //控件编号 11:单选,10:多选
+    options: [
+      {
+        value: _l('选项名称1'),
+        index: 1, //排序
+      },
+      {
+        value: _l('选项名称2'),
+        index: 2, //排序
+      },
+      {
+        value: _l('选项名称3'),
+        index: 3, //排序
+      },
+    ],
+    required: true, //true：必填,false：非必填
+  },
+  {
+    controlName: _l('时间-时分'),
+    alias: _l('字段别名'),
+    type: 46,
+    required: true,
+    unit: 1, // 1时分，6时分秒
+  },
+  {
+    controlName: _l('时间-时分秒'),
+    alias: _l('字段别名'),
+    type: 46,
+    required: true,
+    unit: 6, // 1时分，6时分秒
+  },
+  {
+    controlName: _l('成员-单选'),
+    type: 26,
+    alias: _l('字段别名'),
+    enumDefault: 0,
+    required: true,
+  },
+  {
+    controlName: _l('成员-多选'),
+    type: 26,
+    alias: _l('字段别名'),
+    enumDefault: 1,
+    required: true,
+  },
+  {
+    controlName: _l('附件'),
+    alias: _l('字段别名'),
+    type: 14,
+    required: true,
+  },
+];
+
+export const ADD_WORKSHEET_SUCCESS = {
+  data: _l('工作表ID'),
+  success: true,
+  error_code: 1,
+};

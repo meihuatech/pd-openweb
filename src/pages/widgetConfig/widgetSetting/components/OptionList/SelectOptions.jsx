@@ -3,7 +3,7 @@ import { Icon } from 'src';
 import { get, has, head, pick } from 'lodash';
 import { Support, Dialog, Dropdown } from 'ming-ui';
 import styled from 'styled-components';
-import { getCollectionsByCollectIds, saveOptionsCollection } from 'src/api/worksheet';
+import worksheetAjax from 'src/api/worksheet';
 import { SettingItem } from '../../../styled';
 import SelectOptionList from './SelectOptionList';
 import EditOptionList from './EditOptionList';
@@ -12,6 +12,7 @@ import {
   getDefaultOptions,
   getDefaultCheckedOption,
   parseOptionValue,
+  getAdvanceSetting,
   handleAdvancedSettingChange,
   getOptions,
 } from '../../../util/setting';
@@ -103,6 +104,7 @@ export default function SelectOptions(props) {
   const { type, controlName, controlId, strDefault, enumDefault, enumDefault2, options, dataSource } = data;
   const { appId } = globalSheetInfo;
   const colorful = enumDefault2 === 1;
+  const { showtype } = getAdvanceSetting(data);
 
   // 是新增控件
   const isNewControl = controlId.includes('-');
@@ -120,7 +122,7 @@ export default function SelectOptions(props) {
 
   useEffect(() => {
     if (!dataSource) return;
-    getCollectionsByCollectIds({ appId, collectionIds: [dataSource] }).then(({ msg, data, code }) => {
+    worksheetAjax.getCollectionsByCollectIds({ appId, collectionIds: [dataSource] }).then(({ msg, data, code }) => {
       if (code === 1) {
         setOptionList(head(data));
       } else {
@@ -151,7 +153,7 @@ export default function SelectOptions(props) {
         </span>
       ),
       onOk: () => {
-        saveOptionsCollection({ appId, colorful, options, name: controlName }).then(({ code, data, msg }) => {
+        worksheetAjax.saveOptionsCollection({ appId, colorful, options, name: controlName }).then(({ code, data, msg }) => {
           if (code === 1) {
             const { collectionId } = data;
             setOptionList(data);
@@ -200,7 +202,7 @@ export default function SelectOptions(props) {
               ></i>
               <span>{_l('彩色')}</span>
             </div>
-            {!dataSource && (
+            {!dataSource && showtype !== '2' && (
               <div className="toOptionList flexCenter hoverText" onClick={toOptionList}>
                 <Icon icon="swap_horiz" />
                 <span>{_l('转为选项集')}</span>
@@ -213,7 +215,7 @@ export default function SelectOptions(props) {
             <OptionListItem>
               <div className="title Bold">
                 <div className="name">
-                  {optionList.name}
+                  {(optionList || {}).name}
                   {` ( ${(getOptions(optionList) || []).length} )`}
                 </div>
                 <div className="operate flexCenter">
@@ -264,7 +266,7 @@ export default function SelectOptions(props) {
         <SelectOptionList
           {...props}
           onOk={({ listId, listItem }) => {
-            onChange({ dataSource: listId, default: '' });
+            onChange({ dataSource: listId, default: '', options: listItem.options });
             setOptionList(listItem);
             setVisible({ selectVisible: false });
           }}

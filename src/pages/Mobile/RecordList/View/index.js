@@ -1,6 +1,6 @@
 import React, { Component } from 'react';
 import { connect } from 'react-redux';
-import * as actions from 'src/pages/Mobile/RecordList/redux/actions';
+import * as actions from 'mobile/RecordList/redux/actions';
 import * as worksheetActions from 'src/pages/worksheet/redux/actions';
 import { bindActionCreators } from 'redux';
 import { Flex } from 'antd-mobile';
@@ -13,6 +13,7 @@ import GunterView from './GunterView';
 import GroupFilter from '../GroupFilter';
 import State from '../State';
 import { VIEW_TYPE_ICON, VIEW_DISPLAY_TYPE } from 'src/pages/worksheet/constants/enum';
+import _ from 'lodash';
 
 const { board, sheet, calendar, gallery, structure, gunter } = VIEW_DISPLAY_TYPE;
 
@@ -30,21 +31,15 @@ class View extends Component {
     super(props);
   }
   componentDidMount() {
-    let { viewId, appId, worksheetId } = this.props.base || {};
     if (this.props.mobileNavGroupFilters.length) {
       this.props.fetchSheetRows({ navGroupFilters: this.props.mobileNavGroupFilters });
     } else {
       this.props.fetchSheetRows();
     }
-    this.props.updateMobileViewPermission({ viewId, appId, worksheetId });
   }
   componentWillReceiveProps(nextProps) {
     if (!_.isEqual(this.props.mobileNavGroupFilters, nextProps.mobileNavGroupFilters)) {
       this.props.fetchSheetRows({ navGroupFilters: nextProps.mobileNavGroupFilters });
-    }
-    if (this.props.view.viewId !== nextProps.view.viewId) {
-      let { viewId, appId, worksheetId } = nextProps.base || {};
-      this.props.updateMobileViewPermission({ viewId, appId, worksheetId });
     }
   }
   renderError() {
@@ -62,9 +57,12 @@ class View extends Component {
   }
   render() {
     const { view, viewResultCode, base, isCharge } = this.props;
-
     if (viewResultCode !== 1) {
       return <State resultCode={viewResultCode} type="view" />;
+    }
+
+    if (_.isEmpty(view)) {
+      return null;
     }
 
     const Component = TYPE_TO_COMP[String(view.viewType)];
@@ -73,12 +71,19 @@ class View extends Component {
       isCharge,
       view,
     };
-
     let hasGroupFilter =
-      !_.isEmpty(view.navGroup) && view.navGroup.length > 0 && _.includes([sheet, gallery], String(view.viewType)); // 是否存在分组列表
-    let routerInfo = window.location.pathname.includes('groupFilterDetail');
-    if (hasGroupFilter && !routerInfo) {
-      return <GroupFilter {...this.props} changeMobielSheetLoading={this.props.changeMobielSheetLoading} />;
+      view.viewId === base.viewId &&
+      !_.isEmpty(view.navGroup) &&
+      view.navGroup.length > 0 &&
+      _.includes([sheet, gallery], String(view.viewType)); // 是否存在分组列表
+    if (hasGroupFilter) {
+      return (
+        <GroupFilter
+          {...this.props}
+          changeMobielSheetLoading={this.props.changeMobielSheetLoading}
+          groupId={this.props.base.groupId}
+        />
+      );
     }
     return (
       <div className="overflowHidden flex mobileView flexColumn Relative">
@@ -90,10 +95,19 @@ class View extends Component {
 
 export default connect(
   state => ({
-    ..._.pick(state.mobile, ['base', 'isCharge', 'worksheetInfo', 'viewResultCode', 'mobileNavGroupFilters']),
+    ..._.pick(state.mobile, [
+      'base',
+      'isCharge',
+      'worksheetInfo',
+      'viewResultCode',
+      'mobileNavGroupFilters',
+      'batchOptVisible',
+      'appColor',
+    ]),
     controls: state.sheet.controls,
     views: state.sheet.views,
     ...state.sheet,
+    sheetSwitchPermit: state.mobile.sheetSwitchPermit,
   }),
   dispatch =>
     bindActionCreators(
@@ -103,6 +117,11 @@ export default connect(
           'getNavGroupCount',
           'changeMobielSheetLoading',
           'updateMobileViewPermission',
+          'addNewRecord',
+          'openNewRecord',
+          'changeBatchOptVisible',
+          'changeMobileGroupFilters',
+          'unshiftSheetRow',
         ]),
       },
       dispatch,

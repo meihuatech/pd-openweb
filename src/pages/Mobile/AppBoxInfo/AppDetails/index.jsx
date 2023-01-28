@@ -5,7 +5,7 @@ import AddDialog from './AddDialog';
 import './index.less';
 import LoadDiv from 'ming-ui/components/LoadDiv';
 import { pick, isEqual, map } from 'lodash';
-import Linkify from 'react-linkify';
+import { Linkify } from 'ming-ui';
 import SvgIcon from 'src/components/SvgIcon';
 import axios from 'axios';
 import { browserIsMobile } from 'src/util';
@@ -22,7 +22,7 @@ class AppDetails extends React.Component {
   }
   state = {
     showDialog: false,
-    data: []
+    data: [],
   };
 
   componentDidMount() {
@@ -51,20 +51,23 @@ class AppDetails extends React.Component {
   };
 
   fetch = () => {
-    axios.post(`https://pd.mingdao.com/api/AppManagement/GetAppLibraryDetail`, {
-      libraryId: this.props.libraryId
-    }).then(result => {
-      const { data } = result.data;
-      if (data.length <= 0) {
-        return window.mobileNavigateTo(!md.global.Account.accountId ? '/library' : '/app/lib');
-      } else {
-        this.setState({
-          ...this.state,
-          data: data,
-        });
-      }
-    });
-  }
+    let baseUrl = (md && md.global && md.global.SysSettings && md.global.SysSettings.templateLibraryTypes === '2') ? __api_server__.main : 'https://pd.mingdao.com/api/';
+    axios
+      .post(`${baseUrl}AppManagement/GetAppLibraryDetail`, {
+        libraryId: this.props.libraryId,
+      })
+      .then(result => {
+        const { data } = result.data;
+        if (data.length <= 0) {
+          return window.mobileNavigateTo(!md.global.Account.accountId ? '/library' : '/app/lib');
+        } else {
+          this.setState({
+            ...this.state,
+            data: data,
+          });
+        }
+      });
+  };
 
   appDone = () => {
     const isWxWork = window.navigator.userAgent.toLowerCase().includes('wxwork');
@@ -78,7 +81,7 @@ class AppDetails extends React.Component {
     } else {
       this.setState({ showDialog: true });
     }
-  }
+  };
 
   renderTag = categoryInfo => {
     return (
@@ -90,7 +93,7 @@ class AppDetails extends React.Component {
         ))}
       </React.Fragment>
     );
-  }
+  };
 
   render() {
     if (this.state.data.length <= 0) {
@@ -101,17 +104,8 @@ class AppDetails extends React.Component {
       );
     }
     const isMobile = browserIsMobile();
-    const {
-      name,
-      intro,
-      description,
-      iconUrl,
-      iconColor,
-      cover,
-      pictures,
-      mobilePictures,
-      categoryInfo,
-    } = this.state.data;
+    const { name, intro, description, iconUrl, iconColor, cover, pictures, mobilePictures, categoryInfo } =
+      this.state.data;
     return (
       <React.Fragment>
         <div className="flex detailsBox pAll20 WhiteBG">
@@ -148,14 +142,16 @@ class AppDetails extends React.Component {
                 width: 40,
                 borderRadius: 24,
                 backgroundColor: '#2196F3',
-              }}>
+              }}
+            >
               {(mobilePictures.length ? mobilePictures : pictures).map((item, index) => (
                 <div
                   key={index}
                   style={{
                     display: 'block',
                     position: 'relative',
-                  }}>
+                  }}
+                >
                   <img
                     src={item.previewUrl}
                     style={{ width: '100%', verticalAlign: 'top' }}
@@ -168,7 +164,7 @@ class AppDetails extends React.Component {
             </Carousel>
           </div>
           <AddDialog
-            getRef={ref => this.addDialogEl = ref}
+            getRef={ref => (this.addDialogEl = ref)}
             visible={this.state.showDialog}
             onCancel={() => this.setState({ showDialog: false })}
             libraryId={this.props.libraryId}

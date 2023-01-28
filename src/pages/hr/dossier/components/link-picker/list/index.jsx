@@ -2,11 +2,13 @@ import PropTypes from 'prop-types';
 import cx from 'classnames';
 import React, { Component, Fragment } from 'react';
 import moment from 'moment';
+import previewAttachments from 'src/components/previewAttachments/previewAttachments';
 import TaskDetail from 'src/pages/task/containers/taskDetail/taskDetail';
 import calendar from 'src/pages/calendar/modules/calendarDetail';
 import { getClassNameByExt } from 'src/util';
 import Icon from 'ming-ui/components/Icon';
 import './style.less';
+import _ from 'lodash';
 
 const Icons = {
   0: '',
@@ -73,18 +75,16 @@ class List extends Component {
   };
 
   previewAttachment(attachments, index) {
-    require(['previewAttachments'], previewAttachments => {
-      previewAttachments({
-        index: index || 0,
-        closeCallback: this.clearPreviewItem,
-        attachments: attachments.map(attachment =>
-          Object.assign({}, attachment, {
-            previewAttachmentType: attachment.refId ? 'KC_ID' : 'COMMON_ID',
-          }),
-        ),
-        showThumbnail: true,
-        hideFunctions: ['editFileName'],
-      });
+    previewAttachments({
+      index: index || 0,
+      closeCallback: this.clearPreviewItem,
+      attachments: attachments.map(attachment =>
+        Object.assign({}, attachment, {
+          previewAttachmentType: attachment.refId ? 'KC_ID' : 'COMMON_ID',
+        }),
+      ),
+      showThumbnail: true,
+      hideFunctions: ['editFileName'],
     });
   }
   renderLinkLayer = () => {

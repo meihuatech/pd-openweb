@@ -1,8 +1,8 @@
 import React from 'react';
 import { bindActionCreators } from 'redux';
 import { connect } from 'react-redux';
-import { Icon, ScrollView, LoadDiv, Dialog, Support } from 'ming-ui';
-import { navigateTo } from 'src/router/navigateTo';
+import { Icon, LoadDiv, Support } from 'ming-ui';
+import { Drawer } from 'antd';
 import * as actions from '../redux/actions/print';
 import cx from 'classnames';
 import './print.less';
@@ -10,96 +10,72 @@ import EditPrint from '../components/EditPrint';
 import MoreOption from '../components/MoreOption';
 import CSSTransitionGroup from 'react-addons-css-transition-group';
 import PrintTemDialog from '../components/PrintTemDialog';
-import withClickAway from 'ming-ui/decorators/withClickAway';
 import RangeDrop from 'src/pages/FormSet/components/RangeDrop';
-import { getProjectLicenseInfo } from 'src/api/project';
 import { PRINT_TYPE } from 'src/pages/Print/config';
-import { upgradeVersionDialog } from 'src/util';
-@withClickAway
-class ActDia extends React.Component {
+import { getFeatureStatus, buriedUpgradeVersionDialog } from 'src/util';
+import { getPrintCardInfoOfTemplate } from 'src/pages/worksheet/common/PrintQrBarCode/enum';
+import { printQrBarCode } from 'worksheet/common/PrintQrBarCode';
+import _ from 'lodash';
+class CreatePrintDrawer extends React.Component {
   constructor(props) {
     super(props);
-    this.state = {
-      isNo: null,
-      isFree: false,
-    };
   }
-  componentWillMount() {
-    const { setFn, projectId } = this.props;
-    if (!projectId) {
-      this.setState({
-        isNo: true,
-      });
-      return;
-    }
-    let projects = md.global.Account.projects.filter(it => it.projectId === projectId);
-    if (projects.length <= 0) {
-      //外部协作
-      getProjectLicenseInfo({
-        projectId: projectId,
-      }).then(data => {
-        let { version = [], licenseType } = data;
-        let { versionId } = version;
-        this.setState({
-          /**
-           * licenseType
-           * 0: 过期
-           * 1: 正式版
-           * 2: 体验版
-           */
-          isNo: versionId === 1 || licenseType === 0,
-          isFree: licenseType === 0,
-        });
-      });
-    } else {
-      let { version = [], licenseType } = projects[0];
-      let { versionId } = version;
-      this.setState({
-        isNo: versionId === 1 || licenseType === 0,
-        isFree: licenseType === 0,
-      });
-    }
-  }
+
   render() {
-    const { setFn, projectId } = this.props;
-    const { isNo, isFree } = this.state;
+    const { projectId, onCloseDrawer, visible, addNewRecordPrintTemp, addWordPrintTemp, addCodePrintTemp } = this.props;
+    let featureType = getFeatureStatus(projectId, 20);
+
     return (
-      <ul className="actDia">
-        <li
+      <Drawer
+        width={400}
+        className="printTempDrawer"
+        title={_l('创建打印模板')}
+        placement="right"
+        mask={false}
+        onClose={onCloseDrawer}
+        visible={visible}
+      >
+        <p className="printTempDrawerListTitle">{_l('通过系统默认打印创建')}</p>
+        <div className="printTempDrawerListItem" onClick={addNewRecordPrintTemp}>
+          <span className="iconbox">
+            <Icon icon="doc" className="printTempDrawerListItemIcon" />
+          </span>
+          {_l('记录打印')}
+        </div>
+        <div
+          className="printTempDrawerListItem"
           onClick={() => {
-            setFn({
-              showPrintTemDialog: true,
-              templateId: '',
-              type: 'new',
-              isDefault: true,
-            });
+            addCodePrintTemp(PRINT_TYPE.BAR_CODE_PRINT);
+            onCloseDrawer();
           }}
-          className={cx({})}
         >
-          <Icon icon="print" className="" />
-          {_l('通过系统打印创建')}
-        </li>
-        <li
+          <span className="iconbox">
+            <Icon icon="a-barcode" className="printTempDrawerListItemIcon" />
+          </span>
+          {_l('条形码打印')}
+        </div>
+        <div
+          className="printTempDrawerListItem"
           onClick={() => {
-            if (isNo) {
-              upgradeVersionDialog({ projectId, isFree });
-            } else {
-              setFn({
-                showEditPrint: true,
-              });
-            }
+            addCodePrintTemp(PRINT_TYPE.QR_CODE_PRINT);
+            onCloseDrawer();
           }}
-          className={cx('Relative', {})}
         >
-          <Icon icon="new_word" className="" />
-          {_l('上传 Word 模板')}
-          {isNo && (
-            <span className="upNew">
-              <Icon icon="goprev" className="" />
-            </span>
-          )}
-        </li>
-      </ul>
+          <span className="iconbox">
+            <Icon icon="qr_code" className="printTempDrawerListItemIcon" />
+          </span>
+          {_l('二维码打印')}
+        </div>
+        <p className="printTempDrawerListTitle" style={{ marginTop: '35px' }}>
+          {_l('自定义')}
+        </p>
+        <div className="printTempDrawerListItem" onClick={addWordPrintTemp}>
+          <span className="iconbox">
+            <Icon icon="new_word" className="printTempDrawerListItemIcon" />
+          </span>
+          {_l('上传word模板')}
+        </div>
+      </Drawer>
     );
   }
 }
@@ -116,8 +92,8 @@ class Print extends React.Component {
       showPrintTemDialog: false,
       type: '',
       isDefault: false,
-      showactDia: false,
       isChangeDrop: false,
+      showCreatePrintTemp: false,
     };
   }
   componentDidMount() {
@@ -134,16 +110,23 @@ class Print extends React.Component {
     }
   }
 
-  renderItem = (data, isDefault) => {
+  renderPrintItem = data => {
     const { showDropOption, isRename, templateId, showMoreOption, isChangeDrop } = this.state;
-    const { editPrintName, updatePrint, deletePrint, formSet, editPrintRange } = this.props;
+    const { editPrintName, updatePrint, deletePrint, formSet, editPrintRange, loadPrint } = this.props;
     const { worksheetInfo = [] } = formSet;
     const { views = [] } = worksheetInfo;
+
     return data.map(it => {
+      let printInfo = getPrintCardInfoOfTemplate(it);
       return (
         <div className={cx('templates')}>
-          <div className={cx('topBox', { defaulteTem: isDefault })}>
-            <Icon icon={isDefault ? 'print' : 'new_word'} className="iconTitle Font16" />
+          <div className={cx('topBox', { defaulteTem: it.type !== PRINT_TYPE.WORD_PRINT })}>
+            <Icon
+              icon={it.type === PRINT_TYPE.WORD_PRINT ? 'new_word' : printInfo.icon}
+              className={`iconTitle ${
+                it.type === PRINT_TYPE.WORD_PRINT || printInfo.icon !== 'doc' ? 'Font22' : 'Font16'
+              }`}
+            />
             {isRename && templateId === it.id ? (
               <input
                 type="text"
@@ -205,22 +188,31 @@ class Print extends React.Component {
           </div>
           <div className="con">
             <div className="view">
-              {it.range === 1 && <span className="viewText Gray_9e">{_l('所有记录')}</span>}
-              {it.range !== 1 && it.views.length <= 0 && <span className="viewText Gray_9e">{_l('未指定视图')}</span>}
+              {it.range === 1 && <span className="viewText">{_l('使用范围：所有记录')}</span>}
+              {it.range !== 1 && it.views.length <= 0 && <span className="viewText">{_l('使用范围：未指定视图')}</span>}
               {it.range === 3 && it.views.length > 0 && (
                 <span
-                  className="viewText Gray_9e"
+                  className="viewText"
                   style={{ WebkitBoxOrient: 'vertical' }}
                   title={it.views.map((item, i) => {
                     return i + 1 >= it.views.length ? item.name || item.viewName : `${item.name || item.viewName}、`;
                   })}
                 >
-                  {_l('%0视图', it.views.length)}：
+                  {_l('使用范围：%0视图', it.views.length)}（
                   {it.views.map((item, i) => {
                     return i + 1 >= it.views.length ? item.name || item.viewName : `${item.name || item.viewName}、`;
                   })}
+                  ）
                 </span>
               )}
+            </div>
+            {it.type > 2 && (
+              <div className="printSize">
+                {_l('打印尺寸')}：{printInfo.text}
+              </div>
+            )}
+            <div className="createMethod">
+              {_l('创建方式') + '：' + (it.type === PRINT_TYPE.WORD_PRINT ? _l('word模版') : _l('系统默认打印'))}
             </div>
             <div className="activeCon Relative">
               <span
@@ -261,13 +253,24 @@ class Print extends React.Component {
               <span
                 className="Hand"
                 onClick={() => {
-                  this.setState({
-                    templateId: it.id,
-                    name: it.name,
-                    type: 'preview',
-                    showPrintTemDialog: true,
-                    isDefault: isDefault,
-                  });
+                  if (_.includes([PRINT_TYPE.QR_CODE_PRINT, PRINT_TYPE.BAR_CODE_PRINT], it.type)) {
+                    printQrBarCode({
+                      mode: 'preview',
+                      id: it.id,
+                      printType: it.printType,
+                      projectId: formSet.worksheetInfo.projectId,
+                      worksheetId: formSet.worksheetInfo.worksheetId,
+                      controls: _.get(formSet, 'worksheetInfo.template.controls'),
+                    });
+                  } else {
+                    this.setState({
+                      templateId: it.id,
+                      name: it.name,
+                      type: 'preview',
+                      showPrintTemDialog: true,
+                      isDefault: it.type === PRINT_TYPE.SYS_PRINT,
+                    });
+                  }
                 }}
               >
                 {_l('预览')}
@@ -275,7 +278,19 @@ class Print extends React.Component {
               <span
                 className="Hand mLeft24"
                 onClick={() => {
-                  if (!isDefault) {
+                  if (_.includes([PRINT_TYPE.QR_CODE_PRINT, PRINT_TYPE.BAR_CODE_PRINT], it.type)) {
+                    printQrBarCode({
+                      mode: 'editTemplate',
+                      id: it.id,
+                      printType: it.printType,
+                      projectId: formSet.worksheetInfo.projectId,
+                      worksheetId: formSet.worksheetInfo.worksheetId,
+                      controls: _.get(formSet, 'worksheetInfo.template.controls'),
+                      onClose: () => {
+                        loadPrint({ worksheetId: formSet.worksheetInfo.worksheetId });
+                      },
+                    });
+                  } else if (it.type === PRINT_TYPE.WORD_PRINT) {
                     // 上传的模板
                     this.setState({
                       templateId: it.id,
@@ -288,7 +303,7 @@ class Print extends React.Component {
                       templateId: it.id,
                       type: 'edit',
                       showPrintTemDialog: true,
-                      isDefault: isDefault,
+                      isDefault: it.type === PRINT_TYPE.SYS_PRINT,
                     });
                   }
                 }}
@@ -304,9 +319,11 @@ class Print extends React.Component {
   renderCon = () => {
     const { loadPrint, formSet } = this.props;
     const { printData = [], worksheetId } = formSet;
-    const { showEditPrint, list, isRename, templateId, showMoreOption, showactDia } = this.state;
-    let defaulteTemData = printData.filter(it => it.type === PRINT_TYPE.SYS_PRINT); //系统打印
-    let uploadTemData = printData.filter(it => it.type === PRINT_TYPE.WORD_PRINT); //word模版打印
+    const { showEditPrint, list, isRename, templateId, showMoreOption, showCreatePrintTemp } = this.state;
+    let defaulteTemData = printData.filter(it => it.type === PRINT_TYPE.SYS_PRINT || it.type === PRINT_TYPE.WORD_PRINT); //记录打印
+    let codeTemData = printData.filter(
+      it => it.type === PRINT_TYPE.QR_CODE_PRINT || it.type === PRINT_TYPE.BAR_CODE_PRINT,
+    ); //条码打印
     return (
       <div className="printBox Relative">
         <div className="printBoxList">
@@ -325,33 +342,12 @@ class Print extends React.Component {
                 className="add Relative bold"
                 onClick={() => {
                   this.setState({
-                    showactDia: true,
+                    showCreatePrintTemp: true,
                   });
                 }}
               >
                 <Icon icon="plus" className="mRight8" />
                 {_l('新建模板')}
-                {showactDia && (
-                  <ActDia
-                    onClickAwayExceptions={['.dialogUpdata']}
-                    onClickAway={() =>
-                      this.setState({
-                        showactDia: false,
-                        type: '',
-                        templateId: '',
-                      })
-                    }
-                    projectId={formSet.worksheetInfo.projectId}
-                    setFn={data => {
-                      this.setState({
-                        ...this.state,
-                        ...data,
-                        templateId: '',
-                        type: 'new',
-                      });
-                    }}
-                  />
-                )}
               </span>
             </div>
             {printData.length <= 0 ? (
@@ -363,10 +359,10 @@ class Print extends React.Component {
             ) : (
               <React.Fragment>
                 <div className="printTemplatesList">
-                  {defaulteTemData.length > 0 && <p className="printTemTi">{_l('系统打印模板')}</p>}
-                  {defaulteTemData.length > 0 && this.renderItem(defaulteTemData || [], true)}
-                  {uploadTemData.length > 0 && <p className="printTemTi">{_l('Word模板')}</p>}
-                  {uploadTemData.length > 0 && this.renderItem(uploadTemData || [], false)}
+                  {defaulteTemData.length > 0 && <p className="printTemTi">{_l('记录打印')}</p>}
+                  {defaulteTemData.length > 0 && this.renderPrintItem(defaulteTemData || [])}
+                  {codeTemData.length > 0 && <p className="printTemTi">{_l('条码打印')}</p>}
+                  {codeTemData.length > 0 && this.renderPrintItem(codeTemData || [])}
                 </div>
               </React.Fragment>
             )}
@@ -390,6 +386,47 @@ class Print extends React.Component {
               />
             )}
           </CSSTransitionGroup>
+          <CreatePrintDrawer
+            onCloseDrawer={() => {
+              this.setState({ showCreatePrintTemp: false });
+            }}
+            visible={showCreatePrintTemp}
+            addNewRecordPrintTemp={() => {
+              this.setState({
+                ...this.state,
+                showPrintTemDialog: true,
+                templateId: '',
+                type: 'new',
+                isDefault: true,
+                showCreatePrintTemp: false,
+              });
+            }}
+            addWordPrintTemp={() => {
+              if (getFeatureStatus(formSet.worksheetInfo.projectId, 20) === '2') {
+                buriedUpgradeVersionDialog(formSet.worksheetInfo.projectId, 20);
+              } else {
+                this.setState({
+                  ...this.state,
+                  showEditPrint: true,
+                  templateId: '',
+                  type: 'new',
+                  showCreatePrintTemp: false,
+                });
+              }
+            }}
+            addCodePrintTemp={type => {
+              printQrBarCode({
+                mode: 'newTemplate',
+                printType: type === PRINT_TYPE.QR_CODE_PRINT ? 1 : 3,
+                projectId: formSet.worksheetInfo.projectId,
+                worksheetId: formSet.worksheetInfo.worksheetId,
+                controls: _.get(formSet, 'worksheetInfo.template.controls'),
+                onClose: () => {
+                  loadPrint({ worksheetId: formSet.worksheetInfo.worksheetId });
+                },
+              });
+            }}
+          />
         </div>
       </div>
     );

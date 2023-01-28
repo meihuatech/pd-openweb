@@ -1,11 +1,13 @@
 import React, { Component, createRef } from 'react';
-import { Select, Table, Tooltip, ConfigProvider, Pagination } from 'antd';
+import { Select, Table, Tooltip, Pagination, Button } from 'antd';
 import { Icon, LoadDiv, DatePicker } from 'ming-ui';
 import Config from '../../config';
-import { getActionLogs } from 'src/api/actionLog';
-import 'dialogSelectUser';
+import actionLogAjax from 'src/api/actionLog';
+import downloadAjax from 'src/api/download';
+import 'src/components/dialogSelectUser/dialogSelectUser';
 import moment from 'moment';
 import './index.less';
+import _ from 'lodash';
 
 const seachdateList = [
   { value: 0, label: _l('今天') },
@@ -34,10 +36,6 @@ const columns = [
     },
   },
   {
-    title: _l('登录时间'),
-    dataIndex: 'date',
-  },
-  {
     title: _l('登录方式'),
     dataIndex: 'loginVenue',
     render: (text, record) => {
@@ -46,7 +44,19 @@ const columns = [
     },
   },
   {
-    title: _l('IP地址'),
+    title: _l('登录时间'),
+    dataIndex: 'date',
+  },
+  {
+    title: _l('登录地'),
+    dataIndex: 'geoCity',
+    render: (t, record) => {
+      let { log = {} } = record;
+      return <div>{log.geoCity || ''}</div>;
+    },
+  },
+  {
+    title: _l('IP'),
     dataIndex: 'ip',
     render: (text, record) => {
       let { log = {} } = record;
@@ -120,29 +130,25 @@ export default class LoginLog extends Component {
       },
     );
   };
-  // // 导出
-  // exportListData = () => {
-  //   // TODO: 导出
-  //   appManagement.getToken().then(res => {
-  //     this.dealExport(res);
-  //   });
-  // };
-  // dealExport = token => {
-  //   let args = { token },
-  //     downLoadUrl = '';
-  //   fetch(`${downLoadUrl}/ExportExcel/Export`, {
-  //     method: 'POST',
-  //     headers: {
-  //       'content-type': 'application/json',
-  //     },
-  //     body: JSON.stringify(args),
-  //   });
-  // };
+  // 导出
+  exportListData = () => {
+    let { startDate, endDate, loginerInfo } = this.state;
+    let params = {
+      projectId: Config.projectId,
+      startDate: startDate ? startDate : moment().subtract(30, 'days').format('YYYY-MM-DD'),
+      endDate: endDate ? endDate : moment().format('YYYY-MM-DD'),
+      logType: 1, // ogin=1 logout=2
+    };
+    let accountId = loginerInfo.map(item => item.accountId).join(' ');
+    if (accountId) {
+      params.accountId = accountId;
+    }
+    downloadAjax.exportLoginLog(params);
+  };
   // 筛选登录人
   handleLoginUser = () => {
     $({}).dialogSelectUser({
-      title: _l('添加人员'),
-      showMoreInvite: false,
+      fromAdmin: true,
       SelectUserSettings: {
         projectId: Config.projectId,
         dataRange: 2,
@@ -174,7 +180,7 @@ export default class LoginLog extends Component {
     if (accountId) {
       params.accountId = accountId;
     }
-    getActionLogs(params).then(res => {
+    actionLogAjax.getActionLogs(params).then(res => {
       this.setState({
         logListData: _.get(res, ['data', 'list']) || [],
         count: _.get(res, ['data', 'totalCount']) || 0,
@@ -311,15 +317,18 @@ export default class LoginLog extends Component {
             </div>
           </div>
           <div className="optInfo">
-            {/* <span className="tipInfo">
+            <span className="tipInfo">
               {_l('保留最近6个月的登录日志')}
-              <Tooltip title={_l('可查看2021年12月功能发布后的日志')} placement="bottom">
+              <Tooltip
+                title={_l('导出上限10万条，超出限制可以先筛选，再分次导出。')}
+                placement="bottom"
+              >
                 <Icon icon="info" className="Font14 mLeft5 infoIcon" />
               </Tooltip>
             </span>
             <Button type="primary" className="export" onClick={this.exportListData}>
               {_l('导出')}
-            </Button> */}
+            </Button>
           </div>
         </div>
         <div className="logList">

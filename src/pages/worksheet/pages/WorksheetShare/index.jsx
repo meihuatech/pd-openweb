@@ -7,15 +7,16 @@ import api from 'api/homeApp';
 import cx from 'classnames';
 import { SYSTEM_CONTROL } from 'src/pages/widgetConfig/config/widget';
 import { controlState } from 'src/components/newCustomFields/tools/utils';
-import { renderCellText } from 'worksheet/components/CellControls';
+import renderCellText from 'src/pages/worksheet/components/CellControls/renderText';
 import LoadDiv from 'ming-ui/components/LoadDiv';
 import WorksheetDetailShare from './worksheetDetailShare';
 import WorksheetListShare from './worksheetListShare';
-import { getPublicQueryById, query } from 'src/api/publicWorksheet';
+import publicWorksheetAjax from 'src/api/publicWorksheet';
 import Publicquery from './publicquery';
 import './index.less';
 import { SYS } from 'src/pages/widgetConfig/config/widget.js';
 import { SHARE_TYPE, PAGESIZE } from './config';
+import _ from 'lodash';
 const iconColor = 'rgb(33, 150, 243)';
 
 class WorksheetSahre extends React.Component {
@@ -67,6 +68,7 @@ class WorksheetSahre extends React.Component {
       querydata: {}, //公开查询的筛选数据
       rowIds: [],
       controlsId: [],
+      sheetSwitchPermit: [],
     };
     this.promiseShareInfo = null;
     this.promiseRowsData = null;
@@ -80,8 +82,8 @@ class WorksheetSahre extends React.Component {
     $('html').addClass('WorksheetSharePage');
     document.title = _l('加载中');
     let shareParam;
-    if (location.pathname.indexOf('printshare') >= 0) {
-      shareParam = location.pathname.match(/.*\/printshare\/(.*)/)[1];
+    if (location.pathname.indexOf('public/print') >= 0) {
+      shareParam = location.pathname.match(/.*\/public\/print\/(.*)/)[1];
     } else if (location.pathname.indexOf('public/query') >= 0) {
       shareParam = location.pathname.match(/.*\/public\/query\/(.*)/)[1];
       this.setState({ step: SHARE_TYPE.PUBLICQUERYINPUT, isPublicquery: true });
@@ -124,15 +126,27 @@ class WorksheetSahre extends React.Component {
     this.abortRequest(this.promiseShareInfo);
     if (isPublicquery) {
       //公开查询
-      this.promiseShareInfo = getPublicQueryById({ queryId: id });
+      this.promiseShareInfo = publicWorksheetAjax.getPublicQueryById({ queryId: id });
     } else {
       this.promiseShareInfo = sheetAjax.getShareInfoByShareId({
         shareId: id,
       });
     }
-    this.promiseShareInfo.then((res = {}) => {
-      const { appId = '', worksheetId = '' } = isPublicquery ? res.worksheet || {} : res;
-      const { viewId = '', rowId = '', exported = false } = res;
+    this.promiseShareInfo.then(async (res = {}) => {
+      const { appId = '', worksheetId = '' } = isPublicquery ? res.worksheet || {} : res.data;
+      const { viewId = '', rowId = '', exported = false, shareAuthor } = isPublicquery ? res : res.data;
+      shareAuthor && (window.shareAuthor = shareAuthor);
+      if (location.pathname.indexOf('worksheetshare') >= 0) {
+        if (rowId) {
+          location.href = `/public/record/${id}`;
+        } else {
+          location.href = `/public/view/${id}`;
+        }
+        return;
+      }
+      let sheetSwitchPermit = await sheetAjax.getSwitchPermit({
+        worksheetId: worksheetId,
+      });
       this.setState(
         {
           appId,
@@ -141,10 +155,11 @@ class WorksheetSahre extends React.Component {
           viewId,
           publicqueryRes: res,
           exported,
+          sheetSwitchPermit,
         },
         () => {
           if (!viewId && !appId) {
-            //视图已删除或链接已失效
+            //分享链接关闭或数据不存在
             this.setState({
               loading: false,
               error: true,
@@ -360,7 +375,7 @@ class WorksheetSahre extends React.Component {
     this.abortRequest(this.promiseRowsData);
     if (!printId) {
       if (location.pathname.indexOf('public/query') >= 0) {
-        this.promiseRowsData = query({
+        this.promiseRowsData = publicWorksheetAjax.query({
           worksheetId, // 工作表id
           getType: 1,
           pageSize: 100000, //公开查询不分页
@@ -398,19 +413,20 @@ class WorksheetSahre extends React.Component {
       this.promiseRowsData = sheetAjax.getPrint(sheetArgs);
     }
     this.promiseRowsData.then(data => {
+      let { resultCode } = data || {};
       this.setState({
         pageIndex,
       });
       if (!printId) {
-        if (data.resultCode !== 1 && !isPublicquery) {
+        if (resultCode !== 1 && !isPublicquery) {
           this.setState({
             listLoading: false,
             error: true,
             loading: false,
-            relationRowDetailResultCode: data.resultCode,
+            relationRowDetailResultCode: resultCode,
           });
         } else {
-          if (data.resultCode === 14 && isPublicquery) {
+          if (resultCode === 14 && isPublicquery) {
             //验证码错误
             this.setState({
               listLoading: false,
@@ -421,7 +437,7 @@ class WorksheetSahre extends React.Component {
             alert(_l('验证码错误'));
             return;
           }
-          if (data.resultCode === 4 && isPublicquery) {
+          if (resultCode === 4 && isPublicquery) {
             //无数据
             this.setState({
               listLoading: false,
@@ -432,7 +448,7 @@ class WorksheetSahre extends React.Component {
             });
             return;
           }
-          if (data.resultCode === 8 && isPublicquery) {
+          if (resultCode === 8 && isPublicquery) {
             //查询已关闭 visibleType: 1,
             this.setState({
               listLoading: false,
@@ -445,7 +461,7 @@ class WorksheetSahre extends React.Component {
             });
             return;
           }
-          if (data.resultCode === 7) {
+          if (resultCode === 7) {
             this.setState({
               listLoading: false,
               error: true,
@@ -477,7 +493,7 @@ class WorksheetSahre extends React.Component {
                 viewName: data.worksheet.views[0].name,
                 rowDetail: getRowDetail,
                 rowDetailStep2: getRowDetail,
-                relationRowDetailResultCode: data.resultCode,
+                relationRowDetailResultCode: resultCode,
                 worksheetName: data.worksheet.name,
                 dataTitle: controls.find(o => o.attribute == '1').controlName || '',
                 rowIds: _.get(data, ['data']).map(item => item.rowid),
@@ -487,12 +503,12 @@ class WorksheetSahre extends React.Component {
           );
         }
       } else {
-        if (data.resultCode === 4) {
+        if (resultCode === 4) {
           this.setState({
             loading: false,
             error: true,
             listLoading: false,
-            relationRowDetailResultCode: data.resultCode,
+            relationRowDetailResultCode: resultCode,
           });
         } else {
           let list = data.receiveControls.filter(it => it.checked || it.attribute === 1);
@@ -511,7 +527,7 @@ class WorksheetSahre extends React.Component {
             rowDetail: list,
             rowDetailStep2: list,
             printData: data,
-            relationRowDetailResultCode: data.resultCode,
+            relationRowDetailResultCode: resultCode,
           });
         }
       }
@@ -582,6 +598,7 @@ class WorksheetSahre extends React.Component {
       rowIds,
       controlsId,
       querydata = {},
+      sheetSwitchPermit = [],
     } = this.state;
     let { rowDetail } = this.state;
     const isListDetail = step === SHARE_TYPE.WORKSHEETDETAIL || step === SHARE_TYPE.WORKSHEETDRELATIONDETAIL;
@@ -631,7 +648,7 @@ class WorksheetSahre extends React.Component {
             >
               <div className="unnormalIcon"></div>
               <div className="msg">
-                {errorMsg ? errorMsg : printId ? _l('该链接已失效') : _l('视图已删除或链接已失效')}
+                {errorMsg ? errorMsg : printId ? _l('该链接已失效') : _l('分享链接关闭或数据不存在')}
               </div>
             </div>
           </div>
@@ -691,11 +708,13 @@ class WorksheetSahre extends React.Component {
         >
           {isListDetail ? (
             <WorksheetDetailShare
+              sheetSwitchPermit={sheetSwitchPermit}
               relationRowDetailResultCode={relationRowDetailResultCode}
               printId={printId}
               worksheetId={step === SHARE_TYPE.WORKSHEETDRELATIONDETAIL ? nextWorksheetId : worksheetId}
               rowId={step === SHARE_TYPE.WORKSHEETDRELATIONDETAIL ? nextRowId : rowId}
               viewId={step === SHARE_TYPE.WORKSHEETDRELATIONDETAIL ? nextViewId : viewId}
+              viewIdForPermit={viewId} //功能开关权限根据主记录来走
               appId={appId}
               setStep={this.setStep}
               step={step}
@@ -749,6 +768,8 @@ class WorksheetSahre extends React.Component {
             />
           ) : (
             <WorksheetListShare
+              sheetSwitchPermit={sheetSwitchPermit}
+              viewIdForPermit={viewId}
               printId={printId}
               cardControls={step === SHARE_TYPE.WORKSHEETDNEXT ? rowRelationRowsData.cardControls : cardControls}
               viewSet={step === SHARE_TYPE.WORKSHEETDNEXT ? rowRelationRowsData.viewSet : viewSet}

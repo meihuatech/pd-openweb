@@ -1,12 +1,16 @@
-﻿import ClickAwayable from '../../../mixins/clickAwayable';
+﻿import cx from 'classnames';
+import React from 'react';
+import createTask from 'src/components/createTask/createTask';
+import createReactClass from 'create-react-class';
+import createCalendar from 'src/components/createCalendar/createCalendar';
+import PropTypes from 'prop-types';
+import withClickAway from 'ming-ui/decorators/withClickAway';
+import createDecoratedComponent from 'ming-ui/decorators/createDecoratedComponent';
+const ClickAway = createDecoratedComponent(withClickAway);
 import Menu from 'ming-ui/components/Menu';
 import MenuItem from 'ming-ui/components/MenuItem';
 import './postOperateList.css';
-import PropTypes from 'prop-types';
-import React from 'react';
-import cx from 'classnames';
-
-import createReactClass from 'create-react-class';
+import _ from 'lodash';
 
 const FastCreateTaskSchedule = createReactClass({
   displayName: 'FastCreateTaskSchedule',
@@ -17,8 +21,6 @@ const FastCreateTaskSchedule = createReactClass({
     style: PropTypes.any,
   },
 
-  mixins: [ClickAwayable],
-
   componentClickAway() {
     if (this.props.handFastCreate) {
       this.props.handFastCreate();
@@ -27,10 +29,8 @@ const FastCreateTaskSchedule = createReactClass({
 
   toggleCreateNewCalender() {
     const selectText = _.clone(this.props.selectText);
-    require(['createCalendar'], (createCalendar) => {
-      createCalendar.index({
-        Message: selectText,
-      });
+    createCalendar({
+      Message: selectText,
     });
     if (this.props.handFastCreate) {
       this.props.handFastCreate();
@@ -39,11 +39,10 @@ const FastCreateTaskSchedule = createReactClass({
 
   toggleCreateNewTask() {
     const selectText = _.clone(this.props.selectText);
-    require(['createTask'], (createTask) => {
-      createTask.index({
-        Description: selectText,
-        isFromPost: true,
-      });
+
+    createTask({
+      Description: selectText,
+      isFromPost: true,
     });
     if (this.props.handFastCreate) {
       this.props.handFastCreate();
@@ -68,4 +67,4 @@ const FastCreateTaskSchedule = createReactClass({
   },
 });
 
-module.exports = FastCreateTaskSchedule;
+export default FastCreateTaskSchedule;

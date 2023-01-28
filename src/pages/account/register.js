@@ -4,7 +4,8 @@ import ChangeLang from 'src/components/ChangeLang';
 import Container from './container/registerContainer';
 import RegisterName from './container/registerName';
 import CreateOrAdd from './container/createOrAdd';
-import Create from './container/create';
+import CreateComp from './container/create';
+import createPermissionCheckWrapper from './container/createPermissionCheckWrapper';
 import Add from './container/add';
 import EditInfo from './container/editInfo';
 import InviteLinkExpirate from './container/inviteLinkExpirate';
@@ -17,6 +18,9 @@ import { getRequest, browserIsMobile, htmlEncodeReg } from 'src/util';
 let request = getRequest();
 import preall from 'src/common/preall';
 import { getDataByFilterXSS } from './util';
+import _ from 'lodash';
+
+const Create = createPermissionCheckWrapper(CreateComp);
 class RegisterContainer extends React.Component {
   constructor(props) {
     super(props);
@@ -68,6 +72,10 @@ class RegisterContainer extends React.Component {
   }
 
   componentDidMount() {
+    if (md.global.SysSettings.hideRegister && (location.href.indexOf('/register') > -1 || (location.href.toLowerCase().indexOf('linkinvite.htm') > -1 && request.projectId))) {
+      alert("系统已关闭注册功能", 3, 3000, function () { location.href = '/login.htm' });
+      return;
+    }
     $('html').addClass('registerContainerCon');
     if (location.href.indexOf('/enterpriseRegister.htm?type=create') >= 0) {
       document.title = _l('创建组织');
@@ -155,20 +163,11 @@ class RegisterContainer extends React.Component {
     }
   }
 
-  componentWillUpdate(nextProps, nextState) {
-    if (!nextState.loading) {
-      var $showLangChangeBottom = $('.showLangChangeBottom');
-      if ($showLangChangeBottom) {
-        $showLangChangeBottom.show();
-      }
-    }
-  }
-
   goRegisterFn = () => {
     // 注册来源
     var s = request.s || '';
     if (s) {
-      window.localStorage.setItem('RegFrom', s);
+      safeLocalStorageSetItem('RegFrom', s);
     }
 
     // 绑定微信帐号
@@ -419,7 +418,7 @@ class RegisterContainer extends React.Component {
       changeStep: this.changeStep,
       registerData: _.cloneDeep(this.state.registerData),
       loginSuc: this.loginSuc,
-      setDataFn: (data, callback) => {
+      onChangeData: (data, callback) => {
         this.setState(
           {
             registerData: {
@@ -452,12 +451,6 @@ class RegisterContainer extends React.Component {
     }
   };
 
-  showLangChang = () => {
-    if (this.state.step === 'register') {
-      $('.showLangChangeBottom').removeClass('Hidden');
-    }
-  };
-
   render() {
     if (this.state.loading) {
       return <LoadDiv className="" style={{ margin: '50px auto' }} />;
@@ -465,8 +458,10 @@ class RegisterContainer extends React.Component {
     return (
       <div className="registerBox">
         <div className="registerContainer">
+          <div className="titleHeader">
+            <img src={md.global.SysSettings.brandLogoUrl} height={40} />
+          </div>
           {this.renderCon()}
-          {this.showLangChang()}
         </div>
         <ChangeLang />
       </div>

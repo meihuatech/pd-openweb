@@ -7,10 +7,14 @@ import { connect } from 'react-redux';
 import { bindActionCreators } from 'redux';
 import { updateSheetListLoading } from 'src/pages/worksheet/redux/actions/sheetList';
 import './index.less';
+import { getAppFeaturesVisible, browserIsMobile } from 'src/util';
 
-@connect(undefined, dispatch => ({
-  updateSheetListLoading: bindActionCreators(updateSheetListLoading, dispatch),
-}))
+@connect(
+  undefined,
+  dispatch => ({
+    updateSheetListLoading: bindActionCreators(updateSheetListLoading, dispatch),
+  }),
+)
 export default class AppPkgHeader extends Component {
   constructor(props) {
     super(props);
@@ -38,10 +42,14 @@ export default class AppPkgHeader extends Component {
     const { worksheetId, viewId } = getIds(this.props);
     api.getAppSimpleInfo({ workSheetId: worksheetId }).then(({ appId, appSectionId, workSheetId }) => {
       if (appId && appSectionId) {
-        navigateTo(
-          `/app/${appId}/${appSectionId}/${workSheetId}${viewId ? '/' + viewId : ''}${location.search || ''}`,
-          true,
-        );
+        if (browserIsMobile()) {
+          location.href = `/mobile/recordList/${appId}/${appSectionId}/${workSheetId}${viewId ? '/' + viewId : ''}${location.search || ''}`;
+        } else {
+          navigateTo(
+            `/app/${appId}/${appSectionId}/${workSheetId}${viewId ? '/' + viewId : ''}${location.search || ''}`,
+            true,
+          );
+        }
       }
     });
   };
@@ -61,6 +69,11 @@ export default class AppPkgHeader extends Component {
 
   render() {
     const { ...props } = this.props;
+    // 获取url参数
+    const { s, tb, tr } = getAppFeaturesVisible();
+
+    if (!s && !tb && !tr) return null;
+
     return <AppDetail {...props} />;
   }
 }

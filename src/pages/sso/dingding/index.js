@@ -1,7 +1,6 @@
-
-
 import { ajax, login, browserIsMobile, getRequest, getCurrentTime, checkLogin, replenishRet } from 'src/util/sso';
 import { setPssId } from 'src/util/pssId';
+import _ from 'lodash';
 
 const { code, state, i, ret, pc_slide = '' } = getRequest();
 const isPcSlide = pc_slide.includes('true');
@@ -19,20 +18,16 @@ if (checkLogin()) {
   }
 } else {
   ajax.post({
-    url: __api_server__ + 'Login/DingDingAppLogin',
+    url: __api_server__.main + 'Login/DingDingAppLogin',
     data: {
       code,
       state,
       apkId: i,
     },
     async: true,
-    succees: (result) => {
+    succees: result => {
       const { accountResult, sessionId } = result.data;
       if (accountResult === 1) {
-        // const date = new Date();
-        // date.setTime(date.getTime()+24 * 60 * 60 * 1000);
-        // setCookie('md_pss_id', sessionId, date);
-        // localStorage.setItem('md_pss_id_exp', getCurrentTime(date));
         setPssId(sessionId);
         if (ret) {
           location.href = `/${replenishRet(ret, pc_slide)}`;
@@ -48,7 +43,6 @@ if (checkLogin()) {
         login();
       }
     },
-    error: login
+    error: login,
   });
 }
-

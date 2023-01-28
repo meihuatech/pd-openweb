@@ -4,6 +4,7 @@ import { arrayOf, func, shape, string } from 'prop-types';
 import { RELATE_RECORD_SHOW_TYPE } from 'worksheet/constants/enum';
 import RelateRecordDropdown from 'worksheet/components/RelateRecordDropdown/RelateRecordDropdownCopy';
 import RelateRecordOptions from './RelateRecordOptions';
+import _ from 'lodash';
 
 const Con = styled.div`
   display: flex;
@@ -43,24 +44,13 @@ const Dropdown = styled(RelateRecordDropdown)`
   }
 `;
 
-function filterDynamicSource(filters) {
-  if (!filters) {
-    return;
-  }
-  try {
-    return JSON.stringify(JSON.parse(filters).filter(c => _.isEmpty(c.dynamicSource)));
-  } catch (err) {
-    return;
-  }
-}
-
 export default function RelateRecord(props) {
-  const { values = [], advancedSetting, onChange = () => {} } = props;
+  const { from, values = [], advancedSetting, onChange = () => {} } = props;
   const controlAdvancedSetting = _.get(props, 'control.advancedSetting') || {};
   const control = _.assign({}, props.control, {
     advancedSetting: {
+      // ...(from === 'selectRecordDialog' ? { filters: controlAdvancedSetting.filters } : {}), // 薛老板说去掉 后面加开关 https://www.mingdao.com/app/eed8e526-6c6e-4e05-9ab7-e25550aa990c/5cc4391adb8d4e0001ee6618/5cc4391adb8d4e0001ee6619/row/2d774b9c-40a1-4b3c-83ce-84cf8fa7ac42
       searchcontrol: controlAdvancedSetting.searchcontrol,
-      filters: filterDynamicSource(controlAdvancedSetting.filters),
     },
   });
   const { relationControls = [] } = control;
@@ -70,7 +60,6 @@ export default function RelateRecord(props) {
   let renderSelected;
   function handleChange(value) {
     onChange({
-      filterType: 24,
       ...value,
     });
   }
@@ -110,7 +99,7 @@ export default function RelateRecord(props) {
         {...control}
         advancedSetting={{}}
         controls={relationControls}
-        selected={!values}
+        selected={values}
         showCoverAndControls={true}
         popupContainer={() => document.body}
         multiple={isMultiple}

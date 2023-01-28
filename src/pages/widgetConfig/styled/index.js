@@ -97,6 +97,9 @@ export const SettingItem = styled.div`
     align-items: center;
     justify-content: space-between;
   }
+  .Calendar-column-header {
+    flex: 1;
+  }
 `;
 export const RelateInfo = styled.div`
   margin-top: 12px;
@@ -136,6 +139,11 @@ export const EditInfo = styled(InfoWrap)`
       color: #2196f3;
     }
   }
+  &.borderError {
+    border-color: #f44336;
+    background: #fef2f4;
+    color: #f44336;
+  }
 `;
 
 export const DropdownPlaceholder = styled.div`
@@ -146,7 +154,7 @@ export const DropdownPlaceholder = styled.div`
   border: 1px solid #ddd;
   margin-top: 12px;
   border-radius: 3px;
-  padding: 0 12px;
+  padding: 0 5px 0 12px;
   cursor: pointer;
   &.active,
   &:hover {
@@ -155,7 +163,7 @@ export const DropdownPlaceholder = styled.div`
       border-color: #ddd;
     }
     &.deleted {
-      border-color: #FF0000;
+      border-color: #ff0000;
     }
   }
   &.disabled {
@@ -163,9 +171,9 @@ export const DropdownPlaceholder = styled.div`
     cursor: not-allowed;
   }
   &.deleted {
-    background-color: rgba(251,238,241);
-    color: #FF0000;
-    border: 1px solid #FF0000;
+    background-color: rgba(251, 238, 241);
+    color: #ff0000;
+    border: 1px solid #ff0000;
     cursor: pointer;
   }
   &.invalid {
@@ -175,6 +183,9 @@ export const DropdownPlaceholder = styled.div`
     i {
       color: #f44336;
     }
+  }
+  &.placeholder {
+    color: #bdbdbd;
   }
 `;
 

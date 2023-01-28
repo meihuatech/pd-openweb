@@ -22,25 +22,26 @@ const Con = styled.div`
   }
   .worksheetFilterBtn {
     line-height: 1em;
+    margin-top: 2px;
     margin-right: 12px;
   }
 `;
 
 const Tip = styled.div`
-  margin-top: 7px;
+  margin-top: 2px;
   color: #9e9e9e;
 `;
 
 const Clear = styled.span`
   margin-left: 10px;
-  margin-top: 7px;
+  margin-top: 2px;
   font-weight: 600;
   cursor: pointer;
   color: #2196f3;
 `;
 
 const Title = styled.div`
-  font-size: 20px;
+  font-size: 17px;
   font-weight: 500;
 `;
 
@@ -131,9 +132,7 @@ function Header(props, ref) {
           }}
         />
         <WorkSheetFilter
-          exposeComp={comp => {
-            filterComp.current = comp;
-          }}
+          type="trash"
           onlyUseEditing
           zIndex={1000}
           isCharge={isCharge}
@@ -141,6 +140,7 @@ function Header(props, ref) {
           viewId={viewId}
           projectId={projectId}
           worksheetId={worksheetId}
+          filterResigned={false}
           columns={controls}
           onChange={({ searchType, filterControls }) => {
             loadRows({ pageIndex: 1, searchType, filterControls });

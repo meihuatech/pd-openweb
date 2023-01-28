@@ -1,16 +1,22 @@
 import React, { Fragment, useState, useEffect, useCallback } from 'react';
-import { Button, Input, Dropdown, Icon } from 'ming-ui';
+import { Input, Dropdown, Icon, Tooltip } from 'ming-ui';
+import { Checkbox, Input as AntdInput, Dropdown as AntdDropdown, Divider, Radio, Space, ConfigProvider } from 'antd';
 import styled from 'styled-components';
 import cx from 'classnames';
 import sheetAjax from 'src/api/worksheet';
 import { connect } from 'react-redux';
 import SelectWorksheet from 'src/pages/worksheet/components/SelectWorksheet/SelectWorksheet';
-import { getWorksheetsByAppId } from 'src/api/homeApp';
-import { getAppForManager } from 'src/api/appManagement';
+import appManagementAjax from 'src/api/appManagement';
 import { useSetState } from 'react-use';
-import { COLORS, ICONS } from './config';
 import './index.less';
+import BtnName from './BtnName';
 import LinkPara from '../LinkPara';
+import DefaultValue from './DefaultValue';
+import FilterData from './FilterData';
+import SelectProcess from './SelectProcess';
+import ClickConfirm from './ClickConfirm';
+import { DropdownContent } from 'src/pages/widgetConfig/styled';
+import _ from 'lodash';
 
 const BtnSettingWrap = styled.div`
   display: flex;
@@ -34,6 +40,25 @@ const BtnSettingWrap = styled.div`
       }
     }
   }
+  .selectActionBox {
+    border-radius: 3px;
+    padding: 5px 0;
+    border: 1px solid #e5e5e5;
+    background-color: #fff;
+    .ant-radio-group, .ant-space {
+      width: 100%;
+    }
+    .ant-space {
+      gap: 0 !important;
+    }
+    .ant-space-item {
+      padding: 7px 10px;
+      margin-bottom: 0 !important;
+      &:hover {
+        background-color: #fafafa;
+      }
+    }
+  }
   .settingsBox {
     flex: 1;
     overflow-y: auto;
@@ -41,12 +66,12 @@ const BtnSettingWrap = styled.div`
   .delBtn {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    padding: 16px 24px;
-    border-bottom: 1px solid #e5e5e5;
+    justify-content: flex-end;
+    padding: 10px 24px 2px;
     .iconWrap {
       color: #9d9d9d;
       cursor: pointer;
+      display: flex;
       &:hover {
         color: #757575;
       }
@@ -55,6 +80,9 @@ const BtnSettingWrap = styled.div`
   .settingItem {
     margin-top: 20px;
     padding: 0 24px;
+    &:first-child {
+      margin-top: 0;
+    }
     .Dropdown--input {
       background-color: #fff;
     }
@@ -62,25 +90,24 @@ const BtnSettingWrap = styled.div`
       font-weight: bold;
       margin-bottom: 8px;
     }
-    .openMode {
-      display: flex;
-      border: 1px solid #ddd;
+    .typeSelect {
+      font-size: 13px;
       border-radius: 3px;
-      li {
-        flex: 1;
-        color: #9e9e9e;
-        background-color: #eee;
-        transition: all 0.25s;
-        cursor: pointer;
-        line-height: 34px;
-        text-align: center;
-        &:first-child {
-          border-right: 1px solid #ddd;
-        }
-        &.active {
-          color: #2196f3;
-          background-color: #fff;
-        }
+      padding: 3px;
+      background-color: #eff0f0;
+      >div {
+        height: 25px;
+        line-height: 25px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .active {
+        color: #2196F3 !important;
+        border-radius: 3px;
+        padding: 3px 0;
+        font-weight: bold;
+        background-color: #fff;
       }
     }
     .colorsWrap {
@@ -133,8 +160,24 @@ const BtnSettingWrap = styled.div`
         }
       }
     }
+    .ant-checkbox-input, .ant-radio-input {
+      position: absolute;
+    }
+    .ant-input {
+      font-size: 13px;
+      box-shadow: none;
+      padding: 7px 11px;
+      border-radius: 3px 0 0 3px !important;
+    }
+  }
+  .customPageBtnSelectIcon {
+    width: 312px;
+    .inputWrap {
+      display: none;
+    }
   }
 `;
+
 const Tab = [
   { text: _l('设置按钮'), type: 'setting' },
   { text: _l('卡片说明'), type: 'explain' },
@@ -143,19 +186,33 @@ const CLICK_ACTION = [
   {
     text: _l('创建记录'),
     value: 1,
+    svgIcon: 'plus'
   },
   {
     text: _l('打开视图'),
     value: 2,
+    svgIcon: '1_worksheet'
   },
   {
     text: _l('打开自定义页面'),
     value: 3,
+    svgIcon: 'hr_workbench'
   },
   {
     text: _l('打开链接'),
     value: 4,
+    svgIcon: '16_5_globe_earth'
   },
+  {
+    text: _l('扫码'),
+    value: 5,
+    svgIcon: 'qr_code_19'
+  },
+  {
+    text: _l('调用业务流程'),
+    value: 6,
+    svgIcon: 'custom_actions'
+  }
 ];
 
 const OPEN_MODE = [
@@ -163,26 +220,46 @@ const OPEN_MODE = [
   { value: 2, text: _l('新页面') },
 ];
 
+const ScanDefaultConfig = {
+  qrCodeIsOpen: true,
+  barCodeIsOpen: true,
+  recordLink: 1,
+  otherLink: 0,
+  text: 0,
+  isFilter: false
+};
+
+const ProcessDefaultConfig = {
+  clickType: 1,
+  confirmMsg: _l('你确认执行此操作吗？'),
+  cancelName: _l('取消'),
+  sureName: _l('确认')
+};
+
+let sheetRequest = null;
+
 function BtnSetting(props) {
-  const { appPkg = {}, ids = {}, btnSetting, explain, setBtnSetting, setSetting, onSave, onDel } = props;
-  const { appId } = ids;
+  const { activeIndex, appPkg = {}, ids = {}, btnSetting, btnConfig, explain, setBtnSetting, setSetting, onDel } = props;
+  const { appId, pageId } = ids;
   const [displayType, setDisplayType] = useState('setting');
   const [paras, setParas] = useState(btnSetting.param || []);
+  const [sheetLoading, setSheetLoading] = useState(true);
+
   const projectId = appPkg.projectId || appPkg.id;
 
-  const [dataSource, setDataSource] = useSetState({ worksheets: [], views: [], pages: [] });
+  const [dataSource, setDataSource] = useSetState({ worksheets: [], views: [], pages: [], controls: [], inputs: [] });
 
   const initConfigData = { action: '', viewId: '', openMode: 1, value: '' };
 
-  const { worksheets, views, pages } = dataSource;
-  const { name, action, viewId, openMode, icon, color, value } = btnSetting;
+  const { worksheets, views, pages, controls } = dataSource;
+  const { name, action, viewId, searchId, filterId, openMode, icon, color, btnId, value, param, config } = btnSetting;
 
   useEffect(() => {
     setParas(btnSetting.param || []);
   }, [btnSetting.param]);
 
   useEffect(() => {
-    getAppForManager({ projectId }).then(data => {
+    appManagementAjax.getAppForManager({ projectId }).then(data => {
       if (Array.isArray(data)) {
         let sheets = [];
         let pageList = [];
@@ -204,37 +281,76 @@ function BtnSetting(props) {
   }, []);
 
   useEffect(() => {
-    if (!value || !_.includes([2], action)) return;
-    sheetAjax
-      .getWorksheetInfo({
+    if (value && _.includes([1, 2, 5], action)) {
+      if (sheetRequest && sheetRequest.state() === 'pending' && sheetRequest.abort) {
+        sheetRequest.abort();
+      }
+      setSheetLoading(true);
+      sheetRequest = sheetAjax.getWorksheetInfo({
         worksheetId: value,
         getTemplate: true,
         getViews: true,
         appId,
-      })
-      .then(res => {
-        const { views = [] } = res;
-        setDataSource({ views: views.map(({ viewId, name }) => ({ text: name, value: viewId })) });
       });
-  }, [value, action]);
+      sheetRequest.then(res => {
+        const { views = [], template } = res;
+        setDataSource({
+          views: views.map(({ viewId, name }) => ({ text: name, value: viewId })),
+          controls: template.controls
+        });
+        if (action === 1) {
+          setBtnSetting({
+            ...btnSetting,
+            config: {
+              ...config,
+              controls: template.controls
+            }
+          });
+        }
+        setSheetLoading(false);
+      });
+    }
+  }, [value, action, activeIndex]);
 
   const renderConfig = () => {
     // 创建记录
     if (action === 1) {
       return (
-        <div className="settingItem">
-          <div className="settingTitle">{_l('工作表')}</div>
-          <SelectWorksheet
-            dialogClassName={'btnSettingSelectDialog'}
-            worksheetType={0}
-            projectId={projectId}
-            appId={appId}
-            value={value}
-            onChange={(__, itemId) => {
-              setBtnSetting({ ...btnSetting, value: itemId });
-            }}
-          />
-        </div>
+        <Fragment>
+          <div className="settingItem">
+            <div className="settingTitle">{_l('工作表')}</div>
+            <SelectWorksheet
+              dialogClassName={'btnSettingSelectDialog'}
+              worksheetType={0}
+              projectId={projectId}
+              appId={appId}
+              value={value}
+              onChange={(__, itemId) => {
+                setBtnSetting({
+                  ...btnSetting,
+                  value: itemId,
+                  config: {
+                    ...config,
+                    temporaryWriteControls: []
+                  }
+                });
+              }}
+            />
+          </div>
+          {value && !_.isEmpty(controls) && !sheetLoading && (
+            <DefaultValue
+              appId={appId}
+              btnId={btnId}
+              worksheetId={value}
+              projectId={projectId}
+              controls={controls}
+              config={config}
+              onChangeConfig={(config) => {
+                setBtnSetting({ ...btnSetting, config});
+              }}
+            />
+          )}
+        </Fragment>
       );
     }
     // 打开视图
@@ -269,16 +385,16 @@ function BtnSetting(props) {
           </div>
           <div className="settingItem">
             <div className="settingTitle">{_l('打开方式')}</div>
-            <ul className="openMode">
+            <div className="typeSelect flexRow valignWrapper">
               {OPEN_MODE.map(({ value, text }) => (
-                <li
+                <div
                   key={value}
-                  className={cx({ active: value === openMode })}
+                  className={cx('flex centerAlign pointer Gray_75', { active: value === openMode })}
                   onClick={() => setBtnSetting({ ...btnSetting, openMode: value })}>
                   {text}
-                </li>
+                </div>
               ))}
-            </ul>
+            </div>
           </div>
         </Fragment>
       );
@@ -302,16 +418,16 @@ function BtnSetting(props) {
           </div>
           <div className="settingItem">
             <div className="settingTitle">{_l('打开方式')}</div>
-            <ul className="openMode">
+            <div className="typeSelect flexRow valignWrapper">
               {OPEN_MODE.map(({ value, text }) => (
-                <li
+                <div
                   key={value}
-                  className={cx({ active: value === openMode })}
+                  className={cx('flex centerAlign pointer Gray_75', { active: value === openMode })}
                   onClick={() => setBtnSetting({ ...btnSetting, openMode: value })}>
                   {text}
-                </li>
+                </div>
               ))}
-            </ul>
+            </div>
           </div>
         </Fragment>
       );
@@ -340,22 +456,321 @@ function BtnSetting(props) {
           </div>
           <div className="settingItem">
             <div className="settingTitle">{_l('打开方式')}</div>
-            <ul className="openMode">
+            <div className="typeSelect flexRow valignWrapper">
               {OPEN_MODE.concat([{ value: 3, text: _l('弹窗') }]).map(({ value, text }) => (
-                <li
+                <div
                   key={value}
-                  className={cx({ active: value === openMode })}
+                  className={cx('flex centerAlign pointer Gray_75', { active: value === openMode })}
                   onClick={() => setBtnSetting({ ...btnSetting, openMode: value })}>
                   {text}
-                </li>
+                </div>
               ))}
-            </ul>
+            </div>
           </div>
+        </Fragment>
+      );
+    }
+    // 扫码
+    if (action === 5) {
+      const { qrCodeIsOpen, barCodeIsOpen, recordLink, otherLink, text, isFilter } = _.isObject(config) ? config : {};
+      return (
+        <Fragment>
+          <div className="settingItem">
+            <div className="settingTitle">{_l('扫码方式')}</div>
+            <div className="flexRow">
+              <div className="flex">
+                <Checkbox
+                  checked={qrCodeIsOpen}
+                  onChange={(e) => {
+                    const { checked } = e.target;
+                    if (!checked && !barCodeIsOpen) {
+                      return;
+                    }
+                    setBtnSetting({
+                      ...btnSetting,
+                      config: {
+                        ...config,
+                        qrCodeIsOpen: checked
+                      }
+                    });
+                  }}
+                >
+                  {_l('扫描二维码')}
+                </Checkbox>
+              </div>
+              <div className="flex">
+                <Checkbox
+                  checked={barCodeIsOpen}
+                  onChange={(e) => {
+                    const { checked } = e.target;
+                    if (!checked && !qrCodeIsOpen) {
+                      return;
+                    }
+                    setBtnSetting({
+                      ...btnSetting,
+                      config: {
+                        ...config,
+                        barCodeIsOpen: checked
+                      }
+                    });
+                  }}
+                >
+                  {_l('扫描条形码')}
+                </Checkbox>
+              </div>
+            </div>
+          </div>
+          <div className="settingItem">
+            <Divider />
+          </div>
+          <div className="settingItem">
+            {_l('获得扫码结果后执行动作')}
+          </div>
+          {qrCodeIsOpen && (
+            <Fragment>
+              <div className="settingItem">
+                <div className="settingTitle">{_l('记录链接')}</div>
+                <Dropdown
+                  value={recordLink}
+                  data={[
+                    {
+                      text: _l('打开记录'),
+                      value: 1,
+                    },
+                    {
+                      text: _l('无'),
+                      value: 0,
+                    }
+                  ]}
+                  onChange={value => {
+                    setBtnSetting({
+                      ...btnSetting,
+                      config: {
+                        ...config,
+                        recordLink: value
+                      }
+                    });
+                  }}
+                  menuStyle={{ width: '100%' }}
+                  style={{ width: '100%', background: '#fff' }}
+                  border
+                />
+              </div>
+              <div className="settingItem">
+                <div className="settingTitle">{_l('其他链接')}</div>
+                <Dropdown
+                  value={otherLink}
+                  data={[
+                    {
+                      text: _l('打开链接'),
+                      value: 1,
+                    },
+                    {
+                      text: _l('无'),
+                      value: 0,
+                    }
+                  ]}
+                  onChange={value => {
+                    setBtnSetting({
+                      ...btnSetting,
+                      config: {
+                        ...config,
+                        otherLink: value
+                      }
+                    });
+                  }}
+                  menuStyle={{ width: '100%' }}
+                  style={{ width: '100%', background: '#fff' }}
+                  border
+                />
+              </div>
+            </Fragment>
+          )}
+          <div className="settingItem">
+            <div className="settingTitle">{_l('文本')}</div>
+            <Dropdown
+              value={text}
+              data={[
+                {
+                  text: _l('搜索并打开记录'),
+                  value: 1,
+                },
+                {
+                  text: _l('调用业务流程'),
+                  value: 2,
+                },
+                {
+                  text: _l('无'),
+                  value: 0,
+                }
+              ]}
+              onChange={value => {
+                setBtnSetting({
+                  ...btnSetting,
+                  config: {
+                    ...config,
+                    inputs: [],
+                    text: value
+                  }
+                });
+              }}
+              menuStyle={{ width: '100%' }}
+              style={{ width: '100%', background: '#fff' }}
+              border
+            />
+          </div>
+          {text === 1 && (
+            <Fragment>
+              <div className="settingItem">
+                <div className="Gray_75">{_l('根据扫码的文本结果搜索数据，搜索到一条时直接打开记录，搜索到多条后进入搜索结果列表。')}</div>
+              </div>
+              <div className="settingItem">
+                <div className="settingTitle Normal">{_l('搜索工作表')}</div>
+                <SelectWorksheet
+                  dialogClassName={'btnSettingSelectDialog'}
+                  worksheetType={0}
+                  projectId={projectId}
+                  appId={appId}
+                  value={value}
+                  onChange={(__, itemId) => {
+                    setBtnSetting({
+                      ...btnSetting,
+                      value: itemId,
+                      config: {
+                        ...config,
+                        isFilter: false,
+                        filterConditions: []
+                      }
+                    });
+                  }}
+                />
+              </div>
+              <div className="settingItem">
+                <div className="settingTitle Normal">{_l('视图')}</div>
+                <Dropdown
+                  disabled={!value}
+                  value={viewId || undefined}
+                  data={views}
+                  onChange={value => setBtnSetting({ ...btnSetting, viewId: value })}
+                  style={{ width: '100%', background: '#fff' }}
+                  menuStyle={{ width: '100%' }}
+                  placeholder={_l('选择视图')}
+                  border
+                />
+              </div>
+              {!_.isEmpty(controls) && (
+                <Fragment>
+                  <div className="settingItem">
+                    <FilterData
+                      projectId={projectId}
+                      appId={appId}
+                      worksheetId={value}
+                      filterId={filterId}
+                      controls={controls}
+                      config={config}
+                      onChangeConfig={(config) => {
+                        setBtnSetting({ ...btnSetting, config});
+                      }}
+                    />
+                  </div>
+                  <div className="settingItem">
+                    <div className="settingTitle Normal">{_l('搜索字段')}</div>
+                    <Dropdown
+                      value={searchId || undefined}
+                      data={controls.map(item => {
+                        return {
+                          text: item.controlName,
+                          value: item.controlId
+                        }
+                      })}
+                      onChange={value => {
+                        setBtnSetting({ ...btnSetting, searchId: value })
+                      }}
+                      style={{ width: '100%', background: '#fff' }}
+                      menuStyle={{ width: '100%' }}
+                      placeholder={_l('选择搜索字段')}
+                      border
+                    />
+                  </div>
+                </Fragment>
+              )}
+            </Fragment>
+          )}
+          {text === 2 && (
+            <Fragment>
+              <div className="settingItem">
+                <div className="Gray_75">{_l('将扫码的文本结果作为参数传入PBC流程')}</div>
+              </div>
+              <SelectProcess
+                appId={appId}
+                projectId={projectId}
+                btnSetting={btnSetting}
+                setBtnSetting={setBtnSetting}
+                setDataSource={setDataSource}
+              />
+            </Fragment>
+          )}
+        </Fragment>
+      );
+    }
+    // 调用业务流程
+    if (action === 6) {
+      return (
+        <Fragment>
+          <ClickConfirm
+            config={config}
+            btnSetting={btnSetting}
+            setBtnSetting={setBtnSetting}
+          />
+          <SelectProcess
+            appId={appId}
+            projectId={projectId}
+            btnSetting={btnSetting}
+            setBtnSetting={setBtnSetting}
+            setDataSource={setDataSource}
+          />
         </Fragment>
       );
     }
     return null;
   };
+
+  const changeAction = (value) => {
+    const data = { ...btnSetting, ...initConfigData, action: value };
+
+    if (value === 5) {
+      data.config = {
+        ...data.config,
+        ...ScanDefaultConfig,
+        inputs: [],
+      }
+    } else if (value === 6) {
+      data.config = {
+        ...data.config,
+        ...ProcessDefaultConfig,
+        inputs: [],
+      }
+    } else {
+      data.config = {
+        icon: _.get(btnSetting, 'config.icon'),
+        iconUrl: _.get(btnSetting, 'config.iconUrl')
+      }
+    }
+
+    if (_.get(data, ['config', 'isNewBtn'])) {
+      const { svgIcon } = _.find(CLICK_ACTION, { value });
+      const iconUrl = `${md.global.FileStoreConfig.pubHost}/customIcon/${svgIcon}.svg`;
+      delete data.config.isNewBtn;
+      data.config = {
+        ...data.config,
+        icon: svgIcon,
+        iconUrl
+      }
+    }
+
+    setBtnSetting(data);
+  }
+
   return (
     <BtnSettingWrap>
       <ul className="btnDisplayTab">
@@ -367,66 +782,51 @@ function BtnSetting(props) {
       </ul>
       {displayType === 'setting' && (
         <div className="delBtn">
-          <div className="text Gray_75">{_l('设置 “按钮”')}</div>
           <div className="iconWrap" data-tip={_l('删除')} onClick={onDel}>
             <i className="icon-delete_12 Font18"></i>
           </div>
         </div>
       )}
-      <div className="settingsBox">
+      <div className="settingsBox Relative">
         {displayType === 'setting' ? (
           <Fragment>
-            <div className="settingItem">
-              <div className="settingTitle">{_l('按钮名称')}</div>
-              <Input style={{ width: '100%' }} value={name} onChange={name => setBtnSetting({ ...btnSetting, name })} />
-            </div>
+            <BtnName
+              pageId={pageId}
+              projectId={projectId}
+              btnSetting={btnSetting}
+              btnConfig={btnConfig}
+              setBtnSetting={setBtnSetting}
+            />
             <div className="settingItem">
               <div className="settingTitle">{_l('操作')}</div>
-              <Dropdown
-                value={action}
-                data={CLICK_ACTION}
-                onChange={value => setBtnSetting({ ...btnSetting, ...initConfigData, action: value })}
-                menuStyle={{ width: '100%' }}
-                style={{ width: '100%', background: '#fff' }}
-                placeholder={_l('选择执行操作')}
-                border
-              />
+              {action ? (
+                <Dropdown
+                  value={action}
+                  data={CLICK_ACTION}
+                  onChange={value => {
+                    changeAction(value);
+                  }}
+                  menuStyle={{ width: '100%' }}
+                  style={{ width: '100%', background: '#fff' }}
+                  placeholder={_l('选择执行操作')}
+                  border
+                />
+              ) : (
+                <div className="selectActionBox">
+                  <Radio.Group onChange={e => { changeAction(e.target.value) }} value={action}>
+                    <Space direction="vertical">
+                      {CLICK_ACTION.map(item => (
+                        <Radio key={item.value} value={item.value}>{item.text}</Radio>
+                      ))}
+                    </Space>
+                  </Radio.Group>
+                </div>
+              )}
             </div>
             {action && renderConfig()}
-            <div className="settingItem">
-              <div className="settingTitle">{_l('颜色')}</div>
-              <ul className="colorsWrap">
-                {COLORS.map(item => (
-                  <li
-                    key={item}
-                    className={cx({ isCurrentColor: item === color })}
-                    style={{ backgroundColor: item }}
-                    onClick={() => setBtnSetting({ ...btnSetting, color: item })}>
-                    {item === color && <Icon icon="hr_ok" />}
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div className="settingItem">
-              <div className="settingTitle">{_l('图标')}</div>
-              <ul className="iconsWrap">
-                {ICONS.map(item => {
-                  let isCurrent = icon === item;
-                  return (
-                    <li
-                      key={item}
-                      style={{ backgroundColor: isCurrent ? color : 'transparent' }}
-                      className={cx({ isCurrent })}
-                      onClick={() => setBtnSetting({ ...btnSetting, icon: icon === item ? '' : item })}>
-                      <Icon icon={item} />
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
           </Fragment>
         ) : (
-          <div className="settingItem">
+          <div className="settingItem mTop24">
             <div className="settingTitle">{_l('文本')}</div>
             <Input style={{ width: '100%' }} value={explain} onChange={value => setSetting({ explain: value })} />
           </div>

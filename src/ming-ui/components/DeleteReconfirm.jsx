@@ -5,11 +5,13 @@ import RadioGroup from 'ming-ui/components/RadioGroup2';
 import Checkbox from 'ming-ui/components/Checkbox';
 import Button from 'ming-ui/components/Button';
 import './less/DeleteReconfirm.less';
+import _ from 'lodash';
 
 const noop = () => {};
 
 export default ({
   style,
+  footer,
   className,
   description,
   title,
@@ -55,9 +57,7 @@ export default ({
           handleClick('ok');
         });
     } else {
-      $('.deleteReconfirmFooter .deleteReconfirmOkBtn')
-        .prop('disabled', true)
-        .addClass('Button--disabled');
+      $('.deleteReconfirmFooter .deleteReconfirmOkBtn').prop('disabled', true).addClass('Button--disabled');
     }
   };
 
@@ -77,7 +77,8 @@ export default ({
       title={<span style={{ color: '#f44336' }}>{title}</span>}
       onCancel={closeLayer}
       description={description}
-      footer={renderFooter()}>
+      footer={_.isUndefined(footer) ? renderFooter() : footer}
+    >
       {data.length > 1 ? (
         <RadioGroup data={data} vertical radioItemClassName="deleteReconfirmRadioItem" onChange={onChange} />
       ) : (

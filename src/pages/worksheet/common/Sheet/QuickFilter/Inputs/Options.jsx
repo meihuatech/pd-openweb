@@ -5,6 +5,8 @@ import { arrayOf, func, number, shape, string } from 'prop-types';
 import Dropdown from 'src/components/newCustomFields/widgets/Dropdown';
 import Checkbox from 'src/components/newCustomFields/widgets/Checkbox';
 import Option from './StyledOption';
+import { BaseSelectedItem } from './Styles';
+import _ from 'lodash';
 
 const Con = styled.div`
   position: relative;
@@ -13,7 +15,7 @@ const Con = styled.div`
   .ant-select {
     border-radius: 4px;
     border: 1px solid #dddddd;
-    height: 32px;
+    ${({ isMultiple }) => (isMultiple ? '' : 'height: 32px;')}
     line-height: 32px;
     overflow: hidden;
     &:hover {
@@ -40,6 +42,12 @@ const Con = styled.div`
       .ant-select-selection-search-input {
         height: 30px !important;
       }
+      .ant-select-selection-placeholder {
+        line-height: 30px !important;
+      }
+      .ant-select-selection-item {
+        line-height: 28px !important;
+      }
       .ant-select-selection-item > span {
         margin: 3px 0 !important;
       }
@@ -49,7 +57,11 @@ const Con = styled.div`
     }
     &.ant-select-multiple {
       .ant-select-selector .ant-select-selection-overflow {
-        display: none;
+        ${({ isMultiple }) => (isMultiple ? '.ant-select-selection-search { margin: 0px; }' : 'display: none;')}
+      }
+      .customAntDropdownTitleWithBG {
+        margin-top: 4px !important;
+        margin-bottom: 4px !important;
       }
     }
   }
@@ -66,21 +78,19 @@ const Selected = styled.div`
   top: 1px;
   font-size: 13px;
   z-index: 2;
-  line-height: 30px;
-  height: 30px;
+  min-height: 30px;
   width: calc(100% - 40px);
   pointer-events: none;
 `;
 
 export default function Options(props) {
-  const { values = [], control, advancedSetting = {}, onChange = () => {} } = props;
+  const { isMultiple, values = [], control, advancedSetting = {}, onChange = () => {} } = props;
   const { allowitem, direction } = advancedSetting;
   const { options } = control;
   const multiple = String(allowitem) === '2';
   function handleChange(value) {
     onChange({
       ...value,
-      filterType: 2,
     });
   }
   if (String(direction) === '1') {
@@ -110,12 +120,16 @@ export default function Options(props) {
     return (
       <Con>
         <Dropdown
-          {...{ ...control, advancedSetting: { ...control.advancedSetting, allowadd: '0' } }}
+          fromFilter
+          {...{ ...control, advancedSetting: { ...control.advancedSetting, allowadd: '0', showtype: '1' } }}
           default={undefined}
           dropdownClassName="scrollInTable"
           value={JSON.stringify(values)}
           selectProps={{
             onChange: newValue => {
+              if (_.isObject(newValue)) {
+                newValue = newValue.value;
+              }
               handleChange({ values: newValue ? [newValue] : [] });
             },
           }}
@@ -124,11 +138,11 @@ export default function Options(props) {
     );
   } else if (String(direction) === '2' && String(allowitem) === '2') {
     return (
-      <Con>
-        {!!values.length && <Selected>{_l('选中 %0 个', values.length)}</Selected>}
+      <Con isMultiple>
         <Checkbox
           {...{ ...control, advancedSetting: { ...control.advancedSetting, checktype: '1' } }}
           default={undefined}
+          fromFilter
           isFocus
           dropdownClassName="scrollInTable"
           value={JSON.stringify(values)}

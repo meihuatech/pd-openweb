@@ -2,9 +2,11 @@ import React from 'react';
 import DocumentTitle from 'react-document-title';
 import sheetAjax from 'src/api/worksheet';
 import { Icon, Support, Dialog } from 'ming-ui';
-import Clipboard from 'clipboard';
+import copy from 'copy-to-clipboard';
 import './index.less';
-let controlNo = [22, 10010, 43, 45]; //分段、备注、OCR、嵌入字段/
+import _ from 'lodash';
+import { FILTER_SYS } from 'src/pages/Print/config';
+let controlNo = [22, 10010, 43, 45, 47]; //分段、备注、OCR、嵌入字段,条码/
 export default class UploadTemplateSheet extends React.Component {
   constructor(props) {
     super(props);
@@ -16,7 +18,7 @@ export default class UploadTemplateSheet extends React.Component {
       systemControl: [
         {
           controlId: 'caid',
-          controlName: _l('创建人'),
+          controlName: _l('创建者'),
           type: 26,
         },
         {
@@ -85,6 +87,7 @@ export default class UploadTemplateSheet extends React.Component {
           controls.filter(i => [29, 34].includes(i.type)),
           'dataSource',
         ),
+        handControlSource: true,
       });
 
       const commonControls = [];
@@ -168,13 +171,11 @@ export default class UploadTemplateSheet extends React.Component {
   };
 
   copy = () => {
-    const clipboard = new Clipboard('i.copy', {
-      text(data) {
-        return data.closest('.copySpan') && data.closest('.copySpan').innerText;
-      },
-    });
-    clipboard.on('success', () => {
-      alert(_l('复制成功'));
+    $('body').on('click', 'i.copy', function () {
+      if ($(this).closest('.copySpan').length) {
+        copy($(this).closest('.copySpan').text());
+        alert(_l('复制成功'));
+      }
     });
   };
 
@@ -365,7 +366,11 @@ export default class UploadTemplateSheet extends React.Component {
           )}
         </p>
         {controls.map(it => {
-          if (!controlNo.includes(it.type) && !systemControl.some(o => o.controlId == it.controlId))
+          if (
+            !controlNo.includes(it.type) &&
+            !systemControl.some(o => o.controlId == it.controlId) &&
+            !FILTER_SYS.includes(it.controlId) //排除部分系统字段
+          )
             return this.renderItem(it);
           else return '';
         })}
@@ -556,12 +561,19 @@ export default class UploadTemplateSheet extends React.Component {
             <p className="Gray_75">
               <span>
                 {_l(
-                  '7. 如需不打印没有数据的关联表/子表，请将代码：#NoDataNotPrint[start]# 和 #NoDataNotPrint[end]# 插入到模板中，代码之间的关联记录/子表没有数据则不会打印。',
+                  '7. 打印的二维码默认所有人可扫码查看，若需控制仅限应用内部成员查看，可将二维码字段代码设置为“#{二维码$[20*20]$_Private}”，用户扫码后需登录并且根据权限才能访问。',
                 )}
               </span>
             </p>
             <p className="Gray_75">
-              8. <span className="urlForTel">{_l('下载系统模板')}</span>
+              <span>
+                {_l(
+                  '8. 如需不打印没有数据的关联表/子表，请将代码：#NoDataNotPrint[start]# 和 #NoDataNotPrint[end]# 插入到模板中，代码之间的关联记录/子表没有数据则不会打印。',
+                )}
+              </span>
+            </p>
+            <p className="Gray_75">
+              9. <span className="urlForTel">{_l('下载系统模板')}</span>
               <span>
                 {_l('作为参考范例、查看了解具体如何制作打印模板。')}
                 <Support type={3} href="https://help.mingdao.com/operation17.html" text={_l('帮助')} />

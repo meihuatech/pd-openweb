@@ -1,10 +1,12 @@
-import React, { useEffect, useState } from 'react';
-import PropTypes from 'prop-types';
+import React, { useEffect, useState, useRef } from 'react';
+import PropTypes, { string } from 'prop-types';
 import styled from 'styled-components';
 import { Modal } from 'antd';
+import { Button } from 'ming-ui';
 import ErrorWrapper from './ErrorWrapper';
 import './modalbindesc';
 import './less/Modal.less';
+import _ from 'lodash';
 
 const ModalButtonCon = styled.div`
   z-index: 2;
@@ -17,7 +19,6 @@ const ModalButton = styled.div`
   cursor: pointer;
   font-size: 20px;
   line-height: 40px;
-  width: 40px;
   text-align: center;
   color: #9e9e9e;
   &:hover {
@@ -27,11 +28,30 @@ const ModalButton = styled.div`
 
 const TipCon = styled.div`
   height: 30px;
+  width: 40px;
+  text-align: center;
+`;
+
+const ConfirmCon = styled.div`
+  margin-top: 20px;
+  text-align: right;
 `;
 
 export default function MdModal(props) {
-  const { allowScale, visible, dislocate, closeSize = 40, verticalAlign, closeIcon, onCancel } = props;
+  const {
+    allowScale,
+    visible,
+    dislocate,
+    closeSize = 40,
+    verticalAlign,
+    iconButtons = [],
+    closeIcon,
+    okDisabled,
+    onCancel,
+  } = props;
+  const locateRef = useRef();
   let { width } = props;
+  const showConfirm = props.onOk || props.okText || props.cancelText;
   const [left, setLeft] = useState(0);
   const [isLarge, setIsLarge] = useState(localStorage.getItem('NEW_RECORD_IS_LARGE') === 'true');
   if (allowScale && isLarge) {
@@ -88,6 +108,11 @@ export default function MdModal(props) {
     }
   }, [visible]);
   useEffect(() => {
+    if (locateRef.current) {
+      try {
+        locateRef.current.parentElement.parentElement.style.maxHeight = window.innerHeight - 32 + 'px';
+      } catch (err) {}
+    }
     const id = Math.random() * Math.random();
     if (window.closeFns) {
       window.closeindex = (window.closeindex || 0) + 1;
@@ -115,9 +140,21 @@ export default function MdModal(props) {
         modalProps.style.height = window.innerHeight - 32;
       }
     }
+    if (allowScale && isLarge) {
+      modalProps.style.height = window.innerHeight - 32;
+    }
   }
-  if (allowScale && isLarge) {
-    modalProps.style.height = window.innerHeight - 32;
+  if (showConfirm && !modalProps.footer) {
+    modalProps.footer = (
+      <ConfirmCon>
+        <Button type="link" onClick={props.onCancel || _.noop}>
+          {props.cancelText || _l('取消')}
+        </Button>
+        <Button type="primary" disabled={okDisabled} onClick={props.onOk || _.noop}>
+          {props.okText || _l('确定')}
+        </Button>
+      </ConfirmCon>
+    );
   }
   return (
     <Modal
@@ -126,11 +163,19 @@ export default function MdModal(props) {
         onCancel(e, 'click');
       }}
     >
-      <ModalButtonCon>
+      <div ref={locateRef}></div>
+      <ModalButtonCon className="flexRow">
+        {iconButtons.map((btn, i) => (
+          <ModalButton key={i} onClick={btn.onClick}>
+            <TipCon data-tip={btn.tip}>
+              <i className={`icon ${btn.icon}`}></i>
+            </TipCon>
+          </ModalButton>
+        ))}
         {allowScale && (
           <ModalButton
             onClick={() => {
-              localStorage.setItem('NEW_RECORD_IS_LARGE', !isLarge);
+              safeLocalStorageSetItem('NEW_RECORD_IS_LARGE', !isLarge);
               setIsLarge(!isLarge);
             }}
           >
@@ -149,6 +194,7 @@ MdModal.propTypes = {
   allowScale: PropTypes.bool,
   verticalAlign: PropTypes.string,
   visible: PropTypes.bool,
+  okDisabled: PropTypes.bool,
   width: PropTypes.number,
   dislocate: PropTypes.bool,
   type: PropTypes.string,
@@ -158,5 +204,8 @@ MdModal.propTypes = {
   closeSize: PropTypes.number,
   bodyStyle: PropTypes.shape({}),
   children: PropTypes.node,
+  cancelText: string,
+  okText: string,
   onCancel: PropTypes.func,
+  onOk: PropTypes.func,
 };

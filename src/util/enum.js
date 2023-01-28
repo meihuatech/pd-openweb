@@ -1,6 +1,5 @@
 export const lang = () => ({
   拥有者: _l('拥有者'),
-  创建人: _l('创建者'),
   创建者: _l('创建者'),
   创建时间: _l('创建时间'),
   最近更新时间: _l('最近修改时间'),
@@ -32,6 +31,8 @@ export const LIGHT_COLOR = [
   '#CDA3F8',
   '#B3BCEA',
   '#BDBDBD',
+  '#E8E8E8',
+  '#E5F1FE',
 ];
 
 export const PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----

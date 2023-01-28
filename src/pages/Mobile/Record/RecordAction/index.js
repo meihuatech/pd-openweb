@@ -2,36 +2,27 @@ import React, { Fragment, Component } from 'react';
 import cx from 'classnames';
 import { getRequest } from 'src/util';
 import worksheetAjax from 'src/api/worksheet';
-import { InputItem, Modal, Progress, WingBlank } from 'antd-mobile';
+import { getRowDetail } from 'worksheet/api';
+import { Modal, Progress, WingBlank } from 'antd-mobile';
 import { message } from 'antd';
 import { Icon } from 'ming-ui';
 import FillRecordControls from 'src/pages/worksheet/common/recordInfo/FillRecordControls/MobileFillRecordControls';
 import NewRecord from 'src/pages/worksheet/common/newRecord/MobileNewRecord';
-import CustomRecordCard from 'src/pages/Mobile/RecordList/RecordCard';
-import process, { startProcess } from 'src/pages/workflow/api/process';
+import CustomRecordCard from 'mobile/RecordList/RecordCard';
+import processAjax from 'src/pages/workflow/api/process';
 import { isOpenPermit } from 'src/pages/FormSet/util.js';
 import { permitList } from 'src/pages/FormSet/config.js';
 import homeAppAjax from 'src/api/homeApp';
+import { RecordInfoModal } from 'mobile/Record';
+import SoketMessage from '../SoketMessage';
 import './index.less';
+import _ from 'lodash';
 
 let timeout = null;
 const CUSTOM_BUTTOM_CLICK_TYPE = {
   IMMEDIATELY: 1,
   CONFIRM: 2,
   FILL_RECORD: 3,
-};
-const PUSH_TYPE = {
-  ALERT: 1,
-  CREATE: 2,
-  DETAIL: 3,
-  VIEW: 4,
-  PAGE: 5,
-  LINK: 6,
-};
-
-const TYPES = {
-  3: _l('填写'),
-  4: _l('审批'),
 };
 
 class RecordAction extends Component {
@@ -41,175 +32,23 @@ class RecordAction extends Component {
       fillRecordVisible: false,
       newRecordVisible: false,
       btnDisable: {},
-      shareUrl: '',
       rowInfo: {},
+      previewRecord: {},
       percent: 0,
       num: 0,
+      runInfoVisible: false,
     };
     const { isSubList, editable } = getRequest();
     this.isSubList = isSubList == 'true';
     this.editable = editable == 'true';
   }
 
-  componentDidMount() {
-    IM.socket.on('workflow', this.receiveWorkflow);
-    IM.socket.on('workflow_push', this.receiveWorkflowPush);
-  }
   componentWillReceiveProps(nextProps) {
-    if (nextProps.recordActionVisible && !this.props.recordActionVisible && !this.state.shareUrl) {
-      const { appId } = this.props;
-      if (navigator.share && appId) {
-        this.getWorksheetShareUrl();
-      }
-    }
     if (nextProps.runInfoVisible !== this.props.runInfoVisible) {
       this.setState({ runInfoVisible: nextProps.runInfoVisible });
     }
   }
   recef = React.createRef();
-  componentWillUnmount() {
-    IM.socket.off('workflow', this.receiveWorkflow);
-    IM.socket.off('workflow', this.receiveWorkflowPush);
-    clearTimeout(timeout);
-  }
-  getWorksheetShareUrl() {
-    const { appId, worksheetId, rowId, viewId } = this.props;
-    worksheetAjax
-      .getWorksheetShareUrl({
-        appId,
-        worksheetId,
-        rowId,
-        viewId,
-        objectType: 2,
-      })
-      .then(shareUrl => {
-        this.setState({
-          shareUrl,
-        });
-      });
-  }
-  // 自定义按钮
-  receiveWorkflow = data => {
-    const { status, total, finished, title, type } = data;
-    const { isMobileOperate } = this.props;
-    let { custBtnName } = this.state;
-    if (isMobileOperate) {
-      let percent = total === 0 ? 100 : (finished / total) * 100;
-      this.setState(
-        { runInfoVisible: true, percent, total: total === 0 ? 1 : total, num: total === 0 ? 1 : finished },
-        () => {
-          if (this.state.percent === 100) {
-            this.setState({ runInfoVisible: false });
-          }
-        },
-      );
-    } else if (status == 1) {
-      if (_.includes([3, 4], type)) {
-        clearTimeout(timeout);
-        timeout = setTimeout(() => {
-          Modal.alert(
-            <div className="feedbackInfo">
-              <span className="custBtnName">{_l('“%0', custBtnName)}</span>
-              {_l('” 正在等待%0', TYPES[type])}
-            </div>,
-            '',
-            [{ text: _l('关闭') }],
-          );
-        }, 1000);
-      }
-    } else if (status === 2) {
-      this.setState({
-        percent: 100,
-        total: 1,
-        num: 1,
-        btnDisable: {},
-      });
-      this.props.loadRow();
-      clearTimeout(timeout);
-      timeout = setTimeout(() => {
-        Modal.alert(
-          <div className="feedbackInfo">
-            <span className="custBtnName">{_l('“%0"', custBtnName)}</span>
-            <span className="verticalAlignM">{_l(' 执行成功!')}</span>
-          </div>,
-          '',
-          [{ text: _l('关闭') }],
-        );
-      }, 1000);
-    } else {
-      clearTimeout(timeout);
-      timeout = setTimeout(() => {
-        Modal.alert(
-          <div className="feedbackInfo">
-            <span className="custBtnName">{_l('“%0', custBtnName)}</span>
-            <span className="verticalAlignM">{_l('” 执行失败!')}</span>
-          </div>,
-          '',
-          [{ text: _l('关闭') }],
-        );
-      }, 1000);
-    }
-  };
-  getAppSimpleInfo = workSheetId => {
-    return new Promise((resolve, reject) => {
-      homeAppAjax.getAppSimpleInfo({ workSheetId }, { silent: true }).then(result => {
-        resolve(result);
-      });
-    });
-  };
-  // 流程推送
-  receiveWorkflowPush = data => {
-    const pushType = parseInt(Object.keys(data)[0]);
-    const { pushUniqueId, content, appId: worksheetId, rowId, viewId } = data[pushType];
-    if (pushUniqueId !== md.global.Config.pushUniqueId) {
-      return;
-    }
-    if (pushType === PUSH_TYPE.ALERT) {
-      alert(content);
-    }
-    if (pushType === PUSH_TYPE.CREATE) {
-      this.getAppSimpleInfo(worksheetId).then(({ appId }) => {
-        location.href = `/mobile/addRecord/${appId}/${worksheetId}/${viewId}`;
-      });
-    }
-    if (pushType === PUSH_TYPE.DETAIL) {
-      this.getAppSimpleInfo(worksheetId).then(({ appId }) => {
-        if (viewId) {
-          location.href = `/mobile/record/${appId}/${worksheetId}${viewId ? `/${viewId}` : ''}/${rowId}`;
-        }
-      });
-    }
-    if (pushType === PUSH_TYPE.VIEW) {
-      this.getAppSimpleInfo(worksheetId).then(({ appId, appSectionId }) => {
-        location.href = `/mobile/recordList/${appId}/${appSectionId}/${worksheetId}/${viewId}`;
-      });
-    }
-    if (pushType === PUSH_TYPE.PAGE) {
-      this.getAppSimpleInfo(worksheetId).then(({ appId, appSectionId }) => {
-        location.href = `/mobile/customPage/${appId}/${appSectionId}/${worksheetId}`;
-      });
-    }
-    if (pushType === PUSH_TYPE.LINK) {
-      location.href = content;
-    }
-    message.destroy()
-  };
-  renderRunInfo = () => {
-    const { batchOptCheckedData } = this.props;
-    let { custBtnName = '', total = 1, runInfoVisible } = this.state;
-    let totalNum = total || batchOptCheckedData.length;
-    return (
-      <Modal animationType="slide-up" visible={runInfoVisible} className="runInfoModal">
-        <div className="optRunInfo">
-          <p className="infoHeader">{_l(`%0正在执行...`, custBtnName)}</p>
-          <p className="num">
-            {this.state.num}/{totalNum}
-          </p>
-          <Progress position="normal" percent={this.state.percent} />
-        </div>
-      </Modal>
-    );
-  };
   handleTriggerCustomBtn = btn => {
     const { handleBatchOperateCustomBtn } = this.props;
     this.setState({ custBtnName: btn.name });
@@ -230,9 +69,9 @@ class RecordAction extends Component {
         return;
       }
       // 二次确认
-      Modal.alert(_l('你确认对记录执行此操作吗？'), '', [
-        { text: _l('取消'), onPress: () => {}, style: 'default' },
-        { text: _l('确定'), onPress: () => this.triggerImmediately(btn) },
+      Modal.alert(btn.confirmMsg || _l('你确认对记录执行此操作吗？'), '', [
+        { text: btn.cancelName || _l('取消'), onPress: () => {}, style: 'default' },
+        { text: btn.sureName || _l('确定'), onPress: () => this.triggerImmediately(btn) },
       ]);
     } else if (btn.clickType === CUSTOM_BUTTOM_CLICK_TYPE.FILL_RECORD) {
       // 填写字段
@@ -244,6 +83,7 @@ class RecordAction extends Component {
   };
   triggerImmediately = btn => {
     const { batchOptCheckedData = [], isMobileOperate } = this.props;
+    this.disableCustomButton(btn.btnId);
     if (isMobileOperate) {
       this.setState({ runInfoVisible: true });
     } else {
@@ -251,7 +91,7 @@ class RecordAction extends Component {
         className: 'flowToastInfo',
         content: (
           <div className="feedbackInfo">
-            <span className="custBtnName">{_l('“%0"', btn.name)}</span>
+            <span className="custBtnName">{btn.name}</span>
             <span className="verticalAlignM">{_l('正在执行...')}</span>
           </div>
         ),
@@ -259,44 +99,54 @@ class RecordAction extends Component {
       });
     }
     const { worksheetId, rowId } = this.props;
-    startProcess({
-      appId: worksheetId,
-      sources: [rowId],
-      triggerId: btn.btnId,
-    }).then(data => {
-      if (!data) {
-        this.setState({ percent: 100, total: 1, num: 1, runInfoVisible: false });
-        clearTimeout(timeout);
-        let durationValue = batchOptCheckedData.length ? 0 : 1000;
-        timeout = setTimeout(() => {
-          Modal.alert(
-            <div className="feedbackInfo">
-              <span className="custBtnName">{_l('“%0', btn.name)}</span>
-              {_l('” 执行失败!')}
-            </div>,
-            '',
-            [{ text: _l('关闭') }],
-          );
-        }, durationValue);
-      }
-      this.props.loadCustomBtns();
-      this.disableCustomButton(btn.btnId);
-    });
+    processAjax
+      .startProcess({
+        appId: worksheetId,
+        sources: [rowId],
+        triggerId: btn.btnId,
+      })
+      .then(data => {
+        if (!data) {
+          this.setState({ percent: 100, total: 1, num: 1, runInfoVisible: false });
+          clearTimeout(timeout);
+          let durationValue = batchOptCheckedData.length ? 0 : 1000;
+          timeout = setTimeout(() => {
+            Modal.alert(
+              <div className="feedbackInfo">
+                <span className="custBtnName">{btn.name}</span>
+                {_l(' 执行失败!')}
+              </div>,
+              '',
+              [{ text: _l('关闭') }],
+            );
+          }, durationValue);
+        }
+        this.props.loadCustomBtns();
+        setTimeout(() => {
+          this.setState({ btnDisable: {} });
+          this.props.updateBtnDisabled({});
+        }, 500);
+      });
   };
   disableCustomButton = id => {
     this.setState({
       btnDisable: { ...this.state.btnDisable, [id]: true },
     });
+    this.props.updateBtnDisabled({ [id]: true });
   };
   async fillRecord(btn) {
     const { worksheetId, rowId } = this.props;
     let rowInfo;
     if (rowId) {
-      rowInfo = await worksheetAjax.getRowByID({
+      rowInfo = await getRowDetail({
         worksheetId,
         getType: 1,
         rowId,
       });
+      rowInfo = {
+        ...rowInfo,
+        receiveControls: rowInfo.formData,
+      };
     } else {
       const worksheetInfo = await worksheetAjax.getWorksheetInfo({ worksheetId, getTemplate: true });
       rowInfo = {
@@ -317,6 +167,7 @@ class RecordAction extends Component {
         this.fillRecordId = rowId;
         this.fillRecordProps = {
           formData: rowInfo.receiveControls,
+          appId: this.props.appId,
         };
         this.setState({
           fillRecordVisible: true,
@@ -334,7 +185,7 @@ class RecordAction extends Component {
           if (addRelationControl.enumDefault === 1 && controldata.length) {
             Modal.alert(
               _l('无法执行按钮“%0”', btn.name),
-              _l('“%0”已有关联记录，无法重复添加', addRelationControl.controlName),
+              _l('%0已有关联记录，无法重复添加', addRelationControl.controlName),
               [{ text: _l('确定'), onPress: () => {} }],
             );
             return;
@@ -447,18 +298,6 @@ class RecordAction extends Component {
   handleOpenDiscuss = () => {
     const { appId, worksheetId, viewId, rowId } = this.props;
     window.mobileNavigateTo(`/mobile/discuss/${appId}/${worksheetId}/${viewId}/${rowId}`);
-  };
-  handleOpenShare = () => {
-    const { shareUrl } = this.state;
-    navigator
-      .share({
-        title: _l('系统'),
-        text: document.title,
-        url: shareUrl,
-      })
-      .then(() => {
-        alert(_l('分享成功'));
-      });
   };
   handleDeleteAlert = () => {
     const { hideRecordActionVisible } = this.props;
@@ -582,10 +421,11 @@ class RecordAction extends Component {
   renderNewRecord() {
     const { activeBtn = {} } = this;
     const { newRecordVisible, rowInfo } = this.state;
-    const { worksheetId, rowId } = this.props;
+    const { worksheetId, rowId, appId } = this.props;
     return (
       newRecordVisible && (
         <NewRecord
+          appId={appId}
           title={activeBtn.name}
           className="worksheetRelateNewRecord"
           worksheetId={this.btnAddRelateWorksheetId}
@@ -614,6 +454,11 @@ class RecordAction extends Component {
           hideNewRecord={() => {
             this.setState({ newRecordVisible: false });
           }}
+          openRecord={(rowId, viewId) => {
+            this.setState({
+              previewRecord: { rowId, viewId },
+            });
+          }}
           onAdd={this.handleAddRecordCallback}
         />
       )
@@ -630,7 +475,7 @@ class RecordAction extends Component {
       switchPermit,
       isMobileOperate,
     } = this.props;
-    const { btnDisable, shareUrl } = this.state;
+    const { btnDisable } = this.state;
     return (
       <Modal
         popup
@@ -642,7 +487,7 @@ class RecordAction extends Component {
       >
         <React.Fragment>
           <div className="flexRow header">
-            <span className="Font13">{!isMobileOperate ? sheetRow.titleName : _l('对选中记录执行操作')}</span>
+            <span className="Font13">{!isMobileOperate ? _l('更多操作') : _l('对选中记录执行操作')}</span>
             <div className="closeIcon" onClick={hideRecordActionVisible}>
               <Icon icon="close" />
             </div>
@@ -670,10 +515,10 @@ class RecordAction extends Component {
           </div>
           {appId && !isMobileOperate ? (
             <div className="extrBtnBox">
-              {shareUrl && isOpenPermit(permitList.recordDiscussSwitch, switchPermit, viewId) && (
+              {isOpenPermit(permitList.recordShareSwitch, switchPermit, viewId) && (
                 <div className="flexRow extraBtnItem">
                   <Icon icon="share" className="Font18 delIcon" style={{ color: '#757575' }} />
-                  <div className="flex delTxt Font13 Gray" onClick={this.handleOpenShare}>
+                  <div className="flex delTxt Font13 Gray" onClick={this.props.onShare}>
                     {_l('分享')}
                   </div>
                 </div>
@@ -742,14 +587,48 @@ class RecordAction extends Component {
       </Modal>
     );
   };
+  renderRecordInfo = () => {
+    const { appId, viewId } = this.props;
+    const { previewRecord } = this.state;
+    return (
+      <RecordInfoModal
+        className="full"
+        visible={!!previewRecord.rowId}
+        appId={appId}
+        worksheetId={this.btnAddRelateWorksheetId}
+        viewId={previewRecord.viewId}
+        rowId={previewRecord.rowId}
+        onClose={() => {
+          this.setState({
+            previewRecord: {},
+          });
+        }}
+      />
+    );
+  };
   render() {
+    const { batchOptCheckedData, isMobileOperate } = this.props;
+    const { runInfoVisible, btnDisable = {}, custBtnName } = this.state;
+
     return (
       <div ref={this.recef}>
         {this.renderRecordAction()}
         {this.renderFillRecord()}
         {this.renderNewRecord()}
-        {this.renderRunInfo()}
+        {this.renderRecordInfo()}
         {this.props.isMobileOperate && this.renderFailureRecord()}
+        
+        <SoketMessage
+          runInfoVisible={runInfoVisible}
+          viewId={this.props.viewId}
+          custBtnName={custBtnName}
+          batchOptCheckedData={batchOptCheckedData}
+          btnDisable={btnDisable}
+          isMobileOperate={isMobileOperate}
+          loadRow={this.props.loadRow}
+          updateBtnDisabled={this.props.updateBtnDisabled}
+          updateVisible={flag => this.setState({ runInfoVisible: flag })}
+        />
       </div>
     );
   }

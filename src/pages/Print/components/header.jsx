@@ -4,11 +4,12 @@ import { Icon, Dropdown, Tooltip, Switch } from 'ming-ui';
 import { fromType, printType, typeForCon, DEFAULT_FONT_SIZE, MIDDLE_FONT_SIZE, MAX_FONT_SIZE } from '../config';
 import cx from 'classnames';
 import Api from 'api/homeApp';
+import _ from 'lodash';
 // import * as htmlDocx from 'html-docx-js/dist/html-docx';
 // import {cssStr} from './wordcss';
-// const juice = require('juice');
+// import juice from 'juice';
 // import html2canvas from 'html2canvas';
-// const jsPDF = require('jspdf');
+// import jsPDF from 'jspdf';
 class Header extends React.Component {
   constructor(props) {
     super(props);
@@ -20,7 +21,7 @@ class Header extends React.Component {
   componentWillMount() {
     const { params } = this.props;
     const { type, from, appId, printType } = params;
-    if (from === fromType.PRINT && type === typeForCon.NEW && appId && printType !== 'workflow') {
+    if (from === fromType.PRINT && type === typeForCon.NEW && appId && printType !== 'flow') {
       Api.getAppDetail({ appId: appId }, { silent: true }).then(data => {
         this.setState({
           isUserAdmin: data.permissionType >= 100,
@@ -30,7 +31,7 @@ class Header extends React.Component {
     // document.querySelectorAll('img').forEach(e => {
     //   e.setAttribute('crossOrigin', 'anonymous');
     //   let src = e.getAttribute('src');
-    //   e.setAttribute('src', `${__api_server__}File/ImageConvert?path=` + encodeURIComponent(src));
+    //   e.setAttribute('src', `${__api_server__.main}File/ImageConvert?path=` + encodeURIComponent(src));
     // });
   }
 
@@ -151,15 +152,7 @@ class Header extends React.Component {
                 </React.Fragment>
               )}
               <div className="Right">
-                {type === typeForCon.PREVIEW ? (
-                  <Icon
-                    icon="clear_1"
-                    className=" Font24"
-                    onClick={() => {
-                      this.props.onCloseFn();
-                    }}
-                  />
-                ) : (
+                {type !== typeForCon.PREVIEW && (
                   <React.Fragment>
                     <div
                       className="saveButton InlineBlock Hand Bold"

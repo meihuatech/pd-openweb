@@ -2,15 +2,10 @@ import React, { useState } from 'react';
 import './index.less';
 import login from 'src/api/login';
 import { navigateTo } from 'src/router/navigateTo';
-import MdFunction from 'mdFunction';
 import { Support, Tooltip } from 'ming-ui';
 import { removePssId } from 'src/util/pssId';
-import cx from 'classnames';
-const {
-  app: {
-    userMenu: { usersetcenter },
-  },
-} = window.private;
+import { showFollowWeixinDialog } from 'src/components/common/function';
+import _ from 'lodash';
 
 export default function UserMenu(props) {
   const [userVisible, handleChangeVisible] = useState(false);
@@ -68,13 +63,13 @@ export default function UserMenu(props) {
           <a href="/personal?type=information" className="Relative">
             <span className="icon icon-task-select-other" />
             {_l('个人账户')}
-            {isAccount && <span class="warnLight warnLightUserSetPosition"></span>}
+            {isAccount && <span class="warnLight warnLightUserSetPosition" />}
           </a>
         </li>
 
         {md.global.Account.superAdmin && (
           <li className="ThemeBGColor3" data-tag="privateDeployment">
-            <a href="/privateDeployment">
+            <a href="/privateDeployment/base">
               <span className="icon icon-settings Font16" />
               {_l('系统配置')}
             </a>
@@ -86,9 +81,7 @@ export default function UserMenu(props) {
             className="ThemeBGColor3"
             id="userSetItem"
             onClick={() => {
-              projectLength === 1
-                ? navigateTo(`/admin/home/${md.global.Account.projects[0].projectId}`)
-                : null;
+              projectLength === 1 ? navigateTo(`/admin/home/${md.global.Account.projects[0].projectId}`) : null;
             }}
           >
             <Tooltip
@@ -119,45 +112,9 @@ export default function UserMenu(props) {
           </li>
         )}
       </ul>
-      <ul className={cx('userSetUL', { Hidden: usersetcenter })}>
-        <li className="ThemeBGColor3">
-          <a href="/mobile.htm" target="_blank">
-            <span className="icon icon-phonelink" />
-            {_l('App和客户端')}
-          </a>
-        </li>
-        <li
-          className="ThemeBGColor3"
-          onClick={() => {
-            require(['src/components/common/function'], mdFunction => {
-              mdFunction.showFollowWeixinDialog();
-            });
-          }}
-        >
-          <a className="Hand">
-            <span className="icon icon-weixin" />
-            {_l('微信服务号')}
-          </a>
-        </li>
-        <li className="ThemeBGColor3">
-          <Support className="support" type={2} href="https://help.mingdao.com" text={_l('使用帮助')} />
-        </li>
-        <li className="ThemeBGColor3">
-          <a href="https://learn.mingdao.net" target="_blank">
-            <span className="icon icon-sidebar_video_tutorial" />
-            {_l('视频教程')}
-          </a>
-        </li>
-        <li className="ThemeBGColor3">
-          <a href="http://blog.mingdao.com/" target="_blank">
-            <span className="icon icon-blogs" />
-            {_l('博客')}
-          </a>
-        </li>
-      </ul>
 
       {md.global.Config.IsLocal && !md.global.SysSettings.hideDownloadApp && (
-        <ul className="pTop5 pBottom5">
+        <ul className="userSetUL">
           <li className="ThemeBGColor3" data-tag="appInstallSetting">
             <a href="/appInstallSetting">
               <span className="icon icon-phonelink Font16" />
@@ -167,7 +124,7 @@ export default function UserMenu(props) {
         </ul>
       )}
 
-      <ul className="pTop5 pBottom5">
+      <ul className="userSetUL">
         <li className="ThemeBGColor3">
           <a onClick={logout} rel="external">
             <span className="icon icon-exit" />

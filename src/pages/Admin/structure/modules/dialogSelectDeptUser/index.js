@@ -1,8 +1,11 @@
 import './style.less';
-import 'nanoScroller';
-var doT = require('dot');
-var mdDialog = require('mdDialog').index;
-var departmentController = require('src/api/department');
+import '@mdfe/nanoscroller';
+import doT from '@mdfe/dot';
+import mainHtml from './tpl/main.html';
+import itemHtml from './tpl/item.html';
+import { index as mdDialog } from 'src/components/mdDialog/dialog';
+import departmentController from 'src/api/department';
+import _ from 'lodash';
 
 var DEFAULTS = {
   dialogBoxID: 'selectDepartmentUser_',
@@ -61,7 +64,7 @@ SelectDeptUser.prototype.init = function () {
       _this.bindEvent();
     },
   });
-  this.dialog.content(doT.template(require('./tpl/main.html'))());
+  this.dialog.content(doT.template(mainHtml)());
 };
 
 SelectDeptUser.prototype.bindEvent = function () {
@@ -167,7 +170,7 @@ SelectDeptUser.prototype.renderList = function (data) {
     isFirst: options.pageIndex === 1,
     keywords: options.keywords,
   });
-  var tplFunc = doT.template(require('./tpl/item.html'));
+  var tplFunc = doT.template(itemHtml);
   if (options.pageIndex === 1) {
     this.$content.html(tplFunc(renderData));
   } else {
@@ -203,6 +206,6 @@ SelectDeptUser.prototype.bindNanoScroller = function () {
   }
 };
 
-module.exports = function (opts) {
+export default function (opts) {
   return new SelectDeptUser(opts);
 };

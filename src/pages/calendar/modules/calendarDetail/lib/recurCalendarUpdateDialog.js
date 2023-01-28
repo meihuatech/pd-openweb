@@ -1,15 +1,8 @@
-﻿import 'mdDialog';
+﻿import 'src/components/mdDialog/dialog';
 import './css/recurUpdate.less';
-/**
- * 重复日程操作
- * @param  {String}     operatorTitle       操作提示文字
- * @param  {String}     reCurTitle          重复操作提示文字
- * @param  {Function}   recurCalendarUpdateFun  操作函数
- * @param  {Boolean}    originRecur             是否重复
- * @param  {Boolean}    isChildCalendar     是否是特殊子日程
- * @param  {Object}     addSettings         额外变量 fullCalendar 拖拽使用
- * @return {Undefined}
- */
+import tpl from './template/repeatCalendarOperator.html';
+import doT from '@mdfe/dot';
+
 export default function recurCalendarUpdate(
   { operatorTitle, recurTitle, recurCalendarUpdateFun },
   { isChildCalendar, isRecurChange, originRecur },
@@ -23,13 +16,12 @@ export default function recurCalendarUpdate(
   }
   if (originRecur && !isChildCalendar && !directAll) {
     // 重复日程 非子日程 的 单个日程
-    var tplFunc = require('./template/repeatCalendarOperator.tpl');
     var dialog = $.DialogLayer({
       dialogBoxID: 'repeatCalendarOperator',
       width: 410,
       container: {
         header: recurTitle,
-        content: tplFunc({ isRecurChange, isEdit }),
+        content: doT.template(tpl)({ isRecurChange, isEdit }),
         noText: '',
         yesText: '',
       },

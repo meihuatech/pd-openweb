@@ -1,12 +1,9 @@
 import React from 'react';
-
 import Button from 'ming-ui/components/Button';
 import LoadDiv from 'ming-ui/components/LoadDiv';
 import API, { editIgnoreRecommends } from '../api';
-
-import shallowEqual from 'react-redux/lib/utils/shallowEqual';
-
-const addFriendConfirm = require('addFriendConfirm');
+import addFriendConfirm from 'src/components/addFriendConfirm/addFriendConfirm';
+import _ from 'lodash';
 
 export default class RecommendsList extends React.Component {
   constructor() {

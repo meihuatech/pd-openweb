@@ -1,3 +1,4 @@
+@import '/src/common/mdcss/Themes/themeVariables.less';
 .ming.Textarea {
   border: 1px solid #ccc;
   box-sizing: border-box;
@@ -8,7 +9,7 @@
   overflow-x: hidden;
   overflow-y: auto;
   resize: none;
-  &:hover,
+  &:hover:not(:disabled),
   &:focus {
     border-color: @themeColor3;
   }

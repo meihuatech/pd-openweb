@@ -1,9 +1,11 @@
-﻿import * as AjaxRequest from 'src/api/calendar';
+﻿import AjaxRequest from 'src/api/calendar';
 import { RECURTYPE, FREQUENCY, REMINDTYPE, WEEKDAYS, RECURLAYERS, MEMBER_STATUS } from './constant';
 import recurCalendarUpdate from './lib/recurCalendarUpdateDialog';
 import afterRefreshOp from './lib/afterRefreshOp';
-
+import createShare from 'src/components/createShare/createShare';
 import { Config } from './index';
+import _ from 'lodash';
+import moment from 'moment';
 
 export function getParamsFromUrl() {
   const result = /detail_([^_?]+)_?([^_?]+)?/.exec(location.href);
@@ -260,26 +262,24 @@ export const changeCategory = ({ id, catID }, callback) => {
  * @param { function } callback
  */
 export const shareCalendar = function (params, callback) {
-  require(['createShare'], createShare => {
-    const { keyStatus, token, id, title, start, end, recurTime, address, createUser } = params;
-    createShare.init({
-      isCreate: false,
-      calendarOpt: {
-        title: _l('分享日程'),
-        openURL: md.global.Config.WebUrl + 'm/detail/calendar/',
-        isAdmin: createUser === md.global.Account.accountId,
-        keyStatus,
-        name: title,
-        startTime: start,
-        endTime: end,
-        address: address,
-        shareID: id,
-        recurTime: recurTime,
-        token: token,
-        ajaxRequest: AjaxRequest,
-        shareCallback: callback,
-      },
-    });
+  const { keyStatus, token, id, title, start, end, recurTime, address, createUser } = params;
+  createShare({
+    isCreate: false,
+    calendarOpt: {
+      title: _l('分享日程'),
+      openURL: md.global.Config.WebUrl + 'm/detail/calendar/',
+      isAdmin: createUser === md.global.Account.accountId,
+      keyStatus,
+      name: title,
+      startTime: start,
+      endTime: end,
+      address: address,
+      shareID: id,
+      recurTime: recurTime,
+      token: token,
+      ajaxRequest: AjaxRequest,
+      shareCallback: callback,
+    },
   });
 };
 

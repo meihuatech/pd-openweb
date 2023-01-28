@@ -1,4 +1,5 @@
 import React from 'react';
+import { Icon } from 'ming-ui';
 import Message from '../components/message';
 import cx from 'classnames';
 import loginController from 'src/api/login';
@@ -7,6 +8,7 @@ import captcha from 'src/components/captcha';
 import { hasCaptcha } from '../util';
 import { encrypt } from 'src/util';
 import { removePssId } from 'src/util/pssId';
+import moment from 'moment';
 
 const request = getRequest();
 
@@ -42,9 +44,9 @@ export default class Container extends React.Component {
     const { emailOrTel, password, fullName, isCheck, dialCode } = loginData;
     let account = !openLDAP ? emailOrTel : fullName;
     if (!openLDAP) {
-      window.localStorage.setItem('LoginName', emailOrTel);
+      safeLocalStorageSetItem('LoginName', emailOrTel);
     } else {
-      window.localStorage.setItem('LoginLDAPName', fullName);
+      safeLocalStorageSetItem('LoginLDAPName', fullName);
     }
     var params = {
       password: encrypt(password),
@@ -61,7 +63,7 @@ export default class Container extends React.Component {
     let cb = data => {
       const { accountResult, loginType, state } = data;
       if (isCheck && [ActionResult.accountSuccess, ActionResult.needTwofactorVerifyCode].includes(accountResult)) {
-        window.localStorage.setItem(
+        safeLocalStorageSetItem(
           'LoginCheckList',
           JSON.stringify({
             accountId: data.accountId,
@@ -99,9 +101,16 @@ export default class Container extends React.Component {
         return;
       }
       this.setState({ loginDisabled: false });
+      safeLocalStorageSetItem(
+        'loginStatus',
+        JSON.stringify({ state: data.state, createStateTime: moment().format('YYYY-MM-DD HH:mm:ss') }),
+      );
       loginCallback(data, !(openLDAP && isNetwork), () => {
         $('.btnForLogin').click();
       });
+      if (accountResult === 15) {
+        location.href = '/cancellation.htm';
+      }
     };
     if (!(openLDAP && isNetwork)) {
       params.account = dialCode + account.trim();
@@ -160,13 +169,20 @@ export default class Container extends React.Component {
   };
 
   render() {
-    const { loginData = {}, setDataFn, isNetwork, openLDAP } = this.props;
+    const { loginData = {}, onChangeData, isNetwork, openLDAP, canLDAP } = this.props;
     let { isCheck = false } = loginData;
     let { loginDisabled } = this.state;
     return (
       <React.Fragment>
-        <div className="titleHeader">
-          <div className={cx('title', { mTop40: !isNetwork, mTop30: isNetwork })}>{_l('登录')}</div>
+        <div className={cx('titleHeader flexRow alignItemsCenter', { mTop40: !isNetwork, mTop30: isNetwork })}>
+          <div className="title">{openLDAP ? _l('LDAP登录') : _l('登录')}</div>
+          <div className="flex TxtRight">
+            {canLDAP && (
+              <span className="changeLoginType Hand Gray_9e Hover_49" onClick={this.props.changeOpenLDAP}>
+                <Icon icon="swap_horiz" className="mRight5" /> {!openLDAP ? _l('LDAP登录') : _l('平台账户登录')}
+              </span>
+            )}
+          </div>
         </div>
         <Message
           type="login"
@@ -174,7 +190,7 @@ export default class Container extends React.Component {
           openLDAP={openLDAP}
           dataList={loginData}
           isNetwork={isNetwork}
-          setDataFn={setDataFn}
+          onChangeData={onChangeData}
           nextHtml={isValid => {
             return (
               <React.Fragment>
@@ -188,7 +204,7 @@ export default class Container extends React.Component {
                   <div
                     className="cbRememberPasswordDiv Right Hand"
                     onClick={() => {
-                      setDataFn({
+                      onChangeData({
                         ...loginData,
                         isCheck: !isCheck,
                       });

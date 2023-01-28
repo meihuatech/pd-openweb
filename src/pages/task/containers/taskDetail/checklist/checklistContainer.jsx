@@ -1,13 +1,14 @@
 ﻿import React, { Component } from 'react';
 import { connect } from 'react-redux';
 import { DragDropContext } from 'react-dnd';
+import _ from 'lodash';
 import MouseBackEnd from '@mdfe/react-dnd-mouse-backend';
 import config from './common/config';
 import Checklist from './checklist';
 import './less/checklist.less';
 import ajaxRequest from 'src/api/taskCenter';
-import 'createTask';
-import 'mdDialog';
+import 'src/components/createTask/createTask';
+import 'src/components/mdDialog/dialog';
 import { htmlEncodeReg } from 'src/util';
 import {
   updateCheckListIndex,

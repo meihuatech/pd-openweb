@@ -3,10 +3,9 @@ import ReactDOM from 'react-dom';
 import './login.less';
 import './components/message.less';
 import cx from 'classnames';
-import { getResetPasswordTrigerInfo, resetPasswordByState } from 'src/api/register';
-// import captcha from 'src/components/captcha';
+import registerAjax from 'src/api/register';
 import preall from 'src/common/preall';
-import { inputFocusFn, inputBlurFn, warnningTipFn, setCNFn } from './util';
+import { inputFocusFn, inputBlurFn, warnningTipFn, setWarnningData } from './util';
 import { encrypt, getRequest } from 'src/util';
 import RegExp from 'src/util/expression';
 
@@ -41,7 +40,7 @@ class ResetPassword extends React.Component {
   }
 
   getResetPasswordTrigerInfo = () => {
-    getResetPasswordTrigerInfo({
+    registerAjax.getResetPasswordTrigerInfo({
       state: request.state,
     }).then(res => {
       this.setState({
@@ -120,7 +119,7 @@ class ResetPassword extends React.Component {
     this.setState({
       sending: true,
     });
-    resetPasswordByState({
+    registerAjax.resetPasswordByState({
       state: request.state,
       password: encrypt(password),
     }).then(res => {
@@ -168,7 +167,7 @@ class ResetPassword extends React.Component {
         <div className="messageBox mTop20">
           <div
             className={cx('mesDiv', {
-              ...setCNFn(warnningData, ['.passwordIcon', this.password], focusDiv, password),
+              ...setWarnningData(warnningData, ['.passwordIcon', this.password], focusDiv, password),
             })}
           >
             <input
@@ -198,7 +197,7 @@ class ResetPassword extends React.Component {
           </div>
           <div
             className={cx('mesDiv', {
-              ...setCNFn(warnningData, ['.passwordCopy', this.passwordCopy], focusDiv, passwordCopy),
+              ...setWarnningData(warnningData, ['.passwordCopy', this.passwordCopy], focusDiv, passwordCopy),
             })}
           >
             <input
@@ -248,6 +247,9 @@ class ResetPassword extends React.Component {
     return (
       <div className="loginBox">
         <div className="loginContainer">
+          <div className="titleHeader">
+            <img src={md.global.SysSettings.brandLogoUrl} height={40} />
+          </div>
           {this.renderCon()}
           {this.showLangChang()}
         </div>

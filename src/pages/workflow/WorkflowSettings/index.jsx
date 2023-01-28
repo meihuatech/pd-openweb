@@ -8,6 +8,7 @@ import History from './History';
 import ProcessConfig from './ProcessConfig';
 import processVersion from '../api/processVersion';
 import { getFlowInfo, getProcessById, clearSource } from '../redux/actions';
+import _ from 'lodash';
 
 class WorkflowSettings extends Component {
   constructor(props) {
@@ -80,7 +81,7 @@ class WorkflowSettings extends Component {
           </div>
           <div className="flowEmptyWrap flex">
             <div className="flowEmptyPic flowEmptyPic-lock" />
-            <div className="Gray_9e Font14 mTop20">{_l('您无权访问此工作流')}</div>
+            <div className="Gray_9e Font14 mTop20">{_l('您无权访问或已删除')}</div>
           </div>
         </div>
       );

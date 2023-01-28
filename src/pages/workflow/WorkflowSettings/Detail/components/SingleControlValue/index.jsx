@@ -1,20 +1,40 @@
 import React, { Component, Fragment } from 'react';
 import cx from 'classnames';
-import 'dialogSelectUser';
-import { MultipleDropdown, Dropdown, TagTextarea, CityPicker, Icon } from 'ming-ui';
+import 'src/components/dialogSelectUser/dialogSelectUser';
+import { MultipleDropdown, Dropdown, TagTextarea, CityPicker, Icon, QiniuUpload } from 'ming-ui';
 import { DateTime, DateTimeRange } from 'ming-ui/components/NewDateTimePicker';
-import DialogSelectDept from 'dialogSelectDept';
+import DialogSelectDept from 'src/components/dialogSelectDept';
 import Tag from '../Tag';
 import SelectOtherFields from '../SelectOtherFields';
-import { GRADE_STAR_TYPE, GRADE_LEVEL_TYPE } from '../../../enum';
 import { getIcons } from '../../../utils';
+import { previewQiniuUrl } from 'src/components/previewAttachments';
+import { TimePicker } from 'antd';
+import { FORMAT_TEXT } from '../../../enum';
+import { formatResponseData } from 'src/components/UploadFiles/utils';
+import previewAttachments from 'src/components/previewAttachments/previewAttachments';
+import { selectOrgRole } from 'src/components/DialogSelectOrgRole';
+import moment from 'moment';
 
 export default class SingleControlValue extends Component {
   constructor(props) {
     super(props);
     this.state = {
       moreFieldsIndex: '',
+      isUploading: false,
     };
+
+    // 缓存当前的附件的量
+    if (props.item.fieldId === 'attachments' && props.item.fieldValue) {
+      this.cacheFile = safeParse(props.item.fieldValue, 'array');
+    }
+  }
+
+  cacheFile = [];
+
+  componentWillReceiveProps(nextProps) {
+    if (nextProps.item.fieldId !== this.props.item.fieldId) {
+      this.cacheFile = [];
+    }
   }
 
   componentDidUpdate(prevProps, prevState) {
@@ -30,10 +50,23 @@ export default class SingleControlValue extends Component {
    * 更新单个字段的值
    */
   updateSingleControlValue(obj, i) {
-    const { updateSource } = this.props;
+    const { item, updateSource } = this.props;
     const fields = _.cloneDeep(this.props.fields);
 
     fields[i] = Object.assign({}, fields[i], obj);
+
+    if (item.type === 10000008) {
+      fields.forEach(o => {
+        if (o.dataSource === item.fieldId) {
+          o.fieldValue = '';
+          o.nodeId = '';
+          o.nodeName = '';
+          o.fieldValueId = '';
+          o.fieldValueName = '';
+        }
+      });
+    }
+
     updateSource({ fields });
   }
 
@@ -53,6 +86,7 @@ export default class SingleControlValue extends Component {
             appType={item.nodeAppType || item.appType}
             actionId={item.nodeActionId || item.actionId}
             nodeName={item.nodeName}
+            controlId={item.fieldValueId}
             controlName={item.fieldValueName}
             isSourceApp={item.isSourceApp}
           />
@@ -117,6 +151,7 @@ export default class SingleControlValue extends Component {
         selectNodeId={this.props.selectNodeId}
         sourceAppId={this.props.sourceAppId}
         sourceNodeId={this.props.sourceNodeId}
+        isIntegration={this.props.isIntegration}
         dataSource={
           item.type === 29 ? (_.find(this.props.controls, obj => obj.controlId === item.fieldId) || {}).dataSource : ''
         }
@@ -175,13 +210,18 @@ export default class SingleControlValue extends Component {
   /**
    * 部门选择
    */
-  selectDepartment(i, unique) {
+  selectDepartment(item, i, unique) {
     new DialogSelectDept({
       projectId: this.props.companyId,
       selectedDepartment: [],
       unique,
       showCreateBtn: false,
       selectFn: departments => {
+        if (!unique) {
+          const oldIds = JSON.parse(item.fieldValue).map(item => item.departmentId);
+          _.remove(departments, item => _.includes(oldIds, item.departmentId));
+        }
+
         departments = departments.map(obj => {
           return {
             departmentId: obj.departmentId,
@@ -189,20 +229,59 @@ export default class SingleControlValue extends Component {
           };
         });
 
-        this.updateSingleControlValue({ fieldValue: JSON.stringify(departments) }, i);
+        this.updateSingleControlValue(
+          {
+            fieldValue: unique
+              ? JSON.stringify(departments)
+              : JSON.stringify(JSON.parse(item.fieldValue).concat(departments)),
+          },
+          i,
+        );
       },
     });
   }
 
   /**
-   * 刪除 成员 or 部门
+   * 组织角色选择
    */
-  deleteUserOrDepartment(id, i) {
+  selectRole(item, i, unique) {
+    selectOrgRole({
+      projectId: this.props.companyId,
+      unique,
+      onSave: roles => {
+        if (!unique) {
+          const oldIds = JSON.parse(item.fieldValue || '[]').map(item => item.organizeId);
+          _.remove(roles, item => _.includes(oldIds, item.organizeId));
+        }
+
+        roles = roles.map(item => {
+          return {
+            organizeId: item.organizeId,
+            organizeName: item.organizeName,
+          };
+        });
+
+        this.updateSingleControlValue(
+          {
+            fieldValue: unique
+              ? JSON.stringify(roles)
+              : JSON.stringify(JSON.parse(item.fieldValue || '[]').concat(roles)),
+          },
+          i,
+        );
+      },
+    });
+  }
+
+  /**
+   * 刪除 成员 or 部门 or 组织角色
+   */
+  deleteTags(id, i) {
     const { updateSource } = this.props;
     const fields = _.cloneDeep(this.props.fields);
 
     fields[i].fieldValue = JSON.parse(fields[i].fieldValue);
-    _.remove(fields[i].fieldValue, item => item.accountId === id || item.departmentId === id);
+    _.remove(fields[i].fieldValue, item => item.accountId === id || item.departmentId === id || item.organizeId);
     fields[i].fieldValue = JSON.stringify(fields[i].fieldValue);
 
     updateSource({ fields });
@@ -269,8 +348,43 @@ export default class SingleControlValue extends Component {
     }
   }
 
+  /**
+   * 预览附件
+   */
+  previewAttachments(file) {
+    if (file.serverName) {
+      previewQiniuUrl(file.url, {
+        ext: File.GetExt(file.fileExt),
+        name: file.originalFileName,
+      });
+    } else {
+      previewAttachments({
+        attachments: [Object.assign({}, file, { path: file.privateDownloadUrl })],
+        callFrom: 'player',
+      });
+    }
+  }
+
+  renderRelationField = obj => {
+    const { appName, appTypeName, nodeId, nodeName, nodeTypeId, appType, actionId } = obj || {};
+
+    if (nodeId && !nodeName) {
+      return <span style={{ color: '#f44336' }}>{_l('节点已删除')}</span>;
+    }
+
+    return (
+      <Fragment>
+        <span className={`${getIcons(nodeTypeId, appType, actionId)} Font16 Gray_9e mRight5`} />
+        <span>{nodeName}</span>
+        <span className="bold mLeft4 mRight5">{appTypeName}</span>
+        {appName && <span className="bold">{`“${appName}”`}</span>}
+      </Fragment>
+    );
+  };
+
   render() {
     const { controls, item, i } = this.props;
+    const { isUploading } = this.state;
     const formulaMap = _.cloneDeep(this.props.formulaMap);
     let list = [];
 
@@ -311,19 +425,26 @@ export default class SingleControlValue extends Component {
       );
     }
 
-    // 文本框 || 文本组合 || 自动编号 || 富文本
-    if (item.type === 2 || item.type === 32 || item.type === 33 || item.type === 41) {
+    // 文本框 || 文本组合 || 自动编号 || 富文本 || API查询
+    if (item.type === 2 || item.type === 32 || item.type === 33 || item.type === 41 || item.type === 50) {
       return (
         <div className="mTop8 flexRow relative">
           <TagTextarea
-            className={cx('flex', { minH100: item.fieldId === 'content' })}
+            className={cx(
+              'flex',
+              { minH100: item.fieldId === 'content' },
+              {
+                smallPadding:
+                  item.fieldId !== 'content' && item.fieldValue && item.fieldValue.match(/\$[\w]+-[\w]+\$/g),
+              },
+            )}
             height={0}
             defaultValue={item.fieldValue}
             getRef={tagtextarea => {
               this.tagtextarea = tagtextarea;
             }}
             renderTag={(tag, options) => {
-              const ids = tag.split('-');
+              const ids = tag.split(/([a-zA-Z0-9#]{24,32})-/).filter(item => item);
               const nodeObj = formulaMap[ids[0]] || {};
               const controlObj = formulaMap[ids[1]] || {};
 
@@ -333,6 +454,7 @@ export default class SingleControlValue extends Component {
                   appType={nodeObj.appType}
                   actionId={nodeObj.actionId}
                   nodeName={nodeObj.name || ''}
+                  controlId={ids[1]}
                   controlName={controlObj.name || ''}
                   isSourceApp={nodeObj.isSourceApp === 'true'}
                 />
@@ -433,8 +555,10 @@ export default class SingleControlValue extends Component {
       );
     }
 
-    // 单选项 || 下拉框 || 检查框
-    if (item.type === 9 || item.type === 11 || item.type === 36) {
+    // 单选项 || 下拉框 || 检查项 || 外部门户角色
+    if (item.type === 9 || item.type === 11 || item.type === 36 || item.type === 44) {
+      const disabledOtherFields = _.includes(['folder_stage_id', 'portal_role', 'portal_status'], item.fieldId);
+
       list = ((_.find(controls, obj => obj.controlId === item.fieldId) || {}).options || []).map(o => {
         return {
           text: o.value,
@@ -460,7 +584,7 @@ export default class SingleControlValue extends Component {
                 {
                   actionCustomBoxError: item.fieldValue && !_.find(list, obj => obj.value === item.fieldValue),
                 },
-                { clearBorderRadius: item.fieldId !== 'folder_stage_id' },
+                { clearBorderRadius: !disabledOtherFields },
               )}
               data={list}
               value={item.fieldValue || undefined}
@@ -469,7 +593,7 @@ export default class SingleControlValue extends Component {
               onChange={fieldValue => this.updateSingleControlValue({ fieldValue }, i)}
             />
           )}
-          {item.fieldId !== 'folder_stage_id' && this.renderOtherFields(item, i)}
+          {!disabledOtherFields && this.renderOtherFields(item, i)}
         </div>
       );
     }
@@ -513,12 +637,91 @@ export default class SingleControlValue extends Component {
       );
     }
 
-    // 附件 || 签名
-    if (item.type === 14 || item.type === 42) {
+    // 附件
+    if (item.type === 14) {
       return (
         <div className="mTop8 flexRow relative">
           {item.fieldValueId ? (
             this.renderSelectFieldsValue(item, i)
+          ) : item.fieldId === 'attachments' ? (
+            <Fragment>
+              <QiniuUpload
+                className="workflowFileUpload"
+                options={{ max_file_size: '50m' }}
+                onUploaded={(up, file, response) => {
+                  this.setState({ isUploading: false });
+                  up.disableBrowse(false);
+
+                  const currentTotalSize = this.cacheFile
+                    .map(o => parseInt(o.fileSize || o.filesize))
+                    .reduce((o, count) => count + o, 0);
+
+                  if (currentTotalSize + parseInt(file.size) > 50 * 1024 * 1024) {
+                    alert(_l('部分附件上传失败，总大小超过50MB'), 2);
+                    return;
+                  }
+
+                  this.cacheFile.push(formatResponseData(file, decodeURIComponent(JSON.stringify(response))));
+                  this.updateSingleControlValue({ fieldValue: JSON.stringify(this.cacheFile) }, i);
+                }}
+                onAdd={(up, files) => {
+                  this.setState({ isUploading: true });
+                  up.disableBrowse();
+                }}
+                onError={(up, err, errTip) => {
+                  alert(errTip, 2);
+                }}
+              />
+
+              <div className="actionControlBox flex clearBorderRadius pLeft10 pRight10 actionControlUsers">
+                {JSON.parse(item.fieldValue || '[]').map((o, fileIndex) => {
+                  const ext = File.GetExt(o.fileExt || o.ext);
+                  return (
+                    <div
+                      key={fileIndex}
+                      className="InlineFlex boderRadAll_3 GrayBG alignItemsCenter mRight10 mTop3 mBottom3 pRight5 TxtTop relative"
+                      style={{ height: 28, zIndex: 2 }}
+                    >
+                      {File.isPicture('.' + ext) ? (
+                        <img
+                          src={o.serverName + o.key}
+                          style={{ height: 28 }}
+                          // onClick={() => this.previewAttachments(o)}
+                        />
+                      ) : (
+                        <span
+                          className={`fileIcon fileIcon-${ext}`}
+                          style={{ width: 24, height: 28 }}
+                          // onClick={() => this.previewAttachments(o)}
+                        />
+                      )}
+                      <span className="ThemeHoverColor3 pointer">
+                        <span className="ellipsis InlineBlock mLeft5" style={{ maxWidth: 200 }}>
+                          {o.originalFileName || o.originalFilename}
+                        </span>
+                        .{ext}
+                      </span>
+                      <Icon
+                        icon="close"
+                        className="pointer Gray_9e ThemeHoverColor3 mLeft10"
+                        onClick={() => {
+                          const newFieldValue = JSON.parse(item.fieldValue);
+
+                          _.remove(newFieldValue, (obj, objIndex) => objIndex === fileIndex);
+
+                          this.cacheFile = newFieldValue;
+                          this.updateSingleControlValue({ fieldValue: JSON.stringify(newFieldValue) }, i);
+                        }}
+                      />
+                    </div>
+                  );
+                })}
+                {!JSON.parse(item.fieldValue || '[]').length && !isUploading && (
+                  <span className="Gray_bd LineHeight34">{_l('选择附件')}</span>
+                )}
+                {isUploading && <span className="Gray_9e LineHeight34">{_l('上传中...')}</span>}
+              </div>
+            </Fragment>
           ) : (
             <div className="actionControlBox flex clearBorderRadius" />
           )}
@@ -529,7 +732,9 @@ export default class SingleControlValue extends Component {
 
     // 日期 || 日期时间
     if (item.type === 15 || item.type === 16) {
-      const formatText = item.type === 15 ? 'YYYY-MM-DD' : 'YYYY-MM-DD HH:mm';
+      const showType = _.get(_.find(controls, obj => obj.controlId === item.fieldId), 'advancedSetting.showtype');
+      const mode = { 3: 'date', 4: 'month', 5: 'year' };
+      const timeMode = { 1: 'minute', 2: 'hour', 6: 'second' };
 
       return (
         <div className="mTop8 flexRow relative">
@@ -540,12 +745,13 @@ export default class SingleControlValue extends Component {
               <DateTime
                 selectedValue={item.fieldValue ? moment(item.fieldValue) : null}
                 timePicker={item.type === 16}
-                timeMode="minute"
-                onOk={e => this.updateSingleControlValue({ fieldValue: e.format(formatText) }, i)}
-                onClear={() => this.updateSingleControlValue({ fieldValue: '' }, i)}
+                mode={mode[showType]}
+                timeMode={timeMode[showType]}
+                allowClear={false}
+                onOk={e => this.updateSingleControlValue({ fieldValue: e.format(FORMAT_TEXT[showType]) }, i)}
               >
                 {item.fieldValue ? (
-                  moment(item.fieldValue).format(formatText)
+                  moment(item.fieldValue).format(FORMAT_TEXT[showType])
                 ) : (
                   <span className="Gray_bd">{_l('请选择日期')}</span>
                 )}
@@ -627,9 +833,27 @@ export default class SingleControlValue extends Component {
       );
     }
 
-    // 人员 || 部门
-    if (item.type === 26 || item.type === 27) {
-      const unique = _.find(controls, obj => obj.controlId === item.fieldId).enumDefault === 0;
+    // 人员 || 部门 || 组织角色
+    if (item.type === 26 || item.type === 27 || item.type === 48) {
+      const unique = (_.find(controls, obj => obj.controlId === item.fieldId) || {}).enumDefault === 0;
+      const TYPES = {
+        26: {
+          name: 'fullName',
+          id: 'accountId',
+          placeholder: _l('选择人员'),
+        },
+        27: {
+          name: 'departmentName',
+          id: 'departmentId',
+          placeholder: _l('选择部门'),
+        },
+        48: {
+          name: 'organizeName',
+          id: 'organizeId',
+          placeholder: _l('选择组织角色'),
+        },
+      };
+
       return (
         <div className="mTop8 flexRow relative">
           {item.fieldValueId ? (
@@ -640,28 +864,28 @@ export default class SingleControlValue extends Component {
               onClick={evt => {
                 if (item.type === 26) {
                   this.selectUser(evt, item, i, unique);
+                } else if (item.type === 27) {
+                  this.selectDepartment(item, i, unique);
                 } else {
-                  this.selectDepartment(i, unique);
+                  this.selectRole(item, i, unique);
                 }
               }}
             >
               <ul className="pLeft6 tagWrap">
                 {!JSON.parse(item.fieldValue || '[]').length && (
-                  <span className="Gray_bd LineHeight34 mLeft4">
-                    {item.type === 26 ? _l('选择人员') : _l('选择部门')}
-                  </span>
+                  <span className="Gray_bd LineHeight34 mLeft4">{TYPES[item.type].placeholder}</span>
                 )}
                 {JSON.parse(item.fieldValue || '[]').map((list, index) => {
                   return (
                     <li key={index} className="tagItem flexRow">
-                      <span className="tag bold" title={list.fullName || list.departmentName}>
-                        {list.fullName || list.departmentName}
+                      <span className="tag bold" title={list[TYPES[item.type].name]}>
+                        {list[TYPES[item.type].name]}
                       </span>
                       <span
                         className="delTag"
                         onClick={e => {
                           e.stopPropagation();
-                          this.deleteUserOrDepartment(list.accountId || list.departmentId, i);
+                          this.deleteTags(list[TYPES[item.type].id], i);
                         }}
                       >
                         <Icon icon="close" className="pointer" />
@@ -679,10 +903,11 @@ export default class SingleControlValue extends Component {
 
     // 等级
     if (item.type === 28) {
-      const { options, enumDefault } = _.find(controls, obj => obj.controlId === item.fieldId);
+      const { options } = _.find(controls, obj => obj.controlId === item.fieldId);
+
       list = options.map(o => {
         return {
-          text: enumDefault === 1 ? GRADE_STAR_TYPE[o.key] : GRADE_LEVEL_TYPE[o.key],
+          text: o.value,
           value: o.key,
         };
       });
@@ -713,8 +938,8 @@ export default class SingleControlValue extends Component {
       );
     }
 
-    // 关联
-    if (item.type === 29) {
+    // 关联 || 对象数组
+    if (item.type === 29 || item.type === 10000008) {
       const relationControls = (_.find(controls, o => o.controlId === item.fieldId) || {}).flowNodeAppDtos || [];
       const relationControlsList = [
         relationControls.map(o => {
@@ -753,23 +978,50 @@ export default class SingleControlValue extends Component {
       );
     }
 
-    return null;
-  }
-
-  renderRelationField = obj => {
-    const { appName, appTypeName, nodeName, nodeTypeId, appType, actionId } = obj || {};
-
-    if (!appName) {
-      return <span style={{ color: '#f44336' }}>{_l('节点已删除')}</span>;
+    // 签名 || 数组 || 普通数组
+    if (item.type === 42 || item.type === 10000003 || item.type === 10000007) {
+      return (
+        <div className="mTop8 flexRow relative">
+          {item.fieldValueId ? (
+            this.renderSelectFieldsValue(item, i)
+          ) : (
+            <div className="actionControlBox flex clearBorderRadius" />
+          )}
+          {this.renderOtherFields(item, i)}
+        </div>
+      );
     }
 
-    return (
-      <Fragment>
-        <span className={`${getIcons(nodeTypeId, appType, actionId)} Font16 Gray_9e mRight5`} />
-        <span>{nodeName}</span>
-        <span className="bold mLeft4 mRight5">{appTypeName}</span>
-        <span className="bold">{`“${appName}”`}</span>
-      </Fragment>
-    );
-  };
+    // 时间
+    if (item.type === 46) {
+      const lang = getCookie('i18n_langtag') || getNavigatorLang();
+      const timeFormat = item.unit === '1' ? 'HH:mm' : 'HH:mm:ss';
+
+      return (
+        <div className="mTop8 flexRow relative">
+          {item.fieldValueId ? (
+            this.renderSelectFieldsValue(item, i)
+          ) : (
+            <div className="actionControlBox flex ThemeBorderColor3 clearBorderRadius">
+              <TimePicker
+                className="triggerConditionTime"
+                showNow={false}
+                bordered={false}
+                allowClear={false}
+                suffixIcon={null}
+                inputReadOnly
+                placeholder={_l('请选择时间')}
+                format={timeFormat}
+                value={item.fieldValue ? moment(item.fieldValue, timeFormat) : null}
+                onChange={(time, timeString) => this.updateSingleControlValue({ fieldValue: timeString }, i)}
+              />
+            </div>
+          )}
+          {this.renderOtherFields(item, i)}
+        </div>
+      );
+    }
+
+    return null;
+  }
 }

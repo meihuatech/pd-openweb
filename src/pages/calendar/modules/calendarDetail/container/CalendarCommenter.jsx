@@ -1,10 +1,11 @@
 import React, { Component } from 'react';
 import PropTypes from 'prop-types';
 import cx from 'classnames';
-import Commenter from 'commenter';
+import Commenter from 'src/components/comment/commenter';
 
 import { htmlDecodeReg } from 'src/util';
 import Icon from 'ming-ui/components/Icon';
+import moment from 'moment';
 
 export default class CalendarCommenter extends Component {
   constructor(props) {

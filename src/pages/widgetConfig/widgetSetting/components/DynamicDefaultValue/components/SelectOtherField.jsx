@@ -16,9 +16,11 @@ import {
   CURRENT_TYPES,
   CAN_AS_FX_DYNAMIC_FIELD,
   CAN_NOT_AS_FIELD_DYNAMIC_FIELD,
+  DYNAMIC_FROM_MODE,
 } from '../config';
 import styled from 'styled-components';
 import cx from 'classnames';
+import _ from 'lodash';
 
 const MenuStyle = styled.div`
   display: flex;
@@ -58,7 +60,7 @@ export default class SelectOtherField extends Component {
     const isText = _.includes([1, 2, 45], data.type);
     const isAsync = () => {
       // 部门选成员 需要异步获取数据 isAsync设为true
-      if (data.type === 27 && type === 26) return true;
+      if ((data.type === 27 || data.type === 48) && type === 26) return true;
       return false;
     };
 
@@ -101,29 +103,73 @@ export default class SelectOtherField extends Component {
         ]);
         this.setState({ isDynamic: false });
         break;
+      case OTHER_FIELD_TYPE.ROLE:
+        onDynamicValueChange([
+          {
+            rcid: '',
+            cid: '',
+            staticValue: JSON.stringify({ organizeName: _l('当前用户的组织角色'), organizeId: 'user-role' }),
+            isAsync: true,
+          },
+        ]);
+        this.setState({ isDynamic: false });
+        break;
       case OTHER_FIELD_TYPE.USER:
-        onDynamicValueChange([{ rcid: '', cid: data.id, staticValue: '', isAsync: false }]);
+        onDynamicValueChange([
+          {
+            rcid: '',
+            cid: '',
+            staticValue: JSON.stringify({
+              accountId: data.id,
+              name: _l('当前用户'),
+            }),
+            isAsync: false,
+          },
+        ]);
         this.setState({ isDynamic: false });
         break;
       case OTHER_FIELD_TYPE.DATE:
         onDynamicValueChange([{ rcid: '', cid: '', staticValue: data.value, time: data.id }]);
         this.setState({ isDynamic: false });
         break;
+      case OTHER_FIELD_TYPE.TIME:
+        onDynamicValueChange([{ rcid: '', cid: '', staticValue: data.value }]);
+        this.setState({ isDynamic: false });
+        break;
+      case OTHER_FIELD_TYPE.KEYWORD:
+        onDynamicValueChange([{ rcid: '', cid: `${data.id}`, staticValue: '' }]);
+        this.setState({ isDynamic: false });
+        break;
     }
   };
 
   getCurrentField = data => {
+    // 自定义默认值
+    if (this.props.from === DYNAMIC_FROM_MODE.CREATE_CUSTOM) {
+      return this.props.writeObject === 1
+        ? CURRENT_TYPES[data.type] || []
+        : (CURRENT_TYPES[data.type] || []).concat([
+            { icon: 'icon-workflow_other', text: _l('当前记录的字段值'), key: 1 },
+          ]);
+    }
+
     let types = OTHER_FIELD_LIST;
     // 没有函数的控件
     if (!_.includes(CAN_AS_FX_DYNAMIC_FIELD, data.type)) {
       types = types.filter(item => item.key !== OTHER_FIELD_TYPE.FX);
     }
     // 没有动态值的控件
-    if (_.includes(CAN_NOT_AS_FIELD_DYNAMIC_FIELD, data.type)) {
+    if (
+      _.includes(CAN_NOT_AS_FIELD_DYNAMIC_FIELD, data.type) ||
+      (data.type === 29 && _.get(data.advancedSetting || {}, 'showtype') === '2')
+    ) {
       types = types.filter(item => item.key !== OTHER_FIELD_TYPE.FIELD);
     }
     // 有其他字段的控件
-    if (_.includes(CAN_AS_OTHER_DYNAMIC_FIELD, data.type)) {
+    if (
+      _.includes(CAN_AS_OTHER_DYNAMIC_FIELD, data.type) ||
+      (_.includes([2, 6], data.type) && DYNAMIC_FROM_MODE.SEARCH_PARAMS === this.props.from && data.isSearch)
+    ) {
       types = (CURRENT_TYPES[data.type] || []).concat(types);
     }
     //子表里的字段默认值没有查询和函数配置
@@ -146,8 +192,9 @@ export default class SelectOtherField extends Component {
       propFiledVisible,
     } = this.props;
     const filterTypes = this.getCurrentField(data);
-    //子表特殊处理
-    const isSubList = _.includes([34], data.type);
+    //子表、列表特殊处理
+    const isSubList =
+      _.includes([34], data.type) || (data.type === 29 && _.get(data.advancedSetting || {}, 'showtype') === '2');
     return (
       <Fragment>
         <div ref={this.$wrap} className="selectOtherFieldContainer">
@@ -212,6 +259,7 @@ export default class SelectOtherField extends Component {
         )}
         {fxVisible && (
           <FunctionEditorDialog
+            supportJavaScript
             value={getAdvanceSetting(data, 'defaultfunc')}
             title={data.controlName}
             controls={allControls.filter(c => c.controlId !== data.controlId)}

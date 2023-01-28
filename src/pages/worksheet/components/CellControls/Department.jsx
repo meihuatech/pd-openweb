@@ -4,10 +4,13 @@ import { autobind } from 'core-decorators';
 import Trigger from 'rc-trigger';
 import cx from 'classnames';
 import DialogSelectGroups from 'src/components/dialogSelectDept';
+import { Tooltip } from 'ming-ui';
 import withClickAway from 'ming-ui/decorators/withClickAway';
 import createDecoratedComponent from 'ming-ui/decorators/createDecoratedComponent';
+import departmentAjax from 'src/api/department';
 const ClickAwayable = createDecoratedComponent(withClickAway);
 import EditableCellCon from '../EditableCellCon';
+import _ from 'lodash';
 
 // enumDefault 单选 0 多选 1
 export default class Text extends React.Component {
@@ -43,6 +46,22 @@ export default class Text extends React.Component {
       this.handleSelect();
     }
   }
+  @autobind
+  handleTableKeyDown(e) {
+    const { updateEditingStatus } = this.props;
+    switch (e.key) {
+      case 'Escape':
+        updateEditingStatus(false);
+        break;
+      case 'Enter':
+        if (!this.isSelecting) {
+          this.handleSelect();
+        }
+        break;
+      default:
+        break;
+    }
+  }
 
   @autobind
   handleChange() {
@@ -66,6 +85,7 @@ export default class Text extends React.Component {
       unique: cell.enumDefault === 0,
       showCreateBtn: false,
       selectFn: cb,
+      onClose: () => (this.isSelecting = false),
     });
   }
 
@@ -73,7 +93,9 @@ export default class Text extends React.Component {
   handleSelect() {
     const { cell, updateEditingStatus } = this.props;
     const { value } = this.state;
+    this.isSelecting = true;
     this.selectDepartments(data => {
+      this.isSelecting = false;
       if (cell.enumDefault === 0) {
         // 单选
         this.setState(
@@ -125,6 +147,7 @@ export default class Text extends React.Component {
       singleLine,
       popupContainer,
       cell,
+      projectId,
       editable,
       isediting,
       updateEditingStatus,
@@ -149,7 +172,9 @@ export default class Text extends React.Component {
           {value.map((department, index) => (
             <span className="cellDepartment" style={{ maxWidth: style.width - 20 }}>
               <div className="flexRow">
-                <i className="Font14 Gray_9e icon-workflow mLeft3"></i>
+                <div className="iconWrap" style={{ backgroundColor: '#2196f3' }}>
+                  <i className="Font14 icon-department"></i>
+                </div>
                 <div className="departmentName mLeft4 flex ellipsis">
                   {department.departmentName ? department.departmentName : _l('该部门已删除')}
                 </div>
@@ -190,21 +215,39 @@ export default class Text extends React.Component {
           onClick={onClick}
           className={cx(className, { canedit: editable })}
           style={style}
-          iconName="workflow"
+          iconName="department"
           isediting={isediting}
           onIconClick={cell.enumDefault === 0 ? this.handleSelect : this.handleMutipleEdit}
         >
           {!!value && (
             <div className={cx('cellDepartments cellControl', { singleLine })}>
               {value.map((department, index) => (
-                <span className="cellDepartment" style={{ maxWidth: style.width - 20 }}>
-                  <div className="flexRow">
-                    <i className="Font14 Gray_9e icon-workflow mLeft3"></i>
-                    <div className="departmentName mLeft4 flex ellipsis">
-                      {department.departmentName ? department.departmentName : _l('该部门已删除')}
+                <Tooltip
+                  mouseEnterDelay={0.6}
+                  text={() =>
+                    new Promise(resolve =>
+                      departmentAjax
+                        .getDepartmentFullNameByIds({
+                          projectId,
+                          departmentIds: [department.departmentId],
+                        })
+                        .then(res => {
+                          resolve(_.get(res, '0.name'));
+                        }),
+                    )
+                  }
+                >
+                  <span className="cellDepartment" style={{ maxWidth: style.width - 20 }}>
+                    <div className="flexRow">
+                      <div className="iconWrap" style={{ backgroundColor: '#2196f3' }}>
+                        <i className="Font14 icon-department"></i>
+                      </div>
+                      <div className="departmentName mLeft4 flex ellipsis">
+                        {department.departmentName ? department.departmentName : _l('该部门已删除')}
+                      </div>
                     </div>
-                  </div>
-                </span>
+                  </span>
+                </Tooltip>
               ))}
             </div>
           )}

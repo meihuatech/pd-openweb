@@ -2,21 +2,26 @@ import PropTypes from 'prop-types';
 import React, { Component } from 'react';
 import ReactDom from 'react-dom';
 import classNames from 'classnames';
-import 'md.select';
+import 'src/components/select/select';
 import intlTelInput from '@mdfe/intl-tel-input';
 import '@mdfe/intl-tel-input/build/css/intlTelInput.min.css';
 import utils from '@mdfe/intl-tel-input/build/js/utils';
-import 'dialogSelectUser';
+import 'src/components/dialogSelectUser/dialogSelectUser';
 import Act from './act';
-import DialogSelectDept from 'dialogSelectDept';
-import DialogSelectJob from 'src/components/DialogSelectJob';
-import ClipboardButton from 'react-clipboard.js';
-var workSiteController = require('src/api/workSite');
-var importUserController = require('src/api/importUser');
+import DialogSelectDept from 'src/components/dialogSelectDept';
+import copy from 'copy-to-clipboard';
+import workSiteController from 'src/api/workSite';
+import importUserController from 'src/api/importUser';
+import departmentController from 'src/api/department';
 import { Icon, Radio } from 'ming-ui';
 import { encrypt } from 'src/util';
 import RegExp from 'src/util/expression';
-import { Tooltip } from 'antd';
+import { Tooltip, Select } from 'antd';
+import jobAjax from 'src/api/job';
+import cx from 'classnames';
+import _ from 'lodash';
+
+const { Option } = Select;
 
 const checkUser = ([input, iti]) => {
   if (!input.value) {
@@ -86,23 +91,26 @@ const checkFuncs = {
   },
 };
 
-const inviteCallback = (data, isClear, callback, isAutonomously) => {
+const inviteCallback = (data, callback, copyText, isClear) => {
   const RESULTS = {
     FAILED: 0,
     SUCCESS: 1,
     OVERINVITELIMITCOUNT: 4,
   };
-  const text = isAutonomously ? _l('创建') : _l('邀请');
+  const text = copyText ? _l('创建') : _l('邀请');
   if (!data || data.actionResult == RESULTS.FAILED) {
     alert(_l('%0失败', text), 2);
   } else if (data.actionResult == RESULTS.OVERINVITELIMITCOUNT) {
     alert(_l('超过%0数量限制', text), 3);
   } else {
-    const { failUsers, successUsers, existsUsers, forbidUsers } = data;
-    if (failUsers) {
-      alert(_l('%0失败', text), 2);
-    } else if (successUsers) {
-      isAutonomously ? alert(_l('创建成功, 账号密码已复制'), 1) : alert(_l('邀请成功'), 1);
+    const { failUsers, successUsers, existsUsers, forbidUsers, successCount } = data;
+    if (failUsers && failUsers.length) {
+      const failReason = _.get(failUsers[0], 'failReason');
+      alert(failReason || _l('邀请失败'), 2);
+    } else if (successUsers || successCount) {
+      copyText && copy(copyText);
+      copyText ? alert(_l('创建成功, 账号密码已复制'), 1) : alert(_l('邀请成功'), 1);
+
       if (!isClear) {
         callback();
       }
@@ -193,12 +201,15 @@ class Main extends Component {
     super(props);
     this.state = _.merge({}, initialState, {
       departmentInfos: this.props.departmentInfos || [], //部门信息
-      jobInfos: this.props.jobInfos || [], //职位信息
       workSites: [],
       workSitesLoaded: false,
       jobsLoaded: false,
       isShowAct: false,
       idAct: '',
+      jobList: [],
+      jobIds: [],
+      keywords: '',
+      fullDepartmentInfo: {},
     });
     this.closeDialog = props.closeDialog;
     this.dialogCenter = props.dialogCenter;
@@ -209,12 +220,14 @@ class Main extends Component {
     this.handleSubmit = this.handleSubmit.bind(this);
     this.handleFieldInput = this.handleFieldInput.bind(this);
     this.clearError = this.clearError.bind(this);
+    this.iti = null;
+    this.ajaxRequest = null;
   }
 
   componentDidMount() {
     this.dialogCenter();
     this.itiInviteFn();
-    // this.itiAutonomouslyFn();
+    this.getJobList();
   }
 
   componentDidUpdate() {
@@ -229,6 +242,21 @@ class Main extends Component {
     this.itiInvite.destroy();
     this.itiAutonomously.destroy();
   }
+
+  itiFn = () => {
+    if (this.mobile) {
+      this.iti && this.iti.destroy();
+      this.iti = intlTelInput(this.mobile, {
+        customPlaceholder: '',
+        autoPlaceholder: 'off',
+        initialCountry: 'cn',
+        loadUtils: '',
+        preferredCountries: ['cn'],
+        utilsScript: utils,
+        separateDialCode: true,
+      });
+    }
+  };
 
   itiInviteFn = () => {
     this.itiInvite && this.itiInvite.destroy();
@@ -426,7 +454,7 @@ class Main extends Component {
 
   submitInfo(isClear) {
     const state = this.state;
-    const { isUploading } = state;
+    const { isUploading, autonomously, autonomouslyPasswrod } = state;
     if (isUploading) return false;
     if (state.editable) {
       this.handleFieldBlur('userName')();
@@ -441,12 +469,16 @@ class Main extends Component {
       return false;
     } else {
       const { projectId } = this.props;
-      const { editable, inviteType, departmentInfos = [], jobInfos = [], jobNumber, workSiteId, contactPhone } = state;
+      const { editable, inviteType, departmentInfos = [], jobNumber, workSiteId, contactPhone, jobIds = [] } = state;
+      const copyText =
+        inviteType === 'autonomously'
+          ? `${_l('登录账号')}: ${autonomously} ${_l('密码')}: ${autonomouslyPasswrod}`
+          : '';
       const params = {
         projectId,
         accountId: '',
         account: '',
-        jobIds: jobInfos.map(it => it.jobId).join(';'),
+        jobIds: jobIds.join(';'),
         departmentIds: departmentInfos.map(it => it.departmentId).join(';'),
         jobNumber,
         workSiteId,
@@ -464,14 +496,28 @@ class Main extends Component {
       }
       this.setState({
         isUploading: true,
+        departmentInfos: [],
       });
       importUserController
         .inviteUser(params)
         .then(data => {
-          inviteCallback(data, isClear, this.props.closeDialog, state.inviteType === 'autonomously');
+          inviteCallback(
+            data,
+            isClear
+              ? () => {
+                  this.autonomously.value = '';
+                  this.setState({ autonomouslyPasswrod: '' });
+                }
+              : this.props.closeDialog,
+            copyText,
+            isClear,
+          );
         })
         .always(() => {
           this.setState(_.merge({}, this.state, initialState, { inviteType: state.inviteType }));
+          if (this.mobile) {
+            this.mobile.value = '';
+          }
         });
     }
   }
@@ -480,8 +526,7 @@ class Main extends Component {
     const { projectId } = this.props;
     const _this = this;
     $({}).dialogSelectUser({
-      title: _l('邀请成员'),
-      showMoreInvite: false,
+      fromAdmin: true,
       SelectUserSettings: {
         filterProjectId: projectId,
         unique: true,
@@ -504,24 +549,12 @@ class Main extends Component {
     new DialogSelectDept({
       projectId,
       unique: false,
+      fromAdmin: true,
       selectedDepartment: departmentInfos,
       showCreateBtn: false,
       selectFn(departments) {
         _this.setState({
           departmentInfos: departments,
-        });
-      },
-    });
-  };
-  // 添加职位
-  dialogSelectJobFn = e => {
-    const { projectId } = this.props;
-    new DialogSelectJob({
-      projectId,
-      onSave: data => {
-        this.setState({
-          jobInfos: data,
-          // idAct: data[0].departmentId
         });
       },
     });
@@ -547,7 +580,9 @@ class Main extends Component {
             onClick={this.changeInviteType('invite')}
             text={_l('邀请加入')}
           />
-          <Radio checked={!isInvite} onClick={this.changeInviteType('autonomously')} text={_l('自主创建')} />
+          {!md.global.Config.IsPlatformLocal && (
+            <Radio checked={!isInvite} onClick={this.changeInviteType('autonomously')} text={_l('自主创建')} />
+          )}
         </div>
         {!isInvite ? (
           <div className="formGroup">
@@ -648,6 +683,63 @@ class Main extends Component {
     );
   }
 
+  getJobList = jobName => {
+    const { projectId } = this.props;
+    const { keywords, jobList = [] } = this.state;
+    if (this.ajaxRequest) {
+      this.ajaxRequest.abort();
+    }
+    this.ajaxRequest = jobAjax.getJobs({
+      projectId,
+      keywords,
+      pageIndex: 1,
+      pageSize: 1000,
+    });
+    this.ajaxRequest.then(res => {
+      let newJobInfo = jobName && _.find(res.list, item => item.jobName === jobName);
+      let jobIds = jobName && newJobInfo ? [newJobInfo.jobId] : [];
+      this.setState({
+        jobList: res.list,
+        jobIds: [...this.state.jobIds, ...jobIds],
+      });
+    });
+  };
+
+  handleAddJob = jobName => {
+    const { projectId } = this.props;
+    jobAjax.addJob({
+      projectId,
+      jobName,
+    }).then(res => {
+      if (res) {
+        alert(_l('创建成功'));
+        this.getJobList(jobName);
+      } else {
+        alert(_l('创建失败'), 2);
+      }
+    });
+  };
+
+  getDepartmentFullName = (departmentId = '') => {
+    let { projectId } = this.props;
+    let { fullDepartmentInfo = {} } = this.state;
+    const departmentIds = [departmentId].filter(it => !fullDepartmentInfo[it]);
+    if (_.isEmpty(departmentIds)) {
+      return;
+    }
+    departmentController
+      .getDepartmentFullNameByIds({
+        projectId,
+        departmentIds: [departmentId],
+      })
+      .then(res => {
+        res.forEach(it => {
+          fullDepartmentInfo[it.id] = it.name;
+        });
+        this.setState({ fullDepartmentInfo });
+      });
+  };
+
   render() {
     const {
       editable,
@@ -658,13 +750,21 @@ class Main extends Component {
       autonomouslyPasswrod,
       errors,
       isUploading,
-      jobInfos,
-      inviteType,
-      jobs = [],
-      autonomously,
+      jobList = [],
+      jobIds = [],
+      keywords = '',
+      fullDepartmentInfo = {},
     } = this.state;
-    const copyText =
-      inviteType === 'autonomously' ? `${_l('登录账号')}: ${autonomously} ${_l('密码')}: ${autonomouslyPasswrod}` : ' ';
+    let jobResult = [...jobList];
+
+    if (keywords) {
+      jobResult = jobResult.filter(item => item.jobName.indexOf(keywords) > -1);
+    }
+    jobIds.forEach(item => {
+      if ((item || '').toString().indexOf('add_') > -1) {
+        jobResult.push({ jobId: '', jobName: item.split('add_')[1] });
+      }
+    });
     return (
       <div className="dialogContent_invite">
         <div className="formTable">
@@ -697,65 +797,82 @@ class Main extends Component {
         </div>
         {this.renderInvite()}
         <div className="formTable">
-          <div className="formGroup">
+          <div className="formGroup mBottom24">
             <span className="formLabel">{_l('部门')}</span>
             {departmentInfos.map((item, i) => {
+              const fullName = (fullDepartmentInfo[item.departmentId] || '').split('/');
               return (
-                <span className="itemSpan mAll5">
-                  {item.departmentName}
-                  {i === 0 && <span className="isTopIcon">主</span>}
-                  <div className="moreOption">
-                    <Icon
-                      className="Font14 Hand Gray_bd"
-                      icon="moreop"
-                      onClick={e => {
-                        this.setState(
-                          {
-                            isShowAct: !this.state.isShowAct,
-                          },
-                          () => {
-                            if (this.state.isShowAct) {
-                              this.setState({
-                                idAct: item.departmentId,
-                              });
-                            }
-                          },
-                        );
-                      }}
-                    />
-                    {this.state.isShowAct && this.state.idAct === item.departmentId && (
-                      <Act
-                        onClickAwayExceptions={[]}
-                        onClickAway={() =>
-                          this.setState({
-                            isShowAct: false,
-                          })
-                        }
-                        isPosition={false}
-                        isTop={i === 0}
-                        deleteFn={() => {
-                          let list = departmentInfos.filter(it => it.departmentId !== item.departmentId);
-                          this.setState({
-                            isShowAct: false,
-                            idAct: '',
-                            departmentInfos: list,
-                          });
+                <Tooltip
+                  tooltipClass="departmentFullNametip"
+                  popupPlacement="bottom"
+                  title={
+                    <div>
+                      {fullName.map((n, i) => (
+                        <span>
+                          {n}
+                          {fullName.length - 1 > i && <span className="mLeft8 mRight8">/</span>}
+                        </span>
+                      ))}
+                    </div>
+                  }
+                  mouseEnterDelay={0.5}
+                >
+                  <span className="itemSpan mAll5" onMouseEnter={() => this.getDepartmentFullName(item.departmentId)}>
+                    {item.departmentName}
+                    {i === 0 && <span className="isTopIcon">主</span>}
+                    <div className="moreOption">
+                      <Icon
+                        className="Font14 Hand Gray_bd"
+                        icon="moreop"
+                        onClick={e => {
+                          this.setState(
+                            {
+                              isShowAct: !this.state.isShowAct,
+                            },
+                            () => {
+                              if (this.state.isShowAct) {
+                                this.setState({
+                                  idAct: item.departmentId,
+                                });
+                              }
+                            },
+                          );
                         }}
-                        setToTop={() => {
-                          let list = departmentInfos.filter(it => it.departmentId !== item.departmentId);
-                          let data = departmentInfos.find(it => it.departmentId === item.departmentId);
-                          list.unshift(data);
-                          this.setState({
-                            isShowAct: false,
-                            idAct: '',
-                            departmentInfos: list,
-                          });
-                        }}
-                        isShowAct={this.state.isShowAct}
                       />
-                    )}
-                  </div>
-                </span>
+                      {this.state.isShowAct && this.state.idAct === item.departmentId && (
+                        <Act
+                          onClickAwayExceptions={[]}
+                          onClickAway={() =>
+                            this.setState({
+                              isShowAct: false,
+                            })
+                          }
+                          isPosition={false}
+                          isTop={i === 0}
+                          deleteFn={() => {
+                            let list = departmentInfos.filter(it => it.departmentId !== item.departmentId);
+                            this.setState({
+                              isShowAct: false,
+                              idAct: '',
+                              departmentInfos: list,
+                            });
+                          }}
+                          setToTop={() => {
+                            let list = departmentInfos.filter(it => it.departmentId !== item.departmentId);
+                            let data = departmentInfos.find(it => it.departmentId === item.departmentId);
+                            list.unshift(data);
+                            this.setState({
+                              isShowAct: false,
+                              idAct: '',
+                              departmentInfos: list,
+                            });
+                          }}
+                          isShowAct={this.state.isShowAct}
+                        />
+                      )}
+                    </div>
+                  </span>
+                </Tooltip>
               );
             })}
             <Icon
@@ -770,111 +887,82 @@ class Main extends Component {
           </div>
           <div className="formGroup mBottom25">
             <span className="formLabel mTop5">{_l('职位')}</span>
-            <div className="jobBox">
-              {_.map(jobInfos, item => {
-                return (
-                  <span className="itemSpan mAll5">
-                    {item.jobName}
-                    <div className="moreOption">
-                      <Icon
-                        className="Font14 Hand Gray_bd"
-                        icon="moreop"
-                        onClick={e => {
-                          this.setState(
-                            {
-                              isShowAct: !this.state.isShowAct,
-                            },
-                            () => {
-                              if (this.state.isShowAct) {
-                                this.setState({
-                                  idAct: item.jobId,
-                                });
-                              }
-                            },
-                          );
-                        }}
-                      />
-                      {this.state.isShowAct && this.state.idAct === item.jobId && (
-                        <Act
-                          onClickAwayExceptions={[]}
-                          onClickAway={() =>
-                            this.setState({
-                              isShowAct: false,
-                              idAct: '',
-                            })
-                          }
-                          isPosition={true}
-                          isTop={false}
-                          deleteFn={() => {
-                            this.setState({
-                              isShowAct: false,
-                              idAct: '',
-                              jobInfos: this.state.jobInfos.filter(it => it.jobId !== item.jobId),
-                            });
-                          }}
-                          isShowAct={this.state.isShowAct}
-                        />
-                      )}
-                    </div>
-                  </span>
-                );
-              })}
-              <span className="jobChooseIcon Relative">
-                <Icon
-                  className="Font26 Hand Gray_9e mAll5 TxtMiddle"
-                  icon="task_add-02"
-                  onClick={e => {
-                    this.dialogSelectJobFn();
-                  }}
-                />
-                {/*{jobs.length <= 0 && <React.Fragment>
-                  <Icon className="Font26 Hand Gray_9e mAll5 TxtMiddle Red" icon="task-folder-message" />
-                  <span className='Red'>{_l('尚未配置职位')}</span>
-                  <span className='Gray_75'>{_l('前往创建')}</span>
-                </React.Fragment>} */}
-              </span>
-            </div>
+            <Select
+              ref={select => {
+                this.select = select;
+              }}
+              className="w100 jobSelect"
+              dropdownClassName="dropJobList"
+              showSearch
+              allowClear={jobIds.length > 0}
+              listHeight={285}
+              optionLabelProp="label"
+              value={jobIds}
+              placeholder="请选择"
+              suffixIcon={<Icon icon="arrow-down-border Font14" />}
+              filterOption={() => true}
+              notFoundContent={<span className="Gray_99">{_l('可直接输入创建新的职位')}</span>}
+              onSearch={keywords =>
+                this.setState({ keywords, jobIds: jobIds.filter(item => item.indexOf('add_') === -1) })
+              }
+              onDropdownVisibleChange={open => {
+                this.setState({ keywords: '' });
+                !open && this.select.blur();
+              }}
+              mode="multiple"
+              onChange={jobIds => {
+                let newJob = jobIds.find(item => item.indexOf('add_') > -1);
+                if (newJob) {
+                  let jobName = newJob.split('add_')[1];
+                  this.setState({ keywords: '' }, () => {
+                    this.handleAddJob(jobName);
+                  });
+                } else {
+                  this.setState({ jobIds, keywords: '' });
+                }
+              }}
+            >
+              {!!keywords && _.isEmpty(jobList) && (
+                <Option disabled>
+                  <span className="ellipsis customRadioItem Gray_9e">{_l('可直接输入创建新的职位')}</span>
+                </Option>
+              )}
+              {jobResult.map(item => (
+                <Option key={item.jobId} value={item.jobId} label={item.jobName}>
+                  {item.jobName}
+                </Option>
+              ))}
+
+              {keywords && !jobResult.find(item => item.jobName === keywords) && (
+                <Option value={`add_${keywords}`} label={keywords}>
+                  <span>{_l('创建新职位：%0', keywords)}</span>
+                </Option>
+              )}
+            </Select>
           </div>
         </div>
         <div className="ThemeColor3 Hand mTop20 mBottom25" onClick={this.toggleShowMoreInfo()}>
-          <span className={moreInfo ? 'icon-arrow-up' : 'icon-arrow-down'} />{' '}
+          <span className={moreInfo ? 'icon-arrow-up' : 'icon-arrow-down'} />
           <span className="mLeft5"> {moreInfo ? _l('收起更多') : _l('展开更多')} </span>
         </div>
         {moreInfo ? this.renderMoreInfo(moreInfo) : null}
         <div className="btnGroups">
-          <span className="Hand ThemeHoverColor3" onClick={this.closeDialog}>
+          <span className="Hand cancelBtn" onClick={this.closeDialog}>
             {_l('取消')}
           </span>
           <a
-            className="btnBootstrap btnBootstrap-small mLeft25"
+            className="btnBootstrap mLeft16 addContinueBtn"
             href="javascript:void(0);"
-            style={{
-              lineHeight: '36px',
-              height: '36px',
-              padding: '0 24px',
-              borderRadius: '32px',
-              border: '1px solid #2196F3',
-              background: '#fff',
-              color: '#2196F3',
-            }}
             disabled={isUploading}
-            onClick={this.handleSubmit()}
+            onClick={this.handleSubmit(true)}
           >
             {_l('继续添加')}
           </a>
           <a
-            className="btnBootstrap btnBootstrap-small mLeft25"
+            className="btnBootstrap mLeft16 addBtn"
             href="javascript:void(0);"
             disabled={isUploading}
-            style={{
-              lineHeight: '36px',
-              height: '36px',
-              padding: '0 24px',
-              borderRadius: '32px',
-              background: '#2196F3',
-              color: '#fff',
-            }}
-            onClick={this.handleSubmit(true)}
+            onClick={this.handleSubmit()}
           >
             {_l('添加')}
           </a>
@@ -884,6 +972,6 @@ class Main extends Component {
   }
 }
 
-module.exports = function (container, props) {
+export default function (container, props) {
   ReactDom.render(<Main {...props} />, container);
-};
+}

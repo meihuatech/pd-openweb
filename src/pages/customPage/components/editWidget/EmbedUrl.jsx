@@ -1,11 +1,12 @@
 import React, { Fragment, useState } from 'react';
 import styled from 'styled-components';
-import { Button, Icon } from 'ming-ui';
+import { Icon } from 'ming-ui';
+import { ConfigProvider, Button, Tooltip } from 'antd';
 import Dialog from 'rc-dialog';
 import 'rc-dialog/assets/index.css';
 import { Dropdown, Input } from 'antd';
-import { FlexCenter, genUrl } from '../../util';
-import PreviewEmbedContent from '../previewContent';
+import { FlexCenter, genUrl, parseLink } from '../../util';
+import PreviewWraper from '../previewContent';
 import { connect } from 'react-redux';
 import LinkPara from './LinkPara';
 import { Header } from '../../styled';
@@ -47,15 +48,13 @@ const ContentWrap = styled(FlexCenter)`
     width: 100%;
   }
   .previewBtn {
-    box-sizing: border-box;
-    height: 32px;
-    line-height: 32px;
-    border-radius: 18px;
-    background-color: #fff;
-    color: #2196f3;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.24);
+    height: 36px;
+    padding: 0 15px;
+    color: #40a9ff;
+    border: none;
+    border-radius: 24px;
     &:hover {
-      background-color: rgba(255, 255, 255, 0.8);
+      color: #1079cc;
     }
   }
 `;
@@ -65,62 +64,75 @@ function EmbedUrl({ onClose, onEdit, widget = {}, info }) {
   const [preview, setPreview] = useState(!!widget.value);
 
   const [paras, setParas] = useState(widget.param || []);
-  const urlWithPara = genUrl(url, paras, info);
+  const [config, setConfig] = useState(widget.config || {});
+  const { reload = false, newTab = false } = config;
+  let urlWithPara = genUrl(url, paras, info);
+  const handleSave = () => {
+    if (!url) {
+      alert(_l('url不能为空'));
+      return;
+    }
+    onEdit({ value: url, param: paras, config });
+  }
   return (
     <Dialog
       className="editWidgetDialogWrap"
       visible
       onClose={onClose}
-      closeIcon={<Icon icon="close Font26 Gray_75 ThemeHoverColor3" />}>
-      <Header>
-        <div className="typeName">{_l('嵌入url')}</div>
-        <Button
-          className="saveBtn"
-          onClick={() => {
-            if (!url) {
-              alert(_l('url不能为空'));
-              return;
-            }
-            onEdit({ value: url, param: paras });
-          }}>
-          {_l('保存')}
-        </Button>
-      </Header>
-      <ContentWrap>
-        <div className="previewWrap">
-          {preview ? (
-            <PreviewEmbedContent value={urlWithPara} />
-          ) : (
-            _l('嵌入网页、视频、图片链接, 你也可以嵌入一个视图、记录的分享链接')
-          )}
-        </div>
-        <div className="configWrap">
-          <div className="content">
-            <p>{_l('输入url')}</p>
-            <Input.TextArea
-              className="urlInput"
-              autoSize={{ minRows: 4, maxRows: 30 }}
-              value={url}
-              onChange={e => {
-                const value = e.target.value;
-                setPreview(false);
-                setUrl(value);
-              }}
-            />
-            <Button
-              disabled={!url}
-              className="previewBtn"
-              onClick={() => {
-                if (!url) return;
-                setPreview(true);
-              }}>
-              {_l('预览')}
+    >
+      <ConfigProvider autoInsertSpaceInButton={false}>
+        <Header>
+          <div className="typeName">{_l('嵌入url')}</div>
+          <div className="flexRow valignWrapper">
+            <Button block className="save" shape="round" type="primary" onClick={handleSave}>
+              {_l('保存')}
             </Button>
-            <LinkPara paras={paras} setParas={setParas} />
-            <div className="parasConfigWrap"></div>
+            <Tooltip title={_l('关闭')} placement="bottom">
+              <Icon icon="close" className="Font24 pointer mLeft16 Gray_9e" onClick={onClose} />
+            </Tooltip>
           </div>
-        </div>
-      </ContentWrap>
+        </Header>
+        <ContentWrap>
+          <div className="previewWrap">
+            {preview ? (
+              <PreviewWraper
+                reload={reload}
+                newTab={newTab}
+                value={urlWithPara}
+                param={widget.param}
+              />
+            ) : (
+              _l('嵌入网页、视频、图片链接, 你也可以嵌入一个视图、记录的分享链接')
+            )}
+          </div>
+          <div className="configWrap">
+            <div className="content">
+              <p>{_l('输入url')}</p>
+              <Input.TextArea
+                className="urlInput"
+                autoSize={{ minRows: 4, maxRows: 30 }}
+                value={url}
+                onChange={e => {
+                  const value = e.target.value;
+                  setPreview(false);
+                  setUrl(value);
+                }}
+              />
+              <Button
+                className="previewBtn"
+                onClick={() => {
+                  if (!url) return;
+                  setPreview(true);
+                }}
+              >
+                <span className="bold">{_l('预览')}</span>
+              </Button>
+              <LinkPara showActionBar paras={paras} setParas={setParas} config={config} setConfig={setConfig} />
+              <div className="parasConfigWrap"></div>
+            </div>
+          </div>
+        </ContentWrap>
+      </ConfigProvider>
     </Dialog>
   );
 }

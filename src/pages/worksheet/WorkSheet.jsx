@@ -17,6 +17,7 @@ import { updateBase, updateWorksheetLoading } from './redux/actions';
 import { addWorkSheet, updateSheetListLoading } from 'src/pages/worksheet/redux/actions/sheetList';
 import CustomPageContent from 'worksheet/components/CustomPageContent';
 import './worksheet.less';
+import _ from 'lodash';
 
 @connect(undefined, dispatch => ({
   addWorkSheet: bindActionCreators(addWorkSheet, dispatch),
@@ -41,7 +42,10 @@ class WorkSheet extends Component {
       $(document.body).addClass('isPublicApp');
     }
     const id = this.getValidedWorksheetId(this.props);
-    const { appId, groupId, viewId } = match.params;
+    let { appId, groupId, viewId } = match.params;
+    if (md.global.Account.isPortal) {
+      appId = md.global.Account.appId;
+    }
     updateBase({
       appId,
       viewId,
@@ -59,8 +63,12 @@ class WorkSheet extends Component {
       return;
     }
     const id = this.getValidedWorksheetId(nextProps);
-    const { appId, groupId, viewId } = nextProps.match.params;
-    if (appId !== this.props.match.params.appId || groupId !== this.props.match.params.groupId) {
+    let { appId, groupId, viewId } = nextProps.match.params;
+    if (
+      appId !== this.props.match.params.appId ||
+      groupId !== this.props.match.params.groupId ||
+      nextProps.match.params.worksheetId !== this.props.match.params.worksheetId
+    ) {
       updateWorksheetLoading(true);
     }
     if (
@@ -69,6 +77,9 @@ class WorkSheet extends Component {
       groupId !== this.props.match.params.groupId ||
       id !== worksheetId
     ) {
+      if (md.global.Account.isPortal) {
+        appId = md.global.Account.appId;
+      }
       updateBase({
         appId,
         viewId,
@@ -78,8 +89,8 @@ class WorkSheet extends Component {
     }
     this.setCache(nextProps.match.params);
   }
-  shouldComponentUpdate() {
-    return !/\/app\/[\w-]+$/.test(location.pathname);
+  shouldComponentUpdate(nextProps) {
+    return nextProps.sheetListLoading !== this.props.sheetListLoading || !/\/app\/[\w-]+$/.test(location.pathname);
   }
   componentWillUnmount() {
     $(document.body).removeClass('fixedScreen');
@@ -91,7 +102,10 @@ class WorkSheet extends Component {
    * 设置缓存
    */
   setCache(params) {
-    const { appId, groupId, worksheetId, viewId } = params;
+    let { appId, groupId, worksheetId, viewId } = params;
+    if (md.global.Account.isPortal) {
+      appId = md.global.Account.appId;
+    }
     let storage = JSON.parse(localStorage.getItem(`mdAppCache_${md.global.Account.accountId}_${appId}`));
 
     if (!worksheetId) {
@@ -104,7 +118,7 @@ class WorkSheet extends Component {
         );
         storage.lastWorksheetId = '';
         storage.lastViewId = '';
-        localStorage.setItem(`mdAppCache_${md.global.Account.accountId}_${params.appId}`, JSON.stringify(storage));
+        safeLocalStorageSetItem(`mdAppCache_${md.global.Account.accountId}_${appId}`, JSON.stringify(storage));
       }
       return;
     }
@@ -123,16 +137,25 @@ class WorkSheet extends Component {
     storage.lastWorksheetId = worksheetId;
     storage.lastViewId = viewId;
 
-    localStorage.setItem(`mdAppCache_${md.global.Account.accountId}_${params.appId}`, JSON.stringify(storage));
+    safeLocalStorageSetItem(`mdAppCache_${md.global.Account.accountId}_${appId}`, JSON.stringify(storage));
   }
   getValidedWorksheetId(props) {
     const { match, sheetList, isCharge } = props || this.props;
-    const possessSheetList = isCharge ? sheetList : sheetList.filter(item => item.status === 1);
+    const possessSheetList = isCharge ? sheetList : sheetList.filter(item => item.status === 1 && !item.navigateHide);
     let id;
     if (match.params.worksheetId) {
       id = match.params.worksheetId;
     } else if (possessSheetList.length) {
-      id = possessSheetList[0].workSheetId;
+      // 以前是直接返回第一个表作为默认值会后面切换视图时新旧 worksheetId 比对出错，改为 navigate
+      if (match.params.appId && match.params.groupId) {
+        navigateTo(
+          `/app/${match.params.appId}/${match.params.groupId}/${possessSheetList[0].workSheetId}${
+            location.search || ''
+          }`,
+        );
+      } else {
+        id = possessSheetList[0].workSheetId;
+      }
     }
     return id;
   }
@@ -141,14 +164,17 @@ class WorkSheet extends Component {
   handleCreateItem = (obj, callback) => {
     if (this.pending) return;
     const { match, addWorkSheet, updatePageInfo, updateEditPageVisible } = this.props;
-    const { appId, groupId, viewId } = match.params;
+    let { appId, groupId, viewId } = match.params;
+    if (md.global.Account.isPortal) {
+      appId = md.global.Account.appId;
+    }
     const { iconColor, projectId } = store.getState().appPkg;
-    const { type, name, icon } = obj;
+    const { type, name } = obj;
     this.pending = true;
     const enumType = type === 'worksheet' ? 0 : 1;
 
     const iconUrl = `${md.global.FileStoreConfig.pubHost}customIcon/${
-      type === 'customPage' ? '1_0_home' : '1_worksheet'
+      type === 'customPage' ? 'dashboard' : 'table'
     }.svg`;
 
     addWorkSheet(
@@ -157,14 +183,13 @@ class WorkSheet extends Component {
         appSectionId: groupId,
         name,
         iconColor,
-        icon,
         projectId,
         iconUrl,
         type: enumType,
       },
       res => {
-        const { pageId } = res;
         this.pending = false;
+        const { pageId } = res;
         if (type === 'customPage') {
           navigateTo(`/app/${appId}/${groupId}/${pageId}`);
           updatePageInfo({ pageName: name, pageId });
@@ -174,13 +199,20 @@ class WorkSheet extends Component {
     );
   };
   renderRightComp = ({ id, appId, groupId, currentSheet }) => {
-    const { sheetList, isCharge, sheetListLoading, match, projectId } = this.props;
+    const { sheetList, isCharge, sheetListLoading, match } = this.props;
     const { type } = currentSheet;
     if (sheetListLoading) {
       return <LoadDiv size="big" className="mTop32" />;
     }
     if ((_.isEmpty(sheetList) || _.isEmpty(currentSheet)) && !md.global.Account.isPortal) {
       const emptySheet = id && _.isEmpty(currentSheet);
+      if (
+        !_.isEmpty(sheetList.filter(s => s.appId === appId && s.appSectionId === groupId)) &&
+        new URL(location.href).searchParams.get('from') === 'insite'
+      ) {
+        navigateTo(`/app/${appId}${groupId ? '/' + groupId : ''}`, true);
+        return;
+      }
       return (
         <WorksheetEmpty
           sheetCount={sheetList.length}
@@ -199,15 +231,25 @@ class WorkSheet extends Component {
     );
   };
   render() {
-    const { visible, sheetList, pageId, match, projectId } = this.props;
-    const { appId, groupId } = match.params;
+    let { visible, sheetList = [], pageId, match, isCharge } = this.props;
+    const { projectId } = store.getState().appPkg;
+    let { appId, groupId } = match.params;
+    if (md.global.Account.isPortal) {
+      appId = md.global.Account.appId;
+    }
     const id = this.getValidedWorksheetId();
     const currentSheet = _.find(sheetList, { workSheetId: id }) || {};
 
     return (
       <WaterMark projectId={projectId}>
         <div className="worksheet flexRow">
-          <WorkSheetLeft appId={appId} groupId={groupId} id={id} onCreateItem={this.handleCreateItem} />
+          <WorkSheetLeft
+            appId={appId}
+            projectId={projectId}
+            groupId={groupId}
+            id={id}
+            onCreateItem={this.handleCreateItem}
+          />
           {this.renderRightComp({ ...match.params, currentSheet, id })}
 
           {visible &&
@@ -234,7 +276,6 @@ export default withRouter(
       sheetList: state.sheetList.data,
       isCharge: state.sheetList.isCharge,
       worksheetId: state.sheet.base.worksheetId,
-      projectId: state.sheet.worksheetInfo.projectId,
       ..._.pick(state.customPage, ['visible', 'pageId']),
     }),
     dispatch =>

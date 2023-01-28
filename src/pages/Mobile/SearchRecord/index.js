@@ -2,12 +2,20 @@ import React, { Fragment, Component } from 'react';
 import { connect } from 'react-redux';
 import { Icon } from 'ming-ui';
 import { Flex, ActivityIndicator, WhiteSpace, ListView, WingBlank } from 'antd-mobile';
-import CustomRecordCard from 'src/pages/Mobile/RecordList/RecordCard';
-import Back from '../components/Back';
-import * as recordListActions from '../RecordList/redux/actions';
-import * as actions from './redux/actions';
+import CustomRecordCard from 'mobile/RecordList/RecordCard';
+import sheetApi from 'src/api/worksheet';
 import { WithoutSearchRows } from '../RecordList/SheetRows';
+import {
+  getDefaultCondition,
+  formatConditionForSave,
+  redefineComplexControl,
+} from 'src/pages/worksheet/common/WorkSheetFilter/util';
+import { formatValuesOfOriginConditions } from 'src/pages/worksheet/common/WorkSheetFilter/util';
+import { getRequest } from 'src/util';
 import './index.less';
+import _ from 'lodash';
+
+const pageSize = 20;
 
 class Search extends Component {
   constructor(props) {
@@ -16,184 +24,178 @@ class Search extends Component {
       rowHasChanged: (row1, row2) => row1 !== row2,
     });
     this.state = {
-      value: '',
-      isQuery: false,
+      sheetInfo: {},
+      rows: [],
+      filterControls: [],
       dataSource,
       isMore: true,
-      loading: false,
-      pageIndex: 1
+      loading: true,
+      pageIndex: 1,
     };
   }
   componentDidMount() {
-    const { currentSheetInfo, match } = this.props;
-    const { params } = match;
-    if (_.isEmpty(currentSheetInfo)) {
-      this.props.dispatch(recordListActions.getSheet({
-        worksheetId: params.worksheetId,
+    const { params } = this.props.match;
+    const { filterId } = getRequest();
+
+    const requestSheet = sheetApi
+      .getWorksheetInfo({
         appId: params.appId,
-      }));
-    }
-  }
-  handleChange(event) {
-    const { target } = event;
-    this.setState({
-      value: target.value,
+        worksheetId: params.worksheetId,
+        getTemplate: true,
+        getViews: true,
+      })
+      .then();
+
+    const requestFilters = filterId
+      ? sheetApi.getWorksheetFilterById({
+          filterId,
+        })
+      : undefined;
+
+    Promise.all([requestSheet, requestFilters]).then(result => {
+      const [sheet, filterData = {}] = result;
+      this.setState({
+        sheetInfo: sheet,
+        filterControls: formatValuesOfOriginConditions(filterData.items || []),
+      });
+      this.requestFilterRows();
     });
   }
-  handleSearch(pageIndex = 1) {
+  requestFilterRows = () => {
     const { params } = this.props.match;
-    const { value } = this.state;
-    this.emptySearchSheetRows();
+    const { loading, isMore, pageIndex, filterControls, sheetInfo } = this.state;
+    const controls = _.get(sheetInfo, ['template', 'controls']) || [];
+    const { keyWords, searchId } = getRequest();
+    const isMingdao = navigator.userAgent.toLowerCase().indexOf('mingdao application') >= 0;
+
     this.setState({
-      isQuery: true,
       loading: true,
     });
-    $('.searchWrapper input').blur();
-    this.props.dispatch(actions.changeSearchSheetRows({
-      worksheetId: params.worksheetId,
-      appId: params.appId,
-      viewId: params.viewId,
-      keyWords: value,
-      pageIndex,
-    }, isMore => {
-      this.setState({
+
+    const searchControl = _.find(controls, { controlId: searchId });
+    let searchFilter = null;
+
+    if (searchControl) {
+      const data = getDefaultCondition(redefineComplexControl(searchControl));
+      searchFilter = formatConditionForSave(
+        {
+          ...data,
+          type: 2,
+          values: [keyWords],
+        },
+        1,
+      );
+    }
+
+    sheetApi
+      .getFilterRows({
+        appId: params.appId,
+        worksheetId: params.worksheetId,
+        searchType: 1,
+        pageSize,
         pageIndex,
-        loading: false,
-        isMore,
-        refreshing: false,
+        status: 1,
+        viewId: params.viewId,
+        keyWords: searchId ? undefined : keyWords,
+        filterControls: searchFilter ? filterControls.concat(searchFilter) : filterControls,
+      })
+      .then(({ data }) => {
+        const { rows } = this.state;
+        const newRows = rows.concat(data);
+        if (newRows.length === 1) {
+          const url = `/mobile/record/${params.appId}/${params.worksheetId}/${params.viewId}/${newRows[0].rowid}`;
+          if (isMingdao) {
+            location.href = url;
+          } else {
+            window.mobileNavigateTo(url, true);
+          }
+        }
+        this.setState({
+          rows: newRows,
+          isMore: data.length === pageSize,
+          pageIndex: pageIndex + 1,
+          loading: false,
+          dataSource: this.state.dataSource.cloneWithRows(newRows),
+        });
       });
-    }));
-  }
-  componentWillReceiveProps(nextProps) {
-    if (nextProps.currentSearchSheetRows.length !== this.props.currentSearchSheetRows.length) {
-      this.setState({
-        dataSource: this.state.dataSource.cloneWithRows({...nextProps.currentSearchSheetRows}),
-      });
-    }
-    if (_.isEmpty(nextProps.currentSheetInfo) !== _.isEmpty(this.props.currentSheetInfo)) {
-      const { template } = nextProps.currentSheetInfo;
-      this.setState({
-        showControls: template.controls.slice(1, 4).map(item => item.controlId),
-      });
-    }
-  }
-  emptySearchSheetRows() {
-    this.props.dispatch(actions.emptySearchSheetRows());
-  }
-  componentWillUnmount() {
-    this.emptySearchSheetRows();
-  }
-  handleEndReached() {
-    const { loading, isMore, pageIndex } = this.state;
+  };
+  handleEndReached = () => {
+    const { loading, isMore } = this.state;
     if (!loading && isMore) {
-      this.handleSearch(pageIndex + 1);
+      this.requestFilterRows();
     }
-  }
+  };
   renderRow = item => {
-    const { worksheetControls, match, currentSheetInfo } = this.props;
+    const { match } = this.props;
     const { params } = match;
-    const { currentView } = currentSheetInfo;
+    const { sheetInfo } = this.state;
+    const { views } = sheetInfo;
+    const view = _.find(views, { viewId: params.viewId });
+
+    const worksheetControls = sheetInfo.template.controls.filter(item => {
+      if (item.attribute === 1) {
+        return true;
+      }
+      return _.isEmpty(view) ? true : !view.controls.includes(item.controlId);
+    });
+
     return (
       <WingBlank size="md" key={item.rowid}>
         <CustomRecordCard
           key={item.rowid}
           data={item}
-          view={currentView}
+          view={view}
           controls={worksheetControls}
-          allowAdd={currentSheetInfo.allowAdd}
+          allowAdd={sheetInfo.allowAdd}
           onClick={() => {
-            window.mobileNavigateTo(`/mobile/record/${params.appId}/${params.worksheetId}/${params.viewId}/${item.rowid}`);
+            window.mobileNavigateTo(
+              `/mobile/record/${params.appId}/${params.worksheetId}/${params.viewId}/${item.rowid}`,
+            );
           }}
         />
       </WingBlank>
     );
-  }
+  };
   render() {
-    const { value, isQuery, loading, isMore, dataSource } = this.state;
-    const { worksheetControls, currentSearchSheetRows } = this.props;
+    const { loading, isMore, rows, dataSource } = this.state;
     return (
       <div className="searchRecordWrapper flexColumn h100">
-        <div className="searchWrapper">
-          <Icon icon="h5_search"/>
-          <form action="#" onSubmit={e => { e.preventDefault() }} className="w100">
-            <input
-              className="w100"
-              type="search"
-              autoFocus
-              placeholder={_l('搜索')}
-              value={value}
-              onChange={this.handleChange.bind(this)}
-              onKeyDown={event => { event.which === 13 && this.handleSearch() }}
-            />
-          </form>
-          {value ? (
-            <Icon
-              icon="workflow_cancel"
-              onClick={() => {
-                this.emptySearchSheetRows();
-                this.setState({
-                  value: '',
-                  isQuery: false,
-                });
-              }}
-            />
-          ) : null}
-        </div>
-        <WhiteSpace size="md" />
         <div className="flex">
-          {
-            loading && _.isEmpty(currentSearchSheetRows) ? (
-              <Flex justify="center" align="center" className="h100">
-                <ActivityIndicator size="large" />
-              </Flex>
-            ) : (
-              <Fragment>
-                {
-                  currentSearchSheetRows.length ? (
-                    <Fragment>
-                      <ListView
-                        className="searchSheetRowsWrapper h100"
-                        dataSource={dataSource}
-                        renderHeader={() => ( <Fragment /> )}
-                        renderFooter={() => (
-                          isMore ? <Flex justify="center">{loading ? <ActivityIndicator animating /> : null}</Flex> : <Fragment />
-                        )}
-                        pageSize={10}
-                        scrollRenderAheadDistance={500}
-                        onEndReached={this.handleEndReached.bind(this)}
-                        onEndReachedThreshold={10}
-                        renderRow={this.renderRow}
-                      />
-                    </Fragment>
-                  ) : null
-                }
-                {
-                  !currentSearchSheetRows.length && isQuery ? (
-                    <div className="h100">
-                      <WithoutSearchRows text={_l('没有搜索结果')}/>
-                    </div>
-                  ) : null
-                }
-                <Back
-                  className="low"
-                  onClick={() => {
-                    this.props.history.goBack();
-                  }}
+          {loading && _.isEmpty(rows) ? (
+            <Flex justify="center" align="center" className="h100">
+              <ActivityIndicator size="large" />
+            </Flex>
+          ) : (
+            <Fragment>
+              {rows.length ? (
+                <ListView
+                  className="searchSheetRowsWrapper h100"
+                  dataSource={dataSource}
+                  renderHeader={() => <Fragment />}
+                  renderFooter={() =>
+                    isMore ? (
+                      <Flex justify="center">{loading ? <ActivityIndicator animating /> : null}</Flex>
+                    ) : (
+                      <Fragment />
+                    )
+                  }
+                  pageSize={10}
+                  scrollRenderAheadDistance={500}
+                  onEndReached={this.handleEndReached}
+                  onEndReachedThreshold={10}
+                  renderRow={this.renderRow}
                 />
-              </Fragment>
-            )
-          }
+              ) : (
+                <div className="h100">
+                  <WithoutSearchRows text={_l('没有搜索结果')} />
+                </div>
+              )}
+            </Fragment>
+          )}
         </div>
       </div>
     );
   }
 }
 
-export default connect((state) => {
-  const { currentSheetInfo, worksheetControls, currentSearchSheetRows } = state.mobile;
-  return {
-    currentSheetInfo,
-    worksheetControls,
-    currentSearchSheetRows,
-  };
-})(Search);
+export default Search;

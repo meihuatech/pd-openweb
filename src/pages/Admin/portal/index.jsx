@@ -8,6 +8,8 @@ import Search from 'src/pages/workflow/components/Search';
 import UserHead from 'src/pages/feed/components/userHead/userHead';
 import ajaxRequest from 'src/api/externalPortal';
 import projectAjax from 'src/api/project';
+import _ from 'lodash';
+import moment from 'moment';
 
 const DATE_TYPE = [
   { key: ['lastTimeStart', 'lastTimeTimeEnd'], text: _l('最近登录时间'), id: 'last' },
@@ -24,8 +26,6 @@ const getValue = (value, type) => {
   }
   return value ? `${value} 23:59` : value;
 };
-
-const { admin: { homePage: { userBuy } }} = window.private;
 
 export default class Portal extends Component {
   constructor(props) {
@@ -83,7 +83,7 @@ export default class Portal extends Component {
    */
   getApps() {
     ajaxRequest
-      .getByProject({
+      .getAppInfoByProject({
         projectId: this.state.projectId,
         pageIndex: 0,
         pageSize: 0,
@@ -194,6 +194,7 @@ export default class Portal extends Component {
           <div className="mLeft12 ellipsis flex mRight20">{item.name}</div>
         </div>
         <div className="w150 ellipsis">{item.mobilePhone}</div>
+        <div className="w150 ellipsis">{item.email}</div>
         <div className="columnWidth ellipsis">{item.appName}</div>
         <div className="columnWidth ellipsis">
           {item.createTime ? moment(item.createTime).format('YYYY年MM月DD日 HH:mm') : ''}
@@ -298,7 +299,7 @@ export default class Portal extends Component {
             {_l('%0人', limitExternalUserCount - total < 0 ? 0 : limitExternalUserCount - total)}
           </span>
 
-          {allowUpgradeExternalPortal && showOption && !userBuy && (
+          {allowUpgradeExternalPortal && showOption && (
             <span className="mLeft20">
               {/* <span className="Gray_9e mRight5">{_l('%0天后到期', expireDays)}</span> */}
               <Link
@@ -311,14 +312,14 @@ export default class Portal extends Component {
             </span>
           )}
 
-          {showOption && !userBuy && (
+          {/* {showOption && (
             <Link
               className={cx('ThemeColor3 ThemeHoverColor2  NoUnderline', { mLeft20: !allowUpgradeExternalPortal })}
               to={`/admin/expansionservice/${this.props.match.params.projectId}/portaluser`}
             >
               {_l('扩充')}
             </Link>
-          )}
+          )} */}
         </div>
 
         {selectedColumnIds.length > 0 ? (
@@ -416,7 +417,7 @@ export default class Portal extends Component {
             <div className="flex" />
             <Search
               className="w200"
-              placeholder={_l('姓名 / 手机号')}
+              placeholder={_l('姓名 / 手机号 / 邮箱')}
               handleChange={keywords => this.updateState({ keywords: keywords.trim() })}
             />
           </div>
@@ -429,13 +430,14 @@ export default class Portal extends Component {
               checked={totalCount > 0 && selectedColumnIds.length === totalCount}
               onClick={checked =>
                 this.setState({
-                  selectedColumnIds: checked ? [] : list.map(i => i.accountId),
+                  selectedColumnIds: checked ? [] : (list || []).map(i => i.accountId),
                 })
               }
             />
           </div>
           <div className="flex mLeft10">{_l('姓名')}</div>
           <div className="w150 flexRow">{_l('手机号')}</div>
+          <div className="w150 flexRow">{_l('邮箱')}</div>
           <div className="columnWidth flexRow">{_l('加入应用')}</div>
           <div className="columnWidth flexRow">
             <div

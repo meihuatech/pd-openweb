@@ -2,12 +2,13 @@ import PropTypes from 'prop-types';
 import React, { Component } from 'react';
 import { FROM } from '../../tools/config';
 import UserHead from 'src/pages/feed/components/userHead';
-import 'dialogSelectUser';
-import 'quickSelectUser';
+import 'src/components/dialogSelectUser/dialogSelectUser';
+import 'src/components/quickSelectUser/quickSelectUser';
 import cx from 'classnames';
-import SelectUser from 'src/pages/Mobile/components/SelectUser';
+import SelectUser from 'mobile/components/SelectUser';
 import { browserIsMobile, getCurrentProject } from 'src/util';
 import { getTabTypeBySelectUser } from 'src/pages/worksheet/common/WorkSheetFilter/util';
+import _ from 'lodash';
 
 export default class Widgets extends Component {
   static propTypes = {
@@ -75,6 +76,7 @@ export default class Widgets extends Component {
             left: 0,
           },
           zIndex: 10001,
+          isDynamic: enumDefault === 1,
           SelectUserSettings: {
             unique: enumDefault === 0,
             projectId: projectId,
@@ -158,7 +160,7 @@ export default class Widgets extends Component {
                 {item.name || item.fullname || item.fullName}
               </span>
 
-              {((enumDefault === 0 && value.length === 1) || enumDefault !== 0) && !disabled && (
+              {!disabled && (
                 <i className="icon-minus-square Font16 tagDel" onClick={() => this.removeUser(item.accountId)} />
               )}
             </div>

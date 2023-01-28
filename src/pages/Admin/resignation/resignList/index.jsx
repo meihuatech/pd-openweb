@@ -4,21 +4,27 @@ import classNames from 'classnames';
 
 import userController from 'src/api/user';
 
-import LoadDiv from 'ming-ui/components/LoadDiv';
 import UserHead from 'src/pages/feed/components/userHead';
-import Menu from 'ming-ui/components/Menu';
-import MenuItem from 'ming-ui/components/MenuItem';
-import Checkbox from 'ming-ui/components/Checkbox';
-
+import { LoadDiv, Checkbox, Dialog } from 'ming-ui';
+import { Input } from 'antd';
+import captcha from 'src/components/captcha';
 import withClickAway from 'ming-ui/decorators/withClickAway';
 import createDecoratedComponent from 'ming-ui/decorators/createDecoratedComponent';
-import { addToken } from 'src/util';
 const ClickAwayable = createDecoratedComponent(withClickAway);
 
-import 'pager';
-import Confirm from 'confirm';
+import 'src/components/pager/pager';
 import './style.less';
 import Empty from '../../common/TableEmpty';
+import AccountController from 'src/api/account';
+import { encrypt } from 'src/util';
+import { getPssId } from 'src/util/pssId';
+import _ from 'lodash';
+import moment from 'moment';
+
+const errorMsg = {
+  6: _l('密码错误'),
+  8: _l('验证码错误'),
+};
 
 export default class ResignList extends React.Component {
   static propTypes = {
@@ -126,34 +132,115 @@ export default class ResignList extends React.Component {
     }
 
     var url = `${md.global.Config.AjaxApiUrl}download/exportProjectUserList`;
-    var fromHtml = `<form id="downFile" target="_blank" action="${addToken(url)}" method="post">
-    <input type="hidden" name="userStatus" value="4" />
-    <input type="hidden" name="projectId" value="${projectId}" />
-    <input type="hidden" name="accountIds" value="${accountIds.toString()}" />
-    </form>
-    `;
-    $('body').append(fromHtml);
-    $('#downFile').submit().remove();
+
+    fetch(url, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        Authorization: `md_pss_id ${getPssId()}`,
+      },
+      body: JSON.stringify({
+        userStatus: '4',
+        projectId,
+        accountIds: accountIds.join(','),
+      }),
+    })
+      .then(response => response.blob())
+      .then(blob => {
+        let date = moment(new Date()).format('YYYYMMDDHHmmss');
+        const fileName = `${date}` + '.xlsx';
+        const link = document.createElement('a');
+
+        link.href = window.URL.createObjectURL(blob);
+        link.download = fileName;
+        link.click();
+        window.URL.revokeObjectURL(link.href);
+      });
   }
+  confirmPassword = () => {
+    let { password } = this.state;
+    let _this = this;
+    if (!password) {
+      alert(_l('请输入登录密码'), 3);
+      return;
+    }
+    let throttled = function (res) {
+      if (res.ret !== 0) {
+        return;
+      }
+      AccountController.checkAccount({
+        ticket: res.ticket,
+        randStr: res.randstr,
+        captchaType: md.staticglobal.getCaptchaType(),
+        password: encrypt(password),
+      }).then(res => {
+        if (res === 1) {
+          _this.exportList();
+          _this.setState({ showInputPassword: false });
+        } else {
+          alert(errorMsg[res] || _l('操作失败'), 2);
+        }
+      });
+    };
+
+    if (md.staticglobal.getCaptchaType() === 1) {
+      new captcha(throttled);
+    } else {
+      new TencentCaptcha(md.global.Config.CaptchaAppId.toString(), throttled).show();
+    }
+  };
+  dialogInputPassword = () => {
+    let { showInputPassword, password } = this.state;
+    if (showInputPassword) {
+      return (
+        <Dialog
+          className="dialogInputPassword"
+          visible={showInputPassword}
+          title={_l('请输入登录密码，以验证管理员身份')}
+          footer={
+            <div className="Hand" onClick={this.confirmPassword}>
+              {_l('确认')}
+            </div>
+          }
+          onCancel={() => {
+            this.setState({ showInputPassword: false });
+          }}
+        >
+          <div>{_l('登录密码')}</div>
+          <Input.Password
+            value={password}
+            autocomplete="new-password"
+            onChange={e => this.setState({ password: e.target.value })}
+          />
+        </Dialog>
+      );
+    } else {
+      return '';
+    }
+  };
 
   recovery(accountId, fullName) {
     const { projectId } = this.props;
-    Confirm({ content: _l('确定恢复[%0]权限吗？', fullName) }, () => {
-      userController
-        .recoveryUser({
-          accountId,
-          projectId,
-        })
-        .then(data => {
-          if (data == 1) {
-            this.fetchList();
-            alert(_l('恢复成功'));
-          } else if (data == 4) {
-            alert(_l('当前用户数已超出人数限制'), 3, false);
-          } else {
-            alert(_l('恢复失败'), 2);
-          }
-        });
+    Dialog.confirm({
+      title: _l('确认框'),
+      description: _l('确定恢复[%0]权限吗？', fullName),
+      onOk: () => {
+        userController
+          .recoveryUser({
+            accountId,
+            projectId,
+          })
+          .then(data => {
+            if (data == 1) {
+              this.fetchList();
+              alert(_l('恢复成功'));
+            } else if (data == 4) {
+              alert(_l('当前用户数已超出人数限制'), 3, false);
+            } else {
+              alert(_l('恢复失败'), 2);
+            }
+          });
+      },
     });
   }
 
@@ -190,10 +277,10 @@ export default class ResignList extends React.Component {
                 }}
               />
             </td>
-            <td className="pAll10 pLeft16 TxtMiddle tableUser overflow_ellipsis">
+            <td className="pAll10 TxtMiddle tableUser overflow_ellipsis">
               <div className="flexRow userBox">
                 <UserHead
-                  className="mLeft10 mRight10 InlineBlock TxtMiddle"
+                  className="mRight10 InlineBlock TxtMiddle"
                   user={{ ...user, userHead: user.avatar }}
                   size={40}
                   lazy={'false'}
@@ -257,7 +344,12 @@ export default class ResignList extends React.Component {
               <span className="Gray Font15 Bold LineHeight30">{_l('已选择 %0 条', accountIds.length)}</span>
               <span className="Hand ThemeColor3 LineHeight30 InlineBlock Relative adminHoverColor">
                 <span className="icon-download Font16 mLeft24 TxtMiddle" />
-                <span className="TxtMiddle" onClick={() => this.exportList()}>
+                <span
+                  className="TxtMiddle"
+                  onClick={() => {
+                    this.setState({ showInputPassword: true });
+                  }}
+                >
                   {_l('导出选中用户')}
                 </span>
               </span>
@@ -308,6 +400,11 @@ export default class ResignList extends React.Component {
   }
 
   render() {
-    return <div className="pTop20 mLeft24 mRight24 resignList">{this.renderContent()}</div>;
+    return (
+      <div className="pTop20 mLeft24 mRight24 resignList">
+        {this.renderContent()}
+        {this.dialogInputPassword()}
+      </div>
+    );
   }
 }

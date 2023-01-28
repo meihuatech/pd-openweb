@@ -2,7 +2,7 @@
 import { SEARCH_SUCCESS } from '../actions/search';
 import { merge } from 'lodash';
 import { parse, Schemas } from '../middleware/api';
-import { getParentsId } from '../modules/util';
+import { getParentsId, filterDeleteTreeData, updateTreeData } from '../modules/util';
 
 const ACTIONS = {
   ...ENTITIES_ACTIONS,
@@ -16,6 +16,9 @@ const initialState = {
   newDepartments: [], //
   expandedKeys: [], //默认展开的ID
   searchUsers: [],
+  isShowExport: false,
+  importExportType: '',
+  importExportResult: {},
 };
 
 const mergeDepartmentUsers = (department, payload) => {
@@ -132,7 +135,7 @@ const mergeDepartments = (state, action) => {
       return {
         ...state,
         ...entities,
-        users: originData[0].users,
+        users: (_.isArray(originData) && !_.isEmpty(originData) && originData[0].users) || [],
         departments: { ...state.departments, ...entities.departments },
       };
     default:
@@ -167,7 +170,7 @@ const setDataFn = (data, departmentId = '') => {
 };
 
 const deleteDepartment = (state, action) => {
-  const { parentId, departmentId } = action;
+  const { parentId, departmentId, expandedKeys } = action;
   const { departments, newDepartments } = state;
   const filteredDepartments = {
     ...departments,
@@ -180,9 +183,14 @@ const deleteDepartment = (state, action) => {
   return {
     ...state,
     departments: filteredDepartments,
-    newDepartments: setDataFn(newDepartments, departmentId).list,
-    expandedKeys: action.expandedKeys,
+    newDepartments: filterDeleteTreeData(newDepartments, departmentId),
+    expandedKeys,
   };
+};
+
+const editDepartment = (state, action) => {
+  const { newDepartments, expandedKeys = [] } = action;
+  return { ...state, newDepartments, expandedKeys };
 };
 
 const mergeSearchUser = (state, action) => {
@@ -251,12 +259,51 @@ const mergeSearchDepartments = (state, action) => {
 };
 
 const entities = (state = initialState, action) => {
-  const { type, response, departmentId, department, id, curDepartmentId, isGetAll } = action;
+  const {
+    type,
+    response,
+    departmentId,
+    department,
+    id,
+    curDepartmentId,
+    isGetAll,
+    isShowExport,
+    importExportType,
+    importExportResult = {},
+    fullDepartmentInfo = {},
+  } = action;
   let { getDepartmentIds, newDepartments, departments } = state;
+  if (type === 'UPDATE_IMPORT_EXPORT_RESULT') {
+    return {
+      ...state,
+      importExportResult,
+    };
+  }
+  if (type === 'UPDATE_SHOW_EXPORT') {
+    return {
+      ...state,
+      isShowExport,
+    };
+  }
+  if (type === 'UPDATE_IMPORT_EXPORT_TYPE') {
+    return {
+      ...state,
+      importExportType,
+    };
+  }
+  if (type === 'UPDATE_FULL_DEPARTMENT_INFO') {
+    return {
+      ...state,
+      fullDepartmentInfo,
+    };
+  }
   if (type === 'PROJECT_ID_CHANGED') return initialState;
   if (typeof ACTIONS[type] === 'undefined') return state;
   if (type === ACTIONS.DELETE_DEPARTMENT) {
     return deleteDepartment(state, action);
+  }
+  if (type === ACTIONS.EDIT_DEPARTMENT) {
+    return editDepartment(state, action);
   }
   if (type === ACTIONS.SEARCH_SUCCESS) {
     // return mergeSearchUser(state, action);

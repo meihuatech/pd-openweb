@@ -8,6 +8,7 @@ import captcha from 'src/components/captcha';
 import { encrypt } from 'src/util';
 import { setPssId } from 'src/util/pssId';
 import { getRequest, htmlDecodeReg } from 'src/util';
+import _ from 'lodash';
 
 export default class Container extends React.Component {
   constructor(props) {
@@ -35,7 +36,7 @@ export default class Container extends React.Component {
   };
 
   doAction = res => {
-    const { changeStep, step, registerData, setDataFn, defaultAccountVerifyNextAction } = this.props;
+    const { changeStep, step, registerData, onChangeData, defaultAccountVerifyNextAction } = this.props;
     const {
       password,
       emailOrTel,
@@ -244,7 +245,7 @@ export default class Container extends React.Component {
   };
 
   doCreateAccount = callback => {
-    const { changeStep, step, registerData, setDataFn, defaultAccountVerifyNextAction } = this.props;
+    const { changeStep, step, registerData, onChangeData, defaultAccountVerifyNextAction } = this.props;
     const { password, emailOrTel, verifyCode, confirmation, isLink, inviteFromType, TPParams, loginForAdd, dialCode } =
       registerData;
     RegisterController.createAccount({
@@ -286,7 +287,7 @@ export default class Container extends React.Component {
             ) {
               const { user = {} } = data;
               const { encrypeAccount, encrypePassword } = user;
-              setDataFn({
+              onChangeData({
                 ...registerData,
                 encrypeAccount,
                 encrypePassword,
@@ -297,19 +298,19 @@ export default class Container extends React.Component {
             callback();
           }
         } else if (data.actionResult == ActionResult.userAccountExists) {
-          setDataFn({
+          onChangeData({
             ...registerData,
             warnningData: [{ tipDom: '#txtMobilePhone', warnningText: _l('该号码已注册，您可以使用已有账号登录') }],
           });
         } else if (data.actionResult == ActionResult.inviteLinkExpirate) {
           changeStep('inviteLinkExpirate');
         } else if (data.actionResult == ActionResult.failInvalidVerifyCode) {
-          setDataFn({
+          onChangeData({
             ...registerData,
             warnningData: [{ tipDom: '.txtLoginCode', warnningText: _l('验证码错误'), isError: true }],
           });
         } else if (data.actionResult == ActionResult.noEfficacyVerifyCode) {
-          setDataFn({
+          onChangeData({
             ...registerData,
             warnningData: [{ tipDom: '.txtLoginCode', warnningText: _l('验证码已经失效，请重新发送'), isError: true }],
           });
@@ -322,12 +323,12 @@ export default class Container extends React.Component {
   };
 
   useOldAccountFn = () => {
-    const { registerData, setDataFn } = this.props;
+    const { registerData, onChangeData } = this.props;
     const { isLink, loginForAdd } = registerData;
     let request = getRequest();
     let returnUrl = request.ReturnUrl;
     if (isLink) {
-      setDataFn({
+      onChangeData({
         ...registerData,
         loginForAdd: !loginForAdd,
         warnningData: [],
@@ -342,7 +343,7 @@ export default class Container extends React.Component {
   };
 
   render() {
-    const { changeStep, step, registerData, setDataFn, defaultAccountVerifyNextAction } = this.props;
+    const { changeStep, step, registerData, onChangeData, defaultAccountVerifyNextAction } = this.props;
     const { inviteInfo = {}, confirmation, isLink, company = {}, loginForAdd, onlyRead } = registerData;
     const { companyName = '', titleStr } = company;
     const { createUserName = '' } = inviteInfo;
@@ -363,13 +364,13 @@ export default class Container extends React.Component {
           type={isLink ? (loginForAdd ? 'login' : 'invite') : 'register'}
           keys={
             isLink
-              ? loginForAdd
-                ? ['emailOrTel', 'password']
-                : ['emailOrTel', 'code', 'password']
-              : ['tel', 'code', 'password']
+              ? loginForAdd || location.pathname.indexOf('join') >= 0 //定向邀请已存在手机号和邮箱不需要验证
+                ? ['emailOrTel', !loginForAdd ? 'setPassword' : 'password']
+                : ['emailOrTel', 'code', 'setPassword']
+              : ['tel', 'code', 'setPassword']
           }
           dataList={_.cloneDeep(registerData)}
-          setDataFn={setDataFn}
+          onChangeData={onChangeData}
           nextHtml={isValid => {
             return (
               <React.Fragment>
@@ -380,7 +381,16 @@ export default class Container extends React.Component {
                       {_l('忘记密码？')}
                     </a>
                   ) : (
-                    <span></span>
+                    <span>
+                      {_l('点注册即代表同意')}
+                      <a target="_blank" className="terms Hand" href="/terms">
+                        {_l('《服务协议》')}
+                      </a>
+                      {_l('和')}
+                      <a target="_blank" className="terms Hand" href="/privacy">
+                        {_l('《隐私政策》')}
+                      </a>
+                    </span>
                   )}
                 </p>
                 <span

@@ -2,21 +2,57 @@ import React, { Fragment } from 'react';
 import { Icon } from 'ming-ui';
 import cx from 'classnames';
 import { Flex, ActivityIndicator } from 'antd-mobile';
-import charts from 'src/pages/worksheet/common/Statistics/Charts';
-import { WithoutData, Abnormal } from 'src/pages/worksheet/common/Statistics/components/ChartStatus';
-import { reportTypes } from 'src/pages/worksheet/common/Statistics/Charts/common';
+import charts from 'statistics/Charts';
+import { WithoutData, Abnormal } from 'statistics/components/ChartStatus';
+import { reportTypes } from 'statistics/Charts/common';
+import styled from 'styled-components';
+import { getAppFeaturesPath } from 'src/util';
+import reportApi from 'statistics/api/report';
+import { VIEW_DISPLAY_TYPE } from 'src/pages/worksheet/constants/enum';
 import './index.less';
+import _ from 'lodash';
+
+const Content = styled.div`
+  flex: 1;
+  .showTotalHeight {
+    height: 100%;
+  }
+`;
 
 function Chart({ data }) {
   if (!data.status) {
     return <Abnormal />;
   }
 
+  const isMingdao = navigator.userAgent.toLowerCase().includes('mingdao application');
+  const isIOS = navigator.userAgent.toLowerCase().includes('iphone');
+  const isWeixin = isIOS && navigator.userAgent.toLowerCase().includes('micromessenger');
+  const isSafari = isIOS && navigator.userAgent.toLowerCase().includes('safari');
   const isMapEmpty = _.isEmpty(data.map);
   const isContrastMapEmpty = _.isEmpty(data.contrastMap);
+  const isContrastEmpty = _.isEmpty(data.contrast);
   const Charts = charts[data.reportType];
   const WithoutDataComponent = <WithoutData />;
-  const ChartComponent = <Charts reportData={data} isThumbnail={true} />;
+  const filter = data.filter || {};
+  const viewOriginalSheet = (params) => {
+    reportApi.getReportSingleCacheId({
+      ...filter,
+      ...params,
+      isPersonal: true,
+      reportId: data.reportId
+    }).then(result => {
+      if (result.id) {
+        const url = `/worksheet/${data.appId}/view/${filter.viewId}?chartId=${result.id}&${getAppFeaturesPath()}`;
+        if (isMingdao || isWeixin || isSafari) {
+          window.location.href = url;
+        } else {
+          window.open(url);
+        }
+      }
+    });
+  }
+  const isViewOriginalData = filter.viewId && [VIEW_DISPLAY_TYPE.sheet].includes(filter.viewType.toString());
+  const ChartComponent = <Charts reportData={data} isThumbnail={true} isViewOriginalData={isViewOriginalData} onOpenChartDialog={viewOriginalSheet} />;
 
   switch (data.reportType) {
     case reportTypes.BarChart:
@@ -26,10 +62,10 @@ function Chart({ data }) {
       return isMapEmpty && isContrastMapEmpty ? WithoutDataComponent : ChartComponent;
       break;
     case reportTypes.PieChart:
-      return _.isEmpty(data.aggregations) ? WithoutDataComponent : ChartComponent;
+      return isMapEmpty ? WithoutDataComponent : ChartComponent;
       break;
     case reportTypes.NumberChart:
-      return ChartComponent;
+      return isMapEmpty && isContrastMapEmpty && isContrastEmpty ? WithoutDataComponent : ChartComponent;
       break;
     case reportTypes.RadarChart:
       return isMapEmpty ? WithoutDataComponent : ChartComponent;
@@ -51,13 +87,30 @@ function Chart({ data }) {
   }
 }
 
-function ChartWrapper({ data, loading, onOpenFilterModal, onOpenZoomModal, isHorizontal }) {
+function ChartWrapper({ data, loading, onOpenFilterModal, onOpenZoomModal, onLoadBeforeData, onLoadNextData, pageComponents = [], isHorizontal }) {
   const isVertical = window.orientation === 0;
   const isMobileChartPage = location.href.includes('mobileChart');
+  const index = _.findIndex(pageComponents, { value: data.reportId });
+  const beforeAllow = (pageComponents.length - index) < pageComponents.length;
+  const nextAllow = index < pageComponents.length - 1;
   return (
     <Fragment>
       <div className="mBottom10 flexRow valignWrapper">
         <div className="Font17 Gray ellipsis name flex">{data.name}</div>
+        {isHorizontal && (
+          <Fragment>
+            <Icon
+              icon="navigate_before"
+              className={cx('Font24 Gray_9e mRight10', { allow: beforeAllow })}
+              onClick={beforeAllow && onLoadBeforeData.bind(this, index - 1)}
+            />
+            <Icon
+              icon="navigate_next"
+              className={cx('Font24 Gray_9e mRight20', { allow: nextAllow })}
+              onClick={nextAllow && onLoadNextData.bind(this, index + 1)}
+            />
+          </Fragment>
+        )}
         <Icon className="Font20 Gray_9e mRight10" icon="swap_vert" onClick={onOpenFilterModal} />
         {isHorizontal ? (
           <Icon className="Font20 Gray_9e" icon="close" onClick={onOpenZoomModal} />
@@ -65,13 +118,15 @@ function ChartWrapper({ data, loading, onOpenFilterModal, onOpenZoomModal, isHor
           isVertical && <Icon className={cx('Font18 Gray_9e', { Visibility: isMobileChartPage })} icon="task-new-fullscreen" onClick={onOpenZoomModal} />
         )}
       </div>
-      {loading ? (
-        <Flex justify="center" align="center" className="h100">
-          <ActivityIndicator size="large" />
-        </Flex>
-      ) : (
-        <Chart data={data} />
-      )}
+      <Content className={cx('flexColumn overflowHidden', `statisticsCard-${data.reportId}`)}>
+        {loading ? (
+          <Flex justify="center" align="center" className="h100">
+            <ActivityIndicator size="large" />
+          </Flex>
+        ) : (
+          <Chart data={data} />
+        )}
+      </Content>
     </Fragment>
   );
 }

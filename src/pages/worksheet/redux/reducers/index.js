@@ -7,13 +7,14 @@ import * as sheetview from './sheetview';
 import * as galleryview from './galleryview';
 import * as calendarview from './calendarview';
 import * as gunterView from './gunterview';
+import * as excelCreateAppAndSheet from './excelCreateAppAndSheet';
 
 function base(state = {}, action) {
   switch (action.type) {
     case 'WORKSHEET_UPDATE_BASE':
       return { ...state, ...action.base };
     case 'WORKSHEET_UPDATE_FILTERS':
-      return { ...state, chartId: undefined };
+      return { ...state, ...(location.search.indexOf('chartId=') > -1 ? { chartId: undefined } : {}) };
     case 'WORKSHEET_INIT':
       if ((state.viewId && /^[0-9a-z]{24}$/.test(state.viewId)) || state.chartId) {
         return state;
@@ -64,4 +65,5 @@ export default combineReducers({
   galleryview: combineReducers(galleryview),
   calendarview: combineReducers(calendarview),
   gunterView: combineReducers(gunterView),
+  excelCreateAppAndSheet: combineReducers(excelCreateAppAndSheet),
 });

@@ -3,14 +3,16 @@ import Trigger from 'rc-trigger';
 import PropTypes from 'prop-types';
 import cx from 'classnames';
 import { Menu, MenuItem, Input } from 'ming-ui';
+import { VerticalMiddle } from 'worksheet/components/Basics';
 import { getIconByType } from 'src/pages/widgetConfig/util';
 import { SYS } from 'src/pages/widgetConfig/config/widget.js';
+import _ from 'lodash';
 export default class AddCondition extends Component {
   static propTypes = {
     defaultVisible: PropTypes.bool,
     columns: PropTypes.arrayOf(PropTypes.shape({})),
     onAdd: PropTypes.func,
-    from: PropTypes.string, //来源
+    from: PropTypes.string, // 来源
   };
   constructor(props) {
     super(props);
@@ -41,7 +43,18 @@ export default class AddCondition extends Component {
   }
 
   render() {
-    let { from, columns, onAdd, renderInParent, conditionCount, filterColumnClassName, popupContainer } = this.props;
+    let {
+      disabled,
+      from,
+      columns = [],
+      isAppendToBody,
+      onAdd,
+      children,
+      renderInParent,
+      conditionCount,
+      filterColumnClassName,
+      popupContainer,
+    } = this.props;
     const { keyword, columnListVisible } = this.state;
     if (from === 'rule') {
       columns = columns.filter(item => !_.includes(SYS, item.controlId));
@@ -76,7 +89,7 @@ export default class AddCondition extends Component {
                 style={this.props.style}
               >
                 {columns.length ? (
-                  _.sortBy(columns, 'row').map((c, i) => (
+                  columns.map((c, i) => (
                     <MenuItem
                       className={cx({ segmentationLine: 'segmentation' in c })}
                       onClick={() => {
@@ -85,17 +98,21 @@ export default class AddCondition extends Component {
                       }}
                       key={i}
                     >
-                      <i className={cx('Font16 icon', `icon-${getIconByType(c.type)}`)}></i>
-                      <span>{c.controlName}</span>
+                      <VerticalMiddle>
+                        <i
+                          className={cx('Font16 icon', `icon-${getIconByType(c.originType === 37 ? 37 : c.type)}`)}
+                        ></i>
+                        <span className="ellipsis">{c.controlName}</span>
+                      </VerticalMiddle>
                     </MenuItem>
                   ))
                 ) : (
-                  <div className="tip">{keyword ? _l('没有搜索结果') : _l('没有更多字段')}</div>
+                  <div className="tip TxtCenter">{keyword ? _l('没有搜索结果') : _l('没有更多字段')}</div>
                 )}
               </Menu>
             </div>
           }
-          getPopupContainer={() => (renderInParent ? this.box : document.body)}
+          getPopupContainer={() => (renderInParent && !isAppendToBody ? this.box : document.body)}
           popupAlign={{
             points: ['tl', 'bl'],
             offset: this.props.offset ? this.props.offset : [0, 12],
@@ -108,6 +125,9 @@ export default class AddCondition extends Component {
           <span
             ref={con => (this.box = con)}
             onClick={() => {
+              if (disabled) {
+                return;
+              }
               this.setState({ columnListVisible: true }, () => {
                 if (this.inputRef.current) {
                   this.inputRef.current.focus();
@@ -115,14 +135,15 @@ export default class AddCondition extends Component {
               });
             }}
           >
-            {this.props.comp ? (
-              this.props.comp()
-            ) : (
-              <React.Fragment>
-                <i className="icon icon-add"></i>
-                {_l('添加筛选条件')}
-              </React.Fragment>
-            )}
+            {children ||
+              (this.props.comp ? (
+                this.props.comp()
+              ) : (
+                <React.Fragment>
+                  <i className="icon icon-add"></i>
+                  {_l('添加筛选条件')}
+                </React.Fragment>
+              ))}
           </span>
         </Trigger>
       </div>

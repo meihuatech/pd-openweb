@@ -4,7 +4,7 @@ import styled from 'styled-components';
 import { ScrollView } from 'ming-ui';
 import DocumentTitle from 'react-document-title';
 import Skeleton from 'src/router/Application/Skeleton';
-import { Absolute } from 'src/pages/publicWorksheetConfig/components/Basics';
+import { Absolute } from 'worksheet/components/Basics';
 import BgContainer from 'src/pages/publicWorksheetConfig/components/BgContainer';
 import Qr from 'src/pages/publicWorksheetConfig/components/Qr';
 import { themes } from 'src/pages/publicWorksheetConfig/enum';
@@ -14,6 +14,7 @@ import { getPublicWorksheet, getPublicWorksheetInfo } from './action';
 import FillWorksheet from './FillWorksheet';
 import NotFillStatus from './notFillStatus';
 import './index.less';
+import moment from 'moment';
 
 const TopBar = styled.div(
   ({ color }) => `height: 10px; background: ${color}; opacity: .4; border-radius: 3px 3px 0 0;`,

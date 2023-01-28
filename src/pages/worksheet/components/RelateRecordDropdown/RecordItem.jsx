@@ -3,7 +3,8 @@ import PropTypes from 'prop-types';
 import styled from 'styled-components';
 import cx from 'classnames';
 import { getTitleTextFromRelateControl } from 'src/components/newCustomFields/tools/utils';
-import { renderCellText } from 'src/pages/worksheet/components/CellControls';
+import renderCellText from 'src/pages/worksheet/components/CellControls/renderText';
+import _ from 'lodash';
 
 function getCoverControlData(data) {
   return _.find(data, file => File.isPicture(file.ext) || file.previewUrl);
@@ -69,7 +70,7 @@ export default class RecordItem extends React.PureComponent {
     const { controls, showControls } = this.props;
     const allControls = [
       { controlId: 'ownerid', controlName: _l('拥有者'), type: 26 },
-      { controlId: 'caid', controlName: _l('创建人'), type: 26 },
+      { controlId: 'caid', controlName: _l('创建者'), type: 26 },
       { controlId: 'ctime', controlName: _l('创建时间'), type: 16 },
       { controlId: 'utime', controlName: _l('最近修改时间'), type: 16 },
     ].concat(controls);
@@ -103,7 +104,8 @@ export default class RecordItem extends React.PureComponent {
   }
 
   render() {
-    const { multiple, coverCid, control, showControls, data, selected, showCoverAndControls, onClick } = this.props;
+    const { active, multiple, coverCid, control, showControls, data, selected, showCoverAndControls, onClick } =
+      this.props;
     const { cover } = this;
     const titleText = getTitleTextFromRelateControl(control, data);
     const size = showCoverAndControls && showControls.length ? SIZE.BIG : SIZE.NORMAL;
@@ -128,7 +130,7 @@ export default class RecordItem extends React.PureComponent {
     }
     return (
       <div
-        className={cx(baseCle, 'flexRow', { selected, big: size === SIZE.BIG })}
+        className={cx(baseCle, 'flexRow', { selected, big: size === SIZE.BIG, hover: active })}
         onClick={onClick}
         style={{ ...style, minHeight: height }}
       >

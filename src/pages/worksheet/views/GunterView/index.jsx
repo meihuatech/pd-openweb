@@ -11,6 +11,7 @@ import { browserIsMobile } from 'src/util';
 import SelectionIndicator from './components/SelectionIndicator';
 import { PERIOD_TYPE } from 'src/pages/worksheet/views/GunterView/config';
 import './index.less';
+import _ from 'lodash';
 
 const Drag = styled.div(
   ({ left }) => `
@@ -36,16 +37,18 @@ export default class Gunter extends Component {
   constructor(props) {
     super(props);
     const gunterDirectoryWidth = localStorage.getItem('gunterDirectoryWidth');
-    const worksheetSheetEl = document.querySelector('.worksheetSheet');
     this.state = {
-      directoryWidth: isGunterExport ? 570 : (gunterDirectoryWidth ? Number(gunterDirectoryWidth) : 210),
+      directoryWidth: isGunterExport ? 570 : gunterDirectoryWidth ? Number(gunterDirectoryWidth) : 210,
       dragMaskVisible: false,
-      maxWidth: worksheetSheetEl ? (60 / 100) * worksheetSheetEl.offsetWidth : 0,
+      maxWidth: 0,
     };
   }
   componentDidMount() {
-    const { calendartype } = this.props.view.advancedSetting;
-    this.props.updateViewConfig();
+    const { view, updateViewConfig } = this.props;
+    const { calendartype } = view.advancedSetting;
+
+    updateViewConfig();
+
     if (isGunterExport) {
       this.props.fetchRows();
     } else {
@@ -55,12 +58,21 @@ export default class Gunter extends Component {
       );
       this.props.fetchRows();
     }
+
+    const viewEl = document.querySelector(`.gunterView-${view.viewId}`);
+    this.setState({
+      maxWidth: viewEl ? (60 / 100) * viewEl.offsetWidth : 0,
+    });
   }
   componentWillUnmount() {
     this.props.destroyGunterView();
   }
   componentWillReceiveProps({ view }) {
-    if (view.viewId !== this.props.view.viewId) {
+    if (
+      view.viewId !== this.props.view.viewId ||
+      view.advancedSetting.navshow !== this.props.view.advancedSetting.navshow || //显示项设置 更新数据
+      view.advancedSetting.navfilters !== this.props.view.advancedSetting.navfilters
+    ) {
       this.props.resetLoadGunterView();
     }
     if (view.advancedSetting.calendartype !== this.props.view.advancedSetting.calendartype) {
@@ -86,12 +98,12 @@ export default class Gunter extends Component {
     }
   }
   render() {
-    const { loading, groupingVisible } = this.props;
+    const { view, loading, groupingVisible, layoutType } = this.props;
     const { directoryWidth, dragMaskVisible, maxWidth } = this.state;
-    const isMobile = browserIsMobile();
+    const isMobile = browserIsMobile() || layoutType === 'mobile';
 
     return (
-      <div className={cx('gunterView flexRow', { gunterViewLoading: loading })}>
+      <div className={cx('gunterView flexRow', `gunterView-${view.viewId}`, { gunterViewLoading: loading })}>
         {groupingVisible && !isMobile && (
           <Fragment>
             {dragMaskVisible && (
@@ -102,7 +114,7 @@ export default class Gunter extends Component {
                 onChange={value => {
                   const { chartScroll, groupingScroll } = this.props;
                   this.setState({ dragMaskVisible: false, directoryWidth: value });
-                  localStorage.setItem('gunterDirectoryWidth', value);
+                  safeLocalStorageSetItem('gunterDirectoryWidth', value);
                   chartScroll.refresh();
                   chartScroll._execEvent('scroll');
                   groupingScroll.refresh();
@@ -114,7 +126,7 @@ export default class Gunter extends Component {
             <Drag left={directoryWidth} onMouseDown={() => this.setState({ dragMaskVisible: true })} />
           </Fragment>
         )}
-        <GunterChart />
+        <GunterChart isMobile={isMobile} />
         {!loading && !isMobile && <SelectionIndicator />}
       </div>
     );

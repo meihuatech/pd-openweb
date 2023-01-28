@@ -22,6 +22,9 @@ export const currentSheetRows = (state = [], action) => {
       return Object.assign([], action.data);
     case 'MOBILE_ADD_SHEET_ROWS':
       return Object.assign([], state.concat(action.data));
+    case 'MOBILE_UNSHIFT_SHEET_ROWS':
+      state.unshift(action.data);
+      return Object.assign([], state);
     default:
       return state;
   }
@@ -48,6 +51,15 @@ export const filters = (state = { keyWords: '', quickFilterKeyWords: '', visible
 export const quickFilter = (state = [], action) => {
   switch (action.type) {
     case 'MOBILE_UPDATE_QUICK_FILTER':
+      return [...action.filter];
+    default:
+      return state;
+  }
+};
+
+export const sheetFiltersGroup = (state = [], action) => {
+  switch (action.type) {
+    case 'MOBILE_UPDATE_FILTERS_GROUP':
       return [...action.filter];
     default:
       return state;
@@ -115,7 +127,7 @@ export const worksheetControls = (state = [], action) => {
   }
 };
 
-export const sheetRowLoading = (state = true, action) => {
+export const sheetRowLoading = (state = false, action) => {
   switch (action.type) {
     case 'MOBILE_FETCH_SHEETROW_START':
       return true;
@@ -152,10 +164,10 @@ export const batchOptCheckedData = (state = [], action) => {
   }
 };
 
-export const mobileViewPermission = (state = {}, action) => {
+export const isClickChart = (state = false, action) => {
   switch (action.type) {
-    case 'UPDATE_MOBILEVIEW_PERMISSION':
-      return action.data;
+    case 'UPDATE_CLICK_CHART':
+      return action.flag;
     default:
       return state;
   }

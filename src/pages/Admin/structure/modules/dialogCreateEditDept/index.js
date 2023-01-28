@@ -1,11 +1,15 @@
 import './style.less';
-require('mdDialog');
-var doT = require('dot');
-var util = require('../util');
-var departmentController = require('src/api/department');
+import 'src/components/mdDialog/dialog';
+import doT from '@mdfe/dot';
+import { getRenderInfo } from '../util';
+import departmentController from 'src/api/department';
+import fixedDataAjax from 'src/api/fixedData.js';
+import chargerTpl from './tpl/chargeUserTpl.html';
+import mainHtml from './tpl/main.html';
+import { updateTreeData } from 'src/pages/Admin/structure/modules/util';
+import dialog from '../dialogSelectDeptUser';
 
-var chargerTpl = require('./tpl/chargeUserTpl.html');
-var mainTpl = require('./tpl/main.html').replace('#include.chargeUserTpl', chargerTpl);
+const mainTpl = mainHtml.replace('#include.chargeUserTpl', chargerTpl);
 
 var RESULTS = {
   FAILED: 0,
@@ -75,13 +79,13 @@ CreateEditDeptDialog.prototype.renderMain = function () {
   var options = this.options;
   var _this = this;
   var tplFunc = doT.template(mainTpl);
-  util.getRenderInfo(options.projectId, options.departmentId).then(function (data) {
+  getRenderInfo(options.projectId, options.departmentId).then(function (data) {
     options.data = data;
     var renderData = Object.assign({}, data, {
       type: options.type,
+      isLevel0: options.isLevel0,
     });
     _this.dialog.content(tplFunc(renderData));
-    // FIXME: https://discuss.reactjs.org/t/understanding-the-new-setstate-callback-behavior-post-v16/8920
     setTimeout(function () {
       if (options.type === 'edit') {
         _this.appendDeleteDeptBtn();
@@ -95,8 +99,8 @@ CreateEditDeptDialog.prototype.renderMain = function () {
 CreateEditDeptDialog.prototype.appendDeleteDeptBtn = function () {
   this.$deleteBtn = $(
     '<span style="" class="LineHeight20 Left mTop5 Hand deleteBtn"><i class="icon-task-new-delete Font16 mRight10"></i><span>' +
-    _l('删除') +
-    '</span></span>'
+      _l('删除') +
+      '</span></span>',
   );
   $('#' + this.options.dialogBoxID)
     .find('.footer')
@@ -119,16 +123,20 @@ CreateEditDeptDialog.prototype.bindEvent = function () {
   var options = this.options;
   // var parentDepartment = options.type === 'create' ? options.data : options.data.parentDepartment;
   this.$changeParent.on('click', function () {
+    if (options.type === 'create') {
+      return;
+    }
     var parentDepartment = {
       departmentId: _this.$parent.data('departmentid'),
       departmentName: _this.$parent.text(),
     };
-    import('dialogSelectDept').then(selectDeptDialog => {
+    import('src/components/dialogSelectDept').then(selectDeptDialog => {
       selectDeptDialog.default({
         projectId: options.projectId,
         selectedDepartment: [parentDepartment],
         includeProject: true,
         showCreateBtn: false,
+        fromAdmin: true,
         // unique: false,
         selectFn: function ([dept = {}]) {
           _this.$parent.text(dept.departmentName).data({
@@ -139,7 +147,7 @@ CreateEditDeptDialog.prototype.bindEvent = function () {
     });
   });
 
-  this.$content.on('click', '.chargeUserDel', function(evt) {
+  this.$content.on('click', '.chargeUserDel', function (evt) {
     if ($(evt.target).closest('.chargerUserItem').length) {
       $(evt.target).closest('.chargerUserItem').remove();
     }
@@ -153,25 +161,26 @@ CreateEditDeptDialog.prototype.bindEvent = function () {
     this.$charger.on('click', function () {
       var chargeAccountIds = [];
 
-      _this.$charger.siblings('.chargerUserBox').find('.chargeUserName').map((index, item) => {
-        chargeAccountIds.push($(item).data('accountid'));
-      });
-
-      require(['../dialogSelectDeptUser'], function (dialog) {
-        dialog({
-          projectId: options.projectId,
-          departmentId: options.departmentId,
-          selectedUsers: chargeAccountIds,
-          isUnique: false,
-          maxCount: 5,
-          callback: function (accounts) {
-            var tpl = doT.template(chargerTpl)({
-              rebuild: true,
-              accounts: accounts,
-            });
-            _this.$charger.siblings('.chargerUserBox').html(tpl);
-          },
+      _this.$charger
+        .siblings('.chargerUserBox')
+        .find('.chargeUserName')
+        .map((index, item) => {
+          chargeAccountIds.push($(item).data('accountid'));
         });
+
+      dialog({
+        projectId: options.projectId,
+        departmentId: options.departmentId,
+        selectedUsers: chargeAccountIds,
+        isUnique: false,
+        maxCount: 5,
+        callback: function (accounts) {
+          var tpl = doT.template(chargerTpl)({
+            rebuild: true,
+            accounts: accounts,
+          });
+          _this.$charger.siblings('.chargerUserBox').html(tpl);
+        },
       });
     });
   }
@@ -185,29 +194,32 @@ CreateEditDeptDialog.prototype.createDept = function () {
   if ($.trim(deptName) === '') {
     return alert(_l('请输入部门名称'), 2);
   }
-  options.promise = departmentController
-    .addDepartment({
-      projectId: options.projectId,
-      departmentName: deptName,
-      parentId: parentId,
-    })
-    .then(function (data) {
-      if (data.resultStatus !== RESULTS.SUCCESS) {
-        return $.Deferred()
-          .reject(data)
-          .promise();
-      } else {
-        options.callback.call(null, {
-          type: 'CREATE',
-          departmentId: options.departmentId,
-          response: data.departmentInfo,
-        });
-        _this.dialog.closeDialog();
-      }
-    })
-    .then(null, function (error) {
-      _this.createErrorHandler(error.resultStatus);
-    });
+  fixedDataAjax.checkSensitive({ content: deptName }).then(res => {
+    if (res) {
+      return alert(_l('输入内容包含敏感词，请重新填写'), 3);
+    }
+    options.promise = departmentController
+      .addDepartment({
+        projectId: options.projectId,
+        departmentName: deptName,
+        parentId: parentId,
+      })
+      .then(function (data) {
+        if (data.resultStatus !== RESULTS.SUCCESS) {
+          return $.Deferred().reject(data).promise();
+        } else {
+          options.callback.call(null, {
+            type: 'CREATE',
+            departmentId: options.departmentId,
+            response: data.departmentInfo,
+          });
+          _this.dialog.closeDialog();
+        }
+      })
+      .then(null, function (error) {
+        _this.createErrorHandler(error.resultStatus);
+      });
+  });
 };
 
 CreateEditDeptDialog.prototype.createErrorHandler = function (errMessage) {
@@ -232,9 +244,12 @@ CreateEditDeptDialog.prototype.editDept = function () {
   var parentId = this.$parent.data('departmentid');
   var chargeAccountIds = [];
 
-  this.$charger.siblings('.chargerUserBox').find('.chargeUserName').map((index, item) => {
-    chargeAccountIds.push($(item).data('accountid'));
-  });
+  this.$charger
+    .siblings('.chargerUserBox')
+    .find('.chargeUserName')
+    .map((index, item) => {
+      chargeAccountIds.push($(item).data('accountid'));
+    });
 
   if (parentId && parentId === options.departmentId) {
     return alert(_l('不能设设置自己为上级部门'), 3);
@@ -242,40 +257,51 @@ CreateEditDeptDialog.prototype.editDept = function () {
   if ($.trim(deptName) === '') {
     return alert(_l('请输入部门名称'), 2);
   }
-  options.promise = departmentController
-    .editDepartment({
-      projectId: options.projectId,
-      departmentId: options.departmentId,
-      departmentName: deptName,
-      parentId: parentId,
-      chargeAccountIds,
-    })
-    .then(function (data) {
-      if (!data || data.resultStatus !== RESULTS.SUCCESS) {
-        return $.Deferred()
-          .reject(data)
-          .promise();
-      } else {
-        return $.Deferred().resolve(data.departmentInfo);
-      }
-    })
-    .then(
-      function (departmentInfo) {
-        options.callback.call(null, {
-          type: 'EDIT',
-          departmentId: options.departmentId,
-          response: {
-            ...departmentInfo,
-            parentDepartment: parentId,
-            chargeUsers: chargeAccountIds,
-          },
-        });
-        _this.dialog.closeDialog();
-      },
-      function (error) {
-        _this.editErrorHandler(error.resultStatus);
-      }
-    );
+  fixedDataAjax.checkSensitive({ content: deptName }).then(res => {
+    if (res) {
+      return alert(_l('输入内容包含敏感词，请重新填写'), 3);
+    }
+    options.promise = departmentController
+      .editDepartment({
+        projectId: options.projectId,
+        departmentId: options.departmentId,
+        departmentName: deptName,
+        parentId: parentId,
+        chargeAccountIds,
+      })
+      .then(function (data) {
+        if (!data || data.resultStatus !== RESULTS.SUCCESS) {
+          return $.Deferred().reject(data).promise();
+        } else {
+          return $.Deferred().resolve(data.departmentInfo);
+        }
+      })
+      .then(
+        function (departmentInfo) {
+          let { newDepartments = [], expandedKeys } = updateTreeData(
+            options.newDepartments,
+            options.departmentId,
+            departmentInfo.departmentName,
+            parentId,
+          );
+          options.callback.call(null, {
+            type: 'EDIT',
+            departmentId: options.departmentId,
+            expandedKeys,
+            response: {
+              ...departmentInfo,
+              parentDepartment: parentId,
+              chargeUsers: chargeAccountIds,
+              newDepartments,
+            },
+          });
+          _this.dialog.closeDialog();
+        },
+        function (error) {
+          _this.editErrorHandler(error.resultStatus);
+        },
+      );
+  });
 };
 
 CreateEditDeptDialog.prototype.editErrorHandler = function (errMessage) {
@@ -300,9 +326,7 @@ CreateEditDeptDialog.prototype.editErrorHandler = function (errMessage) {
 CreateEditDeptDialog.prototype.deleteDepartment = function () {
   var options = this.options;
   var _this = this;
-  const {
-    departmentId
-  } = options.data.parentDepartment;
+  const { departmentId } = options.data.parentDepartment;
   options.promise = departmentController
     .deleteDepartments({
       projectId: options.projectId,
@@ -310,16 +334,14 @@ CreateEditDeptDialog.prototype.deleteDepartment = function () {
     })
     .then(function (data) {
       if (data !== DELETE_RESULTS.SUCCESS) {
-        return $.Deferred()
-          .reject(data)
-          .promise();
+        return $.Deferred().reject(data).promise();
       } else {
         alert(_l('删除成功'));
         options.callback.call(null, {
           type: 'DELETE',
           response: {
             departmentId: options.departmentId,
-            parentDepartmentId: departmentId
+            parentDepartmentId: departmentId,
           },
         });
         _this.dialog.closeDialog();
@@ -343,6 +365,6 @@ CreateEditDeptDialog.prototype.deleteErrorHandler = function (errMessage) {
   }
 };
 
-module.exports = function (opts) {
+export default function (opts) {
   return new CreateEditDeptDialog(opts);
-};
+}

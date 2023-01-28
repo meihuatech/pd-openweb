@@ -1,4 +1,4 @@
-module.exports = {
+export default {
   /**
   * 使用明道云账号登录
   * @param {Object} args 请求参数
@@ -134,6 +134,19 @@ module.exports = {
    tPLogin: function (args, options = {}) {
      
      return $.api('Login', 'TPLogin', args, options);
+   },
+  /**
+  * 第三方使用明道云账号SSO登录
+  * @param {Object} args 请求参数
+  * @param {string} args.account 账号
+  * @param {string} args.password 密码
+  * @param {Object} options 配置参数
+  * @param {Boolean} options.silent 是否禁止错误弹层
+  * @returns {Promise<Boolean, ErrorModel>}
+  **/
+   tPMDAccountLogin: function (args, options = {}) {
+     
+     return $.api('Login', 'TPMDAccountLogin', args, options);
    },
   /**
   * 【三方应用】企业微信二维码登录

@@ -1,6 +1,6 @@
 import React, { Component, Fragment } from 'react';
 import { ScrollView, LoadDiv, Dropdown, Radio, RichText } from 'ming-ui';
-import { NODE_TYPE, TRIGGER_ID_TYPE, CONTROLS_NAME } from '../../enum';
+import { NODE_TYPE, ACTION_ID, CONTROLS_NAME } from '../../enum';
 import flowNode from '../../../api/flowNode';
 import {
   Member,
@@ -11,6 +11,7 @@ import {
   ActionFields,
 } from '../components';
 import copy from 'copy-to-clipboard';
+import _ from 'lodash';
 
 export default class Email extends Component {
   constructor(props) {
@@ -27,6 +28,7 @@ export default class Email extends Component {
   }
 
   componentDidMount() {
+    this.mounted = true;
     this.getNodeDetail(this.props);
   }
 
@@ -43,6 +45,10 @@ export default class Email extends Component {
     ) {
       this.updateSource({ name: nextProps.selectNodeName });
     }
+  }
+
+  componentWillUnmount() {
+    this.mounted = false;
   }
 
   /**
@@ -146,16 +152,13 @@ export default class Email extends Component {
   renderContent() {
     const { data, showSelectUserDialog, cacheKey, showSelectCCUserDialog, fieldsVisible, fieldsData } = this.state;
     const list = [
-      { text: _l('标准（支持抄送，每个收件人都可以看到所有收件人和抄送人）'), value: TRIGGER_ID_TYPE.SEND_EMAIL },
+      { text: _l('标准（支持抄送，每个收件人都可以看到所有收件人和抄送人）'), value: ACTION_ID.SEND_EMAIL },
       {
         text: _l('群发单显（采用一对一单独发送，每个收件人只能看到自己的地址）'),
-        value: TRIGGER_ID_TYPE.SEND_EMAIL_SINGLE_DISPLAY,
+        value: ACTION_ID.SEND_EMAIL_SINGLE_DISPLAY,
       },
     ];
-    const contentTypes = [
-      { text: _l('纯文本'), value: 0 },
-      { text: _l('富文本（支持html样式）'), value: 1 },
-    ];
+    const contentTypes = [{ text: _l('纯文本'), value: 0 }, { text: _l('富文本（支持html样式）'), value: 1 }];
 
     return (
       <Fragment>
@@ -169,13 +172,13 @@ export default class Email extends Component {
           onChange={actionId => {
             this.updateSource({
               actionId,
-              ccAccounts: actionId === TRIGGER_ID_TYPE.SEND_EMAIL_SINGLE_DISPLAY ? [] : data.ccAccounts,
+              ccAccounts: actionId === ACTION_ID.SEND_EMAIL_SINGLE_DISPLAY ? [] : data.ccAccounts,
             });
           }}
         />
 
         <div className="mTop20 bold">{_l('收件人')}</div>
-        <Member type={NODE_TYPE.MESSAGE} accounts={data.accounts} updateSource={this.updateSource} />
+        <Member accounts={data.accounts} updateSource={this.updateSource} />
         <div
           className="flexRow mTop15 ThemeColor3 workflowDetailAddBtn"
           onClick={() => this.setState({ showSelectUserDialog: true })}
@@ -196,11 +199,10 @@ export default class Email extends Component {
           />
         </div>
 
-        {data.actionId === TRIGGER_ID_TYPE.SEND_EMAIL && (
+        {data.actionId === ACTION_ID.SEND_EMAIL && (
           <Fragment>
             <div className="mTop20 bold">{_l('抄送人')}</div>
             <Member
-              type={NODE_TYPE.MESSAGE}
               accounts={data.ccAccounts}
               updateSource={({ accounts }) => this.updateSource({ ccAccounts: accounts })}
             />
@@ -235,7 +237,7 @@ export default class Email extends Component {
                 {singleObj.controlName}
                 {singleObj.required && <span className="mLeft5 red">*</span>}
               </div>
-              {item.fieldId === 'attachments' && <div className="mTop5 Gray_75">{_l('附件总大小不超过10M')}</div>}
+              {item.fieldId === 'attachments' && <div className="mTop5 Gray_75">{_l('附件总大小不超过50M')}</div>}
 
               {item.fieldId === 'content' && (
                 <div className="flexRow mTop10 relative">
@@ -334,6 +336,8 @@ export default class Email extends Component {
                     ]}
                     data={item.fieldValue || ''}
                     onActualSave={value => {
+                      if (!this.mounted) return;
+
                       let newFields = [].concat(data.fields);
 
                       newFields[i].fieldValue = value;
@@ -414,10 +418,10 @@ export default class Email extends Component {
     return (
       <Fragment>
         <DetailHeader
-          data={{ ...data, selectNodeType: this.props.selectNodeType }}
+          {...this.props}
+          data={{ ...data }}
           icon="icon-workflow_email"
           bg="BGBlue"
-          closeDetail={this.props.closeDetail}
           updateSource={this.updateSource}
         />
         <div className="flex mTop20">
@@ -425,7 +429,7 @@ export default class Email extends Component {
             <div className="workflowDetailBox">{this.renderContent()}</div>
           </ScrollView>
         </div>
-        <DetailFooter isCorrect={!!data.accounts.length} onSave={this.onSave} closeDetail={this.props.closeDetail} />
+        <DetailFooter {...this.props} isCorrect={!!data.accounts.length} onSave={this.onSave} />
       </Fragment>
     );
   }

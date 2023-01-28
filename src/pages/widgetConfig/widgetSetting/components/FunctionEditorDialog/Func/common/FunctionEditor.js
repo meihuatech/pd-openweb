@@ -7,6 +7,7 @@ import useCloseBrackets from '../lib/closebrackets';
 import setJavascriptMode from '../lib/javascript';
 import { functions } from '../enum';
 import '../lib/show-hint.css';
+import _ from 'lodash';
 
 setJavascriptMode(CodeMirror);
 useCloseBrackets(CodeMirror);
@@ -65,27 +66,31 @@ function groupMatch(text, matchText) {
   return result;
 }
 export default class Function {
-  constructor(dom, { value, options = {}, getControlName = () => {}, renderTag } = {}) {
+  constructor(dom, { value, options = {}, type = 'mdfunction', getControlName = () => {}, renderTag } = {}) {
     if (!dom) {
       console.log('target is not a dom element');
       return;
     }
-    this.editor = CodeMirror(dom, {
+    const args = {
       autofocus: true,
       lineWrapping: true,
       matchBrackets: true,
       autoCloseBrackets: true,
       mode: 'text/javascript',
-      keywords: _.assign(
+      ...options,
+    };
+    if (type === 'mdfunction') {
+      args.keywords = _.assign(
         ...Object.keys(functions).map(key => ({
           [key]: {
             type: 'fn',
             style: 'customFn',
           },
         })),
-      ),
-      ...options,
-    });
+      );
+    }
+    this.editor = CodeMirror(dom, args);
+    this.type = type;
     this.getControlName = getControlName;
     this.renderTag = renderTag;
     if (value) {
@@ -119,7 +124,9 @@ export default class Function {
       }
     });
     editor.on('inputRead', (...args) => {
-      this.showHint();
+      if (this.type === 'mdfunction') {
+        this.showHint();
+      }
     });
     editor.on('change', (cm, event) => {
       if (event.origin === 'complete' && functions[event.text[0]]) {

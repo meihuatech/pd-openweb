@@ -2,7 +2,8 @@ import React, { Component } from 'react';
 import CommonInfo from './component/CommonInfo';
 import SubDomain from './component/SubDomain';
 import WorkPlace from './component/WorkPlace';
-import CloseNet from './component/CloseNet'
+import CloseNet from './component/CloseNet';
+import PositionInfo from './component/PositionInfo';
 import Config from '../config';
 import './index.less';
 
@@ -13,6 +14,11 @@ export default class OrgInfo extends Component {
     this.state = {
       level: 1,
     };
+  }
+  componentWillMount() {
+    if (this.props.location.search === '?destroy') {
+      this.setState({ level: 4 });
+    }
   }
 
   renderBodyContent = () => {
@@ -25,7 +31,9 @@ export default class OrgInfo extends Component {
       case 3:
         return <WorkPlace setLevel={this.setLevel} />;
       case 4:
-        return <CloseNet setLevel={this.setLevel}/>
+        return <CloseNet setLevel={this.setLevel} />;
+      case 5:
+        return <PositionInfo setLevel={this.setLevel} />;
     }
   };
 
@@ -34,10 +42,6 @@ export default class OrgInfo extends Component {
   };
 
   render() {
-    return (
-      <div className="system-set-container">
-        {this.renderBodyContent()}
-      </div>
-    );
+    return <div className="system-set-container">{this.renderBodyContent()}</div>;
   }
 }

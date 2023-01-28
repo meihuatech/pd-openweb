@@ -1,3 +1,4 @@
+import _ from 'lodash';
 // 表视图记录更新临时存储
 export function rowCache(state = {}, action) {
   switch (action.type) {
@@ -29,9 +30,12 @@ export function sheetViewConfig(state = initialSheetViewConfig, action) {
     case 'WORKSHEET_SHEETVIEW_SELECT_ALL':
       return { ...state, allWorksheetIsSelected: action.value, sheetSelectedRows: [] };
     case 'WORKSHEET_SHEETVIEW_SELECT_ROWS':
-      return { ...state, sheetSelectedRows: [...action.rows] };
+      return { ...state, allWorksheetIsSelected: false, sheetSelectedRows: [...action.rows] };
     case 'WORKSHEET_SHEETVIEW_CLEAR_SELECT':
     case 'WORKSHEET_SHEETVIEW_FETCH_ROWS_START':
+      if (_.get(action, 'value.noClearSelected')) {
+        return { ...state };
+      }
       return { ...state, allWorksheetIsSelected: false, sheetSelectedRows: [] };
     // 列宽调整逻辑
     case 'WORKSHEET_SHEETVIEW_INIT_COLUMN_WIDTH':
@@ -104,6 +108,8 @@ export function sheetViewData(state = initialSheetViewData, action) {
     // 开始获取记录数据
     case 'WORKSHEET_SHEETVIEW_FETCH_ROWS_START':
       return { ...state, loading: !(action.value || {}).noLoading };
+    case 'WORKSHEET_SHEETVIEW_REFRESH':
+      return { ...state, refreshFlag: Math.random() };
     // 更新记录数据
     case 'WORKSHEET_SHEETVIEW_FETCH_ROWS':
     case 'WORKSHEET_SHEETVIEW_UPDATE_ROWS':
@@ -111,6 +117,9 @@ export function sheetViewData(state = initialSheetViewData, action) {
     // 更新记录页数
     case 'WORKSHEET_SHEETVIEW_UPDATE_COUNT':
       return { ...state, count: action.count };
+    // 更新记录页数
+    case 'WORKSHEET_SHEETVIEW_UPDATE_COUNT_ABNORMAL':
+      return { ...state, pageCountAbnormal: true };
     // 更新单个记录数据
     case 'WORKSHEET_SHEETVIEW_UPDATE_ROWS_BY_ROWIDS':
       return {

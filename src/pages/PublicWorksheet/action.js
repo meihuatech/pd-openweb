@@ -1,11 +1,11 @@
 import qs from 'query-string';
 import publicWorksheetAjax from 'src/api/publicWorksheet';
-import { getControlRules } from 'src/api/worksheet';
+import worksheetAjax from 'src/api/worksheet';
 import { getDisabledControls, overridePos } from 'src/pages/publicWorksheetConfig/utils';
 import { formatControlToServer } from 'src/components/newCustomFields/tools/utils';
-// import { formatFileControls } from 'src/pages/Mobile/Record';
 import { getInfo } from './utils';
 import { browserIsMobile } from 'src/util';
+import _ from 'lodash';
 
 function getVisibleControls(data) {
   const disabledControlIds = getDisabledControls(
@@ -24,7 +24,7 @@ function getVisibleControls(data) {
     ...c,
     advancedSetting: {
       ...(c.advancedSetting || {}),
-      showtype: (c.advancedSetting || {}).showtype === '2' ? '1' : (c.advancedSetting || {}).showtype,
+      showtype: c.type === 29 && (c.advancedSetting || {}).showtype === '2' ? '1' : (c.advancedSetting || {}).showtype,
     },
     controlPermissions:
       _.find(needHidedControlIds, hcid => c.controlId === hcid) ||
@@ -68,8 +68,9 @@ export function getPublicWorksheet(shareId, cb = (err, data) => {}) {
         });
         return;
       }
+      data.shareAuthor && (window.shareAuthor = data.shareAuthor);
       const controls = getVisibleControls(data);
-      getControlRules({
+      worksheetAjax.getControlRules({
         worksheetId: data.worksheetId,
         type: 1, // 1字段显隐
       }).then(rules => {
@@ -187,6 +188,10 @@ export function addWorksheetRow(
           alert(_l('验证码错误'), 3);
         } else if (data.resultCode === 8) {
           alert(_l('你访问的表单已停止数据收集！'), 2);
+        } else if (data.resultCode === 15) {
+          alert(_l('手机验证码错误'), 2);
+        } else if (data.resultCode === 16) {
+          alert(_l('手机验证码过期或失效'), 2);
         } else {
           alert(_l('提交发生错误'), 3);
         }

@@ -5,6 +5,7 @@ import { Dropdown } from 'ming-ui';
 import UserHead from 'src/pages/feed/components/userHead';
 import { USER_TYPE, NODE_TYPE, USER_ORGANIZE, DEPARTMENT_ORGANIZE } from '../../../enum';
 import Tag from '../Tag';
+import _ from 'lodash';
 
 export default class Member extends Component {
   /**
@@ -31,7 +32,7 @@ export default class Member extends Component {
           lazy={'false'}
           size={26}
         />
-        <div className="mLeft10 ellipsis bold">{item.roleName}</div>
+        <div className="mLeft6 ellipsis bold">{item.roleName}</div>
       </div>
     );
   }
@@ -40,21 +41,11 @@ export default class Member extends Component {
    * render角色
    */
   renderRole(item) {
-    const { type } = this.props;
-
     return (
       <div className="flexRow flowDetailMemberBox">
-        <span
-          className={cx(
-            'flowDetailMemberIcon icon-invite_members',
-            { violet: type === NODE_TYPE.APPROVAL },
-            { green: type === NODE_TYPE.NOTICE },
-            { skyBlue: type === NODE_TYPE.WRITE },
-            { blue: type === NODE_TYPE.MESSAGE || type === NODE_TYPE.EMAIL },
-          )}
-        />
+        <span className={cx('flowDetailMemberIcon icon-group-members bd')} />
 
-        <div className="mLeft10 ellipsis bold">{`${item.roleName}（${item.entityName}）`}</div>
+        <div className="mLeft6 ellipsis bold">{`${item.roleName}（${item.entityName}）`}</div>
       </div>
     );
   }
@@ -92,6 +83,7 @@ export default class Member extends Component {
           appType={item.appType}
           actionId={item.actionId}
           nodeName={item.entityName}
+          controlId={item.roleId}
           controlName={item.roleName}
         />
         {(item.controlType === 26 ||
@@ -156,31 +148,29 @@ export default class Member extends Component {
   }
 
   /**
-   * 渲染部门 或 职位
+   * 渲染标签
    */
-  renderDepartmentOrJob(item) {
-    const { type } = this.props;
-
+  renderTags(item) {
     return (
       <div className="flexRow flowDetailMemberBox">
         <span
           className={cx(
             'flowDetailMemberIcon',
-            item.type === USER_TYPE.DEPARTMENT ? 'icon-invite_members' : 'icon-limit-principal',
-            { violet: type === NODE_TYPE.APPROVAL },
-            { green: type === NODE_TYPE.NOTICE },
-            { skyBlue: type === NODE_TYPE.WRITE },
-            { blue: type === NODE_TYPE.MESSAGE || type === NODE_TYPE.EMAIL },
+            item.type === USER_TYPE.DEPARTMENT
+              ? 'icon-department blue'
+              : item.type === USER_TYPE.ROLE
+              ? 'icon-limit-principal bd'
+              : 'icon-user bd',
           )}
         />
 
-        <div className="mLeft10 ellipsis bold">{item.entityName}</div>
+        <div className="mLeft6 ellipsis bold">{item.entityName}</div>
       </div>
     );
   }
 
   render() {
-    const { accounts } = this.props;
+    const { accounts, from, isSingle } = this.props;
     const nullText = {
       [USER_TYPE.ROLE]: _l('角色下未设置人员'),
       [USER_TYPE.DEPARTMENT]: _l('部门下未设置人员'),
@@ -191,24 +181,28 @@ export default class Member extends Component {
       <ul className="flowDetailMembers">
         {(accounts || []).map((item, i) => {
           return (
-            <li key={i} className="flexRow" style={{ zIndex: accounts.length - i }}>
+            <li key={i} className={isSingle ? 'inlineFlexRow' : 'flexRow'} style={{ zIndex: accounts.length - i }}>
               {item.type === USER_TYPE.USER && this.renderUser(item)}
               {item.type === USER_TYPE.ROLE && this.renderRole(item)}
               {item.type === USER_TYPE.CONTROL && this.renderControl(item, i)}
               {item.type === USER_TYPE.TEXT && this.renderText(item)}
-              {item.type === USER_TYPE.DEPARTMENT && this.renderDepartmentOrJob(item)}
-              {item.type === USER_TYPE.JOB && this.renderDepartmentOrJob(item)}
+              {_.includes([USER_TYPE.DEPARTMENT, USER_TYPE.JOB, USER_TYPE.ORGANIZE_ROLE], item.type) &&
+                this.renderTags(item)}
 
-              <span className="mLeft5 flowDetailMemberDel" data-tip={_l('刪除')} onClick={() => this.removeMember(i)}>
-                <i className="icon-delete Font18" />
-              </span>
-              {_.includes([USER_TYPE.ROLE, USER_TYPE.DEPARTMENT, USER_TYPE.JOB], item.type) && !item.count && (
-                <div className="flowDetailMemberError flex">
-                  <i className="mRight5 Font16 icon-workflow_error" />
-                  {nullText[item.type]}
-                </div>
+              {!(from === 'integration' && accounts.length <= 1) && (
+                <span className="mLeft5 flowDetailMemberDel" data-tip={_l('刪除')} onClick={() => this.removeMember(i)}>
+                  <i className={cx('icon-delete', isSingle ? 'Font14' : 'Font18')} />
+                </span>
               )}
-              {_.includes([USER_TYPE.ROLE], item.type) && item.count === -1 && (
+              {!isSingle &&
+                _.includes([USER_TYPE.ROLE, USER_TYPE.DEPARTMENT, USER_TYPE.JOB], item.type) &&
+                !item.count && (
+                  <div className="flowDetailMemberError flex">
+                    <i className="mRight5 Font16 icon-workflow_error" />
+                    {nullText[item.type]}
+                  </div>
+                )}
+              {!isSingle && _.includes([USER_TYPE.ROLE], item.type) && item.count === -1 && (
                 <div className="flowDetailMemberError flex">
                   <i className="mRight5 Font16 icon-workflow_error" />
                   {_l('不支持包含全组织的角色')}

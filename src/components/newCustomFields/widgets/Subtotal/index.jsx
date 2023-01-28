@@ -1,9 +1,11 @@
 import PropTypes from 'prop-types';
 import React, { Component } from 'react';
 import { Tooltip, Support } from 'ming-ui';
-import sheetAjax from 'src/api/worksheet';
 import styled from 'styled-components';
 import { browserIsMobile } from 'src/util';
+import { getDatePickerConfigs } from 'src/pages/widgetConfig/util/setting';
+import moment from 'moment';
+import _ from 'lodash';
 
 const Tips = styled.div`
   max-width: 230;
@@ -20,10 +22,6 @@ const Tips = styled.div`
       margin-left: 0 !important;
     }
   }
-`;
-const RefreshBtn = styled.i`
-  display: block;
-  ${({ isLoading }) => (isLoading ? `animation:rotate 2s linear infinite;color:#2196f3;` : '')};
 `;
 const Box = styled.div`
   &.customFormSubtotal {
@@ -52,29 +50,8 @@ export default class Widgets extends Component {
     enumDefault2: PropTypes.number,
   };
 
-  state = {
-    loading: false,
-  };
-
-  onRefresh = () => {
-    const { onChange, worksheetId, recordId, controlId } = this.props;
-    const { loading } = this.state;
-
-    if (loading) return;
-
-    this.setState({ loading: true });
-
-    setTimeout(() => {
-      sheetAjax.refreshSummary({ worksheetId, rowId: recordId, controlId }).then(data => {
-        this.setState({ loading: false });
-        onChange(data);
-      });
-    }, 1000);
-  };
-
   render() {
-    const { value, dot, unit, advancedSetting, recordId, enumDefault2 } = this.props;
-    const { loading } = this.state;
+    const { value, dot, unit, advancedSetting = {}, enumDefault2, enumDefault } = this.props;
     let content = value;
 
     if (content === 'max') {
@@ -108,35 +85,38 @@ export default class Widgets extends Component {
     }
 
     if (!_.isUndefined(value) && enumDefault2 === 6) {
-      content = _.isUndefined(dot) ? value : _.round(value, dot).toFixed(dot);
-      content = content.replace(
-        content.indexOf('.') > -1 ? /(\d{1,3})(?=(?:\d{3})+\.)/g : /(\d{1,3})(?=(?:\d{3})+$)/g,
-        '$1,',
-      );
+      if (advancedSetting.numshow === '1') {
+        content = parseFloat(value) * 100;
+      }
+      content = _.isUndefined(dot) ? content : _.round(content, dot).toFixed(dot);
+
+      if (advancedSetting.thousandth !== '1') {
+        content = content.replace(
+          content.indexOf('.') > -1 ? /(\d{1,3})(?=(?:\d{3})+\.)/g : /(\d{1,3})(?=(?:\d{3})+$)/g,
+          '$1,',
+        );
+      }
       content = content + (unit ? ` ${unit}` : '');
     }
 
-    if (!_.isUndefined(value) && advancedSetting && advancedSetting.summaryresult === '1') {
-      content = Math.round(parseFloat(value) * 100) + '%';
+    if (!_.isUndefined(value) && _.includes([15, 16], enumDefault2) && _.includes([2, 3], enumDefault)) {
+      const { formatMode } = getDatePickerConfigs({
+        type: enumDefault2,
+        advancedSetting: { showtype: unit },
+      });
+      content = moment(value).format(formatMode);
     }
 
-    if (advancedSetting && (advancedSetting.prefix || advancedSetting.suffix)) {
+    if (!_.isUndefined(value) && advancedSetting.summaryresult === '1') {
+      content = _.round(parseFloat(value) * 100, dot || 0).toFixed(dot || 0) + '%';
+    }
+
+    if (advancedSetting.prefix || advancedSetting.suffix) {
       content = (advancedSetting.prefix || '') + content + (advancedSetting.suffix || '');
     }
 
     return (
-      <Box className="customFormControlBox customFormTextareaBox customFormReadonly customFormSubtotal">
-        {content}
-        {!!recordId && (
-          <span
-            data-tip={loading ? _l('刷新中...') : _l('刷新')}
-            className="tip-top Font14 mLeft5 Gray_9e ThemeHoverColor3 pointer"
-            onClick={this.onRefresh}
-          >
-            <RefreshBtn className="icon-workflow_cycle" isLoading={loading} />
-          </span>
-        )}
-      </Box>
+      <Box className="customFormControlBox customFormTextareaBox customFormReadonly customFormSubtotal">{content}</Box>
     );
   }
 }

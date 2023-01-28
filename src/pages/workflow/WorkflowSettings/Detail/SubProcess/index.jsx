@@ -5,6 +5,7 @@ import process from '../../../api/process';
 import { DetailHeader, DetailFooter, SelectNodeObject, UpdateFields } from '../components';
 import { NODE_TYPE } from '../../enum';
 import ProcessVariables from '../../ProcessConfig/components/ProcessVariables';
+import _ from 'lodash';
 
 export default class SubProcess extends Component {
   constructor(props) {
@@ -14,7 +15,7 @@ export default class SubProcess extends Component {
       saveRequest: false,
       subProcessDialog: false,
       processVariables: [],
-      errorItems: [],
+      errorItems: {},
     };
   }
 
@@ -52,7 +53,7 @@ export default class SubProcess extends Component {
         appId: obj.subProcessId,
       })
       .then(result => {
-        this.setState({ data: result });
+        this.setState({ data: result, errorItems: {} });
       });
   }
 
@@ -70,6 +71,11 @@ export default class SubProcess extends Component {
   onSave = () => {
     const { data, saveRequest } = this.state;
     const { name, selectNodeId, executeType, subProcessId, nextExecute, fields } = data;
+
+    if (!selectNodeId) {
+      alert(_l('必须先选择一个对象'), 2);
+      return;
+    }
 
     if (saveRequest) {
       return;
@@ -192,7 +198,7 @@ export default class SubProcess extends Component {
             </div>
             <div className="mTop15">
               <Checkbox
-                className="InlineFlex"
+                className="InlineFlex TxtTop"
                 text={_l('子流程执行完毕后，再开始下一个节点')}
                 checked={data.nextExecute}
                 onClick={checked => this.updateSource({ nextExecute: !checked })}
@@ -229,20 +235,22 @@ export default class SubProcess extends Component {
           </Fragment>
         )}
 
-        <Dialog
-          visible={subProcessDialog}
-          className="subProcessDialog"
-          onCancel={() => this.setState({ subProcessDialog: false })}
-          onOk={this.saveSubPorcessOptions}
-          title={_l('参数设置')}
-        >
-          <ProcessVariables
-            processVariables={processVariables}
-            errorItems={errorItems}
-            setErrorItems={errorItems => this.setState({ errorItems })}
-            updateSource={processVariables => this.setState(processVariables)}
-          />
-        </Dialog>
+        {subProcessDialog && (
+          <Dialog
+            visible
+            className="subProcessDialog"
+            onCancel={() => this.setState({ subProcessDialog: false })}
+            onOk={this.saveSubPorcessOptions}
+            title={_l('参数设置')}
+          >
+            <ProcessVariables
+              processVariables={processVariables}
+              errorItems={errorItems}
+              setErrorItems={errorItems => this.setState({ errorItems })}
+              updateSource={processVariables => this.setState(processVariables)}
+            />
+          </Dialog>
+        )}
       </Fragment>
     );
   }
@@ -253,7 +261,7 @@ export default class SubProcess extends Component {
   saveSubPorcessOptions = () => {
     const { data, processVariables, errorItems } = this.state;
 
-    if (errorItems.filter(item => item).length) {
+    if (_.find(errorItems, o => o)) {
       alert(_l('有参数配置错误'), 2);
       return;
     }
@@ -288,10 +296,10 @@ export default class SubProcess extends Component {
     return (
       <Fragment>
         <DetailHeader
-          data={{ ...data, selectNodeType: this.props.selectNodeType }}
+          {...this.props}
+          data={{ ...data }}
           icon="icon-subprocess"
           bg="BGBlueAsh"
-          closeDetail={this.props.closeDetail}
           updateSource={this.updateSource}
         />
         <div className="flex mTop20">
@@ -299,7 +307,7 @@ export default class SubProcess extends Component {
             <div className="workflowDetailBox">{this.renderContent()}</div>
           </ScrollView>
         </div>
-        <DetailFooter isCorrect={data.selectNodeId} onSave={this.onSave} closeDetail={this.props.closeDetail} />
+        <DetailFooter {...this.props} isCorrect={data.selectNodeId} onSave={this.onSave} />
       </Fragment>
     );
   }

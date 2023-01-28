@@ -17,12 +17,8 @@ import appManagement from 'src/api/appManagement';
 import projectSetting from 'src/api/projectSetting';
 import { Select } from 'antd';
 import WorkflowMonitor from './components/WorkflowMonitor';
-
-const {
-  admin: {
-    homePage: { extendWorkflow, renewBtn },
-  },
-} = window.private;
+import _ from 'lodash';
+import moment from 'moment';
 
 const tablist = [{ tab: 'workflowList', tabName: _l('工作流') }, { tab: 'monitorTab', tabName: _l('监控') }];
 
@@ -34,6 +30,8 @@ const typeList = [
   { label: _l('Webhook'), value: 6 },
   { label: _l('子流程'), value: 8 },
   { label: _l('自定义动作'), value: 7 },
+  { label: _l('审批流程'), value: 11 },
+  { label: _l('封装业务流程'), value: 10 },
 ];
 
 @errorBoundary
@@ -254,7 +252,7 @@ export default class AdminWorkflowList extends Component {
    * 渲染单个列表项
    */
   renderListItem(item) {
-    const { list } = this.state;
+    const { list, loading } = this.state;
 
     return (
       <div className="flexRow manageList" key={item.id}>
@@ -273,9 +271,14 @@ export default class AdminWorkflowList extends Component {
             <div className="ellipsis Font12 Gray_bd">{item.apkName}</div>
           </div>
         </div>
-        <div className="columnWidth">{item.count.toString().replace(/(\d)(?=(\d{3})+$)/g, '$1,')}</div>
+        <div className="columnWidth">{loading ? '-' : item.count.toString().replace(/(\d)(?=(\d{3})+$)/g, '$1,')}</div>
         <div className="columnWidth">
-          <PublishBtn list={list} item={item} updateSource={list => this.setState({ list })} />
+          <PublishBtn
+            disabled={item.startAppType === 9}
+            list={list}
+            item={item}
+            updateSource={list => this.setState({ list })}
+          />
         </div>
         <div className="columnWidth Gray_9e">
           {(START_APP_TYPE[item.child ? 'subprocess' : item.startAppType] || {}).text}
@@ -357,8 +360,50 @@ export default class AdminWorkflowList extends Component {
   }, 200);
 
   changeTab = tab => {
-    localStorage.setItem('workflowTab', tab);
+    safeLocalStorageSetItem('workflowTab', tab);
     this.setState({ activeTab: tab });
+  };
+
+  refresh = () => {
+    const { projectId } = this.props.match.params;
+    const { apkId, enabled, processListType, isAsc, keyWords, pageIndex, sortId, activeTab } = this.state;
+    if (activeTab !== 'workflowList') {
+      this.setState({ dateNow: Date.now() });
+    } else {
+      this.setState({ loading: true });
+      processVersion
+        .init({
+          companyId: projectId,
+          keyword: keyWords,
+          pageIndex,
+          pageSize: 30,
+        })
+        .then(res => {
+          if (res) {
+            processVersion
+              .getProcessByCompanyId({
+                companyId: projectId,
+                apkId,
+                enabled,
+                processListType,
+                isAsc,
+                keyWords,
+                pageIndex: 1,
+                pageSize: 30,
+                sortId,
+              })
+              .then(res => {
+                this.setState({
+                  list: res.processes,
+                  count: res.count,
+                  loading: false,
+                });
+              });
+          } else {
+            this.setState({ loading: false });
+          }
+        });
+    }
   };
 
   render() {
@@ -387,7 +432,6 @@ export default class AdminWorkflowList extends Component {
       { label: _l('关闭'), value: 2 },
     ];
     const licenseType = md.global.Account.projects.find(o => o.projectId === params.projectId).licenseType;
-
     return (
       <div className="adminWorkflowList flex flexColumn">
         <div className="wokflowInfoHeader flexRow">
@@ -403,12 +447,21 @@ export default class AdminWorkflowList extends Component {
               </div>
             ))}
           </div>
-          {activeTab === 'workflowList' && (
-            <div className="pointer ThemeHoverColor3 Gray_9e" onClick={() => this.setState({ msgVisible: true })}>
-              <Icon icon="workflow_sms" />
-              <span className="mLeft5">{_l('短信模版')}</span>
+          <div className="pre">
+            <div
+              className={cx('refresh Hand Font20', { mRight24: activeTab === 'workflowList' })}
+              onClick={this.refresh}
+            >
+              <Icon icon="task-later" />
             </div>
-          )}
+
+            {activeTab === 'workflowList' && (
+              <div className="pointer ThemeHoverColor3 Gray_9e" onClick={() => this.setState({ msgVisible: true })}>
+                <Icon icon="workflow_sms" />
+                <span className="mLeft5">{_l('短信模版')}</span>
+              </div>
+            )}
+          </div>
         </div>
         {activeTab === 'workflowList' ? (
           <Fragment>
@@ -444,21 +497,21 @@ export default class AdminWorkflowList extends Component {
                     {(((limitExecCount - useExecCount) / limitExecCount) * 100 || 0).toFixed(2)}%
                   </span>
 
-                  {licenseType === 1 ? (
+                  {/* {licenseType === 1 ? (
                     <Link
-                      className={cx('ThemeColor3 ThemeHoverColor2 mLeft20 NoUnderline', { Hidden: extendWorkflow })}
+                      className="ThemeColor3 ThemeHoverColor2 mLeft20 NoUnderline"
                       to={`/admin/expansionservice/${params.projectId}/workflow`}
                     >
                       {_l('购买升级包')}
                     </Link>
                   ) : (
                     <Link
-                      className={cx('ThemeColor3 ThemeHoverColor2 mLeft20 NoUnderline', { Hidden: renewBtn })}
+                      className="ThemeColor3 ThemeHoverColor2 mLeft20 NoUnderline"
                       to={`/upgrade/choose?projectId=${params.projectId}`}
                     >
                       {_l('购买付费版')}
                     </Link>
-                  )}
+                  )} */}
                 </Fragment>
               ) : (
                 _l('加载中...')
@@ -557,7 +610,7 @@ export default class AdminWorkflowList extends Component {
         ) : (
           <Fragment>
             <AdminTitle prefix={_l('工作流')} />
-            <WorkflowMonitor match={this.props.match} />
+            <WorkflowMonitor match={this.props.match} dateNow={this.state.dateNow} />
           </Fragment>
         )}
 
@@ -565,6 +618,7 @@ export default class AdminWorkflowList extends Component {
           <MsgTemplate
             companyId={params.projectId}
             api={flowNode.getAllSMSTemplateList}
+            deleteSMSTemplate={flowNode.deleteSMSTemplate}
             closeLayer={() => this.setState({ msgVisible: false })}
           />
         )}

@@ -1,6 +1,6 @@
 import React, { PureComponent } from 'react';
 import ReactDOM from 'react-dom';
-import 'emotion';
+import 'src/components/emotion/emotion';
 import Avatar from '../baseComponent/avatar';
 import Star from '../baseComponent/star';
 import { formatInboxItem } from '../../util';
@@ -11,8 +11,8 @@ import ExecDialog from 'src/pages/workflow/components/ExecDialog';
 import linkify from 'linkifyjs/html';
 import xss from 'xss';
 import ErrorDialog from 'src/pages/worksheet/common/WorksheetBody/ImportDataFromExcel/ErrorDialog';
+import TaskCenterController from 'src/api/taskCenter';
 
-const TaskCenterController = require('src/api/taskCenter');
 /**
  * 系统消息
  * @export
@@ -57,11 +57,11 @@ export default class SystemMessage extends PureComponent {
         // 群组 和 好友
         if (href.indexOf('addresslist') > -1) {
           evt.preventDefault();
-          const { type, gId } = getRequest(href.slice(href.indexOf('?')));
+          const { type, gid } = getRequest(href.slice(href.indexOf('?')));
 
-          if (type === 'group' && gId) {
+          if (type === 'group' && gid) {
             settingGroups({
-              groupId: gId,
+              groupId: gid,
               viewType: 1,
             });
           } else {
@@ -97,6 +97,20 @@ export default class SystemMessage extends PureComponent {
           new ErrorDialog({ fileKey: id[0] });
           return;
         }
+        // 工作表导入
+        if (href.indexOf('excelbatcherrorpage') > -1) {
+          evt.preventDefault();
+          const id = href.slice(href.indexOf('excelbatcherrorpage') + 15).split('/');
+          new ErrorDialog({ fileKey: id[1], isBatch: true });
+          return;
+        }
+
+        // MAP平台
+        if (href.indexOf('map/admin') > -1 || href.indexOf('map/packages') > -1) {
+          evt.preventDefault();
+          window.open(href);
+          return;
+        }
       });
     }
   }
@@ -113,7 +127,10 @@ export default class SystemMessage extends PureComponent {
     };
 
     delete xss.whiteList.video;
-
+    let content = (Message.content || '');
+    if (md.global.Account.isPortal) {
+      content = content.replace(/<a data-accountid=[^>]*/gi, '<a');//外部门户不能点击用户
+    }
     return (
       <div className="messageItem">
         <div className="Left">

@@ -9,12 +9,14 @@ import { TagTextarea, Dropdown, Checkbox } from 'ming-ui';
 import PointerConfig from '../PointerConfig';
 import NumberUnit from '../NumberUnit';
 import ColumnListDropdown from '../ColumnListDropdown';
-import { handleAdvancedSettingChange } from 'src/pages/widgetConfig/util/setting';
+import { getAdvanceSetting, handleAdvancedSettingChange } from 'src/pages/widgetConfig/util/setting';
 import { getControlValue, getControlTextValue, getFormulaControls, genControlTag } from '../../../util/data';
 import { FORMULA } from './enum';
 import FnList from './FnList';
 import { SettingItem } from '../../../styled';
 import PreSuffix from '../PreSuffix';
+import NumberConfig from '../ControlSetting/NumberConfig';
+import { filterOnlyShowField } from 'src/pages/widgetConfig/util';
 
 export default class Formula extends React.Component {
   constructor(props) {
@@ -256,8 +258,9 @@ export default class Formula extends React.Component {
     let { data, allControls, worksheetData, onChange } = this.props;
     const { selectColumnVisible, showInSideFormulaSelect, shoOutSideFormulaSelect, calType, fnmatch } = this.state;
     const dataSource = data.dataSource || '';
-    const nullzero = _.get(data.advancedSetting || {}, 'nullzero');
+    const { nullzero, numshow } = getAdvanceSetting(data);
     let formulaValue = this.getFormulaFromDataSource(calType, dataSource);
+    const filterAllControls = filterOnlyShowField(allControls);
     const fnListEle = (
       <FnList
         fnmatch={showInSideFormulaSelect ? fnmatch : ''}
@@ -322,9 +325,10 @@ export default class Formula extends React.Component {
               />
               {showInSideFormulaSelect && fnListEle}
               <ColumnListDropdown
+                showSearch
                 visible={selectColumnVisible}
                 onClickAway={this.hideSelectColumn}
-                list={getFormulaControls(allControls, data).map(data => ({
+                list={getFormulaControls(filterAllControls, data).map(data => ({
                   value: data.controlId,
                   filterValue: data.controlName,
                   element: _.isEmpty(worksheetData) ? (
@@ -376,11 +380,14 @@ export default class Formula extends React.Component {
             />
           </SettingItem>
         )}
-        <SettingItem>
-          <div className="settingItemTitle">{_l('单位')}</div>
-          <PreSuffix data={data} onChange={onChange} />
-        </SettingItem>
         <PointerConfig data={data} onChange={onChange} />
+        <NumberConfig data={data} onChange={onChange} />
+        {numshow !== '1' && (
+          <SettingItem>
+            <div className="settingItemTitle">{_l('单位')}</div>
+            <PreSuffix data={data} onChange={onChange} />
+          </SettingItem>
+        )}
       </div>
     );
   }

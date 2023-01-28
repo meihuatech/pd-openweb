@@ -2,12 +2,14 @@ import { arrayOf, func, shape, string, bool } from 'prop-types';
 import React, { useEffect, forwardRef, useImperativeHandle, useRef } from 'react';
 import styled from 'styled-components';
 import FunctionEditor from './FunctionEditor';
+import _ from 'lodash';
 
 const Con = styled.div`
-  padding: ${({ readOnly }) => (readOnly ? '10px 14px' : '20px 0 0;')}
+  padding: ${({ readOnly }) => (readOnly ? '4px 6px;' : '20px 0 0;')}
   height: 100%;
   display: flex;
   flex-direction: column;
+  position: relative;
 `;
 
 const Title = styled.div`
@@ -26,9 +28,9 @@ const Title = styled.div`
 const PlaceHolder = styled.div`
   z-index: 2;
   position: absolute;
-  left: 14px;
-  top: 14px;
-  color: #9e9e9e;
+  left: 10px;
+  top: 9px;
+  color: #bdbdbd;
   font-size: 14px;
 `;
 
@@ -48,7 +50,7 @@ const Editor = styled.div`
 `;
 
 function CodeEdit(props, ref) {
-  const { mode, value, title, placeholder, controls, renderTag, onClick = () => {} } = props;
+  const { mode, type, value, title, placeholder, controls, renderTag, onClick = () => {} } = props;
   const readOnly = mode === 'read';
   const editorDomRef = useRef();
   const editorRef = useRef();
@@ -59,10 +61,16 @@ function CodeEdit(props, ref) {
         options: { readOnly: mode === 'read' ? 'nocursor' : undefined },
         getControlName: controlId => (_.find(controls, { controlId }) || {}).controlName,
         renderTag,
+        type,
       });
       editorRef.current = window.functionEditor = functionEditor;
     }
   }, []);
+  useEffect(() => {
+    if (readOnly && editorRef.current) {
+      editorRef.current.editor.setValue(value);
+    }
+  }, [value]);
   useImperativeHandle(ref, () => ({
     insertTag: (tag, position, type) => {
       editorRef.current.insertTag(tag, position, type);
@@ -71,6 +79,7 @@ function CodeEdit(props, ref) {
       editorRef.current.insertFn(value, position);
     },
     getValue: () => editorRef.current.editor.getValue(),
+    setValue: v => editorRef.current.editor.setValue(v),
   }));
   return (
     <Con readOnly={readOnly} onClick={onClick}>
@@ -84,9 +93,10 @@ function CodeEdit(props, ref) {
 export default forwardRef(CodeEdit);
 
 CodeEdit.propTypes = {
-  value: string,
   mode: bool,
+  type: string,
   title: string,
+  value: string,
   placeholder: string,
   controls: arrayOf(shape({})),
   renderTag: func,

@@ -9,6 +9,7 @@ import { navigateTo } from 'src/router/navigateTo';
 import { isHaveCharge } from 'src/pages/worksheet/redux/actions/util';
 import * as sheetActions from 'src/pages/worksheet/redux/actions/index';
 import { getCustomWidgetUri } from 'src/pages/worksheet/constants/common';
+import moment from 'moment';
 
 let getAppSectionDetailRequest;
 
@@ -31,7 +32,7 @@ export function getSheetList(args) {
       const isCharge = isHaveCharge(data.appRoleType, data.isLock);
       dispatch({ type: 'SHEET_LIST_UPDATE_IS_CHARGE', isCharge });
       if (data.workSheetInfo.length) {
-        dispatch({ type: 'SHEET_LIST', data: data.workSheetInfo });
+        dispatch({ type: 'SHEET_LIST', data: data.workSheetInfo.map(s => ({ ...args, ...s })) });
       }
       const { worksheetId } = getState().sheet.base;
       const sheetInfo = _.find(data.workSheetInfo, { workSheetId: worksheetId }) || {};
@@ -58,6 +59,10 @@ export function updateSheetList(id, args) {
     });
     dispatch({ type: 'SHEET_LIST', data: list });
   };
+}
+
+export function clearSheetList() {
+  return { type: 'SHEET_LIST', data: [] };
 }
 
 export function updateSheetIconColor(iconColor) {
@@ -149,7 +154,7 @@ export function moveSheet(ages) {
   };
 }
 
-export function deleteSheet({ appId, groupId, worksheetId, type }) {
+export function deleteSheet({ appId, groupId, worksheetId, projectId, type }) {
   return function (dispatch, getState) {
     const { data: sheetList } = getState().sheetList;
     const deleteFun = function (data, type) {
@@ -173,7 +178,9 @@ export function deleteSheet({ appId, groupId, worksheetId, type }) {
     appManagementAjax
       .removeWorkSheetForApp({
         appId,
+        projectId,
         type,
+        isPermanentlyDelete: false,
         appSectionId: groupId,
         workSheetId: worksheetId,
       })
@@ -238,7 +245,7 @@ export function addWorkSheet(args, cb) {
     appManagementAjax
       .addWorkSheet({
         ...args,
-        icon: type === 0 ? '1_worksheet' : '1_0_home',
+        icon: type === 0 ? 'table' : 'dashboard',
       })
       .then(result => {
         const { pageId, workSheetId, templateId } = result;
@@ -249,6 +256,8 @@ export function addWorkSheet(args, cb) {
             data: {
               workSheetName: args.name,
               workSheetId: pageId,
+              navigateHide: false,
+              status: 1,
               ...pick(args, ['icon', 'iconColor', 'iconUrl', 'type']),
             },
           });

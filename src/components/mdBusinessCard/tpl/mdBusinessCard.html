@@ -1,4 +1,4 @@
-﻿{{ var data = it.data, isGroup = it.type === 2, isUser = it.type === 1; }} {{? isUser }}
+{{ var data = it.data, isGroup = it.type === 2, isUser = it.type === 1; }} {{? isUser }}
 <!--user-->
 <div class="cardHeader">
     {{?data.status === 3}}
@@ -36,24 +36,34 @@
         </div>
         {{?? isUser }}
         <div class="cardContentDesc userCard">
-            {{?data.currentProjectName}} {{?data.orgName}}
-            <span class="overflow_ellipsis contentItem">{{!data.orgName}}</span>
+            {{?data.currentProjectName}} {{?(data.orgName || data.profession)}}
+            <span class="overflow_ellipsis contentItem ">
+                {{?data.orgName}}
+                <span class="orgName">{{!data.orgName}}</span>
+                {{?}}
+                {{?(data.orgName && data.profession)}}
+                <span>|</span>
+                {{?}}
+                {{?data.profession}}
+                <span title="{{!data.profession}}">{{!data.profession}}</span>
+                {{?}}
+            </span>
             {{?}} {{?data.currentJobNumber}}
-            <span class="overflow_ellipsis contentItem">{{!data.currentJobNumber}}</span>
+            <span class="overflow_ellipsis contentItem" title="{{!data.currentJobNumber}}">{{!data.currentJobNumber}}</span>
             {{?}} {{??}}
             <span class="contentTagItemCon">
                 {{?data.companyName}}
-                <span class="contentItemLeft">{{!data.companyName}}</span>
+                <span class="contentItemLeft" title="{{!data.companyName}}">{{!data.companyName}}</span>
                 {{?}} {{?!data.currentProjectName}}
                 <span class="contentTagItem">{{= _l('外协')}}</span>
                 {{?}}
             </span>
             {{?data.profession}}
-            <span class="overflow_ellipsis contentItem">{{!data.profession}}</span>
+            <span class="overflow_ellipsis contentItem" title="{{!data.profession}}">{{!data.profession}}</span>
             {{?}} {{?}} {{?data.email}}
-            <span class="overflow_ellipsis contentItem">{{!data.email}}</span>
+            <span class="overflow_ellipsis contentItem" title="{{!data.email}}">{{!data.email}}</span>
             {{?}} {{?data.mobilePhone}}
-            <span class="overflow_ellipsis contentItem">{{!data.mobilePhone}}</span>
+            <span class="overflow_ellipsis contentItem" title="{{!data.mobilePhone}}">{{!data.mobilePhone}}</span>
             {{?}} {{? !data.nodata && !data.profession && !data.email && !data.mobilePhone }}
             <span class="overflow_ellipsis contentItem Gray_c">{{= _l('这个家伙什么也没有留下')}}~</span>
             {{?}}
@@ -63,7 +73,6 @@
         <div class="cardContentDesc">
             {{? it.secretType === 0 }}
             <span class="contentItem">{{= _l('开放沟通 扁平协作')}}</span>
-            <span class="contentItem">010-53153053</span>
             {{??}}
             <span class="contentItem">{{= _l('原负责人已经离职，由企业小秘书托管')}}</span>
             <span class="contentItem">{{= _l('你可以联系管理员进行移交')}}</span>

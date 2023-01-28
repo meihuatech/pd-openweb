@@ -3,10 +3,13 @@ import styled from 'styled-components';
 import withClickAway from 'ming-ui/decorators/withClickAway';
 import update from 'immutability-helper';
 import { Checkbox } from 'ming-ui';
-import { getControls, filterControls } from '../util';
+import { getControls, filterControls, getOtherSelectField } from '../util';
 import { SelectFieldsWrap } from 'src/pages/widgetConfig/styled';
 import { getIconByType } from '../../../../util';
-import { SYSTEM_CONTROL } from '../../../../config/widget';
+import { SYSTEM_CONTROL, WORKFLOW_SYSTEM_CONTROL, SYSTEM_PERSON_CONTROL } from '../../../../config/widget';
+import { DYNAMIC_FROM_MODE } from '../config';
+import { SYS_CONTROLS } from 'src/pages/widgetConfig/config/widget';
+import _ from 'lodash';
 
 const Empty = styled.div`
   color: #9e9e9e;
@@ -14,6 +17,10 @@ const Empty = styled.div`
   text-align: center;
   background-color: #fff;
 `;
+
+const filterSys = (controls = []) => {
+  return controls.filter(i => !_.includes(SYS_CONTROLS, i.controlId));
+};
 
 @withClickAway
 export default class SelectFields extends Component {
@@ -42,6 +49,35 @@ export default class SelectFields extends Component {
     const { value } = e.target;
     this.setState({ searchValue: value });
   };
+
+  getSheetList = (subListControls, initSheetList) => {
+    const { data = {}, from, parentControl } = this.props;
+    // 自定义默认值
+    if (_.includes([DYNAMIC_FROM_MODE.CREATE_CUSTOM], from)) return initSheetList;
+    if (_.includes([DYNAMIC_FROM_MODE.SEARCH_PARAMS], from)) {
+      // (查询参数 && 非对象数组内字段)不支持关联记录
+      if (!data.dataSource) {
+        return initSheetList;
+      } else {
+        return initSheetList.concat(
+          [parentControl].map(item => ({
+            id: item.controlId,
+            name: item.type === 34 ? _l('子表 “%0”', item.controlName) : _l('关联记录 “%0”', item.controlName),
+          })),
+        );
+      }
+    }
+
+    // 关联多条----关联单条、多条（列表除外）
+    const filterSubListControls = filterControls(data, subListControls);
+    return initSheetList.concat(
+      filterSubListControls.map(item => ({
+        id: item.controlId,
+        name: item.type === 35 ? _l('级联选择 “%0”', item.controlName) : _l('关联记录 “%0”', item.controlName),
+      })),
+    );
+  };
+
   filterFieldList = () => {
     const { from, globalSheetInfo, controls, data = {} } = this.props;
     const subListControls = this.omitSelfAndNest(controls) || [];
@@ -55,19 +91,14 @@ export default class SelectFields extends Component {
             { id: 'current', name: _l('当前子表记录') },
           ]
         : [{ id: 'current', name: _l('当前记录') }];
-    // 关联多条----关联单条、多条（列表除外）
-    const filterSubListControls = filterControls(data, subListControls);
-    // 获取当前记录和关联表控件
-    const sheetList = initSheetList.concat(
-      filterSubListControls.map(item => ({
-        id: item.controlId,
-        name: item.type === 35 ? _l('级联选择 “%0”', item.controlName) : _l('关联记录 “%0”', item.controlName),
-      })),
-    );
+
+    // 获取当前记录和关联表控件(自定义默认值)
+    const sheetList = this.getSheetList(subListControls, initSheetList);
+
     // 获取当前表的控件
     const fieldList = {
-      current: getControls({ data, controls: subListControls, isCurrent: true }),
-      [worksheetId]: getControls({ data, controls: globalSheetControls, isCurrent: true }),
+      current: getControls({ data, controls: filterSys(subListControls), isCurrent: true }),
+      [worksheetId]: getControls({ data, controls: filterSys(globalSheetControls), isCurrent: true }),
     };
     // 获取关联表控件下的所有符合条件的字段
     sheetList.slice(initSheetList.length).forEach(({ id }) => {
@@ -76,7 +107,9 @@ export default class SelectFields extends Component {
       let relationControls = _.get(relateSheetControl, 'relationControls') || [];
       // 如果relationControl没有返回系统字段， 则手动添加上
       if (!relationControls.some(item => item.controlId === 'ctime')) {
-        relationControls = relationControls.concat(SYSTEM_CONTROL);
+        relationControls = relationControls
+          .concat([...SYSTEM_CONTROL, ...WORKFLOW_SYSTEM_CONTROL, ...SYSTEM_PERSON_CONTROL])
+          .filter(i => !_.includes(['wfstatus'], i));
       }
 
       const filteredRelationControls = getControls({ data, controls: relationControls });
@@ -91,14 +124,19 @@ export default class SelectFields extends Component {
     return { sheetList, filteredList };
   };
   isMultiUser = data => {
-    return data.type === 26 && data.enumDefault === 1;
+    return _.includes([26, 27], data.type) && data.enumDefault === 1;
   };
   handleMultiUserClick = para => {
     const { checked, relateSheetControlId, fieldId } = para;
     const { onMultiUserChange, dynamicValue } = this.props;
     const newValue = checked
       ? update(dynamicValue, {
-          $push: [{ cid: fieldId, rcid: relateSheetControlId, staticValue: '' }],
+          $push: [
+            {
+              ...{ cid: fieldId, rcid: relateSheetControlId, staticValue: '' },
+              ...(para.isAsync ? { isAsync: true } : {}),
+            },
+          ],
         })
       : update(dynamicValue, {
           $splice: [[_.findIndex(dynamicValue, item => item.cid === fieldId && item.rcid === relateSheetControlId), 1]],
@@ -108,21 +146,27 @@ export default class SelectFields extends Component {
   getControlCount = list => {
     return _.keys(list).reduce((p, c) => p + (list[c] || []).length, 0);
   };
+  getOtherCount = data => {
+    return data.reduce((p, c) => {
+      return (p.list || []).length + (c.list || []).length;
+    }, 0);
+  };
   render() {
     const { searchValue } = this.state;
     const { onClick, data, dynamicValue } = this.props;
+    const otherList = getOtherSelectField(data, searchValue);
     const { sheetList, filteredList } = this.filterFieldList();
-    const filteredControlCount = this.getControlCount(filteredList);
+    const filteredControlCount = this.getControlCount(filteredList) + this.getOtherCount(otherList);
     return (
       <SelectFieldsWrap>
         <div className="search">
           <i className="icon-search Gray_9e" />
-          <input value={searchValue} onChange={this.handleChange} placeholder={_l('搜索字段')}></input>
+          <input value={searchValue} onChange={this.handleChange} placeholder={_l('搜索字段')} autoFocus></input>
         </div>
         <div className="fieldsWrap">
           {sheetList.map(({ id: recordId, name }) => {
             const list = filteredList[recordId];
-            return list.length > 0 ? (
+            return list && list.length > 0 ? (
               <ul className="relateSheetList">
                 <li>
                   <div className="title">
@@ -147,6 +191,7 @@ export default class SelectFields extends Component {
                               this.handleMultiUserClick({
                                 checked: !checked,
                                 ...ids,
+                                isAsync: data.type === 27 && type === 26,
                               });
                             }}
                           >
@@ -158,6 +203,26 @@ export default class SelectFields extends Component {
                         <li className="overflow_ellipsis" onClick={() => onClick(ids)}>
                           <i className={`icon-${getIconByType(type)}`}></i>
                           <span className="overflow_ellipsis">{controlName}</span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </li>
+              </ul>
+            ) : null;
+          })}
+          {otherList.map(({ list, name }) => {
+            return list.length > 0 ? (
+              <ul className="relateSheetList">
+                <li>
+                  <div className="title">
+                    <span>{name}</span>
+                  </div>
+                  <ul className="fieldList">
+                    {list.map(({ text, id }) => {
+                      return (
+                        <li className="overflow_ellipsis" onClick={() => onClick({ fieldId: id })}>
+                          <span className="overflow_ellipsis">{text}</span>
                         </li>
                       );
                     })}

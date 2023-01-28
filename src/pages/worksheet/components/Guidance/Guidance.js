@@ -3,6 +3,7 @@ import { Button, Icon } from 'ming-ui';
 import Trigger from 'rc-trigger';
 import cx from 'classnames';
 import './Guidance.less';
+import _ from 'lodash';
 
 const maxGuide = 7;
 
@@ -57,15 +58,7 @@ export default class Guidance extends Component {
       info: _l('通过工作流，你可以将业务中的重复工作自动化执行，还可以发通知、短信，对接外部系统，彻底打通上下游业务。'),
     }, {
       title: _l('恭喜！你完成了教学'),
-      info: (
-        <Fragment>
-          <div>
-            {_l('现在开始搭建你自己的业务系统吧，你可以随时点击右上角的')}
-            <Icon className="Gray mLeft5 mRight5 Font15" icon="help"/>
-            {_l('获得帮助。')}
-          </div>
-        </Fragment>
-      ),
+      info: _l('现在开始搭建你自己的业务系统吧。'),
     }];
     return guideTextList[guide];
   }
@@ -75,7 +68,7 @@ export default class Guidance extends Component {
     const base = {
       width: width + extraWidth,
       height: height + extraHeight,
-      top : top - (extraHeight / 2),
+      top: top - (extraHeight / 2),
     }
     if (direction == 'left') {
       return {
@@ -91,7 +84,7 @@ export default class Guidance extends Component {
   }
   saveGuide = () => {
     const { guide } = this.state;
-    localStorage.setItem('guide', guide);
+    safeLocalStorageSetItem('guide', guide);
     if (guide === 2) {
       const moreOperate = document.querySelector('.worksheetCompHeader .moreOperate ul');
       if (moreOperate) {

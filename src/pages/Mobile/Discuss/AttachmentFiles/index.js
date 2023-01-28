@@ -5,6 +5,7 @@ import { Icon, Progress } from 'ming-ui';
 import './index.less';
 import { getRandomString, getClassNameByExt, getToken } from 'src/util';
 import { checkFileAvailable } from 'src/components/UploadFiles/utils.js';
+import previewAttachments from 'src/components/previewAttachments/previewAttachments';
 
 const formatResponseData = (file, response) => {
   const item = {};
@@ -59,14 +60,15 @@ export class UploadFileWrapper extends Component {
         }
 
         self.uploading = true;
-        let isAvailable;
+
         if (advancedSetting) {
+          let isAvailable;
           let tempCount = self.props.originCount || 0;
           isAvailable = checkFileAvailable(advancedSetting, files, tempCount);
-        }
-        if (!isAvailable) {
-          self.onRemoveAll(uploader);
-          return;
+          if (!isAvailable) {
+            self.onRemoveAll(uploader);
+            return;
+          }
         }
         const tokenFiles = [];
         files
@@ -153,8 +155,10 @@ export class UploadFileWrapper extends Component {
         self.uploading = false;
       },
       Error(uploader, error) {
-        if (error.code == -600) {
-          Toast.info('附件总大小超过 ' + utils.formatFileSize(md.global.SysSettings.fileUploadLimitSize * 1024 * 1024) + '，请您分批次上传');
+        if (error.code === window.plupload.FILE_SIZE_ERROR) {
+          Toast.info(_l('单个文件大小超过%0，无法支持上传', utils.formatFileSize(md.global.SysSettings.fileUploadLimitSize * 1024 * 1024)));
+        } else {
+          Toast.info(_l('上传失败，请稍后再试。'));
         }
       },
       Init() {
@@ -162,13 +166,35 @@ export class UploadFileWrapper extends Component {
         const { inputType, disabledGallery, advancedSetting = {} } = self.props;
         const { filetype } = advancedSetting;
         let type = filetype && JSON.parse(filetype).type;
-        const accept = { 1: 'image/*', 2: 'video/*' };
+        const accept = { 1: 'image/*', 2: 'video/*', 0: 'image/*,video/*' };
         const fileTypeObj = { 1: 'image/*', 2: 'image/*,video/*', 3: 'video/*', 4: 'video/*' };
-        if (ele && inputType) {
-          ele.setAttribute('accept', accept[inputType]);
-          ele.setAttribute('capture', 'camera');
-        } else if (type) {
-          ele.setAttribute('accept', fileTypeObj[type]);
+        const ua = window.navigator.userAgent.toLowerCase();
+        const isAndroid = ua.includes('android');
+        const isMiniprogram = ua.includes('miniprogram');
+        const isFeishu = ua.includes('feishu');
+        const equipment = type === 3 ? 'microphone' : type === 4 ? 'camcorder' : 'camera';
+        if (ele) {
+          if (isAndroid && isMiniprogram) {
+            ele.removeAttribute('multiple');
+            if (disabledGallery) {
+              ele.setAttribute('accept', accept[inputType]);
+              ele.setAttribute('capture', 'camera');
+            } else if (type || inputType) {
+              ele.setAttribute('accept', accept[inputType]);
+              ele.setAttribute('capture', equipment);
+            } else {
+              ele.setAttribute('accept', 'image/*');
+            }
+            return;
+          }
+          if (inputType || disabledGallery) {
+            ele.setAttribute('accept', accept[inputType]);
+            ele.setAttribute('capture', 'camera');
+          } else if (type) {
+            ele.setAttribute('accept', fileTypeObj[type]);
+          } else if (!(isFeishu && isAndroid)) {
+            ele.setAttribute('accept', accept[inputType]);
+          }
         }
       },
     };
@@ -216,26 +242,29 @@ export default class AttachmentList extends Component {
     this.props.onChange(newFiles, true);
   }
   previewAttachment(index) {
-    const { attachments } = this.props;
+    const { attachments, hideDownload } = this.props;
     const { updateTime } = attachments[index];
-    require(['previewAttachments'], previewAttachments => {
-      previewAttachments({
-        index: index || 0,
-        attachments: updateTime
-          ? attachments
-          : attachments.map(item => {
-              return {
-                name: `${item.originalFileName || _l('未命名')}${item.fileExt}`,
-                path: `${item.previewUrl || item.url}`,
-                previewAttachmentType: 'QINIU',
-                size: item.fileSize,
-                fileid: item.fileID,
-              };
-            }),
-        callFrom: updateTime ? 'player' : 'chat',
-        showThumbnail: true,
-        hideFunctions: ['editFileName'],
-      });
+    const hideFunctions = ['editFileName'];
+    if (hideDownload) {
+      /* 是否不可下载 且 不可保存到知识和分享 */
+      hideFunctions.push('download', 'share', 'saveToKnowlege');
+    }
+    previewAttachments({
+      index: index || 0,
+      attachments: updateTime
+        ? attachments
+        : attachments.map(item => {
+            return {
+              name: `${item.originalFileName || _l('未命名')}${item.fileExt}`,
+              path: `${item.previewUrl || item.url}`,
+              previewAttachmentType: 'QINIU',
+              size: item.fileSize,
+              fileid: item.fileID,
+            };
+          }),
+      callFrom: updateTime ? 'player' : 'chat',
+      showThumbnail: true,
+      hideFunctions,
     });
   }
   renderImage(item, index) {

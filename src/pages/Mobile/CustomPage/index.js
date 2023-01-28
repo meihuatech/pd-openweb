@@ -5,13 +5,17 @@ import { Flex, ActivityIndicator } from 'antd-mobile';
 import { ScrollView } from 'ming-ui';
 import Back from '../components/Back';
 import styled from 'styled-components';
-import customApi from 'src/pages/worksheet/common/Statistics/api/custom';
+import customApi from 'statistics/api/custom';
 import DocumentTitle from 'react-document-title';
 import GridLayout from 'react-grid-layout';
 import { getDefaultLayout } from 'src/pages/customPage/util';
 import WidgetDisplay from './WidgetDisplay';
+import { getEnumType } from 'src/pages/customPage/util';
 import AppPermissions from '../components/AppPermissions';
 import 'react-grid-layout/css/styles.css';
+import _ from 'lodash';
+
+const isMingdao = navigator.userAgent.toLowerCase().indexOf('mingdao application') >= 0;
 
 const getLayout = components =>
   components.map((item = {}, index) => {
@@ -37,12 +41,33 @@ const LayoutContent = styled.div`
     &.haveTitle {
       height: calc(100% - 40px);
     }
+    &.filter {
+      overflow: inherit;
+      box-shadow: none;
+      background-color: transparent;
+    }
   }
   .componentTitle {
     height: 32px;
     line-height: 32px;
     margin-bottom: 4px;
     font-size: 16px;
+  }
+`;
+
+const EmptyData = styled.div`
+  .iconWrap {
+    width: 130px;
+    height: 130px;
+    border-radius: 50%;
+    margin: 0 auto;
+    background-color: #e6e6e6;
+    text-align: center;
+    padding-top: 35px;
+    i {
+      font-size: 60px;
+      color: #bdbdbd;
+    }
   }
 `;
 
@@ -53,6 +78,7 @@ export default class CustomPage extends Component {
     super(props);
     this.state = {
       loading: false,
+      apk: {},
       pageComponents: [],
       pagName: '',
     };
@@ -69,7 +95,7 @@ export default class CustomPage extends Component {
   }
   getPage(props) {
     const { params } = props.match;
-    const { appNaviStyle } = props;
+    const { appNaviStyle, appSection = [] } = props;
     let currentNavWorksheetId = localStorage.getItem('currentNavWorksheetId');
     let currentNavWorksheetInfo =
       currentNavWorksheetId &&
@@ -77,7 +103,7 @@ export default class CustomPage extends Component {
       JSON.parse(localStorage.getItem(`currentNavWorksheetInfo-${currentNavWorksheetId}`));
     if (appNaviStyle === 2 && currentNavWorksheetInfo) {
       this.setState({
-        pageComponents: currentNavWorksheetInfo.components.filter(item => item.mobile.visible),
+        pageComponents: ((currentNavWorksheetInfo || {}).components || []).filter(item => item.mobile.visible),
         loading: false,
         pagName: currentNavWorksheetInfo.name,
       });
@@ -88,8 +114,25 @@ export default class CustomPage extends Component {
           appId: params.worksheetId,
         })
         .then(result => {
-          localStorage.setItem(`currentNavWorksheetInfo-${params.worksheetId}`, JSON.stringify(result));
+          if (appNaviStyle === 2) {
+            let navSheetList = _.flatten(
+              appSection.map(item => {
+                item.workSheetInfo.forEach(sheet => {
+                  sheet.appSectionId = item.appSectionId;
+                });
+                return item.workSheetInfo;
+              }),
+            )
+              .filter(item => item.status === 1 && !item.navigateHide) //左侧列表状态为1 且 角色权限没有设置隐藏
+              .slice(0, 4);
+            navSheetList.forEach(item => {
+              if (item.workSheetId === params.worksheetId) {
+                safeLocalStorageSetItem(`currentNavWorksheetInfo-${params.worksheetId}`, JSON.stringify(result));
+              }
+            });
+          }
           this.setState({
+            apk: result.apk,
             pageComponents: result.components.filter(item => item.mobile.visible),
             loading: false,
             pagName: result.name,
@@ -113,12 +156,17 @@ export default class CustomPage extends Component {
   renderWithoutData() {
     return (
       <Flex justify="center" align="center" className="h100">
-        <div>{_l('此页面下暂无内容')}</div>
+        <EmptyData>
+          <div className="iconWrap">
+            <i className="icon-custom_widgets"></i>
+          </div>
+          <p className="Gray_75 TxtCenter mTop16">{_l('没有内容')}</p>
+        </EmptyData>
       </Flex>
     );
   }
   renderContent() {
-    const { pageComponents } = this.state;
+    const { apk, pageComponents } = this.state;
     const { params } = this.props.match;
     const layout = getLayout(pageComponents);
     return (
@@ -134,14 +182,18 @@ export default class CustomPage extends Component {
         layout={layout}
       >
         {pageComponents.map((widget, index) => {
-          const { id } = widget;
+          const { id, type } = widget;
           const { title, titleVisible } = widget.mobile;
+          const componentType = getEnumType(type);
           return (
             <LayoutContent key={`${id || index}`} className="resizableWrap">
               {titleVisible && <div className="componentTitle overflow_ellipsis Gray bold">{title}</div>}
-              <div className={cx('widgetContent', { haveTitle: titleVisible })}>
+              <div className={cx('widgetContent', componentType, { haveTitle: titleVisible })}>
                 <WidgetDisplay
-                  {..._.pick(widget, ['type', 'value', 'needUpdate', 'button', 'name', 'param'])}
+                  pageComponents={pageComponents}
+                  componentType={componentType}
+                  widget={widget}
+                  apk={apk}
                   ids={{
                     appId: params.appId,
                     groupId: params.groupId,
@@ -162,7 +214,7 @@ export default class CustomPage extends Component {
       <ScrollView className="h100 w100 GrayBG">
         <DocumentTitle title={pageTitle || pagName || _l('自定义页面')} />
         {loading ? this.renderLoading() : pageComponents.length ? this.renderContent() : this.renderWithoutData()}
-        {!location.href.includes('mobile/app') && (
+        {!(location.href.includes('mobile/app') || isMingdao) && (
           <Back
             className="low"
             onClick={() => {

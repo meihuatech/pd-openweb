@@ -1,10 +1,11 @@
 import React, { Fragment, Component } from 'react';
 import { Flex, ActivityIndicator, List, Toast } from 'antd-mobile';
 import Back from '../components/Back';
-import AddDialog from 'src/pages/Mobile/AppBoxInfo/AppDetails/AddDialog';
+import AddDialog from 'mobile/AppBoxInfo/AppDetails/AddDialog';
 import './index.less';
 import SvgIcon from 'src/components/SvgIcon';
 import axios from 'axios';
+import _ from 'lodash';
 const { Item } = List;
 
 export default class AddBoxList extends Component {
@@ -26,7 +27,8 @@ export default class AddBoxList extends Component {
     this.setState({
       loading: true,
     });
-    axios.post(`https://pd.mingdao.com/api/AppManagement/GetAppsLibraryInfo`, { categoryId }).then(result => {
+    let baseUrl = (md && md.global && md.global.SysSettings && md.global.SysSettings.templateLibraryTypes === '2') ? __api_server__.main : 'https://pd.mingdao.com/api/';
+    axios.post(`${baseUrl}AppManagement/GetAppsLibraryInfo`, { categoryId }).then(result => {
       const { data } = result.data;
       if (data) {
         this.setState({
@@ -51,7 +53,7 @@ export default class AddBoxList extends Component {
         libraryId: item.libraryId,
       });
     }
-  }
+  };
   renderAppsInfo() {
     const { dataBysearch } = this.state;
     return (
@@ -69,7 +71,8 @@ export default class AddBoxList extends Component {
                 className="valignWrapper install bold"
                 onClick={() => {
                   this.handleAddProject(item);
-                }}>
+                }}
+              >
                 {_l('添加')}
               </div>
             }
@@ -78,7 +81,8 @@ export default class AddBoxList extends Component {
                 return;
               }
               this.props.history.push(`/mobile/appBoxInfo/${item.libraryId}`);
-            }}>
+            }}
+          >
             <div className="bold Font16">{item.name}</div>
           </Item>
         ))}
@@ -111,7 +115,7 @@ export default class AddBoxList extends Component {
         <div className="content">
           {this.renderHome()}
           <AddDialog
-            getRef={ref => this.addDialogEl = ref}
+            getRef={ref => (this.addDialogEl = ref)}
             visible={this.state.showDialog}
             isMobile={true}
             onCancel={() => this.setState({ showDialog: false })}

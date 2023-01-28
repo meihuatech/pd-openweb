@@ -3,6 +3,7 @@ import PropTypes from 'prop-types';
 import cx from 'classnames';
 import { Menu, MenuItem } from 'ming-ui';
 import styled from 'styled-components';
+import _ from 'lodash';
 
 const ColumnListWrap = styled.div`
   position: absolute;
@@ -116,7 +117,8 @@ export default class ColumnListDropdown extends React.Component {
       <ColumnListWrap
         className={cx('columnListDropdown', {
           hide: !visible,
-        })}>
+        })}
+      >
         {showSearch && (
           <div className="header search flexRow">
             <i className="icon icon-workflow_find"></i>
@@ -136,8 +138,9 @@ export default class ColumnListDropdown extends React.Component {
         <div className="body columnlistCon">
           <Menu
             className="columnlist"
-            onClickAwayExceptions={[document.querySelector('.selectColumnToConcat')]}
-            onClickAway={onClickAway}>
+            onClickAwayExceptions={[document.querySelector('.columnListDropdown')]}
+            onClickAway={onClickAway}
+          >
             {list.length ? (
               list.map((column, i) => (
                 <MenuItem
@@ -146,7 +149,8 @@ export default class ColumnListDropdown extends React.Component {
                     if (_.isFunction(column.onClick)) {
                       column.onClick(column.value, i);
                     }
-                  }}>
+                  }}
+                >
                   {column.text || column.element}
                 </MenuItem>
               ))

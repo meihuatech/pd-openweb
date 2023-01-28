@@ -5,11 +5,13 @@ import { Tooltip, Icon } from 'ming-ui';
 import { htmlEncodeReg, htmlDecodeReg } from 'src/util';
 import cx from 'classnames';
 import { browserIsMobile } from 'src/util';
+import _ from 'lodash';
 
 const Wrapper = styled.div`
   background-color: #fff;
   box-shadow: 0 3px 6px -4px rgb(0 0 0 / 12%), 0 6px 16px 0 rgb(0 0 0 / 8%), 0 9px 28px 8px rgb(0 0 0 / 5%);
   border-radius: 4px;
+  margin-right: -33px;
   .ant-select-auto-complete {
     z-index: 2;
   }
@@ -196,12 +198,14 @@ const SearchRecord = props => {
       overlay={renderOverlay()}
       overlayStyle={{ zIndex: 100 }}
       visible={visible}
+      placement="bottomRight"
       onVisibleChange={visible => {
         setVisible(visible);
         if (visible) {
           setTimeout(() => {
-            document.querySelector('.searchRecordAutoComplete input').focus();
-          }, 100);
+            const input = document.querySelector('.searchRecordAutoComplete input');
+            input && input.focus();
+          }, 200);
         }
       }}
     >

@@ -1,9 +1,38 @@
 ﻿import React, { Component } from 'react';
 import Avatar from 'react-avatar-edit';
-import { Button } from 'ming-ui';
 import { Base64 } from 'js-base64';
-import { editAccountAvatar } from 'src/api/account';
+import accountAjax from 'src/api/account';
 import { getToken } from 'src/util';
+import { browserIsMobile } from 'src/util';
+import styled from 'styled-components';
+const Wrap = styled.div`
+  position: fixed;
+  bottom: 0;
+  height: 50px;
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+  padding: 6px 20px;
+  display: flex;
+  width: 100%;
+  background: #fff;
+  left: 0;
+  .cancle,
+  .save {
+    flex: 1;
+    height: 36px;
+    background: #ffffff;
+    border-radius: 22px;
+    opacity: 1;
+    border: 1px solid #dddddd;
+    color: #757575;
+    border: 1px solid #dddddd;
+    line-height: 36px;
+    &.save {
+      background: #2196f3;
+      color: #fff;
+      border: 1px solid #2196f3;
+    }
+  }
+`;
 
 export default class AvatarEditor extends Component {
   constructor(props) {
@@ -49,7 +78,7 @@ export default class AvatarEditor extends Component {
       return;
     }
     //1= 用户头像
-    getToken([{ bucket: 4, ext: '.png' }], 1).then(res => {
+    getToken([{ bucket: 4, ext: '.png' }], this.props.defaultType ? 0 : 1).then(res => {
       if (res.error) {
         alert(res.error);
       } else {
@@ -62,7 +91,7 @@ export default class AvatarEditor extends Component {
               this.props.editAvatar(res[0]);
               this.props.closeDialog();
             } else {
-              editAccountAvatar({ fileName: JSON.parse(xhr.responseText).key.replace('UserAvatar/', '') }).then(() => {
+              accountAjax.editAccountAvatar({ fileName: JSON.parse(xhr.responseText).key.replace('UserAvatar/', '') }).then(() => {
                 this.props.updateAvator();
                 this.props.closeDialog();
               });
@@ -85,10 +114,11 @@ export default class AvatarEditor extends Component {
     }
 
     return (
-      <div className="mTop25">
-        <div className="flexRow">
+      <div className="mTop25 pBottom25">
+        <div className="flexRow" style={{ minHeight: 200 }}>
           <Avatar
             label={_l('上传图片')}
+            labelStyle={{ display: 'block', cursor: 'pointer', fontWeight: 700, fontSize: '16px' }}
             width={200}
             height={200}
             imageWidth={200}
@@ -102,11 +132,32 @@ export default class AvatarEditor extends Component {
             <img src={preview || avatar} style={{ width: 80, height: 80, borderRadius: '50%' }} />
           </div>
         </div>
-        <div className="flexEnd">
-          <button type="button" className="ming Button Button--primary mTop20 saveBtn" onClick={this.onSave}>
-            {_l('完成')}
-          </button>
-        </div>
+        {!browserIsMobile() ? (
+          <div className="flexEnd">
+            <button type="button" className="ming Button Button--primary mTop20 saveBtn" onClick={this.onSave}>
+              {_l('完成')}
+            </button>
+          </div>
+        ) : (
+          <Wrap className="actionBox">
+            <div
+              className="cancle Font14 Bold mRight5 TxtCenter"
+              onClick={() => {
+                this.props.closeDialog();
+              }}
+            >
+              {_l('取消')}
+            </div>
+            <div
+              className="save Hand Font14 Bold mLeft5 TxtCenter"
+              onClick={() => {
+                this.onSave();
+              }}
+            >
+              {_l('确认')}
+            </div>
+          </Wrap>
+        )}
       </div>
     );
   }

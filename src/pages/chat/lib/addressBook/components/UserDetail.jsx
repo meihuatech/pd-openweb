@@ -1,23 +1,17 @@
 ﻿import React from 'react';
 import cx from 'classnames';
-
-import Icon from 'ming-ui/components/Icon';
-import LoadDiv from 'ming-ui/components/LoadDiv';
-import DropDown from 'ming-ui/components/Dropdown';
-import ScrollView from 'ming-ui/components/ScrollView';
-
+import Dropdown from 'ming-ui/components/Dropdown';
+import { Tooltip, Icon, LoadDiv, ScrollView, Dialog } from 'ming-ui';
 import Menu from 'ming-ui/components/Menu';
 import MenuItem from 'ming-ui/components/MenuItem';
-
 import { LazyloadImg } from 'src/pages/feed/components/common/img';
-
 import AddFriend from './AddFriend';
-
 import API, { removeFriend } from '../api';
 import { config } from '../config';
-
-const AddFriendConfirm = require('addFriendConfirm');
-const Confirm = require('confirm');
+import departmentController from 'src/api/department';
+import AddFriendConfirm from 'src/components/addFriendConfirm/addFriendConfirm';
+import _ from 'lodash';
+import moment from 'moment';
 
 const defaultState = {
   data: null,
@@ -27,6 +21,7 @@ const defaultState = {
   hasProjects: false,
   activeProjectId: '',
   dropDownValue: '',
+  fullDepartmentInfo: {},
 };
 
 export default class UserDetail extends React.Component {
@@ -59,10 +54,11 @@ export default class UserDetail extends React.Component {
       isLoading: true,
     });
     API.fetchUserDetail(accountId).then(
-      (data) => {
+      data => {
         if (data) {
+          data.userCards = (_.get(data, 'userCards') || []).filter(item => item.companyName);
           const { userCards } = data;
-          const hasProjects = userCards && userCards.length;
+          const hasProjects = userCards.length;
           this.setState({
             ...defaultState,
             // assign default state
@@ -84,7 +80,7 @@ export default class UserDetail extends React.Component {
           // assign default state
           data: undefined,
         });
-      }
+      },
     );
   }
 
@@ -97,12 +93,10 @@ export default class UserDetail extends React.Component {
 
   deleteFriendConfirm() {
     const { accountId } = this.props;
-    new Confirm(
-      {
-        content: _l('确认删除当前好友？'),
-        title: _l('删除后您将不显示在对方的好友列表里'),
-      },
-      () => {
+    Dialog.confirm({
+      title: _l('确认删除当前好友？'),
+      description: _l('删除后您将不显示在对方的好友列表里'),
+      onOk: () => {
         removeFriend(accountId).done(() => {
           alert(_l('删除成功'), 1);
           this.setState({
@@ -112,8 +106,8 @@ export default class UserDetail extends React.Component {
             },
           });
         });
-      }
-    );
+      },
+    });
   }
 
   renderFriendTag() {
@@ -265,10 +259,10 @@ export default class UserDetail extends React.Component {
     } = this.state;
     const projects = userCards.slice(0);
     const { activeProjectId, dropDownValue } = this.state;
-    const renderTab = (projects) => {
+    const renderTab = projects => {
       return (
         <React.Fragment>
-          {_.map(projects, (project) => {
+          {_.map(projects, project => {
             const isActive = activeProjectId === project.projectId;
             return (
               <div
@@ -307,7 +301,7 @@ export default class UserDetail extends React.Component {
           left: 'auto',
           right: '0px',
         },
-        onChange: (projectId) => {
+        onChange: projectId => {
           this.setState({
             activeProjectId: projectId,
             dropDownValue: projectId,
@@ -318,7 +312,7 @@ export default class UserDetail extends React.Component {
       return (
         <React.Fragment>
           {renderTab(prefix)}
-          <DropDown
+          <Dropdown
             className={cx('detail-tab', {
               'ThemeColor3 ThemeBorderColor3': otherProjectIds.indexOf(activeProjectId) !== -1,
               Gray_75: otherProjectIds.indexOf(activeProjectId) === -1,
@@ -330,14 +324,34 @@ export default class UserDetail extends React.Component {
     }
   }
 
+  getDepartmentFullName = (departmentData = []) => {
+    let { fullDepartmentInfo = {} } = this.state;
+    const departmentIds = departmentData.map(item => item.departmentId).filter(it => !fullDepartmentInfo[it]);
+    if (_.isEmpty(departmentIds)) {
+      return;
+    }
+    departmentController
+      .getDepartmentFullNameByIds({
+        projectId: this.state.activeProjectId,
+        departmentIds,
+      })
+      .then(res => {
+        res.forEach(it => {
+          fullDepartmentInfo[it.id] = it.name;
+        });
+        this.setState({ fullDepartmentInfo });
+      });
+  };
+
   renderProjectCard() {
     const placeHolder = <span className="Gray_bd">{_l('未填写')}</span>;
     const {
       data: { userCards },
       activeProjectId,
+      fullDepartmentInfo = {},
     } = this.state;
     const project = _.find(userCards, project => project.projectId === activeProjectId);
-    const { companyName, department, job, jobNumber, workSite, contactPhone } = project;
+    const { companyName, department, job, jobNumber, workSite, contactPhone, departmentInfos } = project;
     return (
       <div className="pTop5 Font13 mTop">
         <div className="detail-info-row">
@@ -346,7 +360,34 @@ export default class UserDetail extends React.Component {
         </div>
         <div className="detail-info-row">
           <span className="Gray_75">{_l('部门')}：</span>
-          {department || placeHolder}
+          {department ? (
+            <Tooltip
+              tooltipClass="departmentFullNametip"
+              popupPlacement="bottom"
+              text={
+                <div>
+                  {departmentInfos.map((v, depIndex) => {
+                    const fullName = (this.state.fullDepartmentInfo[v.departmentId] || '').split('/');
+                    return (
+                      <div className={cx({ mBottom8: depIndex < departmentInfos.length - 1 })}>
+                        {fullName.map((n, i) => (
+                          <span>
+                            {n}
+                            {fullName.length - 1 > i && <span className="mLeft8 mRight8">/</span>}
+                          </span>
+                        ))}
+                      </div>
+                    );
+                  })}
+                </div>
+              }
+              mouseEnterDelay={0.5}
+            >
+              <span onMouseEnter={() => this.getDepartmentFullName(departmentInfos)}>{department}</span>
+            </Tooltip>
+          ) : (
+            <span>{placeHolder}</span>
+          )}
         </div>
         <div className="detail-info-row">
           <span className="Gray_75">{_l('职位')}：</span>
@@ -402,8 +443,7 @@ export default class UserDetail extends React.Component {
 
   render() {
     const { isLoading, data } = this.state;
-    const { accountId } = this.props;
-    if (data === null) return null;
+    const { accountId, projectId, hideBackBtn } = this.props;
     if (isLoading) {
       return (
         <div className="pTop20">
@@ -411,12 +451,18 @@ export default class UserDetail extends React.Component {
         </div>
       );
     }
+    if (data === null) return null;
     if (!isLoading && data === undefined) {
       return <AddFriend accountId={accountId} />;
     }
     return (
       <ScrollView>
         <div className="contacts-detail-wrapper">
+          {projectId && !hideBackBtn && (
+            <div className="back Hand mBottom24" onClick={this.props.back}>
+              <Icon icon="arrow-left-border" /> {_l('返回')}
+            </div>
+          )}
           {this.renderHeader()}
           {this.renderDetail()}
           {this.renderProjectCards()}

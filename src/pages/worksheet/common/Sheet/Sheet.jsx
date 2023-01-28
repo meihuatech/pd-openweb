@@ -6,7 +6,6 @@ import { connect } from 'react-redux';
 import DocumentTitle from 'react-document-title';
 import errorBoundary from 'ming-ui/decorators/errorBoundary';
 import * as actions from 'worksheet/redux/actions';
-import { addRecord } from 'worksheet/common/newRecord';
 import Skeleton from 'src/router/Application/Skeleton';
 import View from 'worksheet/views';
 import SheetContext from './SheetContext';
@@ -14,13 +13,12 @@ import SheetHeader from './SheetHeader';
 import ViewControl from './ViewControl';
 import QuickFilter from './QuickFilter';
 import GroupFilter from './GroupFilter';
-import { isOpenPermit } from 'src/pages/FormSet/util.js';
-import { permitList } from 'src/pages/FormSet/config.js';
 import { VIEW_DISPLAY_TYPE } from 'worksheet/constants/enum';
 import DragMask from 'worksheet/common/DragMask';
 import { Icon } from 'ming-ui';
 const { sheet, gallery } = VIEW_DISPLAY_TYPE;
 import './style.less';
+import _ from 'lodash';
 
 const Con = styled.div`
   flex: 1;
@@ -41,6 +39,10 @@ const ConView = styled.div`
   position: relative;
 `;
 
+const QuickFilterCon = styled.div`
+  border-bottom: 1px solid #e0e0e0;
+`;
+
 const Drag = styled.div(
   ({ left }) => `
   position: absolute;
@@ -50,28 +52,8 @@ const Drag = styled.div(
   height: 100%;
   cursor: ew-resize;
   border-left: 1px solid rgba(0,0,0,0.04);
-  // .openBtn{
-  //   width: 16px;
-  //   height: 32px;
-  //   border: 1px solid #e0e0e0;
-  //   position: absolute;
-  //   z-index: 10;
-  //   line-height: 32px;
-  //   text-align: center;
-  //   border-radius: 0 6px 6px 0;
-  //   left: -1px;
-  //   top: 50%;
-  //   cursor: pointer;
-  //   margin-top: -16px;
-  //   background: #fff;
-  // }
   &:hover{
     border-left: 1px solid #2196f3;
-    // .openBtn{
-    //   background: #2196f3;
-    //   color:#fff;
-    //   border: 1px solid #2196f3;
-    // }
   }
 `,
 );
@@ -79,17 +61,25 @@ const Drag = styled.div(
 function Sheet(props) {
   const {
     loading,
+    error,
     appId,
     groupId,
     worksheetId,
     worksheetInfo,
-    sheetSwitchPermit,
     flag,
+    type = 'common',
     views,
     activeViewStatus,
     isCharge,
-    addNewRecord,
     updateGroupFilter,
+    updateFilters,
+    config = {},
+    navGroupFilters = [],
+    filtersGroup,
+    chartId,
+    showControlIds,
+    showAsSheetView,
+    openNewRecord,
   } = props;
   const [viewConfigVisible, setViewConfigVisible] = useState(false);
   let [dragMaskVisible, setDragMaskVisible] = useState(false);
@@ -100,29 +90,14 @@ function Sheet(props) {
     isOpenGroup ? window.localStorage.getItem('navGroupWidth') || 210 : 32,
   );
   let { viewId } = props;
-  const { loadWorksheet, updateWorksheetSomeControls } = props;
-  const view = _.find(views, { viewId }) || (!viewId && views[0]) || {};
-  let hasGroupFilter =
+  const { loadWorksheet } = props;
+  const view = _.find(views, { viewId }) || (!viewId && !chartId && views[0]) || {};
+  const hasGroupFilter =
     !_.isEmpty(view.navGroup) && view.navGroup.length > 0 && _.includes([sheet, gallery], String(view.viewType));
-  function openNewRecord() {
-    addRecord({
-      showFillNext: true,
-      appId,
-      viewId,
-      worksheetId,
-      worksheetInfo,
-      projectId: worksheetInfo.projectId,
-      needCache: true,
-      addType: 1,
-      showShare: isOpenPermit(permitList.recordShareSwitch, sheetSwitchPermit, viewId),
-      isCharge: isCharge,
-      entityName: worksheetInfo.entityName,
-      onAdd: data => addNewRecord(data, view),
-      updateWorksheetControls: updateWorksheetSomeControls,
-    });
-  }
   const basePara = {
+    type,
     loading,
+    error,
     appId,
     groupId,
     worksheetId,
@@ -135,19 +110,30 @@ function Sheet(props) {
     viewConfigVisible,
     setViewConfigVisible,
     groupFilterWidth: hasGroupFilter ? groupFilterWidth : 0,
+    chartId,
+    showControlIds,
+    showAsSheetView,
   };
   useEffect(() => {
-    loadWorksheet(worksheetId);
+    if (worksheetId) {
+      loadWorksheet(worksheetId);
+    }
   }, [worksheetId, flag]);
+
+  useEffect(() => {
+    if (_.isArray(filtersGroup) && !loading) {
+      updateFilters({ filtersGroup }, view);
+    }
+  }, [filtersGroup, loading]);
 
   useEffect(() => {
     updateGroupFilter([], view);
   }, [view.viewId, worksheetId]);
 
   return (
-    <SheetContext.Provider base={basePara}>
+    <SheetContext.Provider base={basePara} value={{ config }}>
       <Con className="worksheetSheet">
-        {worksheetInfo.name && (
+        {type === 'common' && worksheetInfo.name && (
           <DocumentTitle
             title={`${(window.appInfo && window.appInfo.name) || _l('应用')} - ${worksheetInfo.name || ''}`}
           />
@@ -164,62 +150,55 @@ function Sheet(props) {
           </Loading>
         ) : (
           <React.Fragment>
-            <SheetHeader {...basePara} />
-            {/* TODO 临时处理 避免对象传值导致的值变更 */}
-            <ViewControl {...basePara} view={_.cloneDeep(view)} />
-            {!_.isEmpty(view.fastFilters) && _.includes([sheet, gallery], String(view.viewType)) && (
-              <QuickFilter {...basePara} filters={view.fastFilters} />
+            {type === 'common' && (
+              <React.Fragment>
+                <SheetHeader {...basePara} />
+                <ViewControl {...basePara} view={_.cloneDeep(view)} />
+              </React.Fragment>
             )}
-            {hasGroupFilter ? (
-              <ConView>
-                {dragMaskVisible && (
-                  <DragMask
-                    value={groupFilterWidth}
-                    min={100}
-                    max={360}
-                    onChange={value => {
-                      setDragMaskVisible(false);
-                      setGroupFilterWidth(value);
-                      window.localStorage.setItem('navGroupWidth', value);
+            {type === 'single' && <SheetHeader {...basePara} onlyBatchOperate />}
+            <Con id="worksheetRightContentBox">
+              {!_.isEmpty(view.fastFilters) && _.includes([sheet, gallery], String(view.viewType)) && !chartId && (
+                <QuickFilterCon>
+                  <QuickFilter {...basePara} filters={view.fastFilters} />
+                </QuickFilterCon>
+              )}
+              {hasGroupFilter && !chartId ? (
+                <ConView>
+                  {dragMaskVisible && (
+                    <DragMask
+                      value={groupFilterWidth}
+                      min={100}
+                      max={360}
+                      onChange={value => {
+                        setDragMaskVisible(false);
+                        setGroupFilterWidth(value);
+                        safeLocalStorageSetItem('navGroupWidth', value);
+                      }}
+                    />
+                  )}
+                  <GroupFilter
+                    width={groupFilterWidth}
+                    isOpenGroup={isOpenGroup}
+                    changeGroupStatus={isOpen => {
+                      setIsOpenGroup(isOpen);
+                      safeLocalStorageSetItem('navGroupIsOpen', isOpen);
+                      if (isOpen) {
+                        setGroupFilterWidth(window.localStorage.getItem('navGroupWidth') || 210);
+                      } else {
+                        setGroupFilterWidth(32);
+                      }
                     }}
                   />
-                )}
-                <GroupFilter
-                  width={groupFilterWidth}
-                  isOpenGroup={isOpenGroup}
-                  changeGroupStatus={isOpen => {
-                    setIsOpenGroup(isOpen);
-                    window.localStorage.setItem('navGroupIsOpen', isOpen);
-                    if (isOpen) {
-                      setGroupFilterWidth(window.localStorage.getItem('navGroupWidth') || 210);
-                    } else {
-                      setGroupFilterWidth(32);
-                    }
-                  }}
-                />
-                {isOpenGroup && (
-                  <Drag left={groupFilterWidth} onMouseDown={() => setDragMaskVisible(true)}>
-                    {/* {isOpenGroup && (
-                      <span
-                        className="openBtn"
-                        onMouseDown={e => {
-                          e.stopPropagation();
-                          setDragMaskVisible(false);
-                          setGroupFilterWidth(32);
-                          window.localStorage.setItem('navGroupIsOpen', !isOpenGroup);
-                          setIsOpenGroup(!isOpenGroup);
-                        }}
-                      >
-                        <Icon icon={'a-arrowback'} />
-                      </span>
-                    )} */}
-                  </Drag>
-                )}
+                  {!_.get(window, 'shareState.isPublicView') && isOpenGroup && (
+                    <Drag left={groupFilterWidth} onMouseDown={() => setDragMaskVisible(true)} />
+                  )}
+                  <View {...basePara} />
+                </ConView>
+              ) : (
                 <View {...basePara} />
-              </ConView>
-            ) : (
-              <View {...basePara} />
-            )}
+              )}
+            </Con>
           </React.Fragment>
         )}
       </Con>
@@ -229,6 +208,7 @@ function Sheet(props) {
 
 Sheet.propTypes = {
   flag: PropTypes.string,
+  type: PropTypes.string,
   loading: PropTypes.bool,
   appId: PropTypes.string,
   groupId: PropTypes.string,
@@ -240,8 +220,6 @@ Sheet.propTypes = {
   sheetSwitchPermit: PropTypes.arrayOf(PropTypes.shape({})),
   views: PropTypes.arrayOf(PropTypes.shape({})),
   loadWorksheet: PropTypes.func,
-  addNewRecord: PropTypes.func,
-  updateWorksheetSomeControls: PropTypes.func,
 };
 
 export default connect(
@@ -251,21 +229,15 @@ export default connect(
     worksheetId: state.sheet.base.worksheetId,
     viewId: state.sheet.base.viewId,
     worksheetInfo: state.sheet.worksheetInfo,
-    sheetSwitchPermit: state.sheet.sheetSwitchPermit,
     isCharge: state.sheet.isCharge,
     loading: state.sheet.loading,
+    error: state.sheet.error,
     views: state.sheet.views,
     activeViewStatus: state.sheet.activeViewStatus,
   }),
   dispatch =>
     bindActionCreators(
-      _.pick(actions, [
-        'addNewRecord',
-        'updateBase',
-        'loadWorksheet',
-        'updateWorksheetSomeControls',
-        'updateGroupFilter',
-      ]),
+      _.pick(actions, ['updateBase', 'updateFilters', 'loadWorksheet', 'updateGroupFilter', 'openNewRecord']),
       dispatch,
     ),
 )(errorBoundary(Sheet));

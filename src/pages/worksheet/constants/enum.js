@@ -1,3 +1,4 @@
+import _ from 'lodash';
 export const APP_ROLE_TYPE = {
   CUSTOM_ROLE: 0, // 自定义角色
   READ_ROLE: 10, // 只读角色
@@ -111,6 +112,7 @@ export const RECORD_INFO_FROM = {
   WORKSHEET_ROW_LAND: 2,
   CHAT: 3,
   WORKFLOW: 4,
+  DRAFT: 21,
 };
 export const controlName = {
   2: _l('文本框'),
@@ -142,7 +144,7 @@ export const controlName = {
   31: _l('公式'),
   32: _l('文本组合'),
   33: _l('自动编号'),
-  36: _l('检查框'),
+  36: _l('检查项'),
   10010: _l('备注'),
 };
 
@@ -169,7 +171,7 @@ export const VIEW_TYPE_ICON = [
   { icon: 'event', color: '#F64082', text: _l('日历'), id: 'calendar' },
   { icon: 'gallery_view', color: '#3949ab', text: _l('画廊'), id: 'gallery' },
   { icon: 'hierarchy', color: '#9C27AF', text: _l('层级'), id: 'structure' },
-  { icon: 'gantt', color: '#01BCD5', text: _l('甘特图'), id: 'gunter' }
+  { icon: 'gantt', color: '#01BCD5', text: _l('甘特图'), id: 'gunter' },
 ];
 
 export const WORKSHEET_VIEW_PAGE_SIZE = {
@@ -222,7 +224,7 @@ export const SYSTEM_CONTROLS = [
   },
   {
     controlId: 'caid',
-    controlName: _l('创建人'),
+    controlName: _l('创建者'),
     controlPermissions: '100',
     type: 26,
     display: true,
@@ -243,4 +245,12 @@ export const SYSTEM_CONTROLS = [
   },
 ];
 
-export const CONTROL_EDITABLE_BALCKLIST = [22, 25, 30, 31, 32, 33, 34, 37, 42, 45];
+export const CONTROL_EDITABLE_BLACKLIST = [22, 25, 30, 31, 32, 33, 34, 37, 42, 45, 47];
+
+export const SHEET_VIEW_HIDDEN_TYPES = [
+  10010, // REMARK 备注
+  22, // SPLIT_LINE 分段
+  43, // OCR
+  45, // EMBED 嵌入
+  49, // SEARCH_BTN 查询按钮
+];

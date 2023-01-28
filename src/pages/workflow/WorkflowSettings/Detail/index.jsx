@@ -1,4 +1,5 @@
 import React, { Component } from 'react';
+import PropTypes from 'prop-types';
 import { connect } from 'react-redux';
 import './index.less';
 import nodeModules from './nodeModules';
@@ -8,6 +9,27 @@ import { updateNodeData } from '../../redux/actions';
 import cx from 'classnames';
 
 class Detail extends Component {
+  static propTypes = {
+    companyId: PropTypes.string.isRequired,
+    processId: PropTypes.string.isRequired,
+    relationId: PropTypes.string,
+    relationType: PropTypes.number,
+    flowInfo: PropTypes.any,
+    selectNodeId: PropTypes.string.isRequired,
+    selectNodeType: PropTypes.any.isRequired,
+    selectNodeName: PropTypes.string,
+    isCopy: PropTypes.bool,
+    closeDetail: PropTypes.func.isRequired,
+    haveChange: PropTypes.func,
+    isIntegration: PropTypes.bool,
+    updateNodeData: PropTypes.func,
+  };
+
+  static defaultProps = {
+    flowInfo: {},
+    haveChange: () => {},
+  };
+
   constructor(props) {
     super(props);
   }
@@ -19,23 +41,25 @@ class Detail extends Component {
     const { selectNodeType } = this.props;
     const NodeComponent = nodeModules[selectNodeType];
 
-    return <NodeComponent {...Object.assign({}, this.props, { updateNodeData: this.updateNodeData })} />;
+    return <NodeComponent {...Object.assign({}, { updateNodeData: this.updateNodeData }, this.props)} />;
   }
 
   /**
    * 更新节点数据
    */
   updateNodeData = data => {
-    this.props.dispatch(updateNodeData(data));
+    const { processId } = this.props;
+
+    this.props.dispatch(updateNodeData(processId, data));
   };
 
   render() {
-    const { selectNodeId, selectNodeType, isCopy } = this.props;
+    const { selectNodeId, selectNodeType, isCopy, flowInfo } = this.props;
     const NodeComponent = nodeModules[selectNodeType];
 
     // 分支
     if (selectNodeType === NODE_TYPE.BRANCH_ITEM) {
-      return <NodeComponent {...this.props} updateNodeData={this.updateNodeData} />;
+      return <NodeComponent updateNodeData={this.updateNodeData} {...this.props} />;
     }
 
     return (
@@ -45,7 +69,13 @@ class Detail extends Component {
         transitionLeaveTimeout={250}
       >
         {!!selectNodeId && (
-          <div className={cx('workflowDetail flexColumn', { workflowDetailDisabled: isCopy })}>
+          <div
+            className={cx(
+              'workflowDetail flexColumn',
+              { workflowDetailDisabled: isCopy },
+              { 'workflowDetailRelease pBottom20': !!flowInfo.parentId },
+            )}
+          >
             {this.renderContent()}
           </div>
         )}

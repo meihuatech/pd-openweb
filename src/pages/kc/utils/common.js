@@ -1,5 +1,5 @@
 import { debounce } from 'lodash';
-import { addToken } from 'src/util';
+import { downloadFile } from 'src/util';
 import qs from 'query-string';
 import kcService from '../api/service';
 import {
@@ -14,6 +14,9 @@ import {
   PICK_TYPE,
 } from '../constant/enum';
 import { confirm, getParentId, getLocationType, getPermission, getParentName, isIE } from './index';
+import addLinkFile from 'src/components/addLinkFile/addLinkFile';
+import folderDg from 'src/components/kc/folderSelectDialog/folderSelectDialog';
+import createShare from 'src/components/createShare/createShare';
 
 function saveLastPos(root, folder) {
   if (typeof currentRoot !== 'object' && root !== 1) {
@@ -46,8 +49,8 @@ function saveLastPos(root, folder) {
       : rootNode,
   };
   console.log('uploadedPos -> ', uploadedPos);
-  localStorage.setItem('last_select_folder_pos_' + md.global.Account.accountId, JSON.stringify(uploadedPos));
-  localStorage.setItem('last_select_pos_' + md.global.Account.accountId, JSON.stringify(uploadedPos));
+  safeLocalStorageSetItem('last_select_folder_pos_' + md.global.Account.accountId, JSON.stringify(uploadedPos));
+  safeLocalStorageSetItem('last_select_pos_' + md.global.Account.accountId, JSON.stringify(uploadedPos));
 }
 
 /** 打开上传助手 */
@@ -121,56 +124,54 @@ export function handleOpenUploadAssistant(args) {
 
 export function handleAddLinkFile(args) {
   const { isEdit, item, folder, root, performUpdateItem, reloadList } = args;
-  require(['src/components/addLinkFile/addLinkFile'], addLinkFile => {
-    const { id, rootId } = _.isEmpty(folder)
-      ? typeof root === 'object'
-        ? { id: root.id, rootId: root.id }
-        : {}
-      : folder;
-    const location = { parentId: id, rootId };
-    const handle = new addLinkFile({
-      callback: link => {
-        const { linkName, linkContent } = link;
-        const execTypeName = isEdit ? _l('保存') : _l('创建');
-        let savePromise;
-        if (!isEdit) {
-          savePromise = kcService.addFile({
-            name: linkName + '.url',
-            originLinkUrl: linkContent,
-            size: 0,
-            parentId: location.parentId,
-            rootId: location.rootId,
-          });
-        } else {
-          savePromise = kcService.updateNode({
-            id: item.id,
-            name: linkName + '.url',
-            newLinkUrl: linkContent,
-          });
-        }
-        $.when(savePromise)
-          .then(data => {
-            alert(execTypeName + _l('成功'));
-            if (isEdit && typeof data === 'object') {
-              performUpdateItem(data);
-              return;
-            }
-            reloadList();
-          })
-          .fail(() => {
-            alert(execTypeName + _l('失败'), 3);
-          });
-      },
-      location,
-      isEdit,
-      data: isEdit
-        ? {
-            id: item.id,
-            name: item.name,
-            originLinkUrl: item.originLinkUrl,
+  const { id, rootId } = _.isEmpty(folder)
+    ? typeof root === 'object'
+      ? { id: root.id, rootId: root.id }
+      : {}
+    : folder;
+  const location = { parentId: id, rootId };
+  const handle = new addLinkFile({
+    callback: link => {
+      const { linkName, linkContent } = link;
+      const execTypeName = isEdit ? _l('保存') : _l('创建');
+      let savePromise;
+      if (!isEdit) {
+        savePromise = kcService.addFile({
+          name: linkName + '.url',
+          originLinkUrl: linkContent,
+          size: 0,
+          parentId: location.parentId,
+          rootId: location.rootId,
+        });
+      } else {
+        savePromise = kcService.updateNode({
+          id: item.id,
+          name: linkName + '.url',
+          newLinkUrl: linkContent,
+        });
+      }
+      $.when(savePromise)
+        .then(data => {
+          alert(execTypeName + _l('成功'));
+          if (isEdit && typeof data === 'object') {
+            performUpdateItem(data);
+            return;
           }
-        : undefined,
-    });
+          reloadList();
+        })
+        .fail(() => {
+          alert(execTypeName + _l('失败'), 3);
+        });
+    },
+    location,
+    isEdit,
+    data: isEdit
+      ? {
+          id: item.id,
+          name: item.name,
+          originLinkUrl: item.originLinkUrl,
+        }
+      : undefined,
   });
 }
 
@@ -236,7 +237,7 @@ export function handleShareNode(item, updateKcNodeItem = () => {}) {
 function downloadOne(id, excludeIds) {
   const excludeNodeIds = excludeIds && excludeIds.length ? excludeIds.join(',') : '';
   const url = md.global.Config.AjaxApiUrl + 'file/downKcFile?' + qs.stringify({ id, excludeNodeIds });
-  window.open(addToken(url, !window.isDingTalk));
+  window.open(downloadFile(url));
 }
 
 function downloadAll(root, excludeIds) {
@@ -262,18 +263,18 @@ function downloadAll(root, excludeIds) {
   }
   const url =
     md.global.Config.AjaxApiUrl + 'file/downKcFile?' + qs.stringify({ rootType, rootId, fileName, excludeNodeIds });
-  window.open(addToken(url, !window.isDingTalk));
+  window.open(downloadFile(url));
 }
 
 function batchDownload(ids, folderId, fileName) {
   const url = md.global.Config.AjaxApiUrl + 'file/downKcFile?' + qs.stringify({ ids, folderId, fileName });
-  window.open(addToken(url, !window.isDingTalk));
+  window.open(downloadFile(url));
 }
 
 /** 单条下载 */
 export function handleDownloadOne(item, excludeIds) {
   if (item.viewType === NODE_VIEW_TYPE.LINK) {
-    window.open(addToken(item.downloadUrl, !window.isDingTalk));
+    window.open(downloadFile(item.downloadUrl));
     return;
   }
   if (item && item.id) {
@@ -433,43 +434,41 @@ export function handleMoveOrCopyClick(args, cb = () => {}) {
   }
 
   getAppointRootPromise.then(root => {
-    require(['src/components/kc/folderSelectDialog/folderSelectDialog'], folderDg => {
-      const rootNode =
-        typeof fromRoot === 'object'
-          ? {
-              id: fromRoot.id,
-              projectId: fromRoot.project ? fromRoot.project.projectId : '',
-              name: fromRoot.name,
-            }
-          : {
-              id: null,
-              parentId: null,
-              name: _l('我的文件'),
-            };
-      const appointFolder =
-        typeof fromRoot === 'object' || fromRoot === 1
-          ? {
-              rootFolder: rootNode,
-              node: folder
-                ? {
-                    id: folder.id,
-                    parendId: folder.parendId,
-                    name: folder.name,
-                    projectId: folder.projectId,
-                    position: folder.position,
-                  }
-                : rootNode,
-            }
-          : undefined;
-      folderDg({
-        dialogTitle: type === NODE_OPERATOR_TYPE.MOVE ? _l('移动到') : _l('复制到'),
-        isFolderNode: 1,
-        selectedItems: selectedItemIds,
-        appointRoot: root,
-        appointFolder,
-      }).then(result => {
-        cb(result, type);
-      });
+    const rootNode =
+      typeof fromRoot === 'object'
+        ? {
+            id: fromRoot.id,
+            projectId: fromRoot.project ? fromRoot.project.projectId : '',
+            name: fromRoot.name,
+          }
+        : {
+            id: null,
+            parentId: null,
+            name: _l('我的文件'),
+          };
+    const appointFolder =
+      typeof fromRoot === 'object' || fromRoot === 1
+        ? {
+            rootFolder: rootNode,
+            node: folder
+              ? {
+                  id: folder.id,
+                  parendId: folder.parendId,
+                  name: folder.name,
+                  projectId: folder.projectId,
+                  position: folder.position,
+                }
+              : rootNode,
+          }
+        : undefined;
+    folderDg({
+      dialogTitle: type === NODE_OPERATOR_TYPE.MOVE ? _l('移动到') : _l('复制到'),
+      isFolderNode: 1,
+      selectedItems: selectedItemIds,
+      appointRoot: root,
+      appointFolder,
+    }).then(result => {
+      cb(result, type);
     });
   });
 }
@@ -544,21 +543,19 @@ export function handleMoveOrCopy(options) {
           console.log($('.mdAlertDialog .mdClose'));
           $('.mdAlertDialog .mdClose').click();
         }, 1000);
-        require(['createShare'], createShare => {
-          createShare.init({
-            linkURL:
-              md.global.Config.WebUrl +
-              baseUrl.replace(/^\//, '') +
-              '/' +
-              (result.type === 1
-                ? 'my'
-                : result.type === 2
-                ? result.node.id
-                : result.node.rootId
-                ? result.node.position.slice(1)
-                : result.node.position.replace(/\/.{8}(-.{4}){3}-.{12}/, 'my')),
-            content: operationTips.text,
-          });
+        createShare({
+          linkURL:
+            md.global.Config.WebUrl +
+            baseUrl.replace(/^\//, '') +
+            '/' +
+            (result.type === 1
+              ? 'my'
+              : result.type === 2
+              ? result.node.id
+              : result.node.rootId
+              ? result.node.position.slice(1)
+              : result.node.position.replace(/\/.{8}(-.{4}){3}-.{12}/, 'my')),
+          content: operationTips.text,
         });
       } else {
         alert(operationTips.text, 3);

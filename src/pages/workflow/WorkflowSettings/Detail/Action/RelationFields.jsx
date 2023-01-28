@@ -2,6 +2,7 @@ import React, { Component, Fragment } from 'react';
 import { Dropdown } from 'ming-ui';
 import { SelectNodeObject, FilterAndSort, FindResult } from '../components';
 import flowNode from '../../../api/flowNode';
+import _ from 'lodash';
 
 export default class RelationFields extends Component {
   /**
@@ -105,7 +106,7 @@ export default class RelationFields extends Component {
                 '设置筛选条件，查找满足条件的数据。如果未添加筛选条件则表示只通过排序规则从所有记录中获得唯一数据',
               )}
               sortText={_l(
-                '当查找到多个数据时，将按照以下排序规则获得第一条数据。如果未设置规则，按照关联字段所在视图的排序规则返回第一条数据',
+                '当查找到多个数据时，将按照以下排序规则获得第一条数据。如果未设置规则，按照字段配置的排序规则返回第一条数据',
               )}
             />
             <FindResult

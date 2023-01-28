@@ -13,6 +13,7 @@ import {
   handleBatchDownload,
 } from '../../utils/common';
 import { clearSelect } from './selectAction';
+import _ from 'lodash';
 
 export function updateKcListElement(ele) {
   return {
@@ -64,7 +65,7 @@ export function fetchKcNodes(path, id, cb) {
   return (dispatch, getState) => {
     let type;
     const kcState = getState().kc;
-    path = path || kcState.path || '';
+    path = decodeURIComponent(path || kcState.path || '');
     const { keywords, skip, limit, sortBy, sortType } = kcState.params.toObject();
     let getNodeIdPromise = {};
     let status = NODE_STATUS.NORMAL;

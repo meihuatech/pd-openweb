@@ -1,48 +1,47 @@
-import mdFunction from 'mdFunction';
+import { existAccountHint } from 'src/components/common/function';
 import * as ajax from './ajax';
 import Constant from './constant';
+import 'src/components/dialogSelectUser/dialogSelectUser';
+import Invite from 'src/components/common/inviteMember/inviteMember';
 
-const showInviteBox = (options) => {
-  require(['src/components/dialogSelectUser/dialogSelectUser'], () => {
-    let param = {
-      sourceId: options.sourceId,
-      fromType: options.fromType,
-      SelectUserSettings: {
-        filterAccountIds: options.filterList || [md.global.Account.accountId],
-        callback(data) {
-          if (typeof options.callback === 'function') {
-            options.callback(data);
-          }
-        },
+const showInviteBox = options => {
+  let param = {
+    sourceId: options.sourceId,
+    fromType: options.fromType,
+    isChat: true,
+    SelectUserSettings: {
+      filterAccountIds: options.filterList || [md.global.Account.accountId],
+      callback(data) {
+        if (typeof options.callback === 'function') {
+          options.callback(data);
+        }
       },
-      ChooseInviteSettings: {
-        callback(data, cb) {
-          if (typeof options.inviteCallback === 'function') {
-            options.inviteCallback(data, cb);
-          }
-        },
+    },
+    ChooseInviteSettings: {
+      callback(data, cb) {
+        if (typeof options.inviteCallback === 'function') {
+          options.inviteCallback(data, cb);
+        }
       },
-    };
+    },
+  };
 
-    param = $.extend(param, {
-      showMoreInvite: options.showMoreInvite !== false,
-    });
-    $('body').dialogSelectUser(param);
+  param = $.extend(param, {
+    showMoreInvite: options.showMoreInvite !== false,
   });
+  $('body').dialogSelectUser(param);
 };
 
 const inviteFriend = (accounts, cb) => {
-  require(['src/components/common/inviteMember/inviteMember'], (Invite) => {
-    Invite.inviteToFriend(accounts, cb);
-  });
+  Invite.inviteToFriend(accounts, cb);
 };
 
-export const addGroupMembers = (session) => {
+export const addGroupMembers = session => {
   const current = md.global.Account;
   const { id, type } = session;
   const userArr = [];
 
-  const callback = (userlist) => {
+  const callback = userlist => {
     const accountIds = [];
     const users = [];
     for (let i = 0; i < userlist.length; i++) {
@@ -70,9 +69,9 @@ export const addGroupMembers = (session) => {
           groupId: id,
           accountIds,
         })
-        .then((data) => {
+        .then(data => {
           const accountInfos = data.results[0].accountInfos || [];
-          mdFunction.existAccountHint(data);
+          existAccountHint(data);
           // console.log('addMembers', accountInfos);
         });
     } else if (type === Constant.SESSIONTYPE_USER) {
@@ -82,7 +81,7 @@ export const addGroupMembers = (session) => {
           groupname: '',
           accountIds,
         })
-        .then((group) => {
+        .then(group => {
           // console.log('createGroup', group);
           // // 聊天不添加到群组列表
           // ChatPubSubHelper.publish(ACTIONS.OPEN_CHAT_WINDOW, {
@@ -95,7 +94,7 @@ export const addGroupMembers = (session) => {
 
   const inviteCallback = (accounts, cb) => {
     const param = {};
-    accounts.map((account) => {
+    accounts.map(account => {
       param[account.account] = account.fullname;
     });
     if (type == Constant.SESSIONTYPE_GROUP) {
@@ -105,18 +104,18 @@ export const addGroupMembers = (session) => {
           groupId: id,
           accounts: param,
         })
-        .then((data) => {
+        .then(data => {
           const accountInfos = data.results[0].accountInfos || [];
-          mdFunction.existAccountHint(data, cb);
+          existAccountHint(data, cb);
           // console.log('inviteCallback addMembers', accountInfos);
         });
     }
   };
 
   if (type == Constant.SESSIONTYPE_GROUP) {
-    ajax.fetchDetail(id).then((data) => {
+    ajax.fetchDetail(id).then(data => {
       if (data.groupUsers) {
-        data.groupUsers.forEach((userItem) => {
+        data.groupUsers.forEach(userItem => {
           userArr.push(userItem.accountId);
         });
       }
@@ -175,7 +174,7 @@ export const createDiscussion = (accountid, cb) => {
         .createDiscussion({
           accountIds,
         })
-        .then((data) => {
+        .then(data => {
           cb && cb(data, true);
         });
     },

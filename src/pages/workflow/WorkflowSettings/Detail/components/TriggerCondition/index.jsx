@@ -3,21 +3,25 @@ import PropTypes from 'prop-types';
 import './index.less';
 import { Dropdown, CityPicker, Icon } from 'ming-ui';
 import { DateTime } from 'ming-ui/components/NewDateTimePicker';
-import 'dialogSelectUser';
-import DialogSelectDept from 'dialogSelectDept';
+import 'src/components/dialogSelectUser/dialogSelectUser';
+import DialogSelectDept from 'src/components/dialogSelectDept';
 import cx from 'classnames';
 import TagInput from '../TagInput';
-import { CONTROLS_NAME, CONDITION_TYPE, GRADE_STAR_TYPE, GRADE_LEVEL_TYPE, DATE_LIST } from '../../../enum';
-import { getConditionList, getConditionNumber } from '../../../utils';
+import { CONTROLS_NAME, CONDITION_TYPE, DATE_LIST, FORMAT_TEXT } from '../../../enum';
+import { getConditionList, getConditionNumber, getFilterText } from '../../../utils';
 import ActionFields from '../ActionFields';
 import Tag from '../Tag';
 import SelectOtherFields from '../SelectOtherFields';
+import { Tooltip, TimePicker } from 'antd';
+import { selectOrgRole } from 'src/components/DialogSelectOrgRole';
+import moment from 'moment';
 
 export default class TriggerCondition extends Component {
   static propTypes = {
     processId: PropTypes.string,
     selectNodeId: PropTypes.string,
     sourceAppId: PropTypes.string,
+    isIntegration: PropTypes.bool,
     Header: PropTypes.func,
     isNodeHeader: PropTypes.bool,
     controls: PropTypes.array,
@@ -105,7 +109,9 @@ export default class TriggerCondition extends Component {
     return (
       <Fragment>
         <span className="Gray_9e mRight5">[{CONTROLS_NAME[item.type]}]</span>
-        <span style={{ color: item.controlName ? '#333' : '#f44336' }}>{item.controlName || _l('字段已删除')}</span>
+        <Tooltip title={item.controlName ? null : `ID：${item.controlId}`}>
+          <span style={{ color: item.controlName ? '#333' : '#f44336' }}>{item.controlName || _l('字段已删除')}</span>
+        </Tooltip>
       </Fragment>
     );
   }
@@ -114,10 +120,11 @@ export default class TriggerCondition extends Component {
    * 渲染单个条件
    */
   renderItem(item, i, j, hasOr, hasAnd) {
-    const { singleCondition } = this.props;
+    const { singleCondition, controls, isNodeHeader } = this.props;
     let controlNumber;
     let conditionData = [];
     let conditionIndex;
+    let single;
     const switchConditionId = id => {
       switch (id) {
         case '15':
@@ -130,6 +137,19 @@ export default class TriggerCondition extends Component {
           return '39';
       }
     };
+
+    if (isNodeHeader) {
+      controls.forEach(obj => {
+        if (obj.nodeId === item.nodeId) {
+          single = _.find(obj.controls, o => o.controlId === item.filedId);
+        }
+      });
+    } else {
+      single = _.find(controls, o => o.controlId === item.filedId);
+    }
+
+    const showType = _.get(single || {}, 'advancedSetting.showtype');
+    const unit = _.get(single || {}, 'unit');
 
     if (item.filedId) {
       conditionData = getConditionList(item.filedTypeId, item.enumDefault).ids.map((id, index) => {
@@ -148,7 +168,7 @@ export default class TriggerCondition extends Component {
         }
 
         return {
-          text: CONDITION_TYPE[id],
+          text: getFilterText(single || {}, id),
           value: id,
         };
       });
@@ -180,14 +200,16 @@ export default class TriggerCondition extends Component {
             disabled={!item.filedId}
             renderTitle={() =>
               item.conditionId && (
-                <span>{CONDITION_TYPE[item.conditionId] + (typeof conditionIndex === 'number' ? '*' : '')}</span>
+                <span>
+                  {getFilterText(single || {}, item.conditionId) + (typeof conditionIndex === 'number' ? '*' : '')}
+                </span>
               )
             }
             onChange={conditionId => this.switchCondition(conditionId, i, j)}
           />
         </div>
         <div className="mTop10 relative flexRow">
-          {this.renderItemValue(item, controlNumber, i, j)}
+          {this.renderItemValue(item, controlNumber, i, j, showType, unit)}
           {(item.conditionId === '1' ||
             item.conditionId === '3' ||
             item.conditionId === '5' ||
@@ -261,7 +283,11 @@ export default class TriggerCondition extends Component {
         {isNodeHeader ? (
           <div
             className="ming Dropdown pointer flowDropdown flowDropdownBorder"
-            onClick={() => this.setState({ showControlsIndex: `${i}-${j}` })}
+            onClick={event => {
+              if ($(event.target).closest('.ant-tooltip').length) return;
+
+              this.setState({ showControlsIndex: `${i}-${j}` });
+            }}
           >
             <div className="Dropdown--input Dropdown--border">
               <span className="value">
@@ -271,6 +297,7 @@ export default class TriggerCondition extends Component {
                     appType={item.appType}
                     actionId={item.actionId}
                     nodeName={item.nodeName}
+                    controlId={item.filedId}
                     controlName={item.filedValue}
                   />
                 ) : (
@@ -289,8 +316,10 @@ export default class TriggerCondition extends Component {
             border
             openSearch
             placeholder={_l('请选择')}
+            disabledClickElement=".ant-tooltip"
             renderTitle={() =>
-              item.filedId && this.renderTitle({ type: item.filedTypeId, controlName: item.filedValue })
+              item.filedId &&
+              this.renderTitle({ type: item.filedTypeId, controlName: item.filedValue, controlId: item.filedId })
             }
             onChange={filedId => this.switchField({ i, j, filedId })}
           />
@@ -377,8 +406,8 @@ export default class TriggerCondition extends Component {
   /**
    * 渲染单个条件的值
    */
-  renderItemValue(item, controlNumber = 0, i, j) {
-    const { isNodeHeader } = this.props;
+  renderItemValue(item, controlNumber = 0, i, j, showType, unit) {
+    const { isNodeHeader, projectId } = this.props;
 
     if (_.isEmpty(item)) {
       return <div className="flex triggerConditionNum triggerConditionDisabled" />;
@@ -388,7 +417,7 @@ export default class TriggerCondition extends Component {
 
     const { filedId, filedTypeId, conditionValues, enumDefault, conditionId } = item;
 
-    // 文本 || 手机号码 || 电话号码 || 邮箱 || 证件  || 关联单条 || 文本组合 || 自动编号
+    // 文本 || 手机号码 || 电话号码 || 邮箱 || 证件  || 关联单条 || 文本组合 || 自动编号 || api查询
     if (
       filedTypeId === 1 ||
       filedTypeId === 2 ||
@@ -398,7 +427,8 @@ export default class TriggerCondition extends Component {
       filedTypeId === 7 ||
       filedTypeId === 29 ||
       filedTypeId === 32 ||
-      filedTypeId === 33
+      filedTypeId === 33 ||
+      filedTypeId === 50
     ) {
       return (
         <div className="flex relative flexRow">
@@ -406,7 +436,7 @@ export default class TriggerCondition extends Component {
             this.renderSelectFieldsValue(conditionValues[0], i, j)
           ) : (
             <TagInput
-              disable={_.includes(['33', '34'], item.conditionId)}
+              disable={_.includes(['9', '10', '33', '34', '43'], item.conditionId) && filedTypeId === 29}
               className="flex clearBorderRadius"
               tags={conditionValues.map(obj => obj.value)}
               createTag={val => this.updateConditionValue({ value: val, i, j })}
@@ -489,16 +519,9 @@ export default class TriggerCondition extends Component {
         options = options || [];
         data = options.map(opts => {
           return {
-            text:
-              filedTypeId === 28
-                ? enumDefault === 1
-                  ? GRADE_STAR_TYPE[opts.key]
-                  : GRADE_LEVEL_TYPE[opts.key]
-                : opts.value,
+            text: opts.value,
             value: opts.key,
-            disabled:
-              !(_.includes(['9', '10'], item.conditionId) && _.includes([9, 11], filedTypeId)) &&
-              !!_.find(conditionValues, obj => obj.value.key === opts.key),
+            disabled: !!_.find(conditionValues, obj => obj.value.key === opts.key),
           };
         });
       }
@@ -523,7 +546,7 @@ export default class TriggerCondition extends Component {
                   isSingle: _.includes(['9', '10'], item.conditionId) && _.includes([9, 11], filedTypeId),
                 })
               }
-              renderTitle={() => this.renderDropdownTagList(conditionValues, i, j, filedTypeId, enumDefault)}
+              renderTitle={() => this.renderDropdownTagList(conditionValues, i, j)}
             />
           )}
 
@@ -534,15 +557,17 @@ export default class TriggerCondition extends Component {
 
     // 日期 || 日期时间
     if (filedTypeId === 15 || filedTypeId === 16) {
+      const mode = { 3: 'date', 4: 'month', 5: 'year' };
       const dateList = [];
       const showTimePicker = filedTypeId === 16 && !_.includes(['9', '10'], item.conditionId);
-      const timeMode = _.includes(['ctime', 'utime'], filedId) ? 'second' : 'minute';
-      const formatString =
-        timeMode === 'second' && showTimePicker
-          ? 'YYYY-MM-DD HH:mm:ss'
-          : showTimePicker
-          ? 'YYYY-MM-DD HH:mm'
-          : 'YYYY-MM-DD';
+      const timeMode =
+        _.includes(['ctime', 'utime'], filedId) || showType === '6' ? 'second' : showType === '2' ? 'hour' : 'minute';
+      let formatString = timeMode === 'second' ? 'YYYY-MM-DD HH:mm:ss' : FORMAT_TEXT[showType] || 'YYYY-MM-DD HH:mm:ss';
+
+      // 不显示时间的时候去除 时分秒
+      if (!showTimePicker) {
+        formatString = formatString.split(' ')[0];
+      }
 
       DATE_LIST.forEach((item, i) => {
         if (i % 3 === 0) {
@@ -552,7 +577,17 @@ export default class TriggerCondition extends Component {
         }
       });
 
-      if (_.includes(['9', '10', '17', '18', '39', '41'], item.conditionId)) {
+      // 显示类型是年月
+      if (showType === '4') {
+        _.remove(dateList, (o, index) => _.includes([0, 1], index));
+      }
+
+      // 显示类型是年
+      if (showType === '5') {
+        _.remove(dateList, (o, index) => _.includes([0, 1, 2, 3], index));
+      }
+
+      if (_.includes(['9', '10', '17', '18', '39', '40', '41', '42'], item.conditionId)) {
         return (
           <div className="flex">
             <div className="flexRow relative">
@@ -564,6 +599,11 @@ export default class TriggerCondition extends Component {
                   data={dateList}
                   value={conditionValues[0] && conditionValues[0].type ? conditionValues[0].type : undefined}
                   border
+                  renderTitle={
+                    !conditionValues[0] || !conditionValues[0].type
+                      ? () => <span className="Gray_9e">{_l('请选择')}</span>
+                      : () => <span>{DATE_LIST.find(o => o.value === conditionValues[0].type).text}</span>
+                  }
                   onChange={type =>
                     this.updateConditionDateValue({
                       type,
@@ -583,10 +623,11 @@ export default class TriggerCondition extends Component {
                   selectedValue={
                     conditionValues[0] && conditionValues[0].value ? moment(conditionValues[0].value) : null
                   }
+                  mode={mode[showType]}
                   timePicker={showTimePicker}
                   timeMode={timeMode}
+                  allowClear={false}
                   onOk={e => this.updateConditionDateValue({ value: e.format(formatString), i, j })}
-                  onClear={() => this.updateConditionDateValue({ value: '', i, j })}
                 >
                   {conditionValues[0] && conditionValues[0].value
                     ? moment(conditionValues[0].value).format(formatString)
@@ -610,10 +651,11 @@ export default class TriggerCondition extends Component {
                   selectedValue={
                     conditionValues[0] && conditionValues[0].value ? moment(conditionValues[0].value) : null
                   }
+                  mode={mode[showType]}
                   timePicker={showTimePicker}
                   timeMode={timeMode}
+                  allowClear={false}
                   onOk={e => this.updateConditionDateValue({ value: e.format(formatString), i, j })}
-                  onClear={() => this.updateConditionDateValue({ value: '', i, j })}
                 >
                   {conditionValues[0] && conditionValues[0].value
                     ? moment(conditionValues[0].value).format(formatString)
@@ -636,10 +678,11 @@ export default class TriggerCondition extends Component {
                     selectedValue={
                       conditionValues[1] && conditionValues[1].value ? moment(conditionValues[1].value) : null
                     }
+                    mode={mode[showType]}
                     timePicker={showTimePicker}
                     timeMode={timeMode}
+                    allowClear={false}
                     onOk={e => this.updateConditionDateValue({ value: e.format(formatString), i, j, second: true })}
-                    onClear={() => this.updateConditionDateValue({ value: '', i, j, second: true })}
                   >
                     {conditionValues[1] && conditionValues[1].value
                       ? moment(conditionValues[1].value).format(formatString)
@@ -663,7 +706,11 @@ export default class TriggerCondition extends Component {
           {conditionValues[0] && conditionValues[0].controlId ? (
             this.renderSelectFieldsValue(conditionValues[0], i, j)
           ) : (
-            <div className="flex triggerConditionNum triggerConditionList ThemeBorderColor3 clearBorderRadius">
+            <div
+              className={cx('flex triggerConditionNum triggerConditionList ThemeBorderColor3 clearBorderRadius', {
+                pTop2: conditionValues.length,
+              })}
+            >
               <CityPicker
                 level={level}
                 callback={citys => {
@@ -710,15 +757,17 @@ export default class TriggerCondition extends Component {
       );
     }
 
-    // 人员 || 部门
-    if (filedTypeId === 26 || filedTypeId === 10000001 || filedTypeId === 27) {
+    // 人员 || 部门 || 组织角色
+    if (filedTypeId === 26 || filedTypeId === 27 || filedTypeId === 48 || filedTypeId === 10000001) {
       return (
         <div className="flex relative flexRow">
           {conditionValues[0] && conditionValues[0].controlId ? (
             this.renderSelectFieldsValue(conditionValues[0], i, j)
           ) : (
             <div
-              className="flex triggerConditionNum triggerConditionList ThemeBorderColor3 clearBorderRadius"
+              className={cx('flex triggerConditionNum triggerConditionList ThemeBorderColor3 clearBorderRadius', {
+                pTop2: conditionValues.length,
+              })}
               onClick={evt => {
                 if (_.includes([26, 10000001], filedTypeId)) {
                   this.selectUser(
@@ -728,8 +777,15 @@ export default class TriggerCondition extends Component {
                     j,
                     _.includes(['9', '10'], item.conditionId) && enumDefault === 0,
                   );
-                } else {
+                } else if (filedTypeId === 27) {
                   this.selectDepartment(
+                    conditionValues,
+                    i,
+                    j,
+                    _.includes(['9', '10'], item.conditionId) && enumDefault === 0,
+                  );
+                } else {
+                  this.selectRole(
                     conditionValues,
                     i,
                     j,
@@ -740,7 +796,11 @@ export default class TriggerCondition extends Component {
             >
               {!conditionValues.length ? (
                 <div className="Gray_bd pLeft10 pRight10">
-                  {_.includes([26, 10000001], filedTypeId) ? _l('请选择人员') : _l('请选择部门')}
+                  {_.includes([26, 10000001], filedTypeId)
+                    ? _l('请选择人员')
+                    : filedTypeId === 27
+                    ? _l('请选择部门')
+                    : _l('请选择组织角色')}
                 </div>
               ) : (
                 <ul className="pLeft6 tagWrap">
@@ -768,6 +828,70 @@ export default class TriggerCondition extends Component {
           )}
 
           {this.renderOtherFields(item, i, j)}
+        </div>
+      );
+    }
+
+    // 时间
+    if (filedTypeId === 46) {
+      const timeFormat = unit === '1' ? 'HH:mm' : 'HH:mm:ss';
+
+      return (
+        <div className="flex">
+          <div className="flexRow relative">
+            {conditionValues[0] && conditionValues[0].controlId ? (
+              this.renderSelectFieldsValue(conditionValues[0], i, j)
+            ) : (
+              <div className="flex triggerConditionNum triggerConditionDate ThemeBorderColor3 clearBorderRadius">
+                <TimePicker
+                  className="triggerConditionTime"
+                  showNow={false}
+                  bordered={false}
+                  allowClear={false}
+                  suffixIcon={<i className="icon-access_time Font14 Gray_9e" />}
+                  inputReadOnly
+                  placeholder=""
+                  format={timeFormat}
+                  value={
+                    conditionValues[0] && conditionValues[0].value ? moment(conditionValues[0].value, timeFormat) : null
+                  }
+                  onChange={(time, timeString) => this.updateConditionDateValue({ value: timeString, i, j })}
+                />
+              </div>
+            )}
+            {this.renderOtherFields(item, i, j)}
+            {controlNumber > 1 && <div className="Font13 mLeft10 Gray_9e LineHeight36">{_l('至')}</div>}
+          </div>
+
+          {controlNumber > 1 && (
+            <div className="mTop10 flexRow relative">
+              {conditionValues[1] && conditionValues[1].controlId ? (
+                this.renderSelectFieldsValue(conditionValues[1], i, j, true)
+              ) : (
+                <div className="flex triggerConditionNum triggerConditionDate ThemeBorderColor3 clearBorderRadius">
+                  <TimePicker
+                    className="triggerConditionTime"
+                    showNow={false}
+                    bordered={false}
+                    allowClear={false}
+                    suffixIcon={<i className="icon-access_time Font14 Gray_9e" />}
+                    inputReadOnly
+                    placeholder=""
+                    format={timeFormat}
+                    value={
+                      conditionValues[1] && conditionValues[1].value
+                        ? moment(conditionValues[1].value, timeFormat)
+                        : null
+                    }
+                    onChange={(time, timeString) =>
+                      this.updateConditionDateValue({ value: timeString, i, j, second: true })
+                    }
+                  />
+                </div>
+              )}
+              {this.renderOtherFields(item, i, j, true)}
+            </div>
+          )}
         </div>
       );
     }
@@ -802,7 +926,7 @@ export default class TriggerCondition extends Component {
   /**
    * 渲染标签式下拉选择
    */
-  renderDropdownTagList(conditionValues, i, j, filedTypeId, enumDefault) {
+  renderDropdownTagList(conditionValues, i, j) {
     return (
       <div className="flex triggerConditionNum triggerConditionDropdown">
         {!conditionValues.length ? (
@@ -812,21 +936,8 @@ export default class TriggerCondition extends Component {
             {conditionValues.map((list, index) => {
               return (
                 <li key={index} className="tagItem flexRow">
-                  <span
-                    className="tag"
-                    title={
-                      filedTypeId === 28
-                        ? enumDefault === 1
-                          ? GRADE_STAR_TYPE[list.value.key]
-                          : GRADE_LEVEL_TYPE[list.value.key]
-                        : list.value.value
-                    }
-                  >
-                    {filedTypeId === 28
-                      ? enumDefault === 1
-                        ? GRADE_STAR_TYPE[list.value.key]
-                        : GRADE_LEVEL_TYPE[list.value.key]
-                      : list.value.value}
+                  <span className="tag" title={list.value.value}>
+                    {list.value.value}
                   </span>
                   <span
                     className="delTag"
@@ -854,6 +965,7 @@ export default class TriggerCondition extends Component {
       title: _l('选择人员'),
       showMoreInvite: false,
       SelectUserSettings: {
+        filterResigned: false,
         filterAccountIds: unique ? [] : users.map(item => item.value.key),
         projectId: this.props.projectId,
         dataRange: 2,
@@ -888,6 +1000,24 @@ export default class TriggerCondition extends Component {
   }
 
   /**
+   * 组织角色选择
+   */
+  selectRole(oldRoles, i, j, unique) {
+    selectOrgRole({
+      projectId: this.props.projectId,
+      unique,
+      onSave: roles => {
+        if (!unique) {
+          const oldIds = oldRoles.map(item => item.value.key);
+          _.remove(roles, item => _.includes(oldIds, item.organizeId));
+        }
+
+        this.updateConditionValue({ value: roles, i, j, isSingle: unique });
+      },
+    });
+  }
+
+  /**
    * 更新筛选条件的值
    */
   updateConditionValue = ({ value, i, j, second, isSingle }) => {
@@ -895,7 +1025,7 @@ export default class TriggerCondition extends Component {
     const { updateSource } = this.props;
     const { filedTypeId } = data[i][j];
 
-    // 文本 || 手机号码 || 电话号码 || 邮箱 || 证件  || 关联单条 || 文本组合 || 自动编号
+    // 文本 || 手机号码 || 电话号码 || 邮箱 || 证件  || 关联单条 || 文本组合 || 自动编号 || api查询
     if (
       filedTypeId === 1 ||
       filedTypeId === 2 ||
@@ -905,7 +1035,8 @@ export default class TriggerCondition extends Component {
       filedTypeId === 7 ||
       filedTypeId === 29 ||
       filedTypeId === 32 ||
-      filedTypeId === 33
+      filedTypeId === 33 ||
+      filedTypeId === 50
     ) {
       if (_.includes(data[i][j].conditionValues.map(obj => obj.value), value)) {
         _.remove(data[i][j].conditionValues, obj => obj.value === value);
@@ -949,30 +1080,26 @@ export default class TriggerCondition extends Component {
       }
     }
 
-    // 人员
-    if (_.includes([26, 10000001], filedTypeId)) {
-      if (typeof value === 'string') {
-        _.remove(data[i][j].conditionValues, obj => obj.value.key === value);
-      } else if (isSingle) {
-        data[i][j].conditionValues = [{ value: { key: value[0].accountId, value: value[0].fullname } }];
-      } else {
-        value.forEach(item => {
-          data[i][j].conditionValues.push({ value: { key: item.accountId, value: item.fullname } });
-        });
-      }
-    }
+    // 人员 || 部门 || 组织角色
+    if (_.includes([26, 27, 48, 10000001], filedTypeId)) {
+      const KEY = {
+        26: { id: 'accountId', name: 'fullname' },
+        27: { id: 'departmentId', name: 'departmentName' },
+        48: { id: 'organizeId', name: 'organizeName' },
+        10000001: { id: 'accountId', name: 'fullname' },
+      };
 
-    // 部门
-    if (filedTypeId === 27) {
       if (typeof value === 'string') {
         _.remove(data[i][j].conditionValues, obj => obj.value.key === value);
       } else if (isSingle) {
         data[i][j].conditionValues = [
-          { value: { key: (value[0] || {}).departmentId, value: (value[0] || {}).departmentName } },
+          { value: { key: (value[0] || {})[KEY[filedTypeId].id], value: (value[0] || {})[KEY[filedTypeId].name] } },
         ];
       } else {
         value.forEach(item => {
-          data[i][j].conditionValues.push({ value: { key: item.departmentId, value: item.departmentName } });
+          data[i][j].conditionValues.push({
+            value: { key: item[KEY[filedTypeId].id], value: item[KEY[filedTypeId].name] },
+          });
         });
       }
     }
@@ -1007,7 +1134,7 @@ export default class TriggerCondition extends Component {
    * 更多节点的值
    */
   renderOtherFields(item, i, j, second = false) {
-    const { processId, selectNodeId, sourceAppId, controls } = this.props;
+    const { processId, selectNodeId, sourceAppId, isIntegration, controls } = this.props;
     const { moreFieldsIndex } = this.state;
     let dataSource = '';
 
@@ -1033,6 +1160,7 @@ export default class TriggerCondition extends Component {
         processId={processId}
         selectNodeId={selectNodeId}
         sourceAppId={sourceAppId}
+        isIntegration={isIntegration}
         conditionId={item.conditionId}
         dataSource={dataSource}
         handleFieldClick={obj => this.updateDynamicConditionValue({ ...obj, i, j, second })}
@@ -1101,6 +1229,7 @@ export default class TriggerCondition extends Component {
             appType={item.appType}
             actionId={item.actionId}
             nodeName={item.nodeName}
+            controlId={item.controlId}
             controlName={item.controlName}
           />
         </span>
@@ -1140,7 +1269,7 @@ export default class TriggerCondition extends Component {
     return (
       <Fragment>
         <Header />
-        <div className="flowDetailTigger">
+        <div className="flowDetailTrigger">
           {data.map((item, i) =>
             item.map((source, j) => this.renderItem(source, i, j, i === data.length - 1, j === item.length - 1)),
           )}

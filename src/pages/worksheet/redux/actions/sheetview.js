@@ -1,24 +1,17 @@
 import _ from 'lodash';
+import worksheetAjax from 'src/api/worksheet';
 import {
-  updateWorksheetRow,
-  saveWorksheetView,
-  getFilterRows,
-  getFilterRowsTotalNum,
-  getFilterRowsReport,
-  getViewPermission,
-} from 'src/api/worksheet';
-import { SYSTEM_CONTROL, WIDGETS_TO_API_TYPE_ENUM } from 'src/pages/widgetConfig/config/widget';
+  SYSTEM_CONTROL,
+  WORKFLOW_SYSTEM_CONTROL,
+  WIDGETS_TO_API_TYPE_ENUM,
+} from 'src/pages/widgetConfig/config/widget';
 import { getLRUWorksheetConfig, saveLRUWorksheetConfig, clearLRUWorksheetConfig } from 'worksheet/util';
-import { wrapAjax } from './util';
 import { getNavGroupCount } from './index';
-const wrappedGetFilterRows = wrapAjax(getFilterRows);
-const wrappedGetFilterRowsTotalNum = wrapAjax(getFilterRowsTotalNum);
-const wrappedGetFilterRowsReport = wrapAjax(getFilterRowsReport);
 
-export const fetchRows = ({ isFirst, changeView, noLoading } = {}) => {
+export const fetchRows = ({ isFirst, changeView, noLoading, noClearSelected, updateWorksheetControls } = {}) => {
   return (dispatch, getState) => {
     const { base, filters, sheetview, quickFilter, navGroupFilters } = getState().sheet;
-    const { appId, viewId, worksheetId, chartId, showAsSheetView } = base;
+    const { appId, viewId, worksheetId, maxCount, chartId, showAsSheetView } = base;
     let { pageSize, pageIndex, sortControls } = sheetview.sheetFetchParams;
     if (changeView) {
       pageIndex = 1;
@@ -49,8 +42,13 @@ export const fetchRows = ({ isFirst, changeView, noLoading } = {}) => {
         ]),
       ),
       navGroupFilters,
+      isGetWorksheet: updateWorksheetControls,
       ...(showAsSheetView ? { getType: 0 } : {}),
     };
+    if (maxCount) {
+      args.pageIndex = 1;
+      args.pageSize = maxCount;
+    }
     if (changeView || isFirst) {
       dispatch(setViewLayout(viewId));
     }
@@ -58,10 +56,27 @@ export const fetchRows = ({ isFirst, changeView, noLoading } = {}) => {
       type: 'WORKSHEET_SHEETVIEW_FETCH_ROWS_START',
       value: {
         noLoading,
+        noClearSelected,
       },
     });
     dispatch(getWorksheetSheetViewSummary());
-    wrappedGetFilterRows(args).then(res => {
+    worksheetAjax.getFilterRows(args).then(res => {
+      if (updateWorksheetControls && _.get(res, 'template.controls')) {
+        try {
+          dispatch({
+            type: 'WORKSHEET_UPDATE_CONTROLS',
+            controls: _.get(res, 'template.controls').filter(
+              c =>
+                c.controlId.length === 24 ||
+                _.includes(
+                  SYSTEM_CONTROL.conact(WORKFLOW_SYSTEM_CONTROL).map(c => c.controlId),
+                  c.controlId,
+                ),
+            ),
+          });
+        } catch (err) {}
+        dispatch(setViewLayout(viewId));
+      }
       dispatch({
         type: 'WORKSHEET_SHEETVIEW_FETCH_ROWS',
         rows: res.data,
@@ -75,16 +90,34 @@ export const fetchRows = ({ isFirst, changeView, noLoading } = {}) => {
       }
     });
     if (pageIndex === 1 && !chartId) {
-      wrappedGetFilterRowsTotalNum(args).then(data => {
-        const count = parseInt(data, 10);
-        if (!_.isNaN(count)) {
+      worksheetAjax.getFilterRowsTotalNum(args).then(data => {
+        if (!data) {
           dispatch({
-            type: 'WORKSHEET_SHEETVIEW_UPDATE_COUNT',
-            count,
+            type: 'WORKSHEET_SHEETVIEW_UPDATE_COUNT_ABNORMAL',
           });
+        } else {
+          const count = parseInt(data, 10);
+          if (!_.isNaN(count)) {
+            dispatch({
+              type: 'WORKSHEET_SHEETVIEW_UPDATE_COUNT',
+              count,
+            });
+            dispatch(updateNavGroup());
+          }
         }
       });
     }
+  };
+};
+
+// 更新分组筛选
+export const updateNavGroup = () => {
+  return (dispatch, getState) => {
+    const { views, base } = getState().sheet;
+    const { viewId = '' } = base;
+    const view = views.find(o => o.viewId === viewId) || {};
+    const navGroup = view.navGroup && view.navGroup.length > 0 ? view.navGroup[0] : {};
+    navGroup.controlId && dispatch(getNavGroupCount());
   };
 };
 
@@ -103,57 +136,73 @@ export function updateViewPermission() {
   return (dispatch, getState) => {
     const { base } = getState().sheet;
     const { appId, viewId, worksheetId } = base;
-    getViewPermission({
-      appId,
-      worksheetId,
-      viewId,
-    }).then(data => {
-      if (data.view) {
-        dispatch({
-          type: 'WORKSHEET_SHEETVIEW_UPDATE_PERMISSION',
-          viewId,
-          value: data.view,
-        });
-      }
-    });
+    worksheetAjax
+      .getViewPermission({
+        appId,
+        worksheetId,
+        viewId,
+      })
+      .then(data => {
+        if (data.view) {
+          dispatch({
+            type: 'WORKSHEET_SHEETVIEW_UPDATE_PERMISSION',
+            viewId,
+            value: data.view,
+          });
+        }
+      });
   };
 }
 
-export function updateControlOfRow({ recordId, controlId, value, editType }, options = {}) {
+export function updateControlOfRow({ cell = {}, cells = [], recordId }, options = {}) {
   return (dispatch, getState) => {
+    if (!_.isEmpty(cell) && _.isEmpty(cells)) {
+      cells = [cell];
+    }
     const { base, controls } = getState().sheet;
     const { appId, viewId, worksheetId } = base;
+    const { controlId, value } = cell;
     const control = _.find(controls, { controlId });
-    if (!control) {
+    const newOldControl = cells
+      .map(cell => {
+        const { controlId, value, editType } = cell;
+        const control = _.find(controls, { controlId });
+        return (
+          control && {
+            ..._.pick(control, ['controlId', 'type', 'controlName', 'dot']),
+            editType,
+            value,
+          }
+        );
+      })
+      .filter(_.identity);
+    if (_.isEmpty(newOldControl)) {
       return;
     }
-    updateWorksheetRow({
-      appId,
-      viewId,
-      worksheetId,
-      rowId: recordId,
-      newOldControl: [
-        {
-          ..._.pick(control, ['controlId', 'type', 'controlName', 'dot']),
-          editType,
-          value,
-        },
-      ],
-    })
+    worksheetAjax
+      .updateWorksheetRow({
+        appId,
+        viewId,
+        worksheetId,
+        rowId: recordId,
+        newOldControl,
+      })
       .then(res => {
         if (res.resultCode === 1) {
-          dispatch(getNavGroupCount());
+          dispatch(updateNavGroup());
           if (_.isFunction(options.callback)) {
             options.callback(res.data);
           }
-          dispatch({
-            type: 'WORKSHEET_SHEETVIEW_UPDATE_ROW_CACHE',
-            recordId,
-            controlId,
-            value: res.data[controlId],
-          });
-          if (_.isFunction(options.updateSucessCb)) {
-            options.updateSucessCb(res.data);
+          // dispatch(updateRows([recordId], _.omit(res.data, ['allowedit', 'allowdelete'])));
+          if (_.isFunction(options.updateSuccessCb)) {
+            options.updateSuccessCb(res.data);
+          } else {
+            dispatch({
+              type: 'WORKSHEET_SHEETVIEW_UPDATE_ROW_CACHE',
+              recordId,
+              controlId,
+              value: res.data[controlId],
+            });
           }
           dispatch(getWorksheetSheetViewSummary());
           // 处理新增自定义选项
@@ -188,21 +237,6 @@ export function updateControlOfRow({ recordId, controlId, value, editType }, opt
   };
 }
 
-export function hideRows(rowIds) {
-  return (dispatch, getState) => {
-    const { sheetview } = getState().sheet;
-    const { rows } = sheetview.sheetViewData;
-    rowIds = rowIds.filter(rowId => _.find(rows, r => rowId === r.rowid));
-    if (rowIds.length) {
-      dispatch({
-        type: 'WORKSHEET_SHEETVIEW_HIDE_ROWS',
-        rowIds,
-      });
-    }
-    dispatch(getNavGroupCount());
-  };
-}
-
 export function updateRows(rowIds, value) {
   return {
     type: 'WORKSHEET_SHEETVIEW_UPDATE_ROWS_BY_ROWIDS',
@@ -211,7 +245,7 @@ export function updateRows(rowIds, value) {
   };
 }
 
-export function refresh({ resetPageIndex, noLoading } = {}) {
+export function refresh({ resetPageIndex, changeFilters, noLoading, noClearSelected, updateWorksheetControls } = {}) {
   return (dispatch, getState) => {
     const {
       filters,
@@ -221,29 +255,49 @@ export function refresh({ resetPageIndex, noLoading } = {}) {
     } = getState().sheet;
     const view = _.find(views, { viewId });
     const needClickToSearch = !chartId && _.get(view, 'advancedSetting.clicksearch') === '1';
-    if (filters.keyWords || resetPageIndex) {
+    if (filters.keyWords || resetPageIndex || changeFilters) {
       dispatch(changePageIndex(1));
     }
     if (needClickToSearch && _.isEmpty(quickFilter)) {
       dispatch(setRowsEmpty());
     } else {
-      dispatch(fetchRows({ noLoading }));
+      dispatch(fetchRows({ noLoading, noClearSelected, updateWorksheetControls }));
     }
+    dispatch({ type: 'WORKSHEET_SHEETVIEW_REFRESH' });
   };
 }
 
 export const clearHighLight = tableId => {
   return () => {
-    $(`.mdTable.id-${tableId}-id .cell`).removeClass('highlight');
-    delete window[`sheettablehighlightrow${tableId}`];
+    $(`.sheetViewTable.id-${tableId}-id .cell`).removeClass('highlight');
+    delete window[`sheetTableHighlightRow${tableId}`];
   };
 };
 
 export const setHighLight = (tableId, rowIndex) => {
   return dispatch => {
     dispatch(clearHighLight(tableId));
-    $(`.mdTable.id-${tableId}-id .cell.row-${rowIndex}`).addClass('highlight');
-    window[`sheettablehighlightrow${tableId}`] = rowIndex;
+    $(`.sheetViewTable.id-${tableId}-id .cell.row-${rowIndex}`).addClass('highlight');
+    window[`sheetTableHighlightRow${tableId}`] = rowIndex;
+  };
+};
+
+export const setHighLightOfRows = (rowIds, tableId) => {
+  return (dispatch, getState) => {
+    const { sheetview } = getState().sheet;
+    const { rows } = sheetview.sheetViewData;
+    dispatch(clearHighLight(tableId));
+    rowIds.forEach(rowId => {
+      let rowIndex = _.findIndex(rows, row => row.rowid === rowId);
+      if (_.isUndefined(rowIndex)) {
+        return;
+      }
+      rowIndex = rowIndex + 1;
+      $(`${tableId ? `.sheetViewTable.id-${tableId}-id` : '.sheetViewTable'} .cell.row-${rowIndex}`).addClass(
+        'highlight',
+      );
+      window[`sheetTableHighlightRow${tableId}`] = rowIndex;
+    });
   };
 };
 
@@ -251,12 +305,27 @@ export const clearSelect = () => ({
   type: 'WORKSHEET_SHEETVIEW_CLEAR_SELECT',
 });
 
+export function hideRows(rowIds) {
+  return (dispatch, getState) => {
+    const { sheetview } = getState().sheet;
+    const { rows } = sheetview.sheetViewData;
+    rowIds = rowIds.filter(rowId => _.find(rows, r => rowId === r.rowid));
+    if (rowIds.length) {
+      dispatch(clearSelect());
+      dispatch({
+        type: 'WORKSHEET_SHEETVIEW_HIDE_ROWS',
+        rowIds,
+      });
+    }
+    dispatch(updateNavGroup());
+  };
+}
+
 export function selectRows({ rows = [], selectAll }) {
-  if (typeof selectAll !== 'undefined') {
+  if (selectAll) {
     return {
       type: 'WORKSHEET_SHEETVIEW_SELECT_ALL',
-      value: selectAll,
-      rows,
+      value: true,
     };
   } else {
     return {
@@ -328,7 +397,8 @@ export function saveSheetLayout({ closePopup = () => {} }) {
       view: { ...view, ...updates },
     });
     closePopup();
-    saveWorksheetView(updates)
+    worksheetAjax
+      .saveWorksheetView(updates)
       .then(() => {})
       .fail(err => {
         alert(_l('保存表格外观失败！'), 3);
@@ -400,11 +470,11 @@ function resetView() {
   };
 }
 
-function setViewLayout(viewId) {
+export function setViewLayout(viewId) {
   return (dispatch, getState) => {
     const { views } = getState().sheet;
     const view = _.find(views, { viewId });
-    if (!view) {
+    if (!view || view.viewType !== 0) {
       return;
     }
     const { advancedSetting } = view;
@@ -429,8 +499,8 @@ function setViewLayout(viewId) {
       }
       if (advancedSetting.sheetcolumnwidths) {
         try {
-          sheetColumnWidths = JSON.parse(advancedSetting.sheetcolumnwidths);
-          clearLRUWorksheetConfig('WORKSHEET_VIEW_COLUMN_WIDTH', viewId);
+          sheetColumnWidths = { ...sheetColumnWidths, ...JSON.parse(advancedSetting.sheetcolumnwidths) };
+          saveLRUWorksheetConfig('WORKSHEET_VIEW_COLUMN_WIDTH', viewId, JSON.stringify(sheetColumnWidths));
         } catch (err) {}
       }
     }
@@ -466,39 +536,41 @@ export function getWorksheetSheetViewSummary() {
     if (!columnRpts.length) {
       return;
     }
-    wrappedGetFilterRowsReport({
-      appId,
-      viewId,
-      worksheetId,
-      reportId: chartId || undefined,
-      columnRpts,
-      filterControls: [],
-      keyWords: '',
-      searchType: 1,
-      ...filters,
-      fastFilters: quickFilter.map(f =>
-        _.pick(f, [
-          'controlId',
-          'dataType',
-          'spliceType',
-          'filterType',
-          'dateRange',
-          'value',
-          'values',
-          'minValue',
-          'maxValue',
-        ]),
-      ),
-      navGroupFilters,
-    }).then(data => {
-      if (data && data.length) {
-        dispatch({
-          type: 'WORKSHEET_SHEETVIEW_FETCH_REPORT_SUCCESS',
-          types: types,
-          values: [{}, ...data].reduce((a, b) => Object.assign({}, a, { [b.controlId]: b.value })),
-        });
-      }
-    });
+    worksheetAjax
+      .getFilterRowsReport({
+        appId,
+        viewId,
+        worksheetId,
+        reportId: chartId || undefined,
+        columnRpts,
+        filterControls: [],
+        keyWords: '',
+        searchType: 1,
+        ...filters,
+        fastFilters: quickFilter.map(f =>
+          _.pick(f, [
+            'controlId',
+            'dataType',
+            'spliceType',
+            'filterType',
+            'dateRange',
+            'value',
+            'values',
+            'minValue',
+            'maxValue',
+          ]),
+        ),
+        navGroupFilters,
+      })
+      .then(data => {
+        if (data && data.length) {
+          dispatch({
+            type: 'WORKSHEET_SHEETVIEW_FETCH_REPORT_SUCCESS',
+            types: types,
+            values: [{}, ...data].reduce((a, b) => Object.assign({}, a, { [b.controlId]: b.value })),
+          });
+        }
+      });
   };
 }
 
@@ -528,15 +600,23 @@ export function changeWorksheetSheetViewSummaryType({ controlId, value }) {
   };
 }
 
-export function addRecord(record, afterRowId) {
+export function addRecord(records, afterRowId) {
   return (dispatch, getState) => {
     const { sheetview } = getState().sheet;
     const { rows, count } = sheetview.sheetViewData;
+    if (!_.isArray(records)) {
+      records = [records];
+    }
+    dispatch(updateNavGroup());
+    dispatch({
+      type: 'WORKSHEET_SHEETVIEW_UPDATE_COUNT',
+      count: count + records.length,
+    });
     if (afterRowId) {
       const afterRowIndex = _.findIndex(rows, row => row.rowid === afterRowId);
       const newRows = _.isUndefined(afterRowId)
-        ? [record, ...rows]
-        : [...rows.slice(0, afterRowIndex + 1), record, ...rows.slice(afterRowIndex + 1)];
+        ? [...records, ...rows]
+        : [...rows.slice(0, afterRowIndex + 1), ...records, ...rows.slice(afterRowIndex + records.length)];
       dispatch({
         type: 'WORKSHEET_SHEETVIEW_UPDATE_ROWS',
         rows: newRows,
@@ -545,7 +625,7 @@ export function addRecord(record, afterRowId) {
     } else {
       dispatch({
         type: 'WORKSHEET_SHEETVIEW_UPDATE_ROWS',
-        rows: [record, ...rows],
+        rows: [...records, ...rows],
         count: count + 1,
       });
     }

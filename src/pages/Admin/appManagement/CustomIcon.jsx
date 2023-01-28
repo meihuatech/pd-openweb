@@ -6,6 +6,7 @@ import { Icon, ScrollView } from 'ming-ui';
 import ajaxRequest from 'src/api/appManagement';
 import SvgIcon from 'src/components/SvgIcon';
 import { getToken } from 'src/util';
+import _ from 'lodash';
 
 export default class CustomIcon extends Component {
   state = {
@@ -91,6 +92,13 @@ export default class CustomIcon extends Component {
             _this.getList();
           });
         },
+        Error(up, error) {
+          if (error.code === window.plupload.FILE_SIZE_ERROR) {
+            alert(_l('单个文件大小超过50m，无法支持上传'), 2);
+          } else {
+            alert(_l('上传失败，请稍后再试。'), 2);
+          }
+        }
       },
     });
   }
@@ -128,7 +136,7 @@ export default class CustomIcon extends Component {
     const { projectId } = this.props;
     const { selected } = this.state;
 
-    fetch(`${__api_server__}Download/CustomIcon`, {
+    fetch(`${__api_server__.main}Download/CustomIcon`, {
       method: 'POST',
       body: JSON.stringify({ projectId, fileNames: selected }),
       headers: new Headers({

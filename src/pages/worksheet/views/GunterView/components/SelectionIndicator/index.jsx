@@ -3,6 +3,7 @@ import styled from 'styled-components';
 import { connect } from 'react-redux';
 import { bindActionCreators } from 'redux';
 import * as actions from 'worksheet/redux/actions/gunterview';
+import _ from 'lodash';
 
 const SelectionIndicatorWrapper = styled.div(
   ({ color }) => `
@@ -16,12 +17,13 @@ const SelectionIndicatorWrapper = styled.div(
 `,
 );
 
-const headerHeight = 61;
+const headerHeight = 60;
 const rowHeight = 32;
 
 @connect(
   state => ({
     ..._.pick(state.sheet.gunterView, ['editIndex', 'grouping', 'searchRecordId', 'chartScroll', 'groupingScroll']),
+    ..._.pick(state.sheet, ['base']),
   }),
   dispatch => bindActionCreators(actions, dispatch),
 )
@@ -42,8 +44,8 @@ export default class SelectionIndicator extends React.Component {
     }
   }
   componentDidMount() {
-    const { chartScroll, groupingScroll } = this.props;
-    this.gunterViewEl = document.querySelector('.gunterView');
+    const { chartScroll, groupingScroll, base } = this.props;
+    this.gunterViewEl = document.querySelector(`.gunterView-${base.viewId}`);
     this.gunterViewEl.addEventListener('mousemove', this.handleMouseMove);
     this.gunterViewEl.addEventListener('mouseleave', this.handleMouseLeave);
     this.appEl = document.querySelector('#app');

@@ -8,6 +8,7 @@ import { eventStr } from './util';
 let isChangeing = false;
 import { bindActionCreators } from 'redux';
 import * as Actions from 'src/pages/worksheet/redux/actions/calendarview';
+import _ from 'lodash';
 @connect(
   state => ({
     ...state.sheet,
@@ -22,18 +23,25 @@ class External extends Component {
       eventConH: 0,
       loadUp: false,
       isSearch: false,
+      random: parseInt(Math.random() * 1000000000000),
     };
   }
 
   componentDidMount() {
-    new Draggable(document.getElementById('externalEvents'), {
+    new Draggable(document.getElementById(`externalEvents-${this.state.random}`), {
       itemSelector: '.fcEvent',
     });
   }
 
   componentWillReceiveProps(nextProps, nextState) {
     const { calendarview = {}, getInitType, fetchExternal, refreshEventList, updateCalendarEventIsAdd } = nextProps;
-    const { calendarEventIsAdd } = calendarview;
+    const { calendarEventIsAdd, calendarData = {} } = calendarview;
+    const { calendarInfo } = calendarData;
+    if (!_.isEqual(calendarInfo, _.get(this.props, ['calendarview', 'calendarData', 'calendarInfo']))) {
+      this.setState({
+        isSearch: false,
+      });
+    }
     const typeEvent = getInitType();
     if (calendarEventIsAdd) {
       refreshEventList();
@@ -129,23 +137,33 @@ class External extends Component {
     return (
       <React.Fragment>
         {eventData.map(it => {
-          const { extendedProps = {} } = it;
-          const { editable, rowid, stringColor = '' } = extendedProps;
+          const { extendedProps = {}, timeList = [] } = it;
+          const { rowid, stringColor = '' } = extendedProps;
+          let editable = timeList.length > 1 ? timeList.filter(o => o.editable).length > 0 : timeList[0].editable; //多组时间,且有可编辑的权限，拖拽后选择时间组
           return (
             <div
               className={cx('clearfix fcEventCon', { fcEvent: editable })}
               rowid={rowid}
-              key={rowid}
+              key={`${rowid}-${it.begin}`}
+              keyId={`${rowid}-${it.begin}`}
               enddate={it.enddate}
               onClick={() => {
                 this.props.showRecordInfo(rowid, it, eventData);
               }}
             >
-              {it.start && <div className="colorLeft" style={{ backgroundColor: stringColor }}></div>}
+              {<div className="colorLeft" style={{ backgroundColor: stringColor }}></div>}
               <div className="title Font14 Bold" title={it.title} style={{ WebkitBoxOrient: 'vertical' }}>
                 {it.title}
               </div>
-              {it.start && <div className="Gray_9e Font13 mTop2">{it.start}</div>}
+              {it.timeList.map(o => {
+                if (o.start)
+                  return (
+                    <div className="Gray_9e Font13 mTop2">
+                      {o.start}
+                      <span className="mLeft10">{o.info.mark}</span>
+                    </div>
+                  );
+              })}
             </div>
           );
         })}
@@ -202,7 +220,7 @@ class External extends Component {
     const typeEvent = getInitType();
     const eventData = calenderEventList[typeEvent];
     return (
-      <div id="externalEvents" className="externalEvents" >
+      <div id={`externalEvents-${this.state.random}`} className="externalEvents">
         {this.props.showExternal ? (
           <div className="listBox">
             <div className="searchWrapper">
@@ -252,7 +270,7 @@ class External extends Component {
                         onClick={() => {
                           this.props.getEventScheduledData(it.key);
                           $('.eventListBox .nano-content').scrollTop(0);
-                          window.localStorage.setItem('CalendarShowExternalTypeEvent', it.key);
+                          safeLocalStorageSetItem('CalendarShowExternalTypeEvent', it.key);
                         }}
                       >
                         {it.txt}

@@ -4,7 +4,7 @@ import GridLayout from 'react-grid-layout';
 import 'react-grid-layout/css/styles.css';
 import styled from 'styled-components';
 import cx from 'classnames';
-import reportConfig from 'src/pages/worksheet/common/Statistics/api/reportConfig';
+import reportConfig from 'statistics/api/reportConfig';
 import { connect } from 'react-redux';
 import { bindActionCreators } from 'redux';
 import errorBoundary from 'ming-ui/decorators/errorBoundary';
@@ -16,6 +16,7 @@ import { getEnumType, getDefaultLayout, reportCountLimit } from '../../util';
 import Tools from './Tools';
 import WidthProvider from './widthProvider';
 import { COLUMN_HEIGHT } from '../../config';
+import { v4 as uuidv4 } from 'uuid';
 
 const AutoWidthGridLayout = WidthProvider(GridLayout);
 
@@ -32,17 +33,41 @@ const LayoutContent = styled.div`
     background-color: #fff;
     border-radius: 3px;
     overflow: auto;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.16);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    &.numberChartCardHover {
+      cursor: pointer;
+      transition: box-shadow 0.2s;
+      &:hover {
+        box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.16);
+      }
+    }
+    &.hideNumberChartName {
+      .reportName {
+        display: none;
+      }
+    }
     &.richText {
       .editorNull {
         border: none;
       }
     }
-    &.analysis {
-      overflow: visible;
+    &.analysis, &.embedUrl {
+      // overflow: visible;
+    }
+    &.filter {
+      justify-content: center;
+      padding: 0 10px;
+    }
+    &.filter.mobile {
+      background-color: transparent;
+      box-shadow: none;
+      padding: 0;
+      +span.react-resizable-handle {
+        display: none;
+      }
     }
     &:hover {
-      box-shadow: 0 2px 6px 0px rgba(0, 0, 0, 0.25);
+      // box-shadow: 0 2px 6px 0px rgba(0, 0, 0, 0.20);
     }
     &.haveTitle {
       height: calc(100% - 40px);
@@ -75,6 +100,7 @@ const LayoutContent = styled.div`
       background: transparent;
       min-width: 60px;
       max-width: 100%;
+      width: 100%;
       box-sizing: border-box;
       transition: width border-bottom 0.2s;
       padding-right: 16px;
@@ -90,6 +116,9 @@ const LayoutContent = styled.div`
   .componentsWrap {
     padding: 0 0 4px 0;
     height: 100%;
+  }
+  .react-resizable-handle {
+    z-index: 1;
   }
 `;
 const LAYOUT_CONFIG = {
@@ -120,11 +149,12 @@ function WidgetContent(props) {
     insertTitle = _.noop,
     addRecord = _.noop,
     updatePageInfo = _.noop,
-    setWidget,
+    editingWidget = {},
+    setWidget = _.noop,
     isFullscreen = false,
-    scrollTop = 0,
     adjustScreen,
-    apk
+    apk,
+    isCharge
   } = props;
   const [loading, setLoading] = useState(false);
   const [isEdit, setEdit] = useState(false);
@@ -142,6 +172,7 @@ function WidgetContent(props) {
     window.addEventListener('resize', throttle(handle));
   }, []);
 
+  /*
   useEffect(() => {
     const $inputDom = $input.current;
     if (!$inputDom) return;
@@ -152,6 +183,7 @@ function WidgetContent(props) {
     $inputDom.addEventListener('keydown', handler);
     return () => $inputDom.removeEventListener('keydown', handler);
   }, [$input.current]);
+  */
 
   const handleToolClick = (clickType, { widget, index }) => {
     switch (clickType) {
@@ -175,7 +207,15 @@ function WidgetContent(props) {
           if (loading) return;
           reportConfig
             .copyReport({ reportId: widget.value, sourceType: 1 })
-            .then(data => copyWidget({ ..._.omit(widget, ['id', 'uuid']), value: data.reportId, layoutType }))
+            .then(data => copyWidget({
+              ..._.omit(widget, ['id', 'uuid']),
+              value: data.reportId,
+              layoutType,
+              sourceValue: widget.value,
+              config: {
+                objectId: uuidv4()
+              }
+            }))
             .always(() => setLoading(false));
         } else {
           copyWidget({ ..._.omit(widget, ['id', 'uuid']), layoutType });
@@ -186,9 +226,21 @@ function WidgetContent(props) {
         updateWidgetVisible({ widget, layoutType });
         break;
       case 'switchButtonDisplay':
+        const { btnType, direction } = widget.button.config || {};
         updateWidget({
           widget,
-          button: update(widget.button, { mobileCount: { $apply: item => (item === 1 ? 2 : 1) } }),
+          button: update(widget.button, {
+            mobileCount: {
+              $apply: item => {
+                // 图形按钮，上下结构
+                if (btnType === 2 && direction === 1) {
+                  return item === 4 ? 1 : (item + 1);
+                } else {
+                  return item === 1 ? 2 : 1;
+                }
+              }
+            }
+          }),
         });
         break;
       default:
@@ -211,7 +263,7 @@ function WidgetContent(props) {
     const $wrap = document.getElementById('componentsWrap');
     if (layoutType !== 'web' || !adjustScreen || !$wrap) return config;
     const maxH = max(components.map(item => get(item, ['web', 'layout'])).map(layout => layout.h + layout.y));
-    return { ...config, rowHeight: ($wrap.offsetHeight - 64) / maxH - 10 };
+    return { ...config, rowHeight: ((isFullscreen ? window.screen.height : $wrap.offsetHeight) - (isFullscreen ? 10 : 64)) / maxH - 10 };
   };
 
   return (
@@ -226,7 +278,7 @@ function WidgetContent(props) {
         isDraggable={editable}
         isResizable={editable}
         isFullscreen={isFullscreen}
-        draggableCancel=".disableDrag"
+        draggableCancel=".disableDrag,.chartWrapper .drag"
         onResizeStop={(layout, oldItem = {}) => {
           const index = _.findIndex(layout, { i: oldItem.i });
           const getData = _.get(displayRefs[index], ['getData']);
@@ -249,7 +301,7 @@ function WidgetContent(props) {
           return (
             <LayoutContent key={`${id || index}`} className="resizableWrap">
               {titleVisible && (
-                <div className="componentTitle overflow_ellipsis disableDrag">
+                <div className="componentTitle overflow_ellipsis disableDrag bold" title={title}>
                   {editable || isEdit ? (
                     <input
                       ref={$input}
@@ -264,14 +316,16 @@ function WidgetContent(props) {
                 </div>
               )}
               <div
-                className={cx('widgetContent', enumType, {
+                className={cx('widgetContent', enumType, layoutType, {
                   haveTitle: titleVisible,
                   iframeNoneEvent: enumType === 'embedUrl' && editable,
                 })}
               >
                 <WidgetDisplay
-                  {..._.pick(widget, ['type', 'param', 'value', 'needUpdate', 'button', 'name'])}
+                  widget={widget}
+                  editingWidget={editingWidget}
                   ids={ids}
+                  isCharge={isCharge}
                   projectId={apk.projectId}
                   ref={el => {
                     displayRefs[index] = el;
@@ -279,7 +333,6 @@ function WidgetContent(props) {
                   editable={editable}
                   layoutType={layoutType}
                   isFullscreen={isFullscreen}
-                  scrollTop={scrollTop}
                   addRecord={addRecord}
                 />
                 {editable && (
@@ -306,7 +359,8 @@ export default errorBoundary(
   connect(
     state => ({
       chatVisible: state.chat.visible,
-      sheetListVisible: state.sheetList.isUnfold
+      sheetListVisible: state.sheetList.isUnfold,
+      isCharge: state.sheet.isCharge
     }),
     dispatch => bindActionCreators(actions, dispatch),
   )(WidgetContent),

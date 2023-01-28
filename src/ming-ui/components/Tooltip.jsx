@@ -2,8 +2,8 @@ import React, { Component, cloneElement } from 'react';
 import cx from 'classnames';
 import PropTypes, { arrayOf, string } from 'prop-types';
 import Trigger from 'rc-trigger';
-import { render } from 'react-dom';
 import './less/Tooltip.less';
+import _ from 'lodash';
 
 const builtinPlacements = {
   left: {
@@ -79,6 +79,10 @@ class Tooltip extends Component {
      * 是否禁用
      */
     disable: PropTypes.bool,
+    /**
+     * 是否禁用动画
+     */
+    disableAnimation: PropTypes.bool,
   };
   static defaultProps = {
     action: ['hover'],
@@ -89,19 +93,55 @@ class Tooltip extends Component {
     overflow: [1, 1],
     disable: false,
   };
+  constructor(props) {
+    super(props);
+    this.contentIsFunction = _.isFunction(props.text);
+    this.state = {
+      loading: this.contentIsFunction,
+    };
+  }
   renderPopup() {
     const { text, tooltipClass } = this.props;
+    const { loading, value } = this.state;
+    let content = text;
+    if (this.contentIsFunction) {
+      content = <span>{loading ? _l('加载中...') : value}</span>;
+    } else if (typeof text === 'string') {
+      content = <span>{text}</span>;
+    }
     return (
       <div className={cx('Tooltip-wrapper', tooltipClass)}>
         <div className="Tooltip-arrow" />
-        <div className="Tooltip-content" onScroll={(e) => { e.stopPropagation(); }}>{cloneElement(text)}</div>
+        <div
+          className="Tooltip-content"
+          onScroll={e => {
+            e.stopPropagation();
+          }}
+        >
+          {cloneElement(content)}
+        </div>
       </div>
     );
   }
   render() {
-    const { action, children, popupPlacement, themeColor, offset, overflow, popupVisible, disable } = this.props;
+    const {
+      action,
+      children,
+      text,
+      popupPlacement,
+      themeColor,
+      offset,
+      overflow,
+      disable,
+      destroyPopupOnHide,
+      disableAnimation,
+      onToolTipVisibleChange,
+    } = this.props;
+    const { loading } = this.state;
     const [adjustX, adjustY] = overflow;
-
+    if (!text) {
+      return children;
+    }
     const props = Object.assign(
       {},
       {
@@ -109,8 +149,9 @@ class Tooltip extends Component {
         prefixCls: 'Tooltip',
         action,
         popup: this.renderPopup(),
-        popupTransitionName: `Tooltip-move-${popupPlacement}`,
+        popupTransitionName: disableAnimation ? '' : `Tooltip-move-${popupPlacement}`,
         builtinPlacements,
+        destroyPopupOnHide,
         popupAlign: {
           offset,
           overflow: {
@@ -118,8 +159,23 @@ class Tooltip extends Component {
             adjustY,
           },
         },
+        onPopupVisibleChange: visible => {
+          if (visible && this.contentIsFunction && loading && _.isFunction(text)) {
+            const result = text();
+            if (typeof result === 'string') {
+              this.setState({ loading: false, value: result });
+            } else if (_.isFunction(_.get(result, 'then'))) {
+              result.then(value => {
+                this.setState({ loading: false, value });
+              });
+            }
+          }
+          if (_.isFunction(onToolTipVisibleChange)) {
+            onToolTipVisibleChange(visible);
+          }
+        },
       },
-      this.props
+      this.props,
     );
     if (disable) {
       props.popupVisible = false;

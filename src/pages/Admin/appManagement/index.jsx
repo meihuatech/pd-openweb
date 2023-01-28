@@ -5,11 +5,13 @@ import './index.less';
 import { Link } from 'react-router-dom';
 import { LoadDiv, Dropdown, Switch, Icon, ScrollView, DeleteReconfirm, Dialog, Checkbox, Tooltip } from 'ming-ui';
 import cx from 'classnames';
+import AppTrash from 'src/pages/worksheet/common/Trash/AppTrash';
 import Search from 'src/pages/workflow/components/Search';
 import UserHead from 'src/pages/feed/components/userHead/userHead';
 import ajaxRequest from 'src/api/appManagement';
+import homeAppAjax from 'src/api/homeApp';
 import projectSettingAjaxRequest from 'src/api/projectSetting';
-import 'dialogSelectUser';
+import 'src/components/dialogSelectUser/dialogSelectUser';
 import CustomIcon from './CustomIcon';
 import SvgIcon from 'src/components/SvgIcon';
 import Trigger from 'rc-trigger';
@@ -17,17 +19,21 @@ import ReactDom from 'react-dom';
 import ExportApp from './modules/ExportApp';
 import ImportApp from './modules/ImportApp';
 import SelectApp from './modules/SelectApp';
+import AppAnalytics from 'src/pages/Admin/useAnalytics/components/AppAnalytics';
 import AppLog from './modules/AppLog';
 import { Drawer } from 'antd';
 import EventEmitter from 'events';
-import { upgradeVersionDialog } from 'src/util';
+import { upgradeVersionDialog, getFeatureStatus, buriedUpgradeVersionDialog } from 'src/util';
+import _ from 'lodash';
+import moment from 'moment';
 
 export const emitter = new EventEmitter();
 
 const optionData = [
-  { label: _l('导入应用'), icon: 'reply1', action: 'handleImport', hasBeta: true },
-  { label: _l('批量导出'), icon: 'cloud_download', action: 'handleExportAll', hasBeta: true },
+  { label: _l('导入应用'), icon: 'reply1', action: 'handleImport', hasBeta: true, featureId: 2 },
+  { label: _l('批量导出'), icon: 'cloud_download', action: 'handleExportAll', hasBeta: true, featureId: 2 },
   { label: _l('日志'), icon: 'assignment', action: 'handleLog', hasBeta: false },
+  { label: _l('应用回收站'), icon: 'knowledge-recycle', action: 'openAppTrash', hasBeta: false, featureId: 16 },
 ];
 
 const dialogHeader = {
@@ -36,15 +42,12 @@ const dialogHeader = {
   uploadVisible: _l('导入应用'),
 };
 
-const {
-  admin: {
-    homePage: { upgrade, renewBtn },
-  },
-} = window.private;
 export default class AppManagement extends Component {
   constructor(props) {
     super(props);
     this.state = {
+      hiddenIds: [],
+
       onlyManagerCreateApp: false,
       list: null,
       total: 0,
@@ -167,7 +170,7 @@ export default class AppManagement extends Component {
    * 渲染列表
    */
   renderList() {
-    const { list, pageIndex, loading } = this.state;
+    const { list, pageIndex, loading, hiddenIds } = this.state;
 
     if (list === null) return;
 
@@ -184,7 +187,7 @@ export default class AppManagement extends Component {
 
     return (
       <ScrollView className="flex" onScrollEnd={this.searchDataList}>
-        {list.map(item => this.renderListItem(item))}
+        {list.filter(item => !_.includes(hiddenIds, item.appId)).map(item => this.renderListItem(item))}
         {loading && pageIndex > 1 && <LoadDiv className="mTop15" size="small" />}
       </ScrollView>
     );
@@ -194,6 +197,9 @@ export default class AppManagement extends Component {
    * 渲染单个列表项
    */
   renderListItem(item) {
+    const { projectId } = this.props.match.params;
+    const { list, hiddenIds } = this.state;
+    const featureType = getFeatureStatus(projectId, 2);
     return (
       <div className="flexRow manageList" key={item.appId}>
         <div className={cx('iconWrap mLeft10', { unable: !item.status })} style={{ backgroundColor: item.iconColor }}>
@@ -226,7 +232,21 @@ export default class AppManagement extends Component {
           />
           <div className="mLeft12 ellipsis flex mRight20">{item.createAccountInfo.fullName}</div>
         </div>
-        <div className="w20 mRight20 TxtCenter">
+        <div className="w50 mRight20 TxtCenter flexRow">
+          {getFeatureStatus(projectId, 17) && (
+            <Tooltip text={<span>{_l('使用分析')}</span>}>
+              <span
+                className="Gray_9e Hand Font18 icon-worksheet_column_chart Hover_49 mRight16 chartIcon"
+                onClick={() => {
+                  if (getFeatureStatus(projectId, 17) === '2') {
+                    buriedUpgradeVersionDialog(projectId, 17);
+                    return;
+                  }
+                  this.setState({ appAnalyticsVisible: true, currentAppInfo: { ...item, name: item.appName } });
+                }}
+              ></span>
+            </Tooltip>
+          )}
           <Trigger
             popupVisible={this.state.rowVisible === item.appId}
             onPopupVisibleChange={() => this.handleChangeVisible('rowVisible', item.appId)}
@@ -234,9 +254,14 @@ export default class AppManagement extends Component {
             popup={() => {
               return (
                 <ul className="optionPanelTrigger">
-                  {item.isGoods ? null : (
+                  {item.isGoods || !featureType ? null : (
                     <li
                       onClick={() => {
+                        if (featureType === '2') {
+                          this.setState({ rowVisible: false });
+                          buriedUpgradeVersionDialog(projectId, 2);
+                          return;
+                        }
                         this.handleExport([item]);
                         this.handleChangeVisible('rowVisible', item.appId);
                       }}
@@ -248,7 +273,40 @@ export default class AppManagement extends Component {
                   <li
                     className="deleteIcon"
                     onClick={() => {
-                      this.editAppStatus(item.appId, 2);
+                      DeleteReconfirm({
+                        title: _l('你确定删除此应用吗？'),
+                        description: _l('应用下所有数据将被删除，请确认所有应用成员都不再需要此应用后，再执行此操作'),
+                        data: [{ text: _l('我确认执行此操作'), value: true }],
+                        onOk: () => {
+                          const oldTotal = this.state.total;
+                          this.setState({
+                            total: oldTotal - 1,
+                            hiddenIds: _.uniq([...hiddenIds, item.appId]),
+                          });
+                          homeAppAjax.deleteApp({
+                            appId: item.appId,
+                            projectId,
+                            isHomePage: false,
+                          })
+                            .then(res => {
+                              if (res.data) {
+                                this.setState({
+                                  hiddenIds: hiddenIds.filter(id => id !== item.appId),
+                                });
+                                this.updateState({});
+                              } else {
+                                return $.Deferred().reject();
+                              }
+                            })
+                            .fail(() => {
+                              this.setState({
+                                hiddenIds: hiddenIds.filter(id => id !== item.appId),
+                                total: oldTotal,
+                              });
+                              alert(_l('操作失败，请稍候重试！'), 2);
+                            });
+                        },
+                      });
                       this.handleChangeVisible('rowVisible', item.appId);
                     }}
                   >
@@ -317,10 +375,21 @@ export default class AppManagement extends Component {
     };
     ReactDom.render(
       <Dialog {...options}>
-        <ImportApp closeDialog={() => this.closeDialog('importSingleAppDialog')} />
+        <ImportApp closeDialog={() => this.closeDialog('importSingleAppDialog')}  />
       </Dialog>,
       document.createElement('div'),
     );
+  }
+
+  // 应用回收站
+  openAppTrash() {
+    const { projectId } = this.props.match.params;
+    const featureType = getFeatureStatus(projectId, 16);
+    if (featureType === '2') {
+      buriedUpgradeVersionDialog(projectId, 16);
+    } else {
+      this.setState({ appTrashVisible: true });
+    }
   }
 
   /**
@@ -368,10 +437,7 @@ export default class AppManagement extends Component {
     const editAppStatusFun = () => {
       ajaxRequest.editAppStatus({ projectId, appId, status }).then(result => {
         if (result) {
-          // 删除
-          if (status === 2) {
-            _.remove(list, o => o.appId === appId);
-          } else {
+          if (status !== 2) {
             list = list.map(o => {
               if (o.appId === appId) {
                 o.status = status;
@@ -403,14 +469,6 @@ export default class AppManagement extends Component {
         onOk: editAppStatusFun,
         okText: _l('开启'),
       });
-    } else if (status === 2) {
-      // 删除
-      DeleteReconfirm({
-        title: _l('你确定删除此应用吗？'),
-        description: _l('应用下所有数据将被彻底删除，且无法恢复。请确认所有应用成员都不再需要此应用后，再执行此操作'),
-        data: [{ text: _l('我确认执行此操作'), value: true }],
-        onOk: editAppStatusFun,
-      });
     }
   }
 
@@ -433,9 +491,8 @@ export default class AppManagement extends Component {
     evt.on('click', '.updateAppCharge', function () {
       $(this).dialogSelectUser({
         sourceId: that.props.match.params.projectId,
-        title: _l('选择应用负责人'),
-        showMoreInvite: false,
         fromType: 4,
+        fromAdmin: true,
         SelectUserSettings: {
           filterAll: true,
           filterFriend: true,
@@ -549,12 +606,10 @@ export default class AppManagement extends Component {
   /**
    * 打开自定义图标
    */
-  openCustomSvg = () => {
+  openCustomSvg = featureType => {
     const { projectId } = this.props.match.params;
-    const { version = {} } = _.find(md.global.Account.projects || [], o => o.projectId === projectId) || {};
-
-    if (this.state.isFree) {
-      upgradeVersionDialog({ projectId, isFree: this.state.isFree,explainText: _l('请升级至付费版后使用')});
+    if (featureType === '2') {
+      buriedUpgradeVersionDialog(projectId, 7);
     } else {
       this.setState({ uploadSvg: true });
     }
@@ -592,12 +647,18 @@ export default class AppManagement extends Component {
       moreVisible,
       drawerVisible,
       exportIds,
+      appTrashVisible,
+      appAnalyticsVisible,
+      currentAppInfo = {},
     } = this.state;
+    const projectId = this.props.match.params.projectId;
+    const { version, licenseType } = _.find(md.global.Account.projects || [], o => o.projectId === projectId) || {};
     const statusList = [
       { text: _l('全部状态'), value: '' },
       { text: _l('开启'), value: 1 },
       { text: _l('关闭'), value: 0 },
     ];
+    const featureType = getFeatureStatus(projectId, 7);
 
     if (uploadSvg) {
       return (
@@ -614,10 +675,25 @@ export default class AppManagement extends Component {
             {_l('应用')}
             {total ? `（${total}）` : ''}
           </div>
-          <div className="ThemeHoverColor3 pointer" onClick={this.openCustomSvg}>
-            <Icon icon="hr_custom" className="Font18 mRight5" />
-            {_l('自定义图标')}
-          </div>
+          {featureType && (
+            <div className="ThemeHoverColor3 pointer" onClick={() => this.openCustomSvg(featureType)}>
+              <Icon icon="hr_custom" className="Font18 mRight5" />
+              {_l('自定义图标')}
+            </div>
+          )}
+          {md.global.Config.IsPlatformLocal && (
+            <span
+              data-tip={_l('勾选后，只允许组织后台的应用管理员创建应用；不勾选则允许全员创建应用')}
+              className="appManagementTips pTop5"
+            >
+              <Checkbox
+                className="InlineBlock mLeft25 ThemeHoverColor3"
+                text={_l('只允许应用管理员创建应用')}
+                checked={onlyManagerCreateApp}
+                onClick={checked => this.setOnlyManagerCreateApp(!checked)}
+              />
+            </span>
+          )}
           <Trigger
             popupVisible={moreVisible}
             onPopupVisibleChange={visible => this.setState({ moreVisible: visible })}
@@ -626,10 +702,19 @@ export default class AppManagement extends Component {
               return (
                 <ul className="optionPanelTrigger moreOptionPanelTrigger">
                   {optionData.map(item => {
+                    const featureType = getFeatureStatus(projectId, item.featureId);
+                    if (_.includes(['handleImport', 'handleExportAll', 'openAppTrash'], item.action) && !featureType)
+                      return;
                     return (
                       <li
                         key={item.action}
                         onClick={() => {
+                          if (featureType === '2') {
+                            this.setState({ moreVisible: false });
+                            buriedUpgradeVersionDialog(projectId, item.featureId);
+                            this.setState({ moreVisible: false });
+                            return;
+                          }
                           this[item.action]();
                           this.handleChangeVisible('moreVisible', true);
                         }}
@@ -661,22 +746,22 @@ export default class AppManagement extends Component {
               {maxCount - count < 0 ? 0 : maxCount - count}
             </span>
 
-            {md.global.Account.projects.find(o => o.projectId === this.props.match.params.projectId).licenseType ===
+            {/* {md.global.Account.projects.find(o => o.projectId === this.props.match.params.projectId).licenseType ===
             1 ? (
               <Link
-                className={cx('ThemeColor3 ThemeHoverColor2 mLeft20 NoUnderline', { Hidden: upgrade })}
+                className={cx('ThemeColor3 ThemeHoverColor2 mLeft20 NoUnderline')}
                 to={`/admin/upgradeservice/${this.props.match.params.projectId}`}
               >
                 {_l('升级版本')}
               </Link>
             ) : (
               <Link
-                className={cx('ThemeColor3 ThemeHoverColor2 mLeft20 NoUnderline', { Hidden: renewBtn })}
+                className={cx('ThemeColor3 ThemeHoverColor2 mLeft20 NoUnderline')}
                 to={`/upgrade/choose?projectId=${this.props.match.params.projectId}`}
               >
                 {_l('购买付费版')}
               </Link>
-            )}
+            )} */}
           </div>
         )}
 
@@ -725,7 +810,7 @@ export default class AppManagement extends Component {
             </div>
           </div>
           <div className="columnWidth">{_l('拥有者')}</div>
-          <div className="w20 mRight20" />
+          <div className="w50 mRight20" />
         </div>
 
         {loading && pageIndex === 1 && <LoadDiv className="mTop15" />}
@@ -746,11 +831,21 @@ export default class AppManagement extends Component {
         <Drawer
           className="appLogDrawerContainer"
           width={480}
-          title={_l('日志')}
+          title={
+            <div>
+              <Icon
+                icon="close"
+                className="mRight16 Font20 Gray_9e Hand"
+                onClick={() => this.setState({ drawerVisible: false })}
+              />
+              <span>{_l('日志')}</span>
+            </div>
+          }
           placement="right"
           onClose={() => this.setState({ drawerVisible: false })}
           visible={drawerVisible}
           maskClosable={false}
+          closable={false}
         >
           <AppLog visible={drawerVisible} />
         </Drawer>
@@ -758,6 +853,26 @@ export default class AppManagement extends Component {
         {exportIds.length > 0 ? (
           <ExportApp appIds={exportIds} closeDialog={() => this.setState({ exportIds: [] })} />
         ) : null}
+
+        {appTrashVisible && (
+          <AppTrash
+            projectId={projectId}
+            onCancel={() => this.setState({ appTrashVisible: false })}
+            onRestore={() => {
+              this.setState({ pageIndex: 1 }, this.searchDataList);
+            }}
+          />
+        )}
+
+        {appAnalyticsVisible && (
+          <AppAnalytics
+            currentAppInfo={currentAppInfo}
+            projectId={projectId}
+            onCancel={() => {
+              this.setState({ appAnalyticsVisible: false });
+            }}
+          />
+        )}
       </div>
     );
   }

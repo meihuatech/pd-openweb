@@ -3,7 +3,9 @@ import PropTypes from 'prop-types';
 import { autobind } from 'core-decorators';
 import { Icon, ScrollView, LoadDiv } from 'ming-ui';
 import sheetAjax from 'src/api/worksheet';
-import mdFunction from 'mdFunction';
+import { createLinksForMessage } from 'src/components/common/function';
+import { filterXSS } from 'xss';
+import _ from 'lodash';
 
 const PAGE_SIZE = 30;
 
@@ -89,15 +91,15 @@ export default class Discuss extends Component {
     const children = (
       <div className="logBox">
         {discussList.map((item, index) => {
-          const message = mdFunction.createLinksForMessage({
+          const message = createLinksForMessage({
             message: item.message,
             accountId: item.accountId,
             accountName: item.accountName,
           });
           return (
             <div className="logItem" key={index}>
-              <Icon icon={[undefined, 'plus', 'edit'][item.type] || 'task-new-delete'} />
-              <span className="logContent" dangerouslySetInnerHTML={{ __html: message }} />
+              <Icon icon={[undefined, 'plus', 'edit', 'task-new-delete', 'restart', 'download', 'reply'][item.type]} />
+              <span className="logContent" dangerouslySetInnerHTML={{ __html: filterXSS(message) }} />
               <span className="logTime">{createTimeSpan(item.createTime)}</span>
             </div>
           );

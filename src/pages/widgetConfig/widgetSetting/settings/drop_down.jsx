@@ -1,39 +1,85 @@
-import React, { useState, useEffect, Fragment } from 'react';
-import { string } from 'prop-types';
-import { RadioGroup } from 'ming-ui';
+import React, { Fragment } from 'react';
+import { Dropdown } from 'ming-ui';
 import { SettingItem } from '../../styled';
 import OptionList from '../components/OptionList';
+import { getAdvanceSetting, handleAdvancedSettingChange } from '../../util/setting';
+import _ from 'lodash';
 
 const OPTIONS_DISPLAY = [
   {
-    value: 11,
+    value: '0',
     text: _l('下拉菜单'),
+    type: 11,
   },
   {
-    value: 9,
+    value: '1',
     text: _l('平铺'),
+    type: 9,
+  },
+  {
+    value: '2',
+    text: _l('进度'),
+    type: 11,
   },
 ];
 
-export default function Dropdown({ data, onChange, globalSheetInfo, fromPortal }) {
+const MULTI_SELECT_DISPLAY = [
+  {
+    value: '0',
+    text: _l('横向'),
+  },
+  {
+    value: '1',
+    text: _l('纵向'),
+  },
+];
+
+export default function DropdownCom({ data, onChange, globalSheetInfo, fromPortal, fromExcel }) {
+  const { showtype = '0', direction = '0', otherrequired = '0' } = getAdvanceSetting(data);
+  const FILTER_OPTIONS_DISPLAY = fromPortal ? OPTIONS_DISPLAY.filter(i => i.value !== '2') : OPTIONS_DISPLAY;
   return (
     <Fragment>
       <SettingItem>
-        <RadioGroup
-          size="middle"
-          checkedValue={data.type}
-          data={OPTIONS_DISPLAY}
-          onChange={type => {
-            onChange({ type });
-          }}
-        />
+        <div className="settingItemTitle">{_l('显示方式')}</div>
+        <div className="labelWrap">
+          <Dropdown
+            border
+            data={FILTER_OPTIONS_DISPLAY}
+            value={showtype}
+            onChange={value => {
+              onChange({
+                ...handleAdvancedSettingChange(data, { showtype: value }),
+                type: _.get(
+                  _.find(OPTIONS_DISPLAY, i => i.value === value),
+                  'type',
+                ),
+                // 进度清除其他选项
+                options: value === '2' ? (data.options || []).filter(i => i.key !== 'other') : data.options,
+                otherrequired: value === '2' ? '0' : otherrequired,
+              });
+            }}
+          />
+        </div>
       </SettingItem>
-      <OptionList.SelectOptions
-        data={data}
-        globalSheetInfo={globalSheetInfo}
-        onChange={onChange}
-        fromPortal={fromPortal}
-      />
+      {showtype === '2' && (
+        <SettingItem>
+          <div className="settingItemTitle">{_l('移动端显示')}</div>
+          <Dropdown
+            border
+            value={direction}
+            data={MULTI_SELECT_DISPLAY}
+            onChange={value => onChange(handleAdvancedSettingChange(data, { direction: value }))}
+          />
+        </SettingItem>
+      )}
+      {!fromExcel && (
+        <OptionList.SelectOptions
+          data={data}
+          globalSheetInfo={globalSheetInfo}
+          onChange={onChange}
+          fromPortal={fromPortal}
+        />
+      )}
     </Fragment>
   );
 }

@@ -3,12 +3,15 @@ import PropTypes from 'prop-types';
 import { TagTextarea } from 'ming-ui';
 import SelectOtherFields from '../SelectOtherFields';
 import Tag from '../Tag';
+import cx from 'classnames';
+import _ from 'lodash';
 
 export default class CustomTextarea extends Component {
   static propTypes = {
     processId: PropTypes.string,
     selectNodeId: PropTypes.string,
     sourceAppId: PropTypes.string,
+    isIntegration: PropTypes.bool,
     type: PropTypes.number,
     height: PropTypes.number,
     content: PropTypes.string,
@@ -26,6 +29,7 @@ export default class CustomTextarea extends Component {
     onFocus: () => {},
     operatorsSetMargin: false,
     sourceAppId: '',
+    isIntegration: false,
     className: '',
   };
 
@@ -51,6 +55,7 @@ export default class CustomTextarea extends Component {
       processId,
       selectNodeId,
       sourceAppId,
+      isIntegration,
       type,
       height,
       content,
@@ -66,16 +71,18 @@ export default class CustomTextarea extends Component {
     return (
       <div className="flexRow mTop10 relative">
         <TagTextarea
-          className={`flex ${className}`}
+          className={cx('flex', className, {
+            smallPadding: height === 0 && content && content.match(/\$[\w]+-[\w]+\$/g),
+          })}
           height={height}
-          defaultValue={content}
+          defaultValue={content || ''}
           operatorsSetMargin={operatorsSetMargin}
           getRef={tagtextarea => {
             this.tagtextarea = tagtextarea;
           }}
           onFocus={onFocus}
           renderTag={(tag, options) => {
-            const ids = tag.split('-');
+            const ids = tag.split(/([a-zA-Z0-9#]{24,32})-/).filter(item => item);
             const nodeObj = formulaMap[ids[0]] || {};
             const controlObj = formulaMap[ids[1]] || {};
 
@@ -85,6 +92,7 @@ export default class CustomTextarea extends Component {
                 appType={nodeObj.appType}
                 actionId={nodeObj.actionId}
                 nodeName={nodeObj.name || ''}
+                controlId={ids[1]}
                 controlName={controlObj.name || ''}
               />
             );
@@ -97,6 +105,7 @@ export default class CustomTextarea extends Component {
           processId={processId}
           selectNodeId={selectNodeId}
           sourceAppId={sourceAppId}
+          isIntegration={isIntegration}
           handleFieldClick={obj => {
             const newFormulaMap = _.cloneDeep(formulaMap);
             newFormulaMap[obj.nodeId] = {

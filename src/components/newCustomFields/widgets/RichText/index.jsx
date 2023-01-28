@@ -4,6 +4,7 @@ import cx from 'classnames';
 import { RichText } from 'ming-ui';
 import { browserIsMobile } from 'src/util';
 import autoSize from 'ming-ui/decorators/autoSize';
+import _ from 'lodash';
 @autoSize
 export default class Widgets extends Component {
   static propTypes = {
@@ -28,19 +29,24 @@ export default class Widgets extends Component {
     }
   }
 
-  onChange = value => {
+  onChange = _.debounce(value => {
     this.props.onChange(value);
-  };
+  }, 500);
 
   render() {
-    const { disabled, value, type, flag } = this.props;
+    const { disabled, value, type, flag, richTextControlCount = 0 } = this.props;
 
     return (
       <RichText
+        clickInit={richTextControlCount >= 3}
         maxWidth={this.state.width}
         id={flag}
         data={value || ''}
-        className={cx('customFormItemControl', { remarkControl: type === 10010, richTextForM: browserIsMobile() })}
+        isRemark={type === 10010}
+        className={cx('customFormItemControl', {
+          richTextForM: browserIsMobile(),
+          richTextDisabledControl: disabled,
+        })}
         disabled={disabled}
         onActualSave={this.onChange}
         maxHeight={browserIsMobile() ? 500 : undefined}

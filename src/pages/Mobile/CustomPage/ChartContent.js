@@ -1,14 +1,18 @@
-import React, { useEffect, useState, Fragment } from 'react';
+import React, { useEffect, useState, Fragment, useRef } from 'react';
+import { useDeepCompareEffect } from 'react-use';
 import styled from 'styled-components';
 import cx from 'classnames';
 import { Icon, LoadDiv } from 'ming-ui';
 import { Modal } from 'antd-mobile';
-import report from 'src/pages/worksheet/common/Statistics/api/report';
+import report from 'statistics/api/report';
 import Chart from '../components/Chart';
 import ChartFilter from '../components/Chart/Filter';
 import ChartSort from '../components/Chart/Sort';
-import { fillValueMap, version } from 'src/pages/worksheet/common/Statistics/common';
-import { reportTypes } from 'src/pages/worksheet/common/Statistics/Charts/common';
+import { fillValueMap, version } from 'statistics/common';
+import { reportTypes } from 'statistics/Charts/common';
+import { connect } from 'react-redux';
+import { formatFiltersGroup } from 'src/pages/customPage/components/editWidget/filter/util';
+import _ from 'lodash';
 
 const ModalContent = styled.div`
   background-color: #fff;
@@ -34,6 +38,12 @@ const ModalContent = styled.div`
   }
 `;
 
+const HorizontalModal = styled(Modal)`
+  .am-modal-body {
+    overflow: hidden;
+  }
+`;
+
 const HorizontalChartContent = styled.div`
   position: relative;
   display: flex;
@@ -50,21 +60,46 @@ const HorizontalChartContent = styled.div`
     font-family: system-ui, BlinkMacSystemFont, segoe ui, Roboto, Helvetica, Arial, sans-serif,
       apple color emoji, segoe ui emoji, segoe ui symbol;
   }
+  .allow {
+    border-radius: 50%;
+    background: #f8f8f9;
+  }
 `;
 
 function ChartContent(props) {
-  const { reportId, name, dimensions, accessToken } = props;
+  const { widget, reportId, name, accessToken, filters = [], pageComponents } = props;
+  const objectId = _.get(widget, 'config.objectId');
   const [loading, setLoading] = useState(true);
   const [filterVisible, setFilterVisible] = useState(false);
   const [zoomVisible, setZoomVisible] = useState(false);
   const [data, setData] = useState({ name });
+  const [zoomData, setZoomData] = useState({ name });
   const [defaultData, setDefaultData] = useState();
+  const shareAuthor = window.shareAuthor;
   const headersConfig = {
+    share: shareAuthor,
     access_token: accessToken,
   };
+  const filtersGroup = formatFiltersGroup(objectId, props.filtersGroup);
+  const request = useRef(null);
+
+  useDeepCompareEffect(() => {
+    handleReportRequest();
+  }, [filtersGroup]);
+
+  useEffect(() => {
+    handleReportRequest();
+  }, [reportId]);
 
   const handleReportRequest = param => {
-    let requestParam = { reportId, version };
+    let requestParam = {
+      reportId,
+      version,
+      filters: [
+        filters.length ? filters : undefined,
+        filtersGroup.length ? filtersGroup : undefined
+      ].filter(_ => _)
+    };
     if (param) {
       Object.assign(
         requestParam,
@@ -79,17 +114,53 @@ function ChartContent(props) {
       );
     }
     setLoading(true);
+    if (request.current && request.current.state() === 'pending' && request.current.abort) {
+      request.current.abort();
+    }
+    if (request.current && request.current.state() === 'resolved') {
+      setData({ ...data, map: [] });
+    }
+    request.current = report.getData(requestParam, (shareAuthor || accessToken) ? { headersConfig } : { fireImmediately: true });
+    request.current.then(data => {
+        data.reportId = reportId;
+        const result = fillValueMap(data);
+        setData(result);
+        setZoomData(result);
+        if (_.isEmpty(defaultData)) {
+          setDefaultData(data);
+        }
+        setLoading(false);
+      });
+  }
+
+  const handleNextReportRequest = (reportId, param) => {
+    let requestParam = {
+      reportId,
+      version
+    };
+    if (param) {
+      Object.assign(
+        requestParam,
+        {
+          rangeType: zoomData.rangeType,
+          filterRangeId: zoomData.filterRangeId,
+          particleSizeType: zoomData.xaxes.particleSizeType || null,
+          rangeValue: zoomData.rangeValue,
+          sorts: zoomData.sorts,
+        },
+        param,
+      );
+    }
+    setLoading(true);
     report
       .getData(requestParam, accessToken ? { headersConfig } : {})
       .then(data => {
         data.reportId = reportId;
-        setData(fillValueMap(data));
-        if (_.isEmpty(defaultData)) {
-          setDefaultData(data);
-        }
+        const result = fillValueMap(data);
+        setZoomData(result);
       })
       .always(() => setLoading(false));
-  };
+  }
 
   const handleOpenFilterModal = () => {
     const newFilterVisible = !filterVisible;
@@ -109,13 +180,28 @@ function ChartContent(props) {
         </div>
         <div className="flex scrollView">
           <ChartFilter
-            data={data}
+            data={zoomVisible ? zoomData : data}
             defaultData={defaultData}
-            onChange={handleReportRequest}
+            onChange={(data) => {
+              if (zoomVisible) {
+                handleNextReportRequest(zoomData.reportId, data);
+              } else {
+                handleReportRequest(data);
+              }
+            }}
           />
           {![reportTypes.CountryLayer, reportTypes.NumberChart].includes(data.reportType) && (
             <Fragment>
-              <ChartSort currentReport={data} onChangeCurrentReport={handleReportRequest} />
+              <ChartSort
+                currentReport={zoomVisible ? zoomData : data}
+                onChangeCurrentReport={(data) => {
+                  if (zoomVisible) {
+                    handleNextReportRequest(zoomData.reportId, data);
+                  } else {
+                    handleReportRequest(data);
+                  }
+                }}
+              />
             </Fragment>
           )}
         </div>
@@ -124,10 +210,6 @@ function ChartContent(props) {
   };
 
   const isMobileChartPage = location.href.includes('mobileChart');
-
-  useEffect(() => {
-    handleReportRequest();
-  }, [reportId]);
 
   return (
     <Fragment>
@@ -156,7 +238,7 @@ function ChartContent(props) {
           <ModalContent className="leftAlign flexColumn h100">{DialogContent()}</ModalContent>
         )}
       </Modal>
-      <Modal
+      <HorizontalModal
         popup
         visible={zoomVisible}
         onClose={handleOpenZoomModal}
@@ -172,16 +254,36 @@ function ChartContent(props) {
           {zoomVisible && (
             <Chart
               isHorizontal={true}
-              data={data}
+              pageComponents={pageComponents}
+              data={zoomData}
               loading={loading}
               onOpenFilterModal={handleOpenFilterModal}
               onOpenZoomModal={handleOpenZoomModal}
+              onLoadBeforeData={(index) => {
+                const data = pageComponents[index];
+                handleNextReportRequest(data.value);
+              }}
+              onLoadNextData={(index) => {
+                const data = pageComponents[index];
+                handleNextReportRequest(data.value);
+              }}
             />
           )}
         </HorizontalChartContent>
-      </Modal>
+      </HorizontalModal>
     </Fragment>
   );
 }
 
+ChartContent.defaultProps = {
+  filtersGroup: []
+}
+
+export const StateChartContent = connect(
+  state => ({
+    filtersGroup: state.mobile.filtersGroup
+  })
+)(ChartContent);
+
 export default ChartContent;
+

@@ -8,11 +8,11 @@ import projectController from 'src/api/project';
 import projectSettingController from 'src/api/projectSetting';
 import fixeddataController from 'src/api/fixedData';
 import ClipboardButton from 'react-clipboard.js';
-import cx from 'classnames';
 import AdminCommon from 'src/pages/Admin/common/common';
-import 'uploadAttachment';
+import DialogSettingInviteRules from 'src/pages/Admin/structure/modules/dialogSettingInviteRules/inde.jsx';
 
-const { admin: {commonInfo: {subDomainTotal,workPlace, closeNet}} } = window.private
+import 'src/components/uploadAttachment/uploadAttachment';
+import _ from 'lodash';
 
 export default class CommonInfo extends Component {
   constructor(props) {
@@ -20,7 +20,7 @@ export default class CommonInfo extends Component {
     this.industries = [];
     this.state = {
       logo: '', //logo图片
-      code: '', // 组织id
+      code: '', // 组织门牌号
       homeImage: '',
       subDomain: '',
       companyDisplayName: '', //简称
@@ -31,40 +31,33 @@ export default class CommonInfo extends Component {
       geographyName: '',
       geographyId: '', //所在地
       visibleType: 0,
-      isLogOff: false,
       isUploading: false,
       isLoading: false,
       uploadLoading: false,
+      showDialogSettingInviteRules: false,
     };
   }
 
   componentDidMount() {
     this.getAllData();
+    this.getPrivacy();
   }
 
   componentWillReceiveProps(nextProps) {
     if (nextProps.level !== this.props.level) {
       this.getAllData();
+      this.getPrivacy();
     }
   }
 
   getAllData() {
     this.setState({ isLoading: true });
-    $.when(
-      this.getCompanyCode(),
-      this.getSysColor(),
-      this.getSubDomainInfo(),
-      this.getCommonInfo(),
-      this.getIndustryList(),
-      this.getLicenseType(),
-    ).then(
+    $.when(this.getSysColor(), this.getSubDomainInfo(), this.getCommonInfo(), this.getIndustryList()).then(
       (
-        code,
         { homeImage, logo },
         res,
         { companyDisplayName, companyName, companyNameEnglish, geographyId, industryId },
         { industries = [] },
-        { logoffs },
       ) => {
         this.industries = industries;
         const current_industry = _.find(industries, item => item.id === industryId.toString()) || {};
@@ -77,11 +70,8 @@ export default class CommonInfo extends Component {
             });
           });
         }
-        // logoff
-        const firstList = logoffs[0] || {};
         this.setState(
           {
-            code,
             homeImage: `${homeImage}?imageView2/2/w/194/h/52/q/90`,
             logo,
             subDomain: (res && res.subDomain) || '',
@@ -91,7 +81,6 @@ export default class CommonInfo extends Component {
             geographyId,
             industryId,
             industryName,
-            isLogOff: firstList.type === 1,
             isLoading: false,
           },
           () => {
@@ -108,13 +97,6 @@ export default class CommonInfo extends Component {
   //获取当前注销状态
   getLicenseType() {
     return projectController.getProjectLogOff({
-      projectId: Config.projectId,
-    });
-  }
-
-  //获取企业号
-  getCompanyCode() {
-    return Config.AdminController.corporateIdentity({
       projectId: Config.projectId,
     });
   }
@@ -143,6 +125,17 @@ export default class CommonInfo extends Component {
   //获取行业列表
   getIndustryList() {
     return fixeddataController.loadIndustry({});
+  }
+
+  // 获取加入人员规则
+  getPrivacy() {
+    projectSettingController
+      .getPrivacy({
+        projectId: Config.projectId,
+      })
+      .then(({ allowProjectCodeJoin, regCode }) => {
+        this.setState({ allowProjectCodeJoin, code: regCode });
+      });
   }
 
   //切换二级组件
@@ -179,10 +172,10 @@ export default class CommonInfo extends Component {
       styleType: '0',
       tokenType: 4, //网络logo
       checkProjectLimitFileSizeUrl: '',
-      filesAdded: function () {
+      filesAdded: function() {
         _this.setState({ uploadLoading: true });
       },
-      callback: function (attachments) {
+      callback: function(attachments) {
         if (attachments.length > 0) {
           const attachment = attachments[0];
           const fullFilePath = attachment.serverName + attachment.filePath + attachment.fileName + attachment.fileExt;
@@ -218,6 +211,14 @@ export default class CommonInfo extends Component {
     alert(_l('复制成功'));
   }
 
+  // 打开人员加入规则设置modal设置，修改是否允许搜索组织门牌号
+  openAllowProjectCodeJoin = ({ showDialogSettingInviteRules }) => {
+    this.setState({ showDialogSettingInviteRules });
+    if (!showDialogSettingInviteRules) {
+      this.getPrivacy();
+    }
+  };
+
   render() {
     const {
       logo,
@@ -232,8 +233,9 @@ export default class CommonInfo extends Component {
       subDomain,
       homeImage,
       code,
-      isLogOff,
       isLoading,
+      allowProjectCodeJoin,
+      showDialogSettingInviteRules,
     } = this.state;
     const showInfo = [1, 2, 3].indexOf(visibleType) > -1;
     return (
@@ -279,7 +281,7 @@ export default class CommonInfo extends Component {
                           }
                         }}
                       >
-                        <span className="Font15 icon-upload_pictures"></span>
+                        <span className="Font15 icon-upload_pictures" />
                       </div>
                     </div>
                   </div>
@@ -299,7 +301,7 @@ export default class CommonInfo extends Component {
                 </button>
               </div>
               <div className="common-info-row mTop24">
-                <div className="common-info-row-label">{_l('组织ID')}</div>
+                <div className="common-info-row-label">{_l('组织门牌号')}</div>
                 <div className="common-info-row-content">
                   <ClipboardButton
                     className="adminHoverColor Hand"
@@ -308,13 +310,25 @@ export default class CommonInfo extends Component {
                     onSuccess={this.handleCopyTextSuccess.bind(this)}
                   >
                     <span>{code}</span>
-                    <span className="icon-content-copy Font12 mLeft5"></span>
+                    <span className="icon-content-copy Font12 mLeft5" />
                   </ClipboardButton>
-                  <div className="set-describe mTop4">{_l('成员可输入组织ID加入组织')}</div>
+                  {allowProjectCodeJoin ? (
+                    <div className="set-describe mTop4">{_l('成员可输入组织门牌号加入组织')}</div>
+                  ) : (
+                    <div className="set-describe mTop4">
+                      {_l('您已关闭搜索组织门牌号加入')}
+                      <span
+                        className="mLeft8 open-setting-rules-Txt"
+                        onClick={() => this.openAllowProjectCodeJoin({ showDialogSettingInviteRules: true })}
+                      >
+                        {_l('去开启')}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="common-info-row mTop24">
-                <div className="common-info-row-label">{_l('组织编号')}</div>
+                <div className="common-info-row-label">{_l('组织编号(ID)')}</div>
                 <div className="common-info-row-content">
                   <ClipboardButton
                     className="adminHoverColor Hand"
@@ -323,13 +337,13 @@ export default class CommonInfo extends Component {
                     onSuccess={this.handleCopyTextSuccess.bind(this)}
                   >
                     <span>{Config.projectId}</span>
-                    <span className="icon-content-copy Font12 mLeft5"></span>
+                    <span className="icon-content-copy Font12 mLeft5" />
                   </ClipboardButton>
                   <div className="set-describe mTop4">{_l('组织唯一身份编号，用于沟通反馈问题时使用')}</div>
                 </div>
               </div>
 
-              <div className="split-line"></div>
+              <div className="split-line" />
 
               <div className="common-info-row">
                 <div className="common-info-row-label">{_l('所在地')}</div>
@@ -353,7 +367,7 @@ export default class CommonInfo extends Component {
                   {industryId ? _l('修改') : _l('设置')}
                 </button>
               </div>
-              <div className={cx("common-info-row mTop24", {Hidden: subDomainTotal})}>
+              <div className="common-info-row mTop24">
                 <div className="common-info-row-label">{_l('扩展信息')}</div>
                 <div className="common-info-row-content">
                   <div>
@@ -379,7 +393,17 @@ export default class CommonInfo extends Component {
                   {homeImage && <img src={homeImage} className="domain-review" />}
                 </div>
               </div>
-              <div className={cx("common-info-row mTop24", {Hidden: workPlace})}>
+              <div className="common-info-row mTop24">
+                <div className="common-info-row-label">{_l('职位列表')}</div>
+                <button
+                  type="button"
+                  className="ming Button Button--link ThemeColor3 adminHoverColor"
+                  onClick={this.toggleComp.bind(this, 5)}
+                >
+                  {_l('设置')}
+                </button>
+              </div>
+              <div className="common-info-row mTop24">
                 <div className="common-info-row-label">{_l('工作地点')}</div>
                 <button
                   type="button"
@@ -390,30 +414,24 @@ export default class CommonInfo extends Component {
                 </button>
               </div>
 
-              {!closeNet&&<div className="split-line"></div>}
+              {/*<div className="split-line" />
 
-              <div className={cx("common-info-row", {Hidden: closeNet})}>
+              <div className="common-info-row">
                 <div className="common-info-row-label">{_l('注销组织')}</div>
-                {isLogOff ? (
-                  <div>
-                    {_l('已申请注销')}
-                    <button
-                      type="button"
-                      className="ming Button Button--link ThemeColor3 mLeft16"
-                      onClick={() => this.props.setLevel(4)}
-                    >
-                      {_l('查看详情')}
-                    </button>
-                  </div>
-                ) : (
-                  <span className="Hand adminHoverDeleteColor" onClick={() => this.props.setLevel(4)}>
-                    {_l('注销')}
-                  </span>
-                )}
-              </div>
+                <span className="Hand adminHoverDeleteColor" onClick={() => this.props.setLevel(4)}>
+                  {_l('注销')}
+                </span>
+              </div>*/}
             </div>
           )}
         </div>
+        {showDialogSettingInviteRules && (
+          <DialogSettingInviteRules
+            showDialogSettingInviteRules={showDialogSettingInviteRules}
+            setValue={this.openAllowProjectCodeJoin}
+            projectId={Config.projectId}
+          />
+        )}
       </div>
     );
   }

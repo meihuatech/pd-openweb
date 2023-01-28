@@ -6,10 +6,12 @@ import Number from './Number';
 import Date from './Date';
 import Options from './Options';
 import Users from './Users';
+import Time from './Time';
 import DiabledInput from './DiabledInput';
 import RelateRecord from './RelateRecord';
 import Cascader from './Cascader';
 import RelateFilter from './RelateFilter';
+import _ from 'lodash';
 
 export default function (key, props) {
   if (props.isDynamicsource) {
@@ -40,7 +42,11 @@ export default function (key, props) {
   }
   if (
     key === CONTROL_FILTER_WHITELIST.RELATE_RECORD.value &&
-    (props.type === FILTER_CONDITION_TYPE.RCEQ || props.type === FILTER_CONDITION_TYPE.RCNE)
+    (props.type === FILTER_CONDITION_TYPE.RCEQ ||
+      props.type === FILTER_CONDITION_TYPE.RCNE ||
+      props.type === FILTER_CONDITION_TYPE.ARREQ ||
+      props.type === FILTER_CONDITION_TYPE.ARRNE ||
+      props.type === FILTER_CONDITION_TYPE.ALLCONTAIN)
   ) {
     return <RelateRecord {...props} />;
   }
@@ -55,6 +61,8 @@ export default function (key, props) {
       return <Options {...props} />;
     case CONTROL_FILTER_WHITELIST.USERS.value:
       return <Users {...props} />;
+    case CONTROL_FILTER_WHITELIST.TIME.value:
+      return <Time {...props} />;
     default:
       return <Text {...props} />;
   }

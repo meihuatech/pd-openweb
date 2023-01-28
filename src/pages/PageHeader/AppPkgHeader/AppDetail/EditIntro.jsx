@@ -2,6 +2,7 @@ import React, { Component } from 'react';
 import { string, func, bool } from 'prop-types';
 import Editor from './EditorDiaLogContent';
 import { compareProps } from '../../util';
+import _ from 'lodash';
 export default class AppIntro extends Component {
   static propTypes = {
     isEditing: bool,
@@ -23,6 +24,12 @@ export default class AppIntro extends Component {
     };
   }
 
+  componentWillReceiveProps(nextProps) {
+    this.setState({
+      isEditing: nextProps.isEditing
+    });
+  }
+
   shouldComponentUpdate(nextProps, nextState) {
     const props = this.props || {};
     const state = this.state || {};
@@ -35,7 +42,7 @@ export default class AppIntro extends Component {
   };
 
   render() {
-    const { description: summary, permissionType, onCancel, changeSetting } = this.props;
+    const { description: summary, permissionType, onCancel, changeSetting, cacheKey, changeEditState = _.noop } = this.props;
     const { isEditing } = this.state;
     return (
       <Editor
@@ -43,14 +50,17 @@ export default class AppIntro extends Component {
         summary={summary}
         isEditing={isEditing}
         permissionType={permissionType}
-        changeEditState={isEditing => this.setState({ isEditing })}
+        changeEditState={isEditing => {
+          this.setState({ isEditing });
+          changeEditState(isEditing);
+        }}
         onSave={this.handleSave}
         changeSetting={changeSetting}
         onCancel={() => {
           this.setState({ isEditing: false });
           onCancel && onCancel();
         }}
-        cacheKey="appIntroDescription"
+        cacheKey={cacheKey}
         title={this.props.title}
       />
     );

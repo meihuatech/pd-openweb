@@ -1,15 +1,19 @@
 ﻿import preall from 'src/common/preall';
-var css = require('./css/style.less');
-var shareajax = require('src/api/share');
-var qs = require('query-string');
-var doT = require('dot');
-var { addToken } = require('src/util');
-var frameTpl = doT.template(require('./tpl/frame.html'));
-var fileItemTpl = doT.template(require('./tpl/fileItem.html'));
-var MobileSharePreview = require('../shareMobile/shareMobile');
-var shareFolderAjax = require('src/api/shareFolder');
-var saveToKnowledge = require('src/components/saveToKnowledge/saveToKnowledge');
+import './css/style.less';
+import shareajax from 'src/api/share';
+import qs from 'query-string';
+import doT from '@mdfe/dot';
+import { downloadFile } from 'src/util';
+import frameTplHtml from './tpl/frame.html';
+import fileItemHtml from './tpl/fileItem.html';
+import previewAttachments from 'src/components/previewAttachments/previewAttachments';
+var frameTpl = doT.template(frameTplHtml);
+var fileItemTpl = doT.template(fileItemHtml);
+import MobileSharePreview from '../shareMobile/shareMobile';
+import shareFolderAjax from 'src/api/shareFolder';
+import saveToKnowledge from 'src/components/saveToKnowledge/saveToKnowledge';
 import { browserIsMobile, getClassNameByExt } from 'src/util';
+import _ from 'lodash';
 
 var ShareFolder = function (options) {
   var SF = this;
@@ -72,14 +76,11 @@ ShareFolder.prototype = {
               if (SF.options.isMobile) {
                 SF.preview();
               } else {
-                require.ensure([], function () {
-                  var previewAttachments = require('previewAttachments');
-                  previewAttachments({
-                    callFrom: 'kc',
-                    attachments: [node],
-                    showThumbnail: true,
-                    shareFolderId: SF.rootNode.id,
-                  });
+                previewAttachments({
+                  callFrom: 'kc',
+                  attachments: [node],
+                  showThumbnail: true,
+                  shareFolderId: SF.rootNode.id,
                 });
               }
             });
@@ -112,19 +113,16 @@ ShareFolder.prototype = {
           preview: node.id,
         });
       } else {
-        require.ensure([], function () {
-          var previewAttachments = require('previewAttachments');
-          previewAttachments(
-            {
-              callFrom: 'kc',
-              attachments: [node],
-              showThumbnail: true,
-            },
-            {
-              shareFolderId: SF.rootNode.id,
-            },
-          );
-        });
+        previewAttachments(
+          {
+            callFrom: 'kc',
+            attachments: [node],
+            showThumbnail: true,
+          },
+          {
+            shareFolderId: SF.rootNode.id,
+          },
+        );
       }
     });
     $('.shareFolderCon .main').on('scroll', function (e) {
@@ -202,7 +200,7 @@ ShareFolder.prototype = {
     if (!SF.options.isMobile) {
       this.$container.find('.download').on('click', function () {
         if (SF.rootNode.canDownload) {
-          window.open(addToken(SF.rootNode.downloadUrl + '&shareFolderId=' + SF.rootNode.id, !window.isDingTalk));
+          window.open(downloadFile(SF.rootNode.downloadUrl + '&shareFolderId=' + SF.rootNode.id));
         } else {
           alert(_l('您权限不足，无法下载或保存。请联系文件夹管理员或文件上传者'), 3);
         }
@@ -434,7 +432,7 @@ ShareFolder.prototype = {
       });
   },
   handleLogin() {
-    import('mdDialog').then(() => {
+    import('src/components/mdDialog/dialog').then(() => {
       const dialog = $.DialogLayer({
         container: {
           header: _l('保存到'),

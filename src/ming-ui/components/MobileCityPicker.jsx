@@ -4,6 +4,7 @@ import { LoadDiv } from 'ming-ui';
 import { Modal, List, Tabs } from 'antd-mobile';
 import Controller from 'src/api/fixedData';
 import './less/MobileCityPicker.less';
+import _ from 'lodash';
 
 const particularlyCity = ['110000', '120000', '310000', '500000', '810000', '820000'];
 const overseas = ['910000'];
@@ -128,6 +129,7 @@ export default class MobileCityPicker extends Component {
         selectCitys: newSelectCitys,
         visible: false,
       });
+      this.props.onClose && this.props.onClose();
       return;
     }
 
@@ -137,6 +139,7 @@ export default class MobileCityPicker extends Component {
         visible: false,
         indexLevel: level,
       });
+      this.props.onClose && this.props.onClose();
       return;
     }
 
@@ -149,7 +152,7 @@ export default class MobileCityPicker extends Component {
   }
 
   render() {
-    const { disabled, children, placeholder, onClear } = this.props;
+    const { disabled, children, placeholder, onClear, onClose = () => {} } = this.props;
     const { value, visible, loading, citys, indexLevel, selectCitys } = this.state;
     const tabs = [
       { title: _l('省份') },
@@ -182,7 +185,10 @@ export default class MobileCityPicker extends Component {
               <div className="flex pLeft16"></div>
             </div>
           }
-          onClose={() => this.setState({ visible: false })}
+          onClose={() => {
+            onClose();
+            this.setState({ visible: false });
+          }}
           animationType="slide-up"
         >
           <Tabs

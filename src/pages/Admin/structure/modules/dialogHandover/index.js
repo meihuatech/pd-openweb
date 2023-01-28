@@ -1,6 +1,5 @@
 import React, { Fragment, Component } from 'react';
 import ReactDom from 'react-dom';
-import Confirm from 'confirm';
 import { Dialog, Radio } from 'ming-ui';
 import userController from 'src/api/user';
 import transferController from 'src/api/transfer';
@@ -28,13 +27,12 @@ class InvoiceSetting extends Component {
   }
 
   init() {
-    const { accountId, projectId, success } = this.props;
-    Confirm(
-      {
-        title: '',
-        content: _l('是否确认将该员工移除？'),
-      },
-      () => {
+    const { accountId, projectId, success, user } = this.props;
+    Dialog.confirm({
+      title: '',
+      description: _l('是否确认将该员工【%0】移除？', user.fullname),
+      buttonType: 'danger',
+      onOk: () => {
         userController
           .removeUser({
             accountId,
@@ -52,7 +50,7 @@ class InvoiceSetting extends Component {
             }
           });
       },
-    );
+    });
   }
 
   fail(msg) {
@@ -68,9 +66,9 @@ class InvoiceSetting extends Component {
 
   addUserToTransfer() {
     const { projectId, accountId } = this.props;
-    import('dialogSelectUser').then(() => {
+    import('src/components/dialogSelectUser/dialogSelectUser').then(() => {
       $({}).dialogSelectUser({
-        showMoreInvite: false,
+        fromAdmin: true,
         SelectUserSettings: {
           filterAll: true,
           filterFriend: true,
@@ -134,7 +132,7 @@ class InvoiceSetting extends Component {
           <div className="LineHeight24">
             <a href={'/user_' + user.accountId} className="ThemeColor3 Bold" title={user.fullname}>
               {user.fullname}
-            </a>{' '}
+            </a>
             <span>{_l('仍是某协作模块负责人，可移交给企业小秘书')}</span>
           </div>
           <div className="LineHeight24">{_l('或 指定另一名同事负责交接')}</div>

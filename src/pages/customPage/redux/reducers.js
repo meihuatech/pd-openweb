@@ -1,7 +1,7 @@
 /* eslint-disable no-redeclare */
 /* eslint-disable no-case-declarations */
 import update from 'immutability-helper';
-import uuid from 'uuid/v4';
+import { v4 as uuidv4 } from 'uuid';
 import {
   ADD_WIDGET,
   DEL_WIDGET,
@@ -9,15 +9,18 @@ import {
   UPDATE_LAYOUT,
   UPDATE_PAGE_INFO,
   UPDATE_LOADING,
+  UPDATE_SAVE_LOADING,
   INSET_TITLE,
   UPDATE_MODIFIED,
   COPY_WIDGET,
   UPDATE_WIDGET_VISIBLE,
   UPDATE_EDIT_PAGE_VISIBLE,
   UPDATE_COMPONENTS,
+  UPDATE_FILTERS_GROUP,
 } from './actionType';
-import { getDefaultLayout, getIndexById } from '../util';
+import { getDefaultLayout, getIndexById, enumWidgetType } from '../util';
 import maxBy from 'lodash/maxBy';
+import _ from 'lodash';
 
 const initialState = {
   loading: true,
@@ -31,6 +34,7 @@ const initialState = {
   pageName: '',
   apk: {},
   components: [],
+  filtersGroup: {}
 };
 
 function updateLayout(state, payload) {
@@ -101,14 +105,37 @@ function copyWebLayout(components, layout) {
   return { ...layout, x: maxX + maxW };
 }
 function copyWidget(state, payload) {
-  const { web, ...rest } = payload;
+  const { web, button, ...rest } = payload;
+  let newButton = button;
+
+  if (rest.type === enumWidgetType.button) {
+    const { buttonList = [] } = button || {};
+    newButton = {
+      ...button,
+      buttonList: buttonList.map(item => {
+        const { config = {} } = item;
+        const btn = {
+          ...item,
+          btnId: null,
+          filterId: null,
+          id: uuidv4()
+        }
+        if (config.isFilter) {
+          btn.config = { ...config, isFilter: undefined }
+        }
+        return btn;
+      })
+    }
+  }
+
   return update(state, {
     modified: { $set: true },
     components: {
       $push: [
         {
           ...rest,
-          uuid: uuid(),
+          uuid: uuidv4(),
+          button: newButton,
           web: update(web, {
             layout: {
               $apply: item => copyWebLayout(state.components, item),
@@ -126,6 +153,8 @@ export default function customPage(state = initialState, action) {
       return update(state, { $apply: item => ({ ...item, ...payload }) });
     case UPDATE_LOADING:
       return update(state, { loading: { $set: payload } });
+    case UPDATE_SAVE_LOADING:
+      return update(state, { saveLoading: { $set: payload } });
     case UPDATE_EDIT_PAGE_VISIBLE:
       if (!state.pageId) {
         _.keys(sessionStorage)
@@ -144,15 +173,15 @@ export default function customPage(state = initialState, action) {
           $push: [
             {
               ...payload,
-              uuid: uuid(),
+              uuid: uuidv4(),
               web: {
-                title: _l(''),
+                title: '',
                 titleVisible: false,
                 visible: true,
-                layout: getDefaultLayout({ components: state.components, layoutType: 'web' }),
+                layout: getDefaultLayout({ components: state.components, layoutType: 'web', type: payload.type }),
               },
               mobile: {
-                title: _l(''),
+                title: '',
                 titleVisible: false,
                 visible: true,
                 layout: null,
@@ -209,7 +238,15 @@ export default function customPage(state = initialState, action) {
           },
         },
       });
-
+    case UPDATE_FILTERS_GROUP:
+      const { value, filters } = payload;
+      return {
+        ...state,
+        filtersGroup: {
+          ...state.filtersGroup,
+          [value]: filters
+        }
+      }
     default:
       return state;
   }

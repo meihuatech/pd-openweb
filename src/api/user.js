@@ -1,4 +1,4 @@
-module.exports = {
+export default {
   /**
   * 分页 获取一般用户列表
   * @param {Object} args 请求参数
@@ -94,7 +94,6 @@ module.exports = {
   * @param {Object} args 请求参数
   * @param {string} args.onProjectId 页面所在组织Id（可空）
   * @param {string} args.accountId 账号Id
-  * @param {boolean} args.withSameProjectId 是否同一网络
   * @param {Object} options 配置参数
   * @param {Boolean} options.silent 是否禁止错误弹层
   * @returns {Promise<Boolean, ErrorModel>}
@@ -140,6 +139,7 @@ module.exports = {
   * @param {boolean} args.includeUndefinedAndMyself 是否在前面插入未指定和我自己
   * @param {boolean} args.includeSystemField 是否包含系统预设账户
 比如当前用户、当前用户的下属、未指定、工作流、公开表单、API等
+  * @param {string} args.projectId 当前网络id
   * @param {Object} options 配置参数
   * @param {Boolean} options.silent 是否禁止错误弹层
   * @returns {Promise<Boolean, ErrorModel>}
@@ -175,6 +175,21 @@ module.exports = {
    getContactUserList: function (args, options = {}) {
      
      return $.api('User', 'GetContactUserList', args, options);
+   },
+  /**
+  * 获取网络下已离职的用户信息
+  * @param {Object} args 请求参数
+  * @param {integer} args.pageIndex 页码
+  * @param {integer} args.pageSize 页大小
+  * @param {string} args.keywords 关键司
+  * @param {string} args.projectId 网络Id
+  * @param {Object} options 配置参数
+  * @param {Boolean} options.silent 是否禁止错误弹层
+  * @returns {Promise<Boolean, ErrorModel>}
+  **/
+   getProjectResignedUserList: function (args, options = {}) {
+     
+     return $.api('User', 'GetProjectResignedUserList', args, options);
    },
   /**
   * 网络管理 - 获取网络下用户列表（projectId不存在加载好友，projectId存在加载公司通讯录）
@@ -403,6 +418,62 @@ module.exports = {
    resetPassword: function (args, options = {}) {
      
      return $.api('User', 'ResetPassword', args, options);
+   },
+  /**
+  * 批量重置员工密码
+  * @param {Object} args 请求参数
+  * @param {string} args.projectId 网络Id
+  * @param {array} args.accountIds 账号Id
+  * @param {string} args.password 密码
+  * @param {Object} options 配置参数
+  * @param {Boolean} options.silent 是否禁止错误弹层
+  * @returns {Promise<Boolean, ErrorModel>}
+  **/
+   batchResetPassword: function (args, options = {}) {
+     
+     return $.api('User', 'BatchResetPassword', args, options);
+   },
+  /**
+  * 批量更新用户所在部门
+  * @param {Object} args 请求参数
+  * @param {string} args.projectId 网络Id
+  * @param {array} args.accountIds 账户Ids
+  * @param {array} args.departmentIds 部门ids 第一个为主部门
+  * @param {Object} options 配置参数
+  * @param {Boolean} options.silent 是否禁止错误弹层
+  * @returns {Promise<Boolean, ErrorModel>}
+  **/
+   updateDepartmentForUsers: function (args, options = {}) {
+     
+     return $.api('User', 'UpdateDepartmentForUsers', args, options);
+   },
+  /**
+  * 批量更新用户职位
+  * @param {Object} args 请求参数
+  * @param {string} args.projectId 网络Id
+  * @param {array} args.accountIds 账户Ids
+  * @param {array} args.jobIds 职位ids
+  * @param {Object} options 配置参数
+  * @param {Boolean} options.silent 是否禁止错误弹层
+  * @returns {Promise<Boolean, ErrorModel>}
+  **/
+   updateJobForUsers: function (args, options = {}) {
+     
+     return $.api('User', 'UpdateJobForUsers', args, options);
+   },
+  /**
+  * 批量更新用户工作地点
+  * @param {Object} args 请求参数
+  * @param {string} args.projectId 网络Id
+  * @param {array} args.accountIds 账户Ids
+  * @param {string} args.worksiteId 工作地点id
+  * @param {Object} options 配置参数
+  * @param {Boolean} options.silent 是否禁止错误弹层
+  * @returns {Promise<Boolean, ErrorModel>}
+  **/
+   updateWorkSiteForUsers: function (args, options = {}) {
+     
+     return $.api('User', 'UpdateWorkSiteForUsers', args, options);
    },
   /**
   * 根据ProjectId检测当前用户是不是网络管理员

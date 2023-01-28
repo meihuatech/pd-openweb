@@ -1,14 +1,15 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import classNames from 'classnames';
-import 'dialogSelectUser';
-import Confirm from 'confirm';
+import 'src/components/dialogSelectUser/dialogSelectUser';
+import { Dialog } from 'ming-ui';
 // import RoleAuthCommon from '../common/common';
 import RoleController from 'src/api/role';
 import { navigateTo } from 'src/router/navigateTo';
 import cx from 'classnames';
 
 import EditRoleDialog from '../createEditRole';
+import _ from 'lodash';
 class RoleItem extends React.Component {
   constructor() {
     super();
@@ -39,7 +40,7 @@ class RoleItem extends React.Component {
           $({}).dialogSelectUser({
             sourceId: 0,
             fromType: 0,
-            showMoreInvite: false,
+            fromAdmin: true,
             SelectUserSettings: {
               filterAll: true, // 过滤全部
               filterFriend: true, // 是否过滤好友
@@ -61,18 +62,22 @@ class RoleItem extends React.Component {
       } else if (type === 'delete') {
         return e => {
           e.stopPropagation();
-          new Confirm(
-            {
-              content: '<span></span>',
-              title: _l('您确定删除该角色？'),
-            },
-            function () {
+          Dialog.confirm({
+            title: _l('您确定删除该角色？'),
+            onOk: () => {
               RoleController.removeRole({
                 projectId,
                 roleId: role.roleId,
-              }).then(cb);
+              }).then(res => {
+                const { message, deleteSuccess } = res;
+                if (deleteSuccess) {
+                  alert(_l('操作成功'));
+                } else {
+                  alert(message || _l('操作失败'), 2);
+                }
+              });
             },
-          );
+          });
         };
       } else if (type === 'applyrole' && !this.state.hasClick) {
         return e => {
@@ -81,10 +86,12 @@ class RoleItem extends React.Component {
             projectId: projectId,
             roleId: role.roleId,
           }).then(function (data) {
-            if (data) {
+            if (data === 1) {
               _this.setState({ hasClick: true });
               alert(_l('申请成功'));
-            } else {
+            } else if (data === -1) {
+              alert(_l('不允许申请管理员'), 3);
+            } else if (data === 0) {
               alert(_l('申请失败'), 2);
             }
           });
@@ -96,7 +103,7 @@ class RoleItem extends React.Component {
         className={classNames('roleItem', { 'Gray_9 disabled': !isApply && role.noAuth })}
         onClick={() => {
           if (!isApply) {
-            navigateTo('/admin/rolelist/' + projectId + '/' + role.roleId);
+            navigateTo('/admin/sysroles/' + projectId + '/' + role.roleId);
           }
         }}
       >

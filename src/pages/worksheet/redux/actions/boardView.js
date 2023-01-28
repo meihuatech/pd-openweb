@@ -4,7 +4,10 @@ import { getParaIds } from './util';
 import update from 'immutability-helper';
 import { includes, noop, isEmpty } from 'lodash';
 import { uniqBy } from 'lodash/array';
-import { getFilterRows, updateWorksheetRow } from 'src/api/worksheet';
+import worksheetAjax from 'src/api/worksheet';
+import { wrapAjax } from './util';
+
+const wrappedGetFilterRows = wrapAjax(worksheetAjax.getFilterRows);
 
 export function updateBoardViewRecordCount(data) {
   return { type: 'UPDATE_BOARD_VIEW_RECORD_COUNT', data };
@@ -64,7 +67,7 @@ export function updateBoardViewRecord(data) {
 
 const getBoardViewPara = (sheet = {}, view) => {
   const { base, controls } = sheet;
-  const { viewId, appId, chartId } = base;
+  const { viewId, appId, chartId, type } = base;
   view = view || getCurrentView(sheet);
   const { worksheetId, viewControl, advancedSetting } = view;
   if (!viewControl) {
@@ -77,6 +80,7 @@ const getBoardViewPara = (sheet = {}, view) => {
     relationWorksheetId = selectControl.dataSource;
   }
   let para = {
+    type,
     appId,
     worksheetId,
     viewId,
@@ -86,7 +90,7 @@ const getBoardViewPara = (sheet = {}, view) => {
     ...sheet.filters,
   };
   if (relationWorksheetId) {
-    para = { ...para, relationWorksheetId, kanbanSize: advancedSetting && advancedSetting.hidenone === '1' ? 50 : 20 };
+    para = { ...para, relationWorksheetId, kanbanSize: advancedSetting && advancedSetting.navshow === '1' ? 50 : 20 };
   }
   return para;
 };
@@ -112,8 +116,7 @@ export function initBoardViewData(view) {
 
 // 拉取看板数据以填满页面
 function getBoardViewDataFillPage({ para, dispatch }) {
-  const isRelateHide = para.relationWorksheetId && para.kanbanSize === 50;
-  getFilterRows(para).then(({ data, resultCode }) => {
+  (para.type === 'single' ? worksheetAjax.getFilterRows : wrappedGetFilterRows)(para).then(({ data, resultCode }) => {
     if (resultCode !== 1) {
       dispatch({
         type: 'WORKSHEET_UPDATE_ACTIVE_VIEW_STATUS',
@@ -134,7 +137,7 @@ function getBoardViewDataFillPage({ para, dispatch }) {
     });
     dispatch({
       type: 'CHANGE_BOARD_VIEW_STATE',
-      payload: { kanbanIndex: para.kanbanIndex, hasMoreData: isRelateHide ? false : !(data.length < 20) },
+      payload: { kanbanIndex: para.kanbanIndex, hasMoreData: !(data.length < 20) },
     });
   });
 }
@@ -146,11 +149,14 @@ export function getBoardViewPageData({ alwaysCallback = noop }) {
     const { boardViewState, boardViewRecordCount, boardData } = boardView;
     const { hasMoreData, kanbanIndex } = boardViewState;
     const para = getBoardViewPara(sheet);
-    if (!hasMoreData || !para) {
+    const { relationWorksheetId, kanbanSize } = para || {};
+    // 关联看板隐藏无数据看板，开启不允许拉取数据，关闭时允许
+    const isRelateHide = relationWorksheetId && kanbanSize === 50;
+    if (isRelateHide || !hasMoreData || !para) {
       alwaysCallback();
       return;
     }
-    getFilterRows({ ...para, kanbanIndex: kanbanIndex + 1 })
+    wrappedGetFilterRows({ ...para, kanbanIndex: kanbanIndex + 1 })
       .then(({ data }) => {
         // 将已经存在的看板过滤掉
         const existedKeys = boardData.map(item => item.key);
@@ -182,7 +188,7 @@ export function getSingleBoardPageData({ pageIndex, kanbanKey, alwaysCallback, c
       alwaysCallback();
       return;
     }
-    getFilterRows({ ...para, pageIndex, kanbanKey })
+    wrappedGetFilterRows({ ...para, pageIndex, kanbanKey })
       .then(({ data }) => {
         dispatch({ type: 'CHANGE_BOARD_VIEW_LOADING', loading: false });
         const boardViewIndex = _.findIndex(boardData, item => item.key === kanbanKey);
@@ -217,7 +223,7 @@ export function sortBoardRecord({ srcKey, targetKey, value, ...para }) {
   return (dispatch, getState) => {
     const { sheet } = getState();
     const { rowId } = para;
-    updateWorksheetRow(para).then(res => {
+    worksheetAjax.updateWorksheetRow(para).then(res => {
       if (!isEmpty(res.data)) {
         dispatch({ type: 'SORT_BOARD_VIEW_RECORD', data: { key: srcKey, rowId, targetKey } });
         dispatch(updateBoardViewRecordCount([srcKey, -1]));

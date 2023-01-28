@@ -4,9 +4,10 @@ import '../container/index.less';
 import cx from 'classnames';
 import { Icon } from 'ming-ui';
 import PeopleAvatar from './peopleAvatar';
-import DialogSelectDept from 'dialogSelectDept';
+import DialogSelectDept from 'src/components/dialogSelectDept';
 import MoreActionDia from './moreActionDia';
 import { updateRulesByRuleId } from '../actions/action';
+import _ from 'lodash';
 
 const targetType = {
   user: 10, // 10=人员、20=部门
@@ -45,8 +46,9 @@ class EditCon extends React.Component {
         $this.addDataFn(accountIds, type, targetType.user);
       },
     };
-    import('dialogSelectUser').then(() => {
+    import('src/components/dialogSelectUser/dialogSelectUser').then(() => {
       $({}).dialogSelectUser({
+        fromAdmin: true,
         showMoreInvite: false,
         SelectUserSettings: SelectUserSettingsForAdd,
       });
@@ -60,6 +62,7 @@ class EditCon extends React.Component {
     new DialogSelectDept({
       projectId,
       unique: false,
+      fromAdmin: true,
       // selectedDepartment: departmentInfos,
       selectedDepartment: [],
       showCreateBtn: false,
@@ -109,7 +112,7 @@ class EditCon extends React.Component {
                 {user.targetType === targetType.dept ? (
                   <React.Fragment>
                     <span className="depIcon">
-                      <Icon className="department Hand" icon="topbar_workflow" />
+                      <Icon className="department Hand" icon="department" />
                     </span>
                     <span className="fullname">{user.targetName}</span>
                   </React.Fragment>

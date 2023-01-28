@@ -16,7 +16,7 @@ import {
   updateSheetList,
   deleteSheet,
 } from 'src/pages/worksheet/redux/actions/sheetList';
-import customApi from 'src/pages/worksheet/common/Statistics/api/custom.js';
+import customApi from 'statistics/api/custom.js';
 import CustomPageHeader from './CustomPageHeader';
 import { browserIsMobile } from 'src/util';
 import DocumentTitle from 'react-document-title';
@@ -39,7 +39,7 @@ const CustomPageContentWrap = styled.div`
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.16);
     z-index: 2;
     .customPageDesc {
-      margin: 0 4px;
+      padding: 0 4px;
     }
     .nameWrap {
       display: flex;
@@ -126,8 +126,8 @@ function CustomPageContent(props) {
     ids,
   } = props;
   const { workSheetId: pageId, workSheetName } = currentSheet;
-  const appName = props.appName || apk.appName;
-  const pageName = props.pageName || workSheetName;
+  const appName = props.appName || apk.appName || '';
+  const pageName = props.pageName || workSheetName || '';
   const ref = useRef(null);
   const [show, toggle] = useToggle(false);
 
@@ -172,7 +172,7 @@ function CustomPageContent(props) {
             <div className="iconWrap">
               <i className="icon-custom_widgets"></i>
             </div>
-            <p>{_l('没有内容')}</p>
+            <p className='mTop16'>{_l('没有内容')}</p>
           </div>
         }
       />
@@ -180,8 +180,8 @@ function CustomPageContent(props) {
   };
 
   return (
-    <CustomPageContentWrap>
-      <DocumentTitle title={`${appName} - ${pageName}`} />
+    <CustomPageContentWrap className="CustomPageContentWrap">
+      {(appName || pageName) && <DocumentTitle title={`${appName} - ${pageName}`} />}
       <CustomPageHeader {...props} toggle={toggle} />
       <div ref={ref} className="content">
         {/* {isFullscreen && !_.isEmpty(ref.current) && (

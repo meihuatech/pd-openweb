@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { bindActionCreators } from 'redux';
 import { connect } from 'react-redux';
 import styled from 'styled-components';
-import { last } from 'lodash';
+import _, { last } from 'lodash';
 import cx from 'classnames';
 import { Tooltip } from 'ming-ui';
 import ViewConfig from 'worksheet/common/ViewConfig';
@@ -28,6 +28,10 @@ import { addMultiRelateHierarchyControls } from 'worksheet/redux/actions/hierarc
 import { redefineComplexControl } from 'worksheet/common/WorkSheetFilter/util';
 import { getSearchData } from 'worksheet/views/util';
 import EditFastFilter from 'src/pages/worksheet/common/ViewConfig/components/fastFilter/Edit';
+import { openShareDialog } from 'src/pages/worksheet/components/Share';
+import { isOpenPermit } from 'src/pages/FormSet/util.js';
+import { permitList } from 'src/pages/FormSet/config.js';
+
 const Con = styled.div`
   display: flex;
   align-items: center;
@@ -77,7 +81,7 @@ function ViewControl(props) {
     updateSearchRecord,
   } = props;
   const { worksheetId, projectId } = worksheetInfo;
-  const { count, rowsSummary } = sheetViewData;
+  const { count, pageCountAbnormal, rowsSummary } = sheetViewData;
   const { pageIndex, pageSize } = sheetFetchParams;
   const { allWorksheetIsSelected, sheetSelectedRows, sheetHiddenColumns } = sheetViewConfig;
   const [createCustomBtnVisible, setCreateCustomBtnVisible] = useState();
@@ -86,9 +90,11 @@ function ViewControl(props) {
   const [activeBtnId, setActiveBtnId] = useState();
   const [activeFastFilterId, setActiveFastFilterId] = useState();
   const [btnDataInfo, setActiveBtnIdInfo] = useState();
+  const isShowWorkflowSys = isOpenPermit(permitList.sysControlSwitch, sheetSwitchPermit);
   useEffect(() => {
     setActiveBtnIdInfo(_.find(sheetButtons, item => item.btnId === activeBtnId));
   }, [activeBtnId, sheetButtons]);
+
   return (
     <Con>
       <ViewItems
@@ -116,26 +122,21 @@ function ViewControl(props) {
           navigateTo(`/app/${appId}/${groupId}/${worksheetId}/${newView.viewId}`);
         }}
         onShare={() => {
-          import('src/components/shareAttachment/shareAttachment').then(share => {
-            const params = {
-              id: worksheetId,
-              viewId: viewId,
-              appSectionId: groupId,
-              shareRange: view.shareRange,
+          openShareDialog({
+            from: 'view',
+            isCharge,
+            title: _l('分享视图'),
+            isPublic: view.shareRange === 2,
+            params: {
               appId,
-              ext: '',
-              name: view.name,
-              dialogTitle: _l('分享视图'),
-              attachmentType: 3,
-              node: {
-                canChangeSharable: isCharge,
-              },
-            };
-            share.default(params, {
-              updateView: value => {
-                updateView(Object.assign({}, view, value));
-              },
-            });
+              worksheetId,
+              viewId,
+              title: view.name,
+            },
+            getCopyContent: (type, url) => (type === 'private' ? url : `${url} ${worksheetInfo.name}-${view.name}`),
+            onUpdate: value => {
+              updateView(Object.assign({}, view, value));
+            },
           });
         }}
         onExport={() => {
@@ -149,11 +150,13 @@ function ViewControl(props) {
             projectId: projectId,
             searchArgs: filters,
             selectRowIds: sheetSelectedRows.map(item => item.rowid),
+            sheetSwitchPermit,
             columns: controls.filter(item => {
               return (
                 !_.find(view.controls, hideId => item.controlId === hideId) &&
                 item.controlPermissions &&
-                item.controlPermissions[0] === '1'
+                item.controlPermissions[0] === '1' &&
+                item.controlId !== 'rowid'
               );
             }),
             downLoadUrl: worksheetInfo.downLoadUrl,
@@ -177,8 +180,8 @@ function ViewControl(props) {
         onViewConfigVisible={() => {
           setViewConfigVisible(true);
         }}
-        onSelectView={selectedView => {
-          navigateTo(`/app/${appId}/${groupId}/${worksheetId}/${selectedView.viewId}`);
+        getNavigateUrl={selectedView => {
+          return `/app/${appId}/${groupId}/${worksheetId}/${selectedView.viewId}`;
         }}
       />
       {/**本表层级视图、甘特图 */}
@@ -202,12 +205,13 @@ function ViewControl(props) {
         <i
           className={cx('icon icon-task-later refresh Gray_9e Font18 pointer ThemeHoverColor3 mTop2')}
           onClick={() => {
-            refreshSheet(view);
+            refreshSheet(view, { updateWorksheetControls: true });
           }}
         />
       </Tooltip>
       {Number(view && view.viewType) === 0 && (
         <Pagination
+          abnormalMode={pageCountAbnormal}
           className="pagination"
           pageIndex={pageIndex}
           pageSize={pageSize}
@@ -230,7 +234,9 @@ function ViewControl(props) {
           projectId={projectId}
           worksheetId={worksheetId}
           worksheetControls={controls}
+          sheetSwitchPermit={sheetSwitchPermit}
           onClickAwayExceptions={[
+            '.ant-select-dropdown',
             '.ChooseWidgetDialogWrap',
             '.dropConOption',
             '.dropdownTrigger',
@@ -259,10 +265,24 @@ function ViewControl(props) {
             '.boxEditFastFilterCover',
             '.ant-picker-dropdown',
             '.quickAddControlDialog',
+            '.ant-modal-root',
+            '.ant-tooltip',
+            '.deleteHoverTips',
+            '.CodeMirror-hints',
+            '.Tooltip-wrapper',
           ]}
           onClickAway={() => setViewConfigVisible(false)}
           columns={controls.filter(item => {
-            return item.viewDisplay || !('viewDisplay' in item);
+            if (isShowWorkflowSys) {
+              return item.viewDisplay || !('viewDisplay' in item);
+            }
+            return (
+              (item.viewDisplay || !('viewDisplay' in item)) &&
+              !_.includes(
+                ['wfname', 'wfstatus', 'wfcuaids', 'wfrtime', 'wfftime', 'wfdtime', 'wfcaid', 'wfctime', 'wfcotime'],
+                item.controlId,
+              )
+            );
           })}
           onClose={() => setViewConfigVisible(false)}
           updateCurrentView={data => {
@@ -312,6 +332,12 @@ function ViewControl(props) {
             '.ant-cascader-menus',
             '.ant-tree-select-dropdown',
             '.ant-picker-dropdown',
+            '.ant-modal-root',
+            '.ant-tooltip',
+            '.CodeMirror-hints',
+            '.ck',
+            '.ant-picker-dropdown',
+            '.Tooltip',
           ]}
           onClickAway={() => setCreateCustomBtnVisible(false)}
           isEdit={createBtnIsEdit}

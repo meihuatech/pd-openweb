@@ -3,12 +3,14 @@ import { arrayOf, bool, func, shape, string } from 'prop-types';
 import { Modal, Dialog, Checkbox } from 'ming-ui';
 import styled from 'styled-components';
 import update from 'immutability-helper';
-import { getFilterRows, removeWorksheetRows, restoreWorksheetRows } from 'src/api/worksheet';
-import WorksheetTable from 'worksheet/components/WorksheetTable';
+import worksheetAjax from 'src/api/worksheet';
+import { controlState } from 'src/components/newCustomFields/tools/utils';
+import WorksheetTable from 'worksheet/components/WorksheetTable/V2';
 import { RowHead } from 'worksheet/components/WorksheetTable/components/';
 import ColumnHead from './TrashColumnHead';
 import TrashBatchOperate from './TrashBatchOperate';
 import Header from './Header';
+import _ from 'lodash';
 
 const Con = styled.div`
   width: 100%;
@@ -80,26 +82,29 @@ const createActions = (dispatch, state) => ({
       type: 'UPDATE_LOADING',
       loading: true,
     });
-    getFilterRows({
-      appId,
-      worksheetId,
-      searchType,
-      pageSize: pageSize,
-      pageIndex,
-      keyWords: searchText,
-      status: 9,
-      sortControls: sortControls.filter(_.identity),
-      filterControls,
-    }).then(data => {
-      dispatch({
-        type: 'UPDATE_RECORDS',
-        records: data.data,
-        count: data.count,
+    worksheetAjax
+      .getFilterRows({
+        appId,
+        worksheetId,
+        searchType,
+        pageSize: pageSize,
         pageIndex,
-        pageSize,
-        loading: false,
+        keyWords: searchText,
+        status: 9,
+        sortControls: sortControls.filter(_.identity),
+        filterControls,
+      })
+      .then(data => {
+        dispatch({
+          type: 'UPDATE_RECORDS',
+          records: data.data,
+          count: data.count,
+          pageIndex,
+          pageSize,
+          filterControls,
+          loading: false,
+        });
       });
-    });
   },
   deleteRecord: ids => {
     dispatch({
@@ -108,15 +113,17 @@ const createActions = (dispatch, state) => ({
     });
   },
   clear: ({ appId, worksheetId }) => {
-    removeWorksheetRows({
-      appId,
-      worksheetId,
-    }).then(() => {
-      dispatch({
-        type: 'CLEAR',
+    worksheetAjax
+      .removeWorksheetRows({
+        appId,
+        worksheetId,
+      })
+      .then(() => {
+        dispatch({
+          type: 'CLEAR',
+        });
+        alert(_l('已清空回收站'));
       });
-      alert(_l('已清空回收站'));
-    });
   },
 });
 
@@ -138,14 +145,49 @@ export default function WorkSheetTrash(props) {
   const [selected, setSelected] = useState([]);
   const [selectRows, setSelectRows] = useState([]);
   const [sortControl, setSortControl] = useState();
+  const [disableMaskDataControls, setDisableMaskDataControls] = useState({});
   const [state, dispatch] = useReducer(trashReducer, { records: [] });
-  const { loading = true, count = 0, pageIndex = 1, pageSize = PAGE_SIZE, records = [], searchText = '' } = state;
+  const {
+    loading = true,
+    count = 0,
+    pageIndex = 1,
+    pageSize = PAGE_SIZE,
+    records = [],
+    filterControls,
+    searchText = '',
+  } = state;
   const lineNumberBegin = (pageIndex - 1) * pageSize;
   const hasAuthRows = selectRows.filter(item => item.allowedit || item.allowEdit);
   const hasAuthRowIds = hasAuthRows.map(item => item.rowid);
   const actions = createActions(dispatch, state);
+  const controlsForShow = controls
+    .filter(column => !_.includes(['utime', 'uaid'], column.controlId) && controlState(column).visible)
+    .map(c =>
+      disableMaskDataControls[c.controlId]
+        ? {
+            ...c,
+            advancedSetting: Object.assign({}, c.advancedSetting, {
+              datamask: '0',
+            }),
+          }
+        : c,
+    )
+    .concat([
+      {
+        controlId: 'dtime',
+        controlName: _l('删除时间'),
+        type: 16,
+      },
+      {
+        controlId: 'daid',
+        controlName: _l('删除者'),
+        type: 26,
+      },
+    ]);
   function loadRows(args) {
-    actions.loadRows(Object.assign({}, { appId, worksheetId, pageIndex, pageSize, sortControls: [sortControl] }, args));
+    actions.loadRows(
+      Object.assign({}, { appId, worksheetId, pageIndex, pageSize, sortControls: [sortControl], filterControls }, args),
+    );
   }
   useEffect(() => {
     loadRows({ appId, worksheetId, pageIndex, sortControls: [sortControl] });
@@ -182,7 +224,7 @@ export default function WorkSheetTrash(props) {
                   args.excludeRowIds = records.filter(r => !_.includes(selected, r.rowid)).map(r => r.rowid);
                 }
                 args.restoreRelation = !!needRestoreRelation.current;
-                restoreWorksheetRows(args).then(res => {
+                worksheetAjax.restoreWorksheetRows(args).then(res => {
                   if (!res.isSuccess) {
                     alert(_l('恢复失败'), 3);
                     return;
@@ -249,7 +291,7 @@ export default function WorkSheetTrash(props) {
                     args.isAll = true;
                     args.excludeRowIds = records.filter(r => !_.includes(selected, r.rowid)).map(r => r.rowid);
                   }
-                  removeWorksheetRows(args).then(() => {
+                  worksheetAjax.removeWorksheetRows(args).then(() => {
                     if (selectRows.length === selected.length) {
                       alert(_l('删除成功'));
                     } else {
@@ -274,7 +316,7 @@ export default function WorkSheetTrash(props) {
           appId={appId}
           viewId={viewId}
           worksheetId={worksheetId}
-          controls={controls}
+          controls={controlsForShow}
           pageSize={pageSize}
           pageIndex={pageIndex}
           count={count}
@@ -292,28 +334,26 @@ export default function WorkSheetTrash(props) {
             viewId={viewId}
             noRenderEmpty={!searchText}
             lineNumberBegin={lineNumberBegin}
-            columns={controls
-              .filter(column => column.controlId !== 'utime')
-              .concat([
-                {
-                  controlId: 'dtime',
-                  controlName: _l('删除时间'),
-                  type: 16,
-                },
-                {
-                  controlId: 'daid',
-                  controlName: _l('删除者'),
-                  type: 26,
-                },
-              ])}
+            columns={controlsForShow}
             rowHeight={34}
             selectedIds={selected}
             data={records}
             renderColumnHead={({ control, ...rest }) => (
               <ColumnHead
                 {...rest}
+                control={
+                  disableMaskDataControls[control.controlId]
+                    ? {
+                        ...control,
+                        advancedSetting: Object.assign({}, control.advancedSetting, {
+                          datamask: '0',
+                        }),
+                      }
+                    : control
+                }
+                worksheetId={worksheetId}
+                type="trash"
                 selected={!!selected.length}
-                control={control}
                 isAsc={control.controlId === (sortControl || {}).controlId ? (sortControl || {}).isAsc : undefined}
                 changeSort={newIsAsc => {
                   const newSortControl = _.isUndefined(newIsAsc)
@@ -334,7 +374,9 @@ export default function WorkSheetTrash(props) {
                         ],
                   });
                 }}
-                setFilter={headerRef.current.addFilterByControl}
+                onShowFullValue={() => {
+                  setDisableMaskDataControls({ ...disableMaskDataControls, [control.controlId]: true });
+                }}
               />
             )}
             renderRowHead={({ className, style, rowIndex, row }) => (
@@ -342,7 +384,7 @@ export default function WorkSheetTrash(props) {
                 isTrash
                 // canSelectAll
                 className={className}
-                style={{ ...style, width: 80 }}
+                style={{ ...style, width: String(lineNumberBegin + rowIndex).length * 8 + 64 }}
                 lineNumberBegin={lineNumberBegin}
                 selectedIds={selected}
                 onSelectAllWorksheet={() => {

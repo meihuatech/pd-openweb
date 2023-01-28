@@ -2,8 +2,12 @@ import PropTypes from 'prop-types';
 import React, { Component } from 'react';
 import DialogSelectGroups from 'src/components/dialogSelectDept';
 import cx from 'classnames';
-import SelectUser from 'src/pages/Mobile/components/SelectUser';
+import { Tooltip } from 'ming-ui';
+import SelectUser from 'mobile/components/SelectUser';
+import departmentAjax from 'src/api/department';
+import { getTabTypeBySelectUser } from 'src/pages/worksheet/common/WorkSheetFilter/util';
 import { browserIsMobile } from 'src/util';
+import _ from 'lodash';
 
 export default class Widgets extends Component {
   static propTypes = {
@@ -60,7 +64,7 @@ export default class Widgets extends Component {
   }
 
   render() {
-    const { projectId, disabled, enumDefault, appId } = this.props;
+    const { projectId, disabled, enumDefault, appId, advancedSetting = {}, worksheetId, controlId } = this.props;
     const value = JSON.parse(this.props.value || '[]');
     const { showSelectDepartment } = this.state;
 
@@ -79,20 +83,36 @@ export default class Widgets extends Component {
       >
         {value.map((item, index) => {
           return (
-            <div className={cx('customFormControlTags', { selected: browserIsMobile() && !disabled })} key={index}>
-              <i className="Font14 Gray_9e mLeft8 icon-workflow" />
+            <Tooltip
+              mouseEnterDelay={0.6}
+              text={() =>
+                new Promise(resolve =>
+                  departmentAjax.getDepartmentFullNameByIds({
+                    projectId,
+                    departmentIds: [item.departmentId],
+                  }).then(res => {
+                    resolve(_.get(res, '0.name'));
+                  }),
+                )
+              }
+            >
+              <div className={cx('customFormControlTags', { selected: browserIsMobile() && !disabled })} key={index}>
+                <div className="departWrap" style={{ backgroundColor: '#2196f3' }}>
+                  <i className="Font16 icon-department" />
+                </div>
 
-              <span className="ellipsis mLeft5" style={{ maxWidth: 200 }}>
-                {item.departmentName}
-              </span>
+                <span className="ellipsis mLeft5" style={{ maxWidth: 200 }}>
+                  {item.departmentName}
+                </span>
 
-              {((enumDefault === 0 && value.length === 1) || enumDefault !== 0) && !disabled && (
-                <i
-                  className="icon-minus-square Font16 tagDel"
-                  onClick={() => this.removeDepartment(item.departmentId)}
-                />
-              )}
-            </div>
+                {((enumDefault === 0 && value.length === 1) || enumDefault !== 0) && !disabled && (
+                  <i
+                    className="icon-minus-square Font16 tagDel"
+                    onClick={() => this.removeDepartment(item.departmentId)}
+                  />
+                )}
+              </div>
+            </Tooltip>
           );
         })}
 
@@ -114,6 +134,10 @@ export default class Widgets extends Component {
             onClose={() => this.setState({ showSelectDepartment: false })}
             onSave={this.onSave}
             appId={appId}
+            userType={getTabTypeBySelectUser(this.props)}
+            isRangeData={!!advancedSetting.userrange}
+            filterWorksheetId={worksheetId}
+            filterWorksheetControlId={controlId}
           />
         )}
       </div>

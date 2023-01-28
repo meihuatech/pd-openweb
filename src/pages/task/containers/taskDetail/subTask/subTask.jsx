@@ -7,12 +7,13 @@ import Textarea from 'ming-ui/components/Textarea';
 import config, { OPEN_TYPE } from '../../../config/config';
 import withClickAway from 'ming-ui/decorators/withClickAway';
 import createDecoratedComponent from 'ming-ui/decorators/createDecoratedComponent';
-import 'quickSelectUser';
+import 'src/components/quickSelectUser/quickSelectUser';
 import { addSubTask, editTaskStatus, updateTaskName, updateTaskCharge, taskFoldStatus } from '../../../redux/actions';
-import mdFunction from 'mdFunction';
+import { expireDialogAsync } from 'src/components/common/function';
 import UserHead from 'src/pages/feed/components/userHead';
-import 'dialogSelectUser';
+import 'src/components/dialogSelectUser/dialogSelectUser';
 import { afterUpdateTaskName, afterUpdateTaskStatus, afterAddTask, afterUpdateTaskCharge } from '../../../utils/taskComm';
+import _ from 'lodash';
 
 const ClickAwayable = createDecoratedComponent(withClickAway);
 const statusTip = [_l('任务已锁定，无法操作'), _l('标记为未完成'), _l('任务已锁定，但我是创建者或负责人可以操作'), _l('标记完成')];
@@ -233,7 +234,7 @@ class Subtask extends Component {
   showAddSubTaskModule = () => {
     const { data } = this.props.taskDetails[this.props.taskId];
 
-    mdFunction.expireDialogAsync(data.projectID).then(() => {
+    expireDialogAsync(data.projectID).then(() => {
       this.setState({ addSubTask: true });
     });
   };

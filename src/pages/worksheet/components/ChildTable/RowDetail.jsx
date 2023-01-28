@@ -2,9 +2,11 @@ import React from 'react';
 import PropTypes from 'prop-types';
 import { autobind } from 'core-decorators';
 import CustomFields from 'src/components/newCustomFields';
+import _ from 'lodash';
 
 export default class RowDetail extends React.Component {
   static propTypes = {
+    ignoreLock: PropTypes.bool,
     disabled: PropTypes.bool,
     className: PropTypes.string,
     projectId: PropTypes.string,
@@ -31,7 +33,11 @@ export default class RowDetail extends React.Component {
   }
 
   componentWillReceiveProps(nextProps) {
-    if (nextProps.data && nextProps.data.rowid !== this.props.data.rowid) {
+    if (
+      nextProps.data &&
+      (nextProps.data.rowid !== this.props.data.rowid ||
+        (this.props.isMobile && !_.isEqual(nextProps.data, this.props.data)))
+    ) {
       this.setState({
         flag: Math.random(),
       });
@@ -59,21 +65,12 @@ export default class RowDetail extends React.Component {
     if (!this.customwidget.current) {
       return;
     }
-    const { controlName, data, onSave, onClose } = this.props;
+    const { data, onSave, onClose } = this.props;
     const submitData = this.customwidget.current.getSubmitData();
     const updateControlIds = this.customwidget.current.dataFormat.getUpdateControlIds();
     const formdata = submitData.data;
 
-    if (submitData.hasError) {
-      this.setState({
-        showError: true,
-      });
-      alert(_l('请正确填写%0', controlName), 3);
-      return false;
-    } else if ($('.workSheetNewRecord .Progress--circle').length > 0) {
-      alert(_l('附件正在上传，请稍后', 3));
-      return false;
-    } else if (submitData.hasRuleError) {
+    if (submitData.error) {
       return false;
     } else {
       const row = [{}, ...formdata].reduce((a = {}, b = {}) => Object.assign(a, { [b.controlId]: b.value }));
@@ -106,9 +103,21 @@ export default class RowDetail extends React.Component {
   }
 
   render() {
-    const { disabled, worksheetId, projectId, controls, data, getMasterFormData, handleUniqueValidate, appId } =
-      this.props;
-    const { flag, showError } = this.state;
+    const {
+      ignoreLock,
+      disabled,
+      worksheetId,
+      projectId,
+      controls,
+      data,
+      getMasterFormData,
+      handleUniqueValidate,
+      appId,
+      onRulesLoad,
+      searchConfig,
+      sheetSwitchPermit,
+    } = this.props;
+    const { flag } = this.state;
     const formdata = _.isEmpty(data)
       ? controls
       : controls
@@ -123,11 +132,15 @@ export default class RowDetail extends React.Component {
     return (
       <div ref={this.formcon}>
         <CustomFields
+          ignoreLock={ignoreLock}
           ignoreHideControl
           worksheetId={worksheetId}
           disabled={disabled}
+          searchConfig={searchConfig}
+          sheetSwitchPermit={sheetSwitchPermit}
           columnNumber={1}
           from={2}
+          isCreate={false}
           recordId={data.rowid && data.rowid.startsWith('temp') ? undefined : data.rowid}
           ref={this.customwidget}
           data={formdata.map(c => ({ ...c, isSubList: true })).filter(c => c.type !== 34)}
@@ -135,9 +148,9 @@ export default class RowDetail extends React.Component {
           flag={flag}
           projectId={projectId}
           appId={appId}
-          showError={showError}
-          checkCellUnique={handleUniqueValidate}
+          checkCellUnique={(...args) => handleUniqueValidate(...args, data.rowid)}
           onChange={this.handleChange}
+          onRulesLoad={onRulesLoad}
         />
       </div>
     );

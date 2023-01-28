@@ -1,38 +1,23 @@
 import React, { Fragment, Component } from 'react';
 import { bindActionCreators } from 'redux';
 import { connect } from 'react-redux';
-import { withRouter } from 'react-router-dom';
 import cx from 'classnames';
 import styled from 'styled-components';
-import * as actions from 'src/pages/Mobile/RecordList/redux/actions';
+import * as actions from 'mobile/RecordList/redux/actions';
 import * as sheetviewActions from 'src/pages/worksheet/redux/actions/sheetview.js';
 import { refreshWorksheetControls } from 'worksheet/redux/actions';
-import { Modal } from 'antd-mobile';
+import { Modal, Drawer } from 'antd-mobile';
 import { Icon, Button } from 'ming-ui';
-import Search from 'src/pages/Mobile/RecordList/QuickFilter/Search';
+import QuickFilterSearch from 'mobile/RecordList/QuickFilter/QuickFilterSearch';
 import SheetRows, { WithoutRows } from '../../SheetRows';
 import { Flex, ActivityIndicator } from 'antd-mobile';
 import { isOpenPermit } from 'src/pages/FormSet/util.js';
 import { permitList } from 'src/pages/FormSet/config.js';
 import worksheetAjax from 'src/api/worksheet';
 import { TextTypes } from 'src/pages/worksheet/common/Sheet/QuickFilter/Inputs';
-import RecordAction from 'src/pages/Mobile/Record/RecordAction';
-import { startProcess } from 'src/pages/workflow/api/process';
-
-const FilterWrapper = styled.div`
-  background-color: #fff;
-  padding: 10px;
-  border-radius: 50%;
-  width: 34px;
-  height: 34px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-left: 10px;
-  .active {
-    color: #33a3f4 !important;
-  }
-`;
+import RecordAction from 'mobile/Record/RecordAction';
+import processAjax from 'src/pages/workflow/api/process';
+import _ from 'lodash';
 
 const BatchOptBtn = styled.div`
   display: flex;
@@ -45,6 +30,9 @@ const BatchOptBtn = styled.div`
   font-size: 15px;
   border-radius: 8px 8px 0 0;
   z-index: 1;
+  position: fixed;
+  bottom: 0;
+  width: 100%;
   .deleteOpt {
     color: #f44336;
   }
@@ -68,39 +56,30 @@ const BatchOptBtn = styled.div`
 }
 `;
 
-const formatParams = params => {
-  const { appId, viewId } = params;
-  return {
-    ...params,
-    appId: ['null', 'undefined'].includes(appId) ? '' : appId,
-    viewId: ['null', 'undefined'].includes(viewId) ? '' : viewId,
-  };
-};
 const CUSTOM_BUTTOM_CLICK_TYPE = {
   IMMEDIATELY: 1,
   CONFIRM: 2,
   FILL_RECORD: 3,
 };
 
-@withRouter
 class SheetView extends Component {
   constructor(props) {
     super(props);
     this.state = {};
   }
   componentDidMount() {
-    this.loadCustomBtns(this.props.match.params);
+    this.loadCustomBtns(this.props);
   }
   componentWillReceiveProps(nextProps) {
-    if (!_.isEqual(this.props.match.params, nextProps.match.params)) {
-      this.loadCustomBtns(nextProps.match.params);
+    if (!_.isEqual(this.props.viewId, nextProps.viewId)) {
+      this.loadCustomBtns(nextProps);
     }
   }
   componentWillUnmount() {
     this.props.changeBatchOptVisible(false);
   }
   renderWithoutRows() {
-    const { match, worksheetInfo, sheetSwitchPermit, filters, quickFilter, view } = this.props;
+    const { appId, worksheetInfo, sheetSwitchPermit, filters, quickFilter, view } = this.props;
 
     if (filters.keyWords) {
       return <WithoutRows text={_l('没有搜索结果')} />;
@@ -120,9 +99,7 @@ class SheetView extends Component {
               <Button
                 className="addRecordBtn valignWrapper mTop10"
                 onClick={() => {
-                  window.mobileNavigateTo(
-                    `/mobile/addRecord/${match.params.appId}/${worksheetInfo.worksheetId}/${view.viewId}`,
-                  );
+                  window.mobileNavigateTo(`/mobile/addRecord/${appId}/${worksheetInfo.worksheetId}/${view.viewId}`);
                 }}
               >
                 <Icon icon="add" className="Font22 White" />
@@ -157,12 +134,14 @@ class SheetView extends Component {
     );
   }
   // 加载自定义按钮数据
-  loadCustomBtns = paramsData => {
-    const { view } = this.props;
+  loadCustomBtns = (props = this.props) => {
+    const { appId, worksheetId, viewId } = props;
+    this.setState({ customButtonLoading: true });
     worksheetAjax
       .getWorksheetBtns({
-        ...formatParams(paramsData),
-        viewId: formatParams(paramsData).viewId ? formatParams(paramsData).viewId : view.viewId,
+        appId,
+        worksheetId,
+        viewId,
       })
       .then(data => {
         this.setState({
@@ -171,6 +150,7 @@ class SheetView extends Component {
               _.includes([CUSTOM_BUTTOM_CLICK_TYPE.IMMEDIATELY, CUSTOM_BUTTOM_CLICK_TYPE.CONFIRM], item.clickType) ||
               (item.writeObject === 1 && item.writeType === 1),
           ),
+          customButtonLoading: false,
         });
       });
   };
@@ -196,7 +176,7 @@ class SheetView extends Component {
       navGroupFilters,
       currentSheetRows = [],
     } = this.props;
-    const { appId, worksheetId, viewId } = this.props.match.params || {};
+    const { appId, worksheetId, viewId } = this.props;
     const { allWorksheetIsSelected } = sheetViewConfig;
     const hasAuthRowIds = currentSheetRows
       .filter(item => _.includes(batchOptCheckedData, item.rowid))
@@ -328,7 +308,7 @@ class SheetView extends Component {
       ];
     }
     this.props.changeBatchOptData([]);
-    startProcess({
+    processAjax.startProcess({
       appId: worksheetId,
       sources: batchOptCheckedData,
       triggerId: btn.btnId,
@@ -420,30 +400,41 @@ class SheetView extends Component {
   showRunInfo = flag => {
     this.setState({ runInfoVisible: flag });
   };
+
   render() {
     const {
       view,
+      filters,
       worksheetInfo,
       quickFilter,
-      updateFilters,
       batchOptCheckedData,
       batchOptVisible,
-      match,
-      mobileViewPermission,
+      sheetSwitchPermit,
+      appDetail,
+      appId,
+      worksheetId,
+      viewId,
     } = this.props;
-    const { params } = match;
-    let { customBtns = [], showButtons, permission } = this.state;
+    const { detail } = appDetail;
+    let { customBtns = [], showButtons, customButtonLoading } = this.state;
     const sheetControls = _.get(worksheetInfo, ['template', 'controls']);
-    const filters = view.fastFilters
+    const viewFilters = view.fastFilters
       .map(filter => ({
         ...filter,
         control: _.find(sheetControls, c => c.controlId === filter.controlId),
       }))
       .filter(c => c.control);
-    const excludeTextFilter = filters.filter(item => !TextTypes.includes(item.dataType));
-    const textFilters = filters.filter(item => TextTypes.includes(item.dataType));
+    const excludeTextFilter = viewFilters.filter(item => !TextTypes.includes(item.dataType));
+    const textFilters = viewFilters.filter(item => TextTypes.includes(item.dataType));
     const isFilter = quickFilter.filter(item => !TextTypes.includes(item.dataType)).length;
     let checkedCount = batchOptCheckedData.length;
+    const canDelete =
+      isOpenPermit(permitList.delete, sheetSwitchPermit, view.viewId) && !_.isEmpty(batchOptCheckedData);
+    const showCusTomBtn =
+      isOpenPermit(permitList.execute, sheetSwitchPermit, view.viewId) &&
+      !customButtonLoading &&
+      !_.isEmpty(customBtns) &&
+      !_.isEmpty(batchOptCheckedData);
     return (
       <Fragment>
         {batchOptVisible && (
@@ -461,49 +452,49 @@ class SheetView extends Component {
             <a onClick={this.selectedAll}>{_l('全选')}</a>
           </div>
         )}
-        <div className="flexRow valignWrapper pLeft12 pRight12 pTop15 pBottom5">
-          <Search textFilters={textFilters} />
-          {!_.isEmpty(excludeTextFilter) && (
-            <FilterWrapper>
-              <Icon
-                icon="filter"
-                className={cx('Font20 Gray_9e', { active: isFilter })}
-                onClick={() => {
-                  const { filters } = this.props;
-                  updateFilters({ visible: !filters.visible });
-                }}
-              />
-            </FilterWrapper>
-          )}
-        </div>
+        <QuickFilterSearch
+          textFilters={textFilters}
+          excludeTextFilter={excludeTextFilter}
+          isFilter={isFilter}
+          filters={filters}
+          detail={detail}
+          view={view}
+          worksheetInfo={worksheetInfo}
+          sheetControls={sheetControls}
+          updateFilters={this.props.updateFilters}
+        />
         {this.renderContent()}
-        {batchOptVisible && (
+        {batchOptVisible && (canDelete || showCusTomBtn) && (
           <BatchOptBtn>
-            {mobileViewPermission && mobileViewPermission.canRemove && (
+            {canDelete && (
               <div
                 className={cx('deleteOpt flex', {
-                  disabledDel: _.isEmpty(batchOptCheckedData),
+                  disabledDel: !canDelete,
                 })}
-                onClick={_.isEmpty(batchOptCheckedData) ? () => {} : this.batchDelete}
+                onClick={!canDelete ? () => {} : this.batchDelete}
               >
                 <Icon icon="delete_12" className="mRight16" />
                 {_l('删除')}
               </div>
             )}
-            <div
-              className={cx('extraOpt flex', {
-                disabledExtra: _.isEmpty(customBtns) || _.isEmpty(batchOptCheckedData),
-              })}
-              onClick={_.isEmpty(customBtns) || _.isEmpty(batchOptCheckedData) ? () => {} : this.showCustomButtoms}
-            >
-              <Icon icon="custom_actions" className="mRight10 Font20 extraIcon" />
-              {_l('执行动作')}
-            </div>
+            {showCusTomBtn && (
+              <div
+                className={cx('extraOpt flex', {
+                  disabledExtra: !showCusTomBtn,
+                })}
+                onClick={!showCusTomBtn ? () => {} : this.showCustomButtoms}
+              >
+                <Icon icon="custom_actions" className="mRight10 Font20 extraIcon" />
+                {_l('执行动作')}
+              </div>
+            )}
           </BatchOptBtn>
         )}
         <RecordAction
           recordActionVisible={showButtons}
-          {...formatParams(params)}
+          appId={appId}
+          worksheetId={worksheetId}
+          viewId={viewId}
           customBtns={customBtns}
           worksheetInfo={worksheetInfo}
           loadRow={() => {}}
@@ -540,9 +531,9 @@ export default connect(
     batchOptCheckedData: state.mobile.batchOptCheckedData,
     batchOptVisible: state.mobile.batchOptVisible,
     worksheetControls: state.mobile.worksheetControls,
+    appDetail: state.mobile.appDetail,
     sheetViewConfig: state.sheet.sheetview.sheetViewConfig,
     navGroupFilters: state.sheet.navGroupFilters,
-    mobileViewPermission: state.mobile.mobileViewPermission,
   }),
   dispatch =>
     bindActionCreators(

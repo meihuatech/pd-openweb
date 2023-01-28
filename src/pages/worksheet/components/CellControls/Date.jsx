@@ -42,10 +42,27 @@ export default class Date extends React.Component {
   editIcon = React.createRef();
 
   @autobind
+  handleTableKeyDown(e) {
+    const { updateEditingStatus } = this.props;
+    switch (e.key) {
+      case 'Escape':
+        updateEditingStatus(false);
+        break;
+      default:
+        break;
+    }
+  }
+
+  @autobind
   handleChange(value) {
-    const { cell, updateCell, updateEditingStatus, onValidate } = this.props;
+    const { tableFromModule, updateCell, updateEditingStatus, onValidate } = this.props;
     const error = !onValidate(value);
     if (error) {
+      if (tableFromModule === WORKSHEETTABLE_FROM_MODULE.SUBLIST) {
+        this.setState({
+          value,
+        });
+      }
       return;
     }
     updateCell({
@@ -65,7 +82,7 @@ export default class Date extends React.Component {
   render() {
     const {
       className,
-      formdata = () => [],
+      rowFormData = () => [],
       masterData = () => {},
       style,
       tableFromModule,
@@ -77,6 +94,7 @@ export default class Date extends React.Component {
       rowIndex,
       error,
       updateEditingStatus,
+      updateCell,
       onClick,
     } = this.props;
     const { value } = this.state;
@@ -92,12 +110,12 @@ export default class Date extends React.Component {
         <Trigger
           getPopupContainer={cellPopupContainer}
           popupVisible={isediting && !!error}
-          popup={<CellErrorTips error={error} pos={rowIndex === 1 ? 'bottom' : 'top'} />}
+          popup={<CellErrorTips error={error} pos={rowIndex === 0 ? 'bottom' : 'top'} />}
           destroyPopupOnHide
           zIndex="1051"
           popupAlign={{
-            points: rowIndex === 1 ? ['tl', 'bl'] : ['bl', 'tl'],
-            offset: rowIndex === 1 ? [0, -3] : [0, 0],
+            points: rowIndex === 0 ? ['tl', 'bl'] : ['bl', 'tl'],
+            offset: rowIndex === 0 ? [0, -3] : [0, 0],
           }}
         >
           <EditableCellCon
@@ -116,7 +134,7 @@ export default class Date extends React.Component {
                 {renderText({ ...cell, value })}
               </div>
             )}
-            {isediting && error && <CellErrorTips error={error} pos={rowIndex === 1 ? 'bottom' : 'top'} />}
+            {isediting && error && <CellErrorTips error={error} pos={rowIndex === 0 ? 'bottom' : 'top'} />}
           </EditableCellCon>
         </Trigger>
         {isediting && (
@@ -126,13 +144,23 @@ export default class Date extends React.Component {
               '.ant-picker-dropdown',
               '.cellControlDatePicker',
             ]}
-            onClickAway={() => updateEditingStatus(false)}
+            onClickAway={() => {
+              updateEditingStatus(false);
+              if (tableFromModule === WORKSHEETTABLE_FROM_MODULE.SUBLIST) {
+                if (cell.value !== value) {
+                  updateCell({
+                    value,
+                  });
+                }
+              }
+            }}
           >
             <div className={cx('cellControlDatePicker', className)} style={style}>
               <div className="cellControlDatePickerCon">
                 <DatePicker
                   {...cell}
-                  formData={formdata()}
+                  {...(tableFromModule === WORKSHEETTABLE_FROM_MODULE.SUBLIST ? { value } : {})}
+                  formData={rowFormData()}
                   masterData={masterData()}
                   dropdownClassName="scrollInTable"
                   onChange={this.handleChange}

@@ -1,6 +1,7 @@
 import EventEmitter from 'events';
 import moment from 'moment';
-import { navigateTo } from 'src/router/navigateTo';
+import filterXss from 'xss';
+import copy from 'copy-to-clipboard';
 import { FROM } from 'src/components/newCustomFields/tools/config';
 import DataFormat from 'src/components/newCustomFields/tools/DataFormat';
 import { FORM_ERROR_TYPE_TEXT } from 'src/components/newCustomFields/tools/config';
@@ -8,12 +9,15 @@ import { controlState } from 'src/components/newCustomFields/tools/utils';
 import { updateRulesData } from 'src/components/newCustomFields/tools/filterFn';
 import { RELATE_RECORD_SHOW_TYPE } from 'worksheet/constants/enum';
 import { WIDGETS_TO_API_TYPE_ENUM } from 'src/pages/widgetConfig/config/widget';
-import { getWorksheetInfo } from 'src/api/worksheet';
-import { head } from 'lodash';
+import renderCellText from 'worksheet/components/CellControls/renderText';
+import { SYSTEM_CONTROLS } from 'worksheet/constants/enum';
+import _, { head } from 'lodash';
 
 export { calcDate, formatControlValue, getSelectedOptions } from './util-purejs';
 
 export const emitter = new EventEmitter();
+
+window.onresize = () => emitter.emit('WINDOW_RESIZE');
 
 export function getWorkSheetData(data) {
   return data.map(record => {
@@ -114,8 +118,13 @@ export function compareType(type, cellControl) {
 /**
  * 字段是否支持排序
  */
-export function fieldCanSort(type) {
-  const canSortTypes = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 15, 16, 26, 27, 28, 29, 30, 31, 32, 33, 34, 36, 37, 38, 42];
+export function fieldCanSort(type, control = {}) {
+  const canSortTypes = [
+    2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 15, 16, 26, 27, 28, 29, 30, 31, 32, 33, 34, 36, 37, 38, 42, 46, 48, 50,
+  ];
+  if (control.type === 30 && control.strDefault === '10') {
+    return false;
+  }
   return _.includes(canSortTypes, type);
 }
 
@@ -160,13 +169,22 @@ export function getSortData(type, control = {}) {
       },
     ];
   } else if (type === 36) {
+    let defaultText = [_l('未选中 → 选中'), _l('选中 → 未选中')];
+    if (control.advancedSetting) {
+      if (control.advancedSetting.showtype === '1') {
+        defaultText = [_l('关闭 → 开启'), _l('开启 → 关闭')];
+      }
+      if (control.advancedSetting.showtype === '2') {
+        defaultText = [_l('否 → 是'), _l('是 → 否')];
+      }
+    }
     return [
       {
-        text: _l('未选中 → 选中'),
+        text: defaultText[0],
         value: ascendingValue,
       },
       {
-        text: _l('选中 → 未选中'),
+        text: defaultText[1],
         value: descendingValue,
       },
     ];
@@ -210,17 +228,12 @@ export function filterRelatesheetMutipleControls(controls) {
 export function formatFormulaDate({ value, unit, hideUnitStr, dot = 0 }) {
   let content = '';
   const isNegative = value < 0; // 处理负数
-
   value = (Math.floor(value * Math.pow(10, dot)) / Math.pow(10, dot)).toFixed(dot);
-
   if (isNegative) {
     value = -1 * value;
   }
   const units = [_l('分钟'), _l('小时'), _l('天'), _l('月'), _l('年')];
   let unitStr = units[parseInt(unit, 10) - 1] || '';
-  if (unitStr) {
-    unitStr = ' ' + unitStr;
-  }
   if (hideUnitStr) {
     unitStr = '';
   }
@@ -233,21 +246,15 @@ export function formatFormulaDate({ value, unit, hideUnitStr, dot = 0 }) {
         content = value + unitStr;
       } else if (+value < dayMinute) {
         content =
-          Math.floor(value / hourMinute) +
-          ' ' +
-          units[1] +
-          ' ' +
-          (value % hourMinute > 0 ? (value % hourMinute) + unitStr : '');
+          Math.floor(value / hourMinute) + units[1] + (value % hourMinute >= 0 ? (value % hourMinute) + unitStr : '');
       } else {
         content =
           Math.floor(value / dayMinute) +
-          ' ' +
           units[2] +
-          ' ' +
-          (Math.floor((value % dayMinute) / hourMinute) > 0
-            ? Math.floor((value % dayMinute) / hourMinute) + ' ' + units[1] + ' '
+          (Math.floor((value % dayMinute) / hourMinute) >= 0
+            ? Math.floor((value % dayMinute) / hourMinute) + units[1]
             : '') +
-          (value % hourMinute ? (value % hourMinute).toFixed(dot) + unitStr : '');
+          (value % hourMinute >= 0 ? (value % hourMinute).toFixed(dot) + unitStr : '');
       }
       break;
     case '2':
@@ -256,10 +263,8 @@ export function formatFormulaDate({ value, unit, hideUnitStr, dot = 0 }) {
       } else {
         content =
           Math.floor(value / dayHour) +
-          ' ' +
           units[2] +
-          ' ' +
-          (value % dayHour > 0 ? (value % dayHour).toFixed(dot) + unitStr : '');
+          (value % dayHour >= 0 ? (value % dayHour).toFixed(dot) + unitStr : '');
       }
       break;
     default:
@@ -273,7 +278,7 @@ export function formatFormulaDate({ value, unit, hideUnitStr, dot = 0 }) {
  * 缺点：转义后的字符没有处理 (可以用 https://github.com/mathiasbynens/he 处理)
  */
 export function regexFilterHtmlScript(str) {
-  return str.replace(/(<([^>]+)>)/gi, '');
+  return filterXss(str).replace(/(<([^>]+)>)/gi, '');
 }
 
 /**
@@ -282,7 +287,7 @@ export function regexFilterHtmlScript(str) {
  */
 export function domFilterHtmlScript(str) {
   var div = document.createElement('div');
-  div.innerHTML = str;
+  div.innerHTML = filterXss(str);
   return div.innerText;
 }
 
@@ -342,7 +347,7 @@ export function saveLRUWorksheetConfig(key, id, value) {
   if (Object.keys(newData).length > maxSaveNum) {
     delete newData[Object.keys(newData).pop];
   }
-  localStorage.setItem(key, JSON.stringify(newData));
+  safeLocalStorageSetItem(key, JSON.stringify(newData));
 }
 
 /** LRU 存储 */
@@ -354,7 +359,7 @@ export function clearLRUWorksheetConfig(key, id) {
     } catch (err) {}
   }
   delete data[id];
-  localStorage.setItem(key, JSON.stringify(data));
+  safeLocalStorageSetItem(key, JSON.stringify(data));
 }
 /** LRU 读取 */
 export function getLRUWorksheetConfig(key, id) {
@@ -427,7 +432,7 @@ export function getUnitOfDateFormula(unit) {
  */
 export function getControlValueSortType(control) {
   const controlType = control.sourceControlType || control.type;
-  if (controlType === 6 || controlType === 8 || controlType === 31) {
+  if (controlType === 6 || controlType === 8 || controlType === 31 || controlType === 36) {
     return 'NUMBER';
   } else {
     return 'STRING';
@@ -445,7 +450,7 @@ export function formatRecordToRelateRecord(controls, records = []) {
     records = [];
   }
   const titleControl = _.find(controls, control => control.attribute === 1);
-  const value = records.map(record => {
+  const value = records.map((record = {}) => {
     let name = titleControl ? record[titleControl.controlId] : '';
     if (titleControl && titleControl.type === 29 && name) {
       /**
@@ -480,7 +485,12 @@ export function getSubListError({ rows, rules }, controls = [], showControls = [
   const result = {};
   try {
     rows.forEach(async row => {
-      const rulesResult = checkRulesErrorOfRow({ from, rules, controls, row });
+      const rulesResult = checkRulesErrorOfRow({
+        from,
+        rules,
+        controls: controls.filter(c => _.find(showControls, id => id === c.controlId)),
+        row,
+      });
       const rulesErrors = rulesResult.errors;
       const controldata = rulesResult.formData.filter(
         c => _.find(showControls, id => id === c.controlId) && controlState(c).visible && controlState(c).editable,
@@ -488,6 +498,7 @@ export function getSubListError({ rows, rules }, controls = [], showControls = [
       const formdata = new DataFormat({
         data: controldata,
         from: FROM.NEWRECORD,
+        ignoreRequired: true,
       });
       let errorItems = formdata.getErrorControls();
       rulesErrors.forEach(errorItem => {
@@ -504,9 +515,6 @@ export function getSubListError({ rows, rules }, controls = [], showControls = [
     });
     const uniqueControls = controls.filter(c => _.find(showControls, id => id === c.controlId) && c.unique);
     uniqueControls.forEach(c => {
-      if (!controlState(c).editable) {
-        return;
-      }
       const hadValueRows = rows.filter(row => typeof row[c.controlId] !== 'undefined' && row[c.controlId] !== '');
       const uniqueValueRows = _.uniqBy(hadValueRows, c.controlId);
       if (hadValueRows.length !== uniqueValueRows.length) {
@@ -528,6 +536,10 @@ export function getSubListError({ rows, rules }, controls = [], showControls = [
     throw err;
   }
 }
+
+export const filterHidedSubList = (data = [], from) => {
+  return data.filter(item => item.type === 34 && controlState(item, from).visible && controlState(item, from).editable);
+};
 
 export function controlIsNumber({ type, sourceControlType, enumDefault, enumDefault2 }) {
   return (
@@ -614,10 +626,10 @@ export function copySublistControlValue(control, value) {
     case WIDGETS_TO_API_TYPE_ENUM.USER_PICKER: // 成员
     case WIDGETS_TO_API_TYPE_ENUM.DEPARTMENT: // 部门
     case WIDGETS_TO_API_TYPE_ENUM.SCORE: // 等级
+    case WIDGETS_TO_API_TYPE_ENUM.FORMULA_NUMBER: // 公式
     case WIDGETS_TO_API_TYPE_ENUM.RELATE_SHEET: // 关联记录
     case WIDGETS_TO_API_TYPE_ENUM.SWITCH: // 检查框
     case WIDGETS_TO_API_TYPE_ENUM.RICH_TEXT: // 富文本
-    case WIDGETS_TO_API_TYPE_ENUM.SIGNATURE: // 签名
     case WIDGETS_TO_API_TYPE_ENUM.CASCADER: // 级联选择
     case WIDGETS_TO_API_TYPE_ENUM.LOCATION: // 定位
     case WIDGETS_TO_API_TYPE_ENUM.ATTACHMENT: // 附件
@@ -626,6 +638,8 @@ export function copySublistControlValue(control, value) {
     case WIDGETS_TO_API_TYPE_ENUM.AREA_COUNTY: // 地区
     case WIDGETS_TO_API_TYPE_ENUM.SHEET_FIELD: // 他表字段
       return value;
+    case WIDGETS_TO_API_TYPE_ENUM.SIGNATURE: // 签名
+      return;
     default:
       return;
   }
@@ -647,8 +661,8 @@ export function getRecordTempValue(data = [], relateRecordMultipleData = {}) {
       if (control.type === WIDGETS_TO_API_TYPE_ENUM.SUB_LIST) {
         if (control.value && control.value.rows && control.value.rows.length) {
           results[control.controlId] = control.value.rows.map(r => {
-            const newRow = _.pick(r, v => !checkCellIsEmpty(v));
-            const relateRecordKeys = _.keys(_.pick(r, v => typeof v === 'string' && v.indexOf('sourcevalue') > -1));
+            const newRow = _.pickBy(r, v => !checkCellIsEmpty(v));
+            const relateRecordKeys = _.keys(_.pickBy(r, v => typeof v === 'string' && v.indexOf('sourcevalue') > -1));
             relateRecordKeys.forEach(key => {
               try {
                 const parsed = JSON.parse([newRow[key]]);
@@ -656,7 +670,7 @@ export function getRecordTempValue(data = [], relateRecordMultipleData = {}) {
                   parsed.map(relateRecord => ({
                     ...relateRecord,
                     sourcevalue: JSON.stringify(
-                      _.pick(
+                      _.pickBy(
                         JSON.parse(relateRecord.sourcevalue),
                         v => !checkCellIsEmpty(v) && (typeof v !== 'string' || v.indexOf('sourcevalue') < 0),
                       ),
@@ -676,7 +690,10 @@ export function getRecordTempValue(data = [], relateRecordMultipleData = {}) {
             JSON.parse(control.value).map(r => _.pick(r, ['name', 'type', 'sid'])),
           );
         } catch (err) {}
-      } else if (control.type !== WIDGETS_TO_API_TYPE_ENUM.SUB_LIST && typeof control.value === 'string') {
+      } else if (
+        control.type !== WIDGETS_TO_API_TYPE_ENUM.SUB_LIST &&
+        _.includes(['string', 'number'], typeof control.value)
+      ) {
         results[control.controlId] = control.value;
       }
     });
@@ -732,8 +749,16 @@ export function saveToLocal(key, id, value, max = 5) {
     localStorage.removeItem(`${key}_${savedIds[0]}`, value);
     savedIds = savedIds.slice(1);
   }
-  localStorage.setItem(key, JSON.stringify(savedIds));
-  localStorage.setItem(`${key}_${id}`, value);
+  try {
+    safeLocalStorageSetItem(key, JSON.stringify(savedIds));
+    safeLocalStorageSetItem(`${key}_${id}`, value);
+  } catch (err) {
+    Object.keys(localStorage)
+      .filter(k => k.startsWith(key))
+      .forEach(k => localStorage.removeItem(k));
+    safeLocalStorageSetItem(key, JSON.stringify(savedIds));
+    safeLocalStorageSetItem(`${key}_${id}`, value);
+  }
 }
 
 export function removeFromLocal(key, id) {
@@ -745,7 +770,7 @@ export function removeFromLocal(key, id) {
     } catch (err) {}
   }
   if (savedIds && savedIds.length) {
-    localStorage.setItem(key, JSON.stringify(savedIds));
+    safeLocalStorageSetItem(key, JSON.stringify(savedIds));
   } else {
     localStorage.removeItem(key);
   }
@@ -819,7 +844,7 @@ export function getDefaultValueOfControl(control) {
     case WIDGETS_TO_API_TYPE_ENUM.MONEY: // 金额 8
       return 1;
     case WIDGETS_TO_API_TYPE_ENUM.EMAIL: // 邮箱 5
-      return 'a@b.com';
+      return 'a#b.com'.replace('#', '@');
     case WIDGETS_TO_API_TYPE_ENUM.MOBILE_PHONE: // 手机 4
       return '+8618799999999';
     case WIDGETS_TO_API_TYPE_ENUM.DATE: // 日期 15
@@ -847,16 +872,74 @@ export function runCode(code) {
   return new vm.Script(code).runInNewContext();
 }
 
+const execWorkerCode = `onmessage = function (e) {
+  const result = new Function(e.data)();
+  try {
+    if (typeof result === 'object' && typeof result.then === 'function') {
+      postMessage('promise begin');
+      Promise.all([result]).then(function ([value]) {
+        postMessage('promise value ' + value);
+        postMessage({
+          type: 'over',
+          value,
+        });
+      });
+    } else {
+      postMessage({
+        type: 'over',
+        value: new Function(e.data)(),
+      });
+    }
+  } catch (err) {
+    postMessage({
+      type: 'error',
+      err,
+    });
+  }
+};
+`;
+
+function genFunctionWorker() {
+  return new Worker('data:application/javascript,' + encodeURIComponent(execWorkerCode));
+}
+
+export function asyncRun(code, cb, { timeout = 3000 } = {}) {
+  const functionWorker = genFunctionWorker();
+  const timer = setTimeout(() => {
+    functionWorker.terminate();
+    cb(timeout + 'ms time out');
+  }, timeout);
+  functionWorker.onmessage = msg => {
+    if (msg.data.type === 'over') {
+      cb(null, msg.data.value);
+      clearTimeout(timer);
+      functionWorker.terminate();
+    }
+    if (msg.data.type === 'error') {
+      console.error(msg.err);
+      cb(msg.err);
+      clearTimeout(timer);
+      functionWorker.terminate();
+    } else {
+      // console.log(msg.data);
+    }
+  };
+  functionWorker.postMessage(code);
+}
+
 /**
  * 验证函数表达式基础语法
  */
-export function validateFnExpression(expression) {
-  expression = expression.replace(/[\r\r\n ]/g, '');
-  expression = expression.replace(/([A-Z]+)(?=\()/g, 'test');
-  // expression = expression.replace(/\$((\w{8}(-\w{4}){3}-\w{12})|[0-9a-z]{24})\$/g, '1');
-  expression = expression.replace(/\$(.+?)\$/g, '1');
+export function validateFnExpression(expression, type = 'mdfunction') {
   try {
-    runCode(`function test() {return '-';}${expression}`);
+    expression = expression.replace(/\$(.+?)\$/g, '"1"');
+    if (type === 'mdfunction') {
+      expression = expression.replace(/[\r\r\n ]/g, '');
+      expression = expression.replace(/([A-Z]+)(?=\()/g, 'test');
+      runCode(`function test() {return '-';}${expression}`);
+    } else if (type === 'javascript') {
+      runCode(`function test() {${expression} }`);
+    }
     return true;
   } catch (err) {
     return false;
@@ -874,4 +957,88 @@ export function parseAdvancedSetting(setting) {
     allowsingle: setting.allowsingle === '1', // 子表允许单条添加
     batchcids: safeParseArray(setting.batchcids), // 子表从指定字段添加记录
   };
+}
+
+/**
+ * 对 controls 缺失做补齐
+ */
+
+export function completeControls(controls) {
+  // 不存在系统字段的话 补充系统字段
+  const sysIds = SYSTEM_CONTROLS.map(c => c.controlId);
+  if (!_.some(controls.map(c => _.includes(sysIds, c.controlId)))) {
+    controls = controls.concat(SYSTEM_CONTROLS);
+  }
+  return controls;
+}
+
+export function getNewRecordPageUrl({ appId, worksheetId, viewId }) {
+  return `${md.global.Config.WebUrl}app/${appId}/newrecord/${worksheetId}/${viewId}/`;
+}
+
+export function handleSortRows(rows, control, isAsc) {
+  const controlValueType = getControlValueSortType(control);
+  if (_.isUndefined(isAsc)) {
+    return _.sortBy(rows, 'addTime');
+  }
+  let newRows = _.sortBy(rows, row =>
+    controlValueType === 'NUMBER'
+      ? parseFloat(row[control.controlId])
+      : renderCellText({ ...control, value: row[control.controlId] }),
+  );
+  if (!isAsc) {
+    newRows = newRows.reverse();
+  }
+  return newRows;
+}
+
+export function isKeyBoardInputChar(value) {
+  return (
+    `1234567890-=!@#$%^&*()_+[];',./{}|:"<>?ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz`.indexOf(value) > -1
+  );
+}
+
+export function handleCopyControlText(control) {
+  let content;
+  try {
+    if (_.includes([WIDGETS_TO_API_TYPE_ENUM.SIGNATURE, WIDGETS_TO_API_TYPE_ENUM.SUB_LIST], control.type)) {
+      content = control.value;
+    } else if (control.type === WIDGETS_TO_API_TYPE_ENUM.ATTACHMENT) {
+      content = safeParse(control.value)
+        .map(c => `${c.originalFilename}${c.ext}(${c.previewUrl})`)
+        .join(',');
+    } else if (control.type === WIDGETS_TO_API_TYPE_ENUM.RELATION) {
+      content = safeParse(control.value)
+        .map(
+          c =>
+            `[${
+              {
+                1: _l('任务'),
+                2: _l('项目'),
+                3: _l('日程'),
+                4: _l('文件'),
+                5: _l('申请单'),
+                6: '',
+                7: _l('日程'),
+              }[c.type]
+            }]${c.name}(${c.link})`,
+        )
+        .join(',');
+    } else {
+      content = renderCellText(control);
+    }
+  } catch (err) {}
+  window.tempCopyForSheetView = content;
+  copy(content);
+}
+
+export function getScrollBarWidth() {
+  let width;
+  var scroll = document.createElement('div');
+  scroll.style = 'position: absolute; left: -10000px; top: -10000px; width: 100px; height: 100px; overflow: scroll;';
+  scroll.innerHTML = '<div style="width: 100px;height:200px"></div>';
+  document.body.appendChild(scroll);
+  width = scroll.offsetWidth - scroll.clientWidth;
+  document.body.removeChild(scroll);
+  return width || 10;
 }

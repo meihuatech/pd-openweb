@@ -1,10 +1,10 @@
 import React, { Component } from 'react';
 import cx from 'classnames';
 import PropTypes, { string } from 'prop-types';
-import 'selectize';
-import { Icon } from 'ming-ui';
+import '@mdfe/selectize';
+import { Icon, Tooltip } from 'ming-ui';
 import RelateBox from './RelateBox';
-
+import _ from 'lodash';
 export default class RelateFilter extends Component {
   static propTypes = {
     disabled: PropTypes.bool,
@@ -49,9 +49,13 @@ export default class RelateFilter extends Component {
     });
   };
 
-  renderName = (nameList, i, isParent) => {
+  renderName = (item, nameList, i, isParent) => {
     if (!nameList) {
-      return <span className="isWrong">{_l('该字段已删除')}</span>;
+      return (
+        <Tooltip text={<span>{_l('ID: %0', item.cid)}</span>} popupPlacement="bottom">
+          <span className="isWrong">{_l('该字段已删除')}</span>
+        </Tooltip>
+      );
     }
     return (
       <span>
@@ -95,11 +99,11 @@ export default class RelateFilter extends Component {
                 // 当前记录
                 if (item.rcid !== 'parent') {
                   let nameList = _.find(currentColumns, v => item.cid === v.controlId);
-                  return this.renderName(nameList, i);
+                  return this.renderName(item, nameList, i);
                 } else {
                   //主记录
                   let nameList = _.find(this.props.globalSheetControls, v => item.cid === v.controlId);
-                  return this.renderName(nameList, i, true);
+                  return this.renderName(item, nameList, i, true);
                 }
               })}
           <Icon icon={'expand_more'} className="Gray_9e moreIntro Font16" />

@@ -6,7 +6,7 @@ import { connect } from 'react-redux';
 import { ScrollView, RichText } from 'ming-ui';
 import Skeleton from 'src/router/Application/Skeleton';
 import * as actions from '../redux/actions';
-import { Absolute, BlackBtn, Hr } from '../components/Basics';
+import { Absolute, BlackBtn, Hr } from 'worksheet/components/Basics';
 import Logo from '../components/Logo';
 import EditableText from '../components/EditableText';
 import EditableButton from '../components/EditableButton';
@@ -16,6 +16,7 @@ import FormPreview from './FormPreview';
 import { themes } from '../enum';
 import { getDisabledControls, overridePos } from '../utils';
 import cx from 'classnames';
+import _ from 'lodash';
 
 const TopBar = styled.div(
   ({ color }) => `height: 10px; background: ${color}; opacity: .4; border-radius: 3px 3px 0 0;`,

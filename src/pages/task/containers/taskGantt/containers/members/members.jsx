@@ -1,11 +1,12 @@
 ﻿import React, { Component } from 'react';
 import { connect } from 'react-redux';
 import './members.less';
-import 'dialogSelectUser';
+import 'src/components/dialogSelectUser/dialogSelectUser';
 import config from '../../config/config';
 import { addMembers } from '../../redux/actions';
 import UserHead from 'src/pages/feed/components/userHead';
 import ajaxRequest from 'src/api/taskCenter';
+import _ from 'lodash';
 
 class Members extends Component {
   constructor(props) {

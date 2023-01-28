@@ -2,14 +2,24 @@
 import React from 'react';
 import ReactDom from 'react-dom';
 import './css/createCalendar.less';
-import 'mdBusinessCard';
-import 'quickSelectUser';
-var moment = require('moment');
-var ajaxRequest = require('src/api/calendar');
+import 'src/components/mdBusinessCard/mdBusinessCard';
+import 'src/components/quickSelectUser/quickSelectUser';
+import ajaxRequest from 'src/api/calendar';
 import timezone from './timezone';
 import SelectTimezone from './component/SelectTimezone';
 import RegExp from 'src/util/expression';
 import { htmlEncodeReg, htmlDecodeReg } from 'src/util';
+import doT from '@mdfe/dot';
+import taskHtml from './tpl/createCalendar.html';
+import 'src/components/mdDialog/dialog';
+import 'src/components/mdDatePicker/mdDatePicker';
+import '@mdfe/timepicker';
+import 'src/components/select/select';
+import 'src/components/textboxList/textboxList';
+import 'src/components/autoTextarea/autoTextarea';
+import '@mdfe/jquery-plupload';
+import createShare from 'src/components/createShare/createShare';
+import moment from 'moment';
 
 var CreateCalendar = function (opts) {
   var _this = this;
@@ -43,7 +53,6 @@ var CreateCalendar = function (opts) {
     },
     callback: null,
     createShare: true,
-    ajaxRequest: require('src/api/calendar'),
   };
 
   _this.settings = $.extend(defaults, opts);
@@ -81,53 +90,39 @@ $.extend(CreateCalendar.prototype, {
     var _this = this;
     var settings = this.settings;
 
-    require([
-      'mdDialog',
-      'mdDatePicker',
-      '@mdfe/timepicker',
-      'md.select',
-      'textboxList',
-      'autoTextarea',
-      'plupload',
-    ], function () {
-      // 阻止重复按键导致多个创建框的生成
-      if ($('#' + settings.frameid).length > 0) {
-        return;
-      }
+    // 阻止重复按键导致多个创建框的生成
+    if ($('#' + settings.frameid).length > 0) {
+      return;
+    }
 
-      // 创建弹出层
-      settings.dialog = $.DialogLayer({
-        dialogBoxID: settings.frameid,
-        className: 'createCalendar_container',
-        callback: function () {
-          // 每次删除所有名片层
-          $("[id^='messageDiv_']").remove();
-          // mdDatePicker 移除
-          $('#txtBeginDate, #txtEndDate, #txtOverDate').mdDatePicker('destroy');
+    // 创建弹出层
+    settings.dialog = $.DialogLayer({
+      dialogBoxID: settings.frameid,
+      className: 'createCalendar_container',
+      callback: function () {
+        // 每次删除所有名片层
+        $("[id^='messageDiv_']").remove();
+        // mdDatePicker 移除
+        $('#txtBeginDate, #txtEndDate, #txtOverDate').mdDatePicker('destroy');
+      },
+      container: {
+        header: _l('创建日程'),
+        yesText: '',
+        noText: '',
+        yesFn: function () {
+          return _this.send();
         },
-        container: {
-          header: _l('创建日程'),
-          yesText: '',
-          noText: '',
-          yesFn: function () {
-            return _this.send();
-          },
-        },
-        width: 570,
-        readyFn: function () {
-          $('#txtCalendarName').focus();
-        },
-        isSameClose: false,
-      });
-
-      // 加载模板
-      require(['dot', './tpl/createCalendar.html'], function (doT, taskHtml) {
-        settings.dialog.content(doT.template(taskHtml)(settings));
-
+      },
+      width: 570,
+      readyFn: function () {
         _this.eventInit();
         settings.dialog.dialogCenter();
-      });
+        $('#txtCalendarName').focus();
+      },
+      isSameClose: false,
     });
+
+    settings.dialog.content(doT.template(taskHtml)(Object.assign({}, settings, { moment })));
   },
 
   // 事件初始化
@@ -1276,7 +1271,7 @@ CreateCalendar.methods = {
       return false;
     }
 
-    settings.ajaxRequest
+    ajaxRequest
       .getUserBusyStatus({
         accountID: accountId,
         startDate: moment(start).toISOString(),
@@ -1466,26 +1461,23 @@ CreateCalendar.methods = {
 
   // 是否查看创建的日程
   yesSelCalendar: function (data) {
-    require(['createShare'], function (createShare) {
-      createShare.init({
-        linkURL: md.global.Config.WebUrl + 'apps/calendar/detail_' + data.calendarID,
-        content: '日程创建成功',
-        isCalendar: true,
-        calendarOpt: {
-          title: '分享日程',
-          openURL: md.global.Config.WebUrl + 'm/detail/calendar/',
-          isAdmin: true,
-          keyStatus: true,
-          name: data.name,
-          startTime: data.startDate,
-          endTime: data.endDate,
-          address: data.address,
-          shareID: data.calendarID,
-          recurTime: '',
-          token: data.token,
-          ajaxRequest: CreateCalendar.settings.ajaxRequest,
-        },
-      });
+    createShare({
+      linkURL: md.global.Config.WebUrl + 'apps/calendar/detail_' + data.calendarID,
+      content: '日程创建成功',
+      isCalendar: true,
+      calendarOpt: {
+        title: '分享日程',
+        openURL: md.global.Config.WebUrl + 'm/detail/calendar/',
+        isAdmin: true,
+        keyStatus: true,
+        name: data.name,
+        startTime: data.startDate,
+        endTime: data.endDate,
+        address: data.address,
+        shareID: data.calendarID,
+        recurTime: '',
+        token: data.token,
+      },
     });
   },
 
@@ -1654,9 +1646,6 @@ CreateCalendar.methods = {
           source.data.endDate = end;
           source.data.isRecur = isRecur;
           settings.dialog.closeDialog();
-          if (settings.createShare) {
-            CreateCalendar.methods.yesSelCalendar(source.data);
-          }
 
           if ($.isFunction(settings.callback)) {
             settings.callback(source.data);
@@ -1684,7 +1673,7 @@ CreateCalendar.methods = {
  * @param {string} opts.MemberArray[].fullname 日程成员名字
  * @return {object} 创建日程对象
  */
-exports.index = function (opts) {
+export default function (opts) {
   return new CreateCalendar(opts);
 };
 

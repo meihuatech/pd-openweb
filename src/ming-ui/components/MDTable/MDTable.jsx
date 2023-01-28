@@ -2,7 +2,7 @@ import React, { memo } from 'react';
 import PropTypes from 'prop-types';
 import cx from 'classnames';
 import Hammer from 'hammerjs';
-import uuid from 'uuid';
+import { v4 as uuidv4 } from 'uuid';
 import { autobind } from 'core-decorators';
 import { emitter } from 'worksheet/util';
 import DragMask from 'worksheet/common/DragMask';
@@ -11,6 +11,7 @@ import { VariableSizeGrid } from 'react-window';
 
 delete Hammer.defaults.cssProps.userSelect;
 import './style.less';
+import _ from 'lodash';
 
 const FIXED_ROW_HEIGHT = 34;
 const FOOTER_ROW_HEIGHT = 28;
@@ -78,7 +79,7 @@ export default class MDTable extends React.Component {
       scrollTop: 100,
       columnWidthChangeMaskVisible: false,
     };
-    this.mdtabldId = props.id || uuid.v4();
+    this.mdtabldId = props.id || uuidv4();
     this.scrollbarWidth = props.scrollbarWidth;
     this.scrollLeft = 0;
     this.scrollTop = 0;
@@ -398,6 +399,7 @@ export default class MDTable extends React.Component {
       showFooterRow,
       heightOffset,
       renderCell,
+      allowlink,
       renderFooterCell,
     } = this.props;
     const { fixedColumnCount } = this;
@@ -455,6 +457,7 @@ export default class MDTable extends React.Component {
               scrollTo: this.setScroll,
               tableScrollTop: this.scrollTop,
               gridHeight: gridHeight,
+              allowlink: allowlink,
             }}
           />
         )}
@@ -463,11 +466,11 @@ export default class MDTable extends React.Component {
   }
 
   @autobind
-  showColumnWidthChangeMask({ columnWidth, defaultLeft, callback }) {
+  showColumnWidthChangeMask({ columnWidth, defaultLeft, maskMinLeft, callback }) {
     this.setState({
       columnWidthChangeMaskVisible: true,
       maskLeft: defaultLeft,
-      maskMinLeft: defaultLeft - (columnWidth - 10),
+      maskMinLeft: maskMinLeft || defaultLeft - (columnWidth - 10),
       maskMaxLeft: window.innerWidth,
       maskOnChange: left => {
         this.setState({
@@ -484,6 +487,7 @@ export default class MDTable extends React.Component {
     const {
       loading,
       width,
+      allowlink,
       heightOffset,
       topFixed,
       scrollBarHoverShow,
@@ -562,7 +566,10 @@ export default class MDTable extends React.Component {
     ];
     return (
       <div
-        className={cx('mdTable', `id-${this.mdtabldId}-id`, className, { widthScroll: !!this.widthScroll })}
+        className={cx('mdTable', `id-${this.mdtabldId}-id`, className, {
+          widthScroll: !!this.widthScroll,
+          disableRowHoverBgColor: allowlink === '0',
+        })}
         ref={mdtable => (this.mdtable = mdtable)}
         style={
           responseHeight

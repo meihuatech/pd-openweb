@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import cx from 'classnames';
 import Config from '../config';
-import { mDTwofactorLogin } from 'src/api/login';
+import loginAjax from 'src/api/login';
 import { inputFocusFn, inputBlurFn } from '../util';
 import { getRequest } from 'src/util';
 import { setPssId } from 'src/util/pssId';
@@ -100,7 +100,7 @@ export default function Twofactor(props) {
   };
 
   const loginFn = () => {
-    mDTwofactorLogin({
+    loginAjax.mDTwofactorLogin({
       state,
       type,
       verifyCode,
@@ -163,6 +163,7 @@ export default function Twofactor(props) {
         className="mTop40 Font15 InlineBlock Hand backspaceT"
         onClick={() => {
           // 返回上一层
+          window.localStorage.removeItem('LoginCheckList');//避免自动登录过来的带LoginCheckList来回跳转
           window.history.back();
         }}
       >

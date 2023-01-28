@@ -1,3 +1,5 @@
+import moment from 'moment';
+import _ from 'lodash';
 export const FORM_ERROR_TYPE = {
   REQUIRED: 'REQUIRED',
   MOBILE_PHONE: 'MOBILE_PHONE',
@@ -17,6 +19,7 @@ export const FORM_ERROR_TYPE = {
   DATE_TIME_RANGE: 'DATE_TIME_RANGE',
   RULE_ERROR: 'RULE_ERROR',
   RULE_REQUIRED: 'RULE_REQUIRED',
+  OTHER_REQUIRED: 'OTHER_REQUIRED',
 };
 
 export const FORM_ERROR_TYPE_TEXT = {
@@ -33,6 +36,7 @@ export const FORM_ERROR_TYPE_TEXT = {
   PASSPORT: _l('不是有效的护照号码'),
   HK_PASSPORT: _l('不是有效的港澳通行证号码'),
   TW_PASSPORT: _l('不是有效的台湾通行证号码'),
+  OTHER_REQUIRED: _l('请填写其他'),
   UNIQUE: ({ controlName: label }) => {
     return `${_l('%0不允许重复', label)}`;
   },
@@ -100,14 +104,19 @@ export const FORM_ERROR_TYPE_TEXT = {
     if (max && stringSize > +max) return _l('最多输入%0个字', max);
   },
   CUSTOM: ({ advancedSetting }) => JSON.parse(advancedSetting.regex).err,
-  DATE_TIME_RANGE: (value, min, max) => {
+  DATE_TIME_RANGE: (value, min, max, isTime) => {
+    function computerValue(val) {
+      const mode = isTime ? 'HH:mm:ss' : 'YYYY-MM-DD HH:mm:ss';
+      return moment(val, mode);
+    }
     if (max === min) return _l('请填写%0', min);
     if (max && min) {
-      if (moment(value) > moment(max) || moment(value) < moment(min)) return _l('请填写%0 ~ %1范围内的时间', min, max);
+      if (computerValue(value) > computerValue(max) || computerValue(value) < computerValue(min))
+        return _l('请填写%0 ~ %1范围内的时间', min, max);
       return;
     }
-    if (min && moment(value) < moment(min)) return _l('时间不能早于%0', min);
-    if (max && moment(value) > moment(max)) return _l('时间不能晚于%0', max);
+    if (min && computerValue(value) < computerValue(min)) return _l('时间不能早于%0', min);
+    if (max && computerValue(value) > computerValue(max)) return _l('时间不能晚于%0', max);
   },
 };
 
@@ -120,6 +129,8 @@ export const FROM = {
   H5_ADD: 5,
   H5_EDIT: 6,
   WORKFLOW: 7, // 工作流
+  CUSTOM_BUTTON: 8, // 自定义动作
+  DRAFT: 21,
 };
 
 export const TIME_UNIT = {
@@ -131,4 +142,21 @@ export const TIME_UNIT = {
 };
 
 //非文本类控件
-export const UN_TEXT_TYPE = [9, 10, 11, 15, 16, 19, 23, 24, 26, 27, 28, 29, 34, 36];
+export const UN_TEXT_TYPE = [9, 10, 11, 15, 16, 19, 23, 24, 26, 27, 28, 29, 34, 35, 36, 45, 47, 48];
+
+// 系统字段
+export const SYSTEM_ENUM = [
+  'uaid',
+  'wfname',
+  'wfcuaids',
+  'wfcaid',
+  'wfctime',
+  'wfrtime',
+  'wfftime',
+  'wfstatus',
+  'rowid',
+  'ownerid',
+  'caid',
+  'ctime',
+  'utime',
+];

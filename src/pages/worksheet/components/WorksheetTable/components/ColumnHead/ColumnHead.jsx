@@ -4,19 +4,22 @@ import { autobind } from 'core-decorators';
 import { connect } from 'react-redux';
 import { bindActionCreators } from 'redux';
 import cx from 'classnames';
+import SheetContext from 'worksheet/common/Sheet/SheetContext';
 import { hideColumn, clearHiddenColumn, frozenColumn, sortByControl } from 'worksheet/redux/actions/sheetview';
-import Menu from 'ming-ui/components/Menu';
-import MenuItem from 'ming-ui/components/MenuItem';
+import { Menu, MenuItem, Dialog } from 'ming-ui';
 import { CONTROL_FILTER_WHITELIST } from 'worksheet/common/WorkSheetFilter/enum';
 import { redefineComplexControl } from 'worksheet/common/WorkSheetFilter/util';
 import { controlState } from 'src/components/newCustomFields/tools/utils';
 import BaseColumnHead from 'worksheet/components/BaseColumnHead';
-import { CONTROL_EDITABLE_BALCKLIST } from 'worksheet/constants/enum';
+import { CONTROL_EDITABLE_BLACKLIST } from 'worksheet/constants/enum';
 import { emitter, getSortData, fieldCanSort, getLRUWorksheetConfig, saveLRUWorksheetConfig } from 'worksheet/util';
 import { SYS } from 'src/pages/widgetConfig/config/widget.js';
+import { isOtherShowFeild } from 'src/pages/widgetConfig/util';
 import './ColumnHead.less';
+import _ from 'lodash';
 
 class ColumnHead extends Component {
+  static contextType = SheetContext;
   static propTypes = {
     rowIsSelected: PropTypes.bool,
     readonly: PropTypes.bool,
@@ -100,8 +103,13 @@ class ColumnHead extends Component {
   render() {
     const {
       className,
+      type = '',
+      worksheetId = '',
+      count,
       style,
       isLast,
+      allWorksheetIsSelected,
+      sheetSelectedRows = [],
       disabledFunctions = [],
       rowIsSelected,
       columnIndex,
@@ -111,19 +119,28 @@ class ColumnHead extends Component {
       clearHiddenColumn,
       onBatchEdit,
       canBatchEdit = true,
+      onShowFullValue = () => {},
     } = this.props;
+    const hideColumnFilter = _.get(this.context, 'config.hideColumnFilter');
     let control = { ...this.props.control };
+    const isShowOtherField = isOtherShowFeild(control);
     const itemType = this.getType(control);
-    const canSort = fieldCanSort(itemType);
+    const canSort = fieldCanSort(itemType, control);
     const canEdit =
-      !_.includes(CONTROL_EDITABLE_BALCKLIST, control.type) &&
+      !_.includes(CONTROL_EDITABLE_BLACKLIST, control.type) &&
       controlState(control).editable &&
       canBatchEdit &&
       !SYS.filter(o => o !== 'ownerid').includes(control.controlId); //系统字段(除了拥有者字段)，不可编辑
     const filterWhiteKeys = _.flatten(
       Object.keys(CONTROL_FILTER_WHITELIST).map(key => CONTROL_FILTER_WHITELIST[key].keys),
     );
-    const canFilter = _.includes(filterWhiteKeys, itemType) && !_.includes(disabledFunctions, 'filter');
+    let canFilter =
+      _.includes(filterWhiteKeys, itemType) && !_.includes(disabledFunctions, 'filter') && !window.hideColumnHeadFilter;
+    if (control.type === 30 && control.strDefault === '10') {
+      canFilter = false;
+    }
+    const maskData =
+      _.get(control, 'advancedSetting.datamask') === '1' && _.get(control, 'advancedSetting.isdecrypt') === '1';
     control = redefineComplexControl(control);
     return (
       <BaseColumnHead
@@ -144,6 +161,7 @@ class ColumnHead extends Component {
             onClickAway={closeMenu}
           >
             {canSort &&
+              !isShowOtherField &&
               getSortData(itemType, control).map(item => (
                 <MenuItem
                   key={item.value}
@@ -163,7 +181,21 @@ class ColumnHead extends Component {
                     alert(_l('预览模式下，不能操作'), 3);
                     return;
                   }
-                  onBatchEdit(control);
+                  const selectedLength = allWorksheetIsSelected
+                    ? count - sheetSelectedRows.length
+                    : sheetSelectedRows.length;
+                  if (selectedLength > 1000) {
+                    Dialog.confirm({
+                      title: (
+                        <span style={{ fontWeight: 500, lineHeight: '1.5em' }}>
+                          {_l('最大支持批量执行1000行记录，是否只选中并执行前1000行数据？')}
+                        </span>
+                      ),
+                      onOk: () => onBatchEdit(control),
+                    });
+                  } else {
+                    onBatchEdit(control);
+                  }
                   closeMenu();
                 }}
               >
@@ -171,15 +203,21 @@ class ColumnHead extends Component {
                 {_l('编辑选中记录')}
               </MenuItem>
             )}
-            {canFilter && !rowIsSelected && (
+            {canFilter && !rowIsSelected && !isShowOtherField && !hideColumnFilter && (
               <MenuItem
                 onClick={() => {
-                  emitter.emit('FILTER_ADD_FROM_COLUMNHEAD', control);
+                  emitter.emit('FILTER_ADD_FROM_COLUMNHEAD' + worksheetId + type, control);
                   closeMenu();
                 }}
               >
                 <i className="icon icon-worksheet_filter"></i>
                 {_l('筛选')}
+              </MenuItem>
+            )}
+            {maskData && (
+              <MenuItem onClick={onShowFullValue}>
+                <i className="icon icon-eye_off"></i>
+                {_l('解密')}
               </MenuItem>
             )}
             {(canSort || (canFilter && !rowIsSelected) || (canEdit && rowIsSelected)) && <hr />}
@@ -193,7 +231,7 @@ class ColumnHead extends Component {
                 closeMenu();
               }}
             >
-              <i className="icon icon-workflow_hide"></i>
+              <i className="icon icon-visibility_off"></i>
               {_l('隐藏')}
             </MenuItem>
             {!!sheetHiddenColumns.length && (
@@ -243,6 +281,8 @@ class ColumnHead extends Component {
 const mapStateToProps = state => ({
   sheetHiddenColumns: state.sheet.sheetview.sheetViewConfig.sheetHiddenColumns,
   sortControls: state.sheet.sheetview.sheetFetchParams.sortControls,
+  allWorksheetIsSelected: state.sheet.sheetview.sheetViewConfig.allWorksheetIsSelected,
+  sheetSelectedRows: state.sheet.sheetview.sheetViewConfig.sheetSelectedRows,
 });
 
 const mapDispatchToProps = dispatch =>

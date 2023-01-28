@@ -6,6 +6,7 @@ import sheetAjax from 'src/api/worksheet';
 import Menu from 'ming-ui/components/Menu';
 import MenuItem from 'ming-ui/components/MenuItem';
 import './ColumnVisibleControl.less';
+import _ from 'lodash';
 
 const systemControl = [
   {
@@ -15,7 +16,7 @@ const systemControl = [
   },
   {
     controlId: 'caid',
-    controlName: _l('创建人'),
+    controlName: _l('创建者'),
     type: 26,
   },
   {

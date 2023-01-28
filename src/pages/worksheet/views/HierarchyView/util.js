@@ -7,7 +7,8 @@ import {
 } from '../util';
 import { SYSTEM_CONTROLS } from 'worksheet/constants/enum';
 import { getAdvanceSetting } from 'src/util';
-import { renderCellText } from 'worksheet/components/CellControls';
+import renderCellText from 'src/pages/worksheet/components/CellControls/renderText';
+import _ from 'lodash';
 
 // 获取svg的相关位置数据
 export const getPosition = ($parent, $cur, scale = 1) => {
@@ -70,6 +71,9 @@ export const dealHierarchyData = (
     value: item[key],
   }));
   items.push(...displayItems);
+  let formData = worksheetControls.map(o => {
+    return { ...o, value: item[o.controlId] };
+  });
   return {
     rowId,
     item,
@@ -78,6 +82,7 @@ export const dealHierarchyData = (
     allowDelete,
     ...getRecordAttachments(item[coverCid]),
     coverData: { ...(worksheetControls.find(it => it.controlId === coverCid) || {}), value: item[coverCid] },
+    formData,
     abstractValue: abstract
       ? renderCellText({
           ...(worksheetControls.find(it => it.controlId === abstract) || {}),
@@ -112,6 +117,6 @@ export const hierarchyViewCanSelectFields = ({ controls, worksheetId }) => {
     }),
   });
 };
-export const setItem = (key, value) => localStorage.setItem(key, JSON.stringify(value));
+export const setItem = (key, value) => safeLocalStorageSetItem(key, JSON.stringify(value));
 export const getItem = key => JSON.parse(localStorage.getItem(key));
 export const dropItem = key => localStorage.removeItem(key);

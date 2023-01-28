@@ -3,15 +3,16 @@ import ReactDom from 'react-dom';
 import Score from 'ming-ui/components/Score';
 import ajaxRequest from 'src/api/taskCenter';
 import { errorMessage, taskStatusDialog, getCurrentTime, formatTaskTime, formatStatus, checkIsProject, returnCustonValue } from './utils';
-import 'mdDialog';
+import 'src/components/mdDialog/dialog';
 import Store from 'redux/configureStore';
-import doT from 'dot';
+import doT from '@mdfe/dot';
 import { addTask } from '../redux/actions';
 import singleFolder from '../containers/taskNavigation/tpl/singleFolder.html';
 import singleFolderComm from '../containers/taskNavigation/tpl/singleFolderComm.html';
 import { navigateTo } from 'src/router/navigateTo';
 import DeleteReconfirm from 'ming-ui/components/DeleteReconfirm';
 import { htmlEncodeReg } from 'src/util';
+import moment from 'moment';
 
 // 加载loading
 export const listLoadingContent = (pageIndex) => {

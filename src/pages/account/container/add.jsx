@@ -24,7 +24,7 @@ export default class Add extends React.Component {
   };
 
   doAddProjectCode = (res, callback) => {
-    const { registerData = {}, setDataFn } = this.props;
+    const { registerData = {}, onChangeData } = this.props;
     const { regcode = '' } = registerData;
     this.setState({
       loading: true,
@@ -43,7 +43,7 @@ export default class Add extends React.Component {
           loading: false,
         });
         if (data.joinProjectResult === 1) {
-          setDataFn({
+          onChangeData({
             ...registerData,
             projectId: data.userCard.user.projectId,
             userCard: data.userCard,
@@ -60,19 +60,27 @@ export default class Add extends React.Component {
           });
           let str = _l('操作失败');
           if (data.joinProjectResult === 2) {
-            str = _l('请等待管理员审批');
+            str = _l('您已提交申请，请耐心等待管理员审批！');
           } else if (data.joinProjectResult === 3) {
-            str = _l('该用户已存在组织中');
+            str = _l('您已是该组织成员');
           } else if (data.joinProjectResult === 4) {
-            str = _l('该组织ID不存在');
+            str = _l('该组织门牌号不存在');
           } else if (data.joinProjectResult === 5) {
             str = _l('你加入的组织用户额度不足，请联系该组织管理员');
           } else if (data.joinProjectResult === 6) {
             str = _l('验证码错误');
           } else if (data.joinProjectResult === 7) {
-            str = _l('该组织ID不允许被搜索，请联系该组织管理员');
+            str = _l('该组织未开启搜索加入，请联系组织管理员');
+          } else if (data.joinProjectResult === 12) {
+            str = _l('您提交的加入申请未被通过');
           }
-          alert(str, 3);
+          if (data.joinProjectResult === 3) {
+            alert(str, 1, 2000, function () {
+              location.href = '/personal?type=enterprise';
+            });
+          } else {
+            alert(str, 3);
+          }
         }
       },
       () => {},
@@ -92,7 +100,7 @@ export default class Add extends React.Component {
   };
 
   renderCon = () => {
-    const { changeStep, step, registerData, setDataFn } = this.props;
+    const { changeStep, step, registerData, onChangeData } = this.props;
     const { regcode } = registerData;
     const { warnningText } = this.state;
     return (
@@ -108,7 +116,7 @@ export default class Add extends React.Component {
               onFocus={this.inputOnFocus}
               onChange={e => {
                 $('.errorDiv').removeClass('errorDiv');
-                setDataFn({
+                onChangeData({
                   ...registerData,
                   regcode: e.target.value.trim(),
                 });
@@ -121,7 +129,7 @@ export default class Add extends React.Component {
                 $(this.regcode).focus();
               }}
             >
-              {_l('请填写组织ID')}
+              {_l('示例：MD1314')}
             </div>
             {!!warnningText && <div className={cx('warnningTip Hidden')}>{warnningText}</div>}
           </div>
@@ -131,7 +139,7 @@ export default class Add extends React.Component {
   };
 
   render() {
-    const { changeStep, step, registerData = {}, setDataFn } = this.props;
+    const { changeStep, step, registerData = {}, onChangeData } = this.props;
     const { regcode = '' } = registerData;
     return (
       <React.Fragment>
@@ -147,8 +155,8 @@ export default class Add extends React.Component {
             {_l('返回')}
           </span>
         )}
-        <div className="title mTop24 Font20">{_l('请输入组织ID')}</div>
-        <p className="mTop10 Gray_9e Font15">{_l('组织ID可以通过管理员获取')}</p>
+        <div className="title mTop24 Font20">{_l('请填写组织门牌号')}</div>
+        <p className="mTop10 Gray_9e Font15">{_l('组织门牌号可以通过管理员获取')}</p>
         {this.renderCon()}
         <span
           className="btnForRegister Hand mTop40"
@@ -157,7 +165,7 @@ export default class Add extends React.Component {
               return;
             }
             if (!regcode) {
-              this.setWarnningText(_l('请输入组织ID'));
+              this.setWarnningText(_l('请填写组织门牌号'));
               return;
             }
             let callback = (res = {}) => {

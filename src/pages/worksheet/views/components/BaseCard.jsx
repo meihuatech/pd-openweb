@@ -1,10 +1,13 @@
 import React, { memo, useRef, useState } from 'react';
 import styled from 'styled-components';
-import CellControl, { renderCellText } from 'worksheet/components/CellControls';
+import CellControl from 'worksheet/components/CellControls';
+import renderCellText from 'worksheet/components/CellControls/renderText';
+import Switch from 'worksheet/components/CellControls/Switch';
 import RecordOperate from 'worksheet/components/RecordOperate';
 import { Checkbox } from 'ming-ui';
 import update from 'immutability-helper';
 import cx from 'classnames';
+import _ from 'lodash';
 import { Icon } from 'src';
 import { FlexCenter, Text } from 'worksheet/styled';
 import { checkCellIsEmpty } from 'src/pages/worksheet/util';
@@ -39,15 +42,29 @@ const RecordItemWrap = styled.div`
     &.isGalleryView {
       white-space: nowrap;
     }
+    &.maskHoverTheme {
+      cursor: pointer;
+      &:hover {
+        color: #1d5786;
+        .i.icon-eye_off {
+          color: #9e9e9e !important;
+        }
+      }
+    }
   }
   .abstractWrap {
-    padding: 10px 14px;
-    max-height: 72px;
+    margin: 10px 14px 3px;
+    max-height: 59px;
     overflow: hidden;
     color: #757575;
     text-overflow: ellipsis;
-    word-break: break-all;
     white-space: break-spaces;
+    word-break: break-all;
+    display: -webkit-box;
+    /*! autoprefixer: off */
+    -webkit-line-clamp: 3 !important;
+    -webkit-box-orient: vertical;
+    /* autoprefixer: on */
     &.galleryViewAbstract {
       height: 72px;
     }
@@ -102,6 +119,14 @@ const RecordItemWrap = styled.div`
     right: 0;
     visibility: hidden;
   }
+  .hoverShow {
+    visibility: hidden;
+  }
+  &:hover {
+    .hoverShow {
+      visibility: visible;
+    }
+  }
 `;
 
 const RecordFieldsWrap = styled(FlexCenter)`
@@ -149,15 +174,31 @@ const BaseCard = props => {
     currentView,
     viewParaOfRecord,
     allowCopy,
+    isCharge,
     sheetSwitchPermit = [],
     editTitle,
     onUpdate = noop,
     onDelete = noop,
     onCopySuccess = noop,
   } = props;
-  let { fields = [], rowId, coverImage, allowEdit, allowDelete, abstractValue } = data;
+  let { rowId, coverImage, allowEdit, allowDelete, abstractValue } = data;
+  const isShowWorkflowSys = isOpenPermit(permitList.sysControlSwitch, sheetSwitchPermit);
+  const fields = data.fields
+    ? !isShowWorkflowSys && _.isArray(data.fields)
+      ? data.fields.filter(
+          it =>
+            !_.includes(
+              ['wfname', 'wfstatus', 'wfcuaids', 'wfrtime', 'wfftime', 'wfdtime', 'wfcaid', 'wfctime', 'wfcotime'],
+              it.controlId,
+            ),
+        )
+      : data.fields
+    : [];
   const { path = [] } = stateData;
+  const titleIndex = findIndex(fields, item => item.attribute === 1);
+  const titleField = fields[titleIndex] || {};
   const para = getCardDisplayPara({ currentView, data: stateData });
+  const [forceShowFullValue, setForceShowFullValue] = useState(_.get(titleField, 'advancedSetting.datamask') !== '1');
   let viewId, worksheetId;
   const { appId, projectId, viewType, viewControls, childType, showControlName } = para;
   if (viewParaOfRecord) {
@@ -177,9 +218,12 @@ const BaseCard = props => {
   const isGalleryView = String(viewType) === '3';
   abstractValue = abstract ? abstractValue : '';
 
-  const titleIndex = findIndex(fields, item => item.attribute === 1);
-  const titleField = fields[titleIndex] || {};
   const otherFields = update(fields, { $splice: [[titleIndex, 1]] });
+  const titleMasked =
+    ((isCharge || _.get(titleField, 'advancedSetting.isdecrypt') === '1') &&
+      titleField.type === 2 &&
+      titleField.enumDefault === 2) ||
+    _.includes([6, 8, 3, 5, 7], titleField.type);
 
   const isShowControlName = () => {
     if (String(viewType) === '2' && String(childType) === '2') {
@@ -207,7 +251,8 @@ const BaseCard = props => {
   };
 
   const renderTitleControl = () => {
-    const content = renderCellText(titleField) || _l('未命名');
+    const titleValue = renderCellText(titleField, { noMask: forceShowFullValue });
+    const content = titleValue || _l('未命名');
     if (props.renderTitle) return props.renderTitle({ content, titleField });
     return (
       <div
@@ -215,36 +260,43 @@ const BaseCard = props => {
           haveOtherField: !isEmpty(otherFields),
           overflow_ellipsis: titleField.type === 2,
           isGalleryView,
+          maskHoverTheme: titleMasked && !forceShowFullValue,
         })}
         title={content}
+        onClick={e => {
+          if (!titleMasked) return;
+          e.stopPropagation();
+          setForceShowFullValue(true);
+        }}
       >
         {content}
+        {titleMasked && titleValue && !forceShowFullValue && (
+          <i
+            className="icon icon-eye_off Hand maskData Font16 Gray_bd mLeft4 mTop4 hoverShow"
+            style={{ verticalAlign: 'middle' }}
+          />
+        )}
       </div>
     );
   };
   const renderContent = ({ item, content }) => {
-    const displayContent = !checkCellIsEmpty(item.value) ? (
-      <div className="contentWrap">{content}</div>
-    ) : (
-      <div className="emptyHolder"> </div>
-    );
+    let currentContent = content;
 
     if (item.type === 36) {
       const canEdit =
         isOpenPermit(permitList.quickSwitch, sheetSwitchPermit, viewId) && allowEdit && controlState(item).editable;
-      return (
+      currentContent = (
         <div onClick={e => e.stopPropagation()}>
-          <Checkbox
-            disabled={!canEdit}
-            text={item.controlName}
-            checked={Number(item.value || 0)}
-            onClick={checked => {
-              props.onChange(item, checked ? '0' : '1');
-            }}
-          />
+          <Switch cell={item} from={4} editable={canEdit} updateCell={({ value }) => props.onChange(item, value)} />
         </div>
       );
     }
+
+    const displayContent = !checkCellIsEmpty(item.value) ? (
+      <div className="contentWrap">{currentContent}</div>
+    ) : (
+      <div className="emptyHolder"> </div>
+    );
 
     if (isShowControlName() && item.controlName) {
       return (
@@ -258,12 +310,11 @@ const BaseCard = props => {
   };
 
   const renderAbstract = () => {
-    if (isGalleryView && abstract) {
-      return (
-        <div className="abstractWrap galleryViewAbstract">{abstractValue || <div className="emptyHolder"></div>}</div>
-      );
-    }
-    return abstractValue && <div className="abstractWrap">{abstractValue}</div>;
+    return abstract ? (
+      <div className={cx('abstractWrap', { galleryViewAbstract: isGalleryView })}>
+        {abstractValue || <div className="emptyHolder"></div>}
+      </div>
+    ) : null;
   };
 
   const getPopAlign = () => {
@@ -286,6 +337,7 @@ const BaseCard = props => {
     };
   };
   const isMobile = browserIsMobile();
+  const hideOperate = isMobile || _.get(window, 'shareState.isPublicView');
   return (
     <RecordItemWrap
       ref={$ref}
@@ -296,29 +348,36 @@ const BaseCard = props => {
       {/* // 封面图片左、上放置 */}
       {includes(['1', '2'], coverposition) && <CardCoverImage {...props} viewId={viewId} />}
       <div className="fieldContentWrap">
-        {renderTitleControl()}
+        {renderTitleControl({ forceShowFullValue })}
         {renderAbstract()}
         {!_.isEmpty(otherFields) && (
           <RecordFieldsWrap hasCover={!!coverImage}>
-            {otherFields.map(item => {
-              if (isListRelate(item)) return null;
-              if (checkCellIsEmpty(item.value) && !isGalleryView) return null;
-              const content = (
-                <CellControl from={4} cell={item} sheetSwitchPermit={sheetSwitchPermit} viewId={viewId} />
-              );
-              // 画廊视图或有内容控件则渲染
-              return (
-                <div key={item.controlId} className={'fieldItem'}>
-                  {renderContent({ content, item })}
-                </div>
-              );
-            })}
+            {otherFields
+              // .filter(o => controlState(o).visible)//排除无查看权限的字段
+              .map(item => {
+                if (checkCellIsEmpty(item.value) && !isGalleryView) return null;
+                const content = (
+                  <CellControl
+                    from={4}
+                    cell={item}
+                    sheetSwitchPermit={sheetSwitchPermit}
+                    viewId={viewId}
+                    isCharge={isCharge}
+                  />
+                );
+                // 画廊视图或有内容控件则渲染
+                return (
+                  <div key={item.controlId} className={'fieldItem'} style={item.type === 6 ? { width: '100%' } : {}}>
+                    {renderContent({ content, item })}
+                  </div>
+                );
+              })}
           </RecordFieldsWrap>
         )}
       </div>
       {/* // 封面图片右放置 */}
       {includes(['0'], coverposition) && <CardCoverImage {...props} viewId={viewId} />}
-      {!isMobile && (
+      {!hideOperate && (
         <div className="recordOperateWrap" onClick={e => e.stopPropagation()}>
           {isHaveRecordOperate() ? (
             <RecordOperate

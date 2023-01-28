@@ -2,8 +2,9 @@ import React from 'react';
 import PropTypes from 'prop-types';
 import cx from 'classnames';
 import { autobind } from 'core-decorators';
-import RecordCardListDialog from 'src/components/recordCardListDialog';
 import { getTitleTextFromControls } from 'src/components/newCustomFields/tools/utils';
+import { FILTER_CONDITION_TYPE } from '../../enum';
+import _ from 'lodash';
 
 function safeParse(str) {
   try {
@@ -19,20 +20,25 @@ export default class RelateRecord extends React.Component {
     disabled: PropTypes.bool,
     onChange: PropTypes.func,
     control: PropTypes.shape({}),
-    originValues: PropTypes.arrayOf(PropTypes.string),
+    fullValues: PropTypes.arrayOf(PropTypes.string),
   };
 
   static defaultProps = {
-    originValues: [],
+    fullValues: [],
   };
 
   constructor(props) {
     super(props);
-    let { originValues = [] } = props;
+    let { fullValues = [] } = props;
     this.state = {
-      records: _.map(originValues, r => safeParse(r)),
+      records: _.map(fullValues, r => safeParse(r)),
       selectRecordVisible: false,
     };
+  }
+
+  get selectSingle() {
+    const { type, control = {} } = this.props;
+    return control.enumDefault === 1 && _.includes([FILTER_CONDITION_TYPE.ARREQ, FILTER_CONDITION_TYPE.ARRNE], type);
   }
 
   @autobind
@@ -40,10 +46,14 @@ export default class RelateRecord extends React.Component {
     const { control, onChange } = this.props;
     const { records } = this.state;
     const { relationControls } = control;
-    const newRecords = records.filter(r => !_.find(selectedRecords, sr => r.id === sr.rowid)).concat(selectedRecords.map(sr => ({
-      name: getTitleTextFromControls(relationControls, sr),
-      id: sr.rowid,
-    })));
+    const newRecords = (
+      this.selectSingle ? [] : records.filter(r => !_.find(selectedRecords, sr => r.id === sr.rowid))
+    ).concat(
+      selectedRecords.map(sr => ({
+        name: getTitleTextFromControls(relationControls, sr),
+        id: sr.rowid,
+      })),
+    );
     this.setState({
       records: newRecords,
     });
@@ -62,35 +72,65 @@ export default class RelateRecord extends React.Component {
   }
 
   render() {
-    const { control, disabled } = this.props;
+    const { type, control, disabled } = this.props;
     const { records, selectRecordVisible } = this.state;
-    return (<div className="worksheetFilterRelateRecordCondition">
-      <div className={cx('recordsCon', { disabled })} onClick={() => (this.setState({ selectRecordVisible: true }))}>
-        {records.length ? records.map((record, index) => <div className="recordItem" key={index}>
-          <i className="icon icon-link-worksheet"></i>
-          <span className="recordname">
-            {record.name}
-          </span>
-          <span className="remove" onClick={(e) => { e.stopPropagation(); this.removeRecord(record); }}>
-            <i className="icon icon-delete"></i>
-          </span>
-        </div>) : <span className="placeholder">{_l('请选择')}</span>}
-        {selectRecordVisible && (
-          <RecordCardListDialog
-            allowNewRecord={false}
-            multiple
-            coverCid={control.coverCid}
-            filterRowIds={records.map(r => r.id)}
-            showControls={control.showControls}
-            appId={control.appId}
-            viewId={control.viewId}
-            relateSheetId={control.dataSource}
-            visible={true}
-            onClose={() => this.setState({ selectRecordVisible: false })}
-            onOk={this.addRecord}
-          />
-        )}
+    return (
+      <div className="worksheetFilterRelateRecordCondition">
+        <div
+          className={cx('recordsCon', { disabled })}
+          onClick={() => {
+            import('src/components/recordCardListDialog').then(({ selectRecord }) => {
+              selectRecord({
+                allowNewRecord: false,
+                multiple: !this.selectSingle,
+                coverCid: control.coverCid,
+                filterRowIds: records.map(r => r.id),
+                showControls: control.showControls,
+                appId: control.appId,
+                viewId: control.viewId,
+                relateSheetId: control.dataSource,
+                visible: true,
+                onOk: this.addRecord,
+              });
+            });
+          }}
+        >
+          {records.length ? (
+            records.map((record, index) => (
+              <div className="recordItem" key={index}>
+                <i className="icon icon-link-worksheet"></i>
+                <span className="recordname">{record.name}</span>
+                <span
+                  className="remove"
+                  onClick={e => {
+                    e.stopPropagation();
+                    this.removeRecord(record);
+                  }}
+                >
+                  <i className="icon icon-delete"></i>
+                </span>
+              </div>
+            ))
+          ) : (
+            <span className="placeholder">{_l('请选择')}</span>
+          )}
+          {/* {selectRecordVisible && (
+            <RecordCardListDialog
+              allowNewRecord={false}
+              multiple={!this.selectSingle}
+              coverCid={control.coverCid}
+              filterRowIds={records.map(r => r.id)}
+              showControls={control.showControls}
+              appId={control.appId}
+              viewId={control.viewId}
+              relateSheetId={control.dataSource}
+              visible={true}
+              onClose={() => this.setState({ selectRecordVisible: false })}
+              onOk={this.addRecord}
+            />
+          )} */}
+        </div>
       </div>
-    </div>);
+    );
   }
 }

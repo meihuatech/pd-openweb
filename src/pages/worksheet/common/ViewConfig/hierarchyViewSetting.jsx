@@ -3,7 +3,7 @@ import cx from 'classnames';
 import styled from 'styled-components';
 import { Menu, Dropdown } from 'antd';
 import { LoadDiv } from 'ming-ui';
-import { getWorksheetInfo } from 'src/api/worksheet';
+import worksheetAjax from 'src/api/worksheet';
 import VerifyDel from 'src/pages/worksheet/views/components/VerifyDel';
 import { useSetState } from 'react-use';
 import CardDisplay from './CardDisplay';
@@ -12,6 +12,7 @@ import Abstract from './components/Abstract';
 import CoverSetting from './components/CoverSettingCon';
 import DisplayControl from './components/DisplayControl';
 import { updateViewAdvancedSetting } from './util';
+import _ from 'lodash';
 
 const EmptyHint = styled.div`
   margin: -6px 0 0 20px;
@@ -158,7 +159,7 @@ const HierarchyViewSettingWrap = styled.div`
 
 export default function HierarchyViewSetting(props) {
   const { view, currentSheetInfo, updateCurrentView, appId, filteredColumns } = props;
-  const { viewControls = [], childType, advancedSetting } = view;
+  const { viewControls = [], childType, advancedSetting, layersName } = view;
 
   const [{ activeIndex, delIndex }, setSetting] = useSetState({
     activeIndex: -1,
@@ -190,7 +191,7 @@ export default function HierarchyViewSetting(props) {
     const { worksheetId = '' } = _.last(viewControls) || {};
     if (controlLoading) return;
     setControls({ controlLoading: true });
-    getWorksheetInfo({ worksheetId, getTemplate: true })
+    worksheetAjax.getWorksheetInfo({ worksheetId, getTemplate: true })
       .then(data => {
         setControls({
           availableControls: getSelectableControls(data),
@@ -202,7 +203,7 @@ export default function HierarchyViewSetting(props) {
   };
   const addViewControl = item => {
     const existSheet = viewControls.map(({ worksheetId }) => worksheetId); // 可选控件为关联表且关联他表
-    getWorksheetInfo({ worksheetId: item.dataSource, getTemplate: true }).then(data => {
+    worksheetAjax.getWorksheetInfo({ worksheetId: item.dataSource, getTemplate: true }).then(data => {
       setControls({
         availableControls: getSelectableControls(data, existSheet),
       });
@@ -227,20 +228,25 @@ export default function HierarchyViewSetting(props) {
             worksheetName: currentSheetInfo.name,
           },
         ],
-        editAttrs: ['viewControls'],
+        layersName: [currentSheetInfo.name],
+        editAttrs: ['viewControls', 'layersName'],
       });
       setControls({
         availableControls: getSelectableControls(currentSheetInfo),
       });
     } else {
-      handleChange({ viewControls: viewControls.slice(0, index), editAttrs: ['viewControls'] });
+      handleChange({
+        viewControls: viewControls.slice(0, index),
+        layersName: layersName.slice(0, index),
+        editAttrs: ['viewControls', 'layersName'],
+      });
     }
   };
 
   const renderRelate = () => {
     if (controlLoading) return <LoadDiv />;
     return availableControls.length > 0 ? (
-      <Menu>
+      <Menu style={{ maxHeight: 300, overflowY: 'auto' }}>
         {availableControls.map(item => {
           const { controlId, controlName } = item;
           return (
@@ -365,7 +371,9 @@ export default function HierarchyViewSetting(props) {
             <div className={cx('display Hand', { borderBottomNone: visible })} onClick={() => switchActive(index)}>
               <div className="info">
                 <i className="icon-link2 Gray_9e Font18"></i>
-                <div className="controlName overflow_ellipsis Font14 Bold">{item.controlName}</div>
+                <div className="controlName overflow_ellipsis Font14 Bold">
+                  {item.controlName || item.worksheetName}
+                </div>
                 <div className="sheetInfo Gray_9e overflow_ellipsis">{_l('( 工作表: %0 )', item.worksheetName)}</div>
               </div>
               <div className="handle">

@@ -1,7 +1,7 @@
 import discussionAjax from 'src/api/discussion';
 import worksheetAjax from 'src/api/worksheet';
 
-export const getSheetDiscussion = ({worksheetId, rowId, pageIndex}, callback) => (dispatch, getState) => {
+export const getSheetDiscussion = ({worksheetId, rowId, pageIndex, entityType}, callback) => (dispatch, getState) => {
   const sourceType = rowId ? 8 : 7;
   const sourceId = rowId ? `${worksheetId}|${rowId}` : worksheetId;
   discussionAjax.getDiscussions({
@@ -10,6 +10,7 @@ export const getSheetDiscussion = ({worksheetId, rowId, pageIndex}, callback) =>
     pageIndex,
     pageSize: 10,
     isFocus: false,
+    entityType,
   }).then(result => {
     if (pageIndex === 1) {
       dispatch({ type: 'MOBILE_SET_SHEET_DISCUSSION', data: result.data });
@@ -21,6 +22,10 @@ export const getSheetDiscussion = ({worksheetId, rowId, pageIndex}, callback) =>
     }
   });
 };
+
+export const unshiftSheetDiscussion = data => (dispatch, getState) => {
+  dispatch({ type: 'MOBILE_UNSHIFT_SHEET_DISCUSSION', data });
+}
 
 export const removeSheetDiscussion = (discussionId, rowId) => (dispatch, getState) => {
   const { sheetDiscussions } = getState().mobile;
@@ -76,16 +81,4 @@ export const emptySheetLogs = () => {
     type: 'MOBILE_SET_SHEET_LOG',
     data: [],
   };
-}
-
-export const getMobileDiscussionCount = ({ worksheetId, rowId }) => (dispatch, getState) => {
-  discussionAjax.getDiscussionsCount({
-    sourceId: worksheetId + '|' + rowId,
-    sourceType: 8,
-  }).then(res => {
-    dispatch({
-      type:'MOBILE_SET_DISCUSSION_COUNT',
-      data:res.data || 0
-    })
-  })
 }

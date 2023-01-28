@@ -4,7 +4,8 @@ import PropTypes from 'prop-types';
 import RecordInfoContext from '../RecordInfoContext';
 import CustomButtons from './CustomButtons';
 import MoreMenu from './MoreMenu';
-import { browserIsMobile } from 'src/util';
+import { emitter } from 'worksheet/util';
+import _ from 'lodash';
 
 // TODO 更新记录
 
@@ -33,7 +34,7 @@ export default class Operates extends Component {
     recordinfo: PropTypes.shape({}),
     sideVisible: PropTypes.bool,
     sheetSwitchPermit: PropTypes.arrayOf(PropTypes.shape({})),
-    registeRefreshEvents: PropTypes.func,
+    addRefreshEvents: PropTypes.func,
     reloadRecord: PropTypes.func,
     hideRecordInfo: PropTypes.func,
     onUpdate: PropTypes.func,
@@ -48,12 +49,13 @@ export default class Operates extends Component {
 
   componentDidMount() {
     this.loadBtns();
-    this.props.registeRefreshEvents('loadcustombtns', () => {
+    this.props.addRefreshEvents('loadcustombtns', () => {
       setTimeout(() => {
         this.setState({ btnDisable: {} });
       }, 500);
       this.loadBtns();
     });
+    emitter.addListener('WINDOW_RESIZE', this.setButtonShowNum);
   }
 
   componentWillReceiveProps(nextProps) {
@@ -67,6 +69,10 @@ export default class Operates extends Component {
     if (prevProps.sideVisible !== this.props.sideVisible) {
       this.setButtonShowNum();
     }
+  }
+
+  componentWillUnmount() {
+    emitter.removeListener('WINDOW_RESIZE', this.setButtonShowNum);
   }
 
   customButtonsCon = React.createRef();
@@ -83,6 +89,7 @@ export default class Operates extends Component {
     );
   }
 
+  @autobind
   setButtonShowNum() {
     if (!this.customButtonsCon.current) {
       return;
@@ -164,6 +171,7 @@ export default class Operates extends Component {
           onUpdate={onUpdate}
           onDelete={onDelete}
           handleAddSheetRow={handleAddSheetRow}
+          hideRecordInfo={hideRecordInfo}
         />
       </React.Fragment>
     );

@@ -1,48 +1,329 @@
-import React, { useRef } from 'react';
+import React, { Fragment, useRef, useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import cx from 'classnames';
-import { Modal, WingBlank, Button } from 'antd-mobile';
-import { ScrollView } from 'ming-ui';
+import styled from 'styled-components';
+import { Flex, Modal, WingBlank, Button, ActionSheet } from 'antd-mobile';
+import { ScrollView, LoadDiv } from 'ming-ui';
+import { removeFromLocal } from 'worksheet/util';
 import NewRecordContent from './NewRecordContent';
+import AdvancedSettingHandler from './AdvancedSettingHandler';
+import TouchHandler from 'mobile/components/TouchHandler';
+import MobileDraft from 'src/pages/Mobile/MobileDraft';
 
-export default function NewRecord(props) {
-  const { visible, className, showFillNext, hideNewRecord, ...rest } = props;
+const ModalWrap = styled(Modal)`
+  height: 95%;
+  overflow: hidden;
+  border-top-right-radius: 15px;
+  border-top-left-radius: 15px;
+  &.full {
+    height: 100%;
+    border-top-right-radius: 0;
+    border-top-left-radius: 0;
+  }
+  .mobileContainer {
+    padding-top: 25px;
+  }
+`;
+
+const BtnsWrap = styled.div`
+  height: 50px;
+  background-color: #fff;
+  padding: 0 10px;
+  box-sizing: border-box;
+
+  &.confirm {
+    border: none;
+    padding: 0;
+    position: relative;
+    bottom: -10px;
+  }
+  .flexRow {
+    justify-content: flex-end;
+  }
+  .am-wingblank {
+    overflow: hidden;
+  }
+  .am-button {
+    height: 36px;
+    line-height: 36px;
+    padding: 0 10px;
+  }
+  .am-button-primary:hover {
+    color: #fff;
+  }
+  .am-button,
+  .am-button::before,
+  .am-button-active::before {
+    border-radius: 50px !important;
+  }
+`;
+
+const LoadingMask = styled.div`
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.8);
+  z-index: 2;
+  > div {
+    position: relative;
+    top: 50%;
+    margin-top: -22px;
+  }
+`;
+
+export function MobileRecordRecoverConfirm(props) {
+  const { title, cancelText, updateText, visible, onCancel, onUpdate } = props;
+  return (
+    <ModalWrap popup animationType="slide-up" onClose={onCancel} visible={visible} style={{ height: 130 }}>
+      <div className="flexColumn h100">
+        <Flex align="center" className="Font17 Gray bold pLeft15 pRight15 mTop24 mBottom32">
+          {title}
+        </Flex>
+        <BtnsWrap className="footerBox valignWrapper flexRow" style={{ border: 'none' }}>
+          <WingBlank className="flex" size="sm">
+            <Button className="Font13 bold Gray_75" onClick={onCancel}>
+              {cancelText}
+            </Button>
+          </WingBlank>
+          <WingBlank className="flex" size="sm">
+            <Button className="Font13 bold" type="primary" onClick={onUpdate}>
+              {updateText}
+            </Button>
+          </WingBlank>
+        </BtnsWrap>
+      </div>
+    </ModalWrap>
+  );
+}
+
+function NewRecord(props) {
+  const {
+    visible,
+    className,
+    hideNewRecord = _.noop,
+    notDialog,
+    advancedSetting = {},
+    showDraft,
+    showDraftsEntry,
+    sheetSwitchPermit,
+    ...rest
+  } = props;
+  const { appId, viewId, worksheetInfo } = rest;
   const newRecordContent = useRef(null);
+  const [loading, setLoading] = useState();
+  const [autoFill, setAutoFill] = useState(null);
+
+  useEffect(() => {
+    if (!notDialog) {
+      window.addEventListener('popstate', hideNewRecord, false);
+    }
+    return () => {
+      if (!notDialog) {
+        window.removeEventListener('popstate', hideNewRecord, false);
+      }
+    };
+  }, []);
+
+  const showActionSheetWithOptions = (retain, noretain) => {
+    ActionSheet.showActionSheetWithOptions({
+      options: [],
+      message: (
+        <Fragment>
+          <div className="Font17 Gray bold pTop10 mBottom32 TxtLeft">{_l('继续创建时，是否保留本次提交内容 ?')}</div>
+          <BtnsWrap className="valignWrapper flexRow confirm">
+            <WingBlank className="flex" size="sm">
+              <Button
+                className="Font13 bold Gray_75"
+                onClick={() => {
+                  setAutoFill(false);
+                  noretain();
+                  ActionSheet.close();
+                }}
+              >
+                {_l('不保留')}
+              </Button>
+            </WingBlank>
+            <WingBlank className="flex" size="sm">
+              <Button
+                className="Font13 bold"
+                type="primary"
+                onClick={() => {
+                  setAutoFill(true);
+                  retain();
+                  ActionSheet.close();
+                }}
+              >
+                {_l('保留')}
+              </Button>
+            </WingBlank>
+          </BtnsWrap>
+        </Fragment>
+      ),
+    });
+  };
   const header = (
     <div className="flexRow valignWrapper pTop15 pLeft20 pRight20 pBottom8">
-      <div className="title Font18 Gray flex bold leftAlign ellipsis">{props.title || (props.entityName && _l('创建%0', props.entityName))}</div>
-      <i className="icon icon-close Gray_9e Font20" onClick={hideNewRecord}></i>
+      <div className="title Font18 Gray flex bold leftAlign ellipsis">
+        {advancedSetting.title || props.title || (props.entityName && _l('创建%0', props.entityName))}
+      </div>
+      {visible && showDraft && showDraftsEntry && (
+        <MobileDraft
+          appId={appId}
+          worksheetId={worksheetInfo.worksheetId}
+          controls={_.get(worksheetInfo, 'template.controls')}
+          worksheetInfo={worksheetInfo}
+          showDraft={advancedSetting.closedrafts !== '1'}
+          sheetSwitchPermit={sheetSwitchPermit}
+        />
+      )}
+      <i
+        className="icon icon-closeelement-bg-circle Gray_9e Font22"
+        onClick={() => {
+          hideNewRecord();
+          removeFromLocal('tempNewRecord', viewId);
+        }}
+      >
+      </i>
     </div>
   );
-  const content = <NewRecordContent registeFunc={funcs => (newRecordContent.current = funcs)} {...rest} continueCheck={false} showTitle={false} onCancel={hideNewRecord} from={5}/>;
+  const content = (
+    <NewRecordContent
+      registerFunc={funcs => (newRecordContent.current = funcs)}
+      {...rest}
+      advancedSetting={advancedSetting}
+      continueCheck={false}
+      showTitle={false}
+      autoFill={autoFill}
+      onCancel={hideNewRecord}
+      from={5}
+      onSubmitBegin={() => setLoading(true)}
+      onSubmitEnd={() => setLoading(false)}
+    />
+  );
+
   const footer = (
-    <div className="footerBox btnsWrapper valignWrapper flexRow">
+    <BtnsWrap className="footerBox valignWrapper flexRow">
+      {showDraft && (
+        <WingBlank className="flexColumn TxtCenter" size="sm">
+          <div
+            onClick={() => {
+              newRecordContent.current.newRecord({
+                autoFill,
+                rowStatus: 21,
+              });
+            }}
+          >
+            <i className="icon-drafts_approval Font20 Gray_9e "></i>
+            <div className="Font12 bold Gray_9e">{_l('存草稿')}</div>
+          </div>
+        </WingBlank>
+      )}
+      {advancedSetting.continueBtnVisible && (
+        <WingBlank className="flex" size="sm">
+          <Button
+            className="Font13 bold Gray_75"
+            onClick={() => {
+              if (advancedSetting.autoFillVisible && advancedSetting.continueEndAction === 2 && _.isNull(autoFill)) {
+                const retain = () => {
+                  newRecordContent.current.newRecord({
+                    isContinue: true,
+                    autoFill: true,
+                    actionType: advancedSetting.continueEndAction,
+                  });
+                };
+                const noretain = () => {
+                  newRecordContent.current.newRecord({
+                    isContinue: true,
+                    autoFill: false,
+                    actionType: advancedSetting.continueEndAction,
+                  });
+                };
+                showActionSheetWithOptions(retain, noretain);
+              } else {
+                newRecordContent.current.newRecord({
+                  isContinue: true,
+                  autoFill,
+                  actionType: advancedSetting.continueEndAction,
+                });
+              }
+            }}
+          >
+            {advancedSetting.continueBtnText || _l('提交并继续创建')}
+          </Button>
+        </WingBlank>
+      )}
       <WingBlank className="flex" size="sm">
-        <Button type="primary" onClick={() => newRecordContent.current.newRecord()}>
-          {_l('确定')}
+        <Button
+          className="Font13 bold"
+          type="primary"
+          onClick={() => {
+            if (advancedSetting.autoFillVisible && advancedSetting.submitEndAction === 2 && _.isNull(autoFill)) {
+              const retain = () => {
+                newRecordContent.current.newRecord({
+                  autoFill: true,
+                  actionType: advancedSetting.submitEndAction,
+                });
+              };
+              const noretain = () => {
+                newRecordContent.current.newRecord({
+                  autoFill: true,
+                  actionType: advancedSetting.submitEndAction,
+                });
+              };
+              showActionSheetWithOptions(retain, noretain);
+            } else {
+              newRecordContent.current.newRecord({
+                autoFill,
+                actionType: advancedSetting.submitEndAction,
+              });
+            }
+          }}
+        >
+          {advancedSetting.submitBtnText || _l('提交')}
         </Button>
       </WingBlank>
-    </div>
+    </BtnsWrap>
   );
-  return (
-    <Modal
-      popup
-      animationType="slide-up"
-      className={cx('mobileNewRecordDialog', className)}
-      onCancel={hideNewRecord}
-      visible={visible}
-    >
+  const contentWrap = (
+    <Fragment>
+      {loading && (
+        <LoadingMask>
+          <LoadDiv size="small" />
+        </LoadingMask>
+      )}
       <div className="flexColumn leftAlign h100">
-        {header}
+        {notDialog ? null : header}
         <ScrollView className="flex">
-          <div className="pAll20 pTop30 h100">{content}</div>
+          <div className="pAll20 pTop0 h100">{content}</div>
         </ScrollView>
         {footer}
       </div>
-    </Modal>
-  )
+    </Fragment>
+  );
+
+  if (notDialog) {
+    return contentWrap;
+  } else {
+    return (
+      <ModalWrap
+        popup
+        animationType="slide-up"
+        className={cx('MobileNewRecordModal', className)}
+        onClose={hideNewRecord}
+        visible={visible}
+      >
+        <TouchHandler onClose={hideNewRecord} touchClassName=".MobileNewRecordModal">
+          {contentWrap}
+        </TouchHandler>
+      </ModalWrap>
+    );
+  }
 }
 
 NewRecord.propTypes = {
-  showFillNext: PropTypes.bool,
+  notDialog: PropTypes.bool,
 };
+
+export default AdvancedSettingHandler(NewRecord);

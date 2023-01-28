@@ -1,20 +1,29 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React from 'react';
 import styled from 'styled-components';
-import ButtonList from 'src/pages/customPage/components/WidgetContent/ButtonList';
-import { getEnumType } from 'src/pages/customPage/util';
-import { addRecord } from 'src/pages/customPage/redux/action';
+import { ButtonList } from 'src/pages/customPage/components/WidgetContent/ButtonList';
 import PreviewContent from './PreviewContent';
-import ChartContent from './ChartContent';
+import CarouselPreview from 'src/pages/customPage/components/editWidget/carousel/Carousel';
+import { StateChartContent } from './ChartContent';
+import ViewContent from './ViewContent';
+import Filter from './FilterContent';
 import { RichText } from 'ming-ui';
 
 const WidgetContent = styled.div`
   flex: 1;
   box-sizing: border-box;
-  padding: ${props => (props.componentType === 'embedUrl' ? 0 : '8px 15px')};
+  padding: 8px 15px;
   background-color: #fff;
   height: 100%;
   &.button {
     display: flex;
+  }
+  &.mobileEmbedUrl, &.mobileView, &.mobileFilter, &.mobileCarousel {
+    padding: 0 !important;
+  }
+  &.mobileFilter {
+    display: flex;
+    justify-content: center;
+    background-color: transparent;
   }
   img {
     max-width: 100%;
@@ -27,21 +36,10 @@ const WidgetContent = styled.div`
 const fistLetterUpper = str => str.charAt(0).toUpperCase() + str.slice(1);
 
 function WidgetDisplay(props) {
-  const { type, value, name, button, ids, param = [] } = props;
-  const componentType = getEnumType(type);
-  const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
-  const ref = useRef(null);
-
-  useEffect(() => {
-    if (componentType !== 'analysis') return;
-    const { width, height } = ref.current.getBoundingClientRect();
-    // WidgetContent style padding
-    const paddingHorizontal = 15 * 2;
-    const paddingVertical = 8 * 2;
-    setDimensions({ width: width - paddingHorizontal, height: height - paddingVertical });
-  }, []);
+  const { ids, widget, apk, pageComponents, componentType } = props;
+  const { type, value, name, button, param = [], config = {} } = widget;
   const renderContent = () => {
-    if (componentType === 'embedUrl') return <PreviewContent value={value} param={param} />;
+    if (componentType === 'embedUrl') return <PreviewContent value={value} param={param} config={config} />;
     if (componentType === 'richText')
       return <RichText data={value || ''} className={'mdEditorContent'} disabled={true} backGroundColor={'#fff'} />;
     if (componentType === 'button')
@@ -49,22 +47,45 @@ function WidgetDisplay(props) {
         <ButtonList
           editable={false}
           button={button}
-          ids={ids}
-          layoutType="mobile"
-          addRecord={data => {
-            addRecord(data)();
+          info={{
+            ...ids,
+            projectId: apk.projectId,
+            itemId: ids.worksheetId
           }}
+          layoutType="mobile"
+          addRecord={data => {}}
         />
       );
-    if (componentType === 'analysis') return <ChartContent reportId={value} name={name} dimensions={dimensions} />;
+    if (componentType === 'analysis') {
+      return (
+        <StateChartContent
+          widget={widget}
+          reportId={value}
+          name={name}
+          pageComponents={pageComponents.filter(p => p.type === 1)}
+        />
+      )
+    };
+    if (componentType === 'view') {
+      return (
+        <ViewContent appId={ids.appId} setting={widget} />
+      );
+    }
+    if (componentType === 'filter') {
+      return (
+        <Filter ids={ids} apk={apk} widget={widget} />
+      );
+    }
+    if (componentType === 'carousel') {
+      const { config, componentConfig } = widget;
+      return (
+        <CarouselPreview config={config} componentConfig={componentConfig} />
+      );
+    }
   };
 
   return (
-    <WidgetContent
-      className={`mobile${fistLetterUpper(componentType)} flexColumn`}
-      ref={ref}
-      componentType={componentType}
-    >
+    <WidgetContent className={`mobile${fistLetterUpper(componentType)} flexColumn`}>
       {renderContent()}
     </WidgetContent>
   );

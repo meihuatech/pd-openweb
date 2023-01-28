@@ -1,7 +1,13 @@
-import { renderCellText } from 'src/pages/worksheet/components/CellControls';
+import renderCellText from 'src/pages/worksheet/components/CellControls/renderText';
 import { formatValuesOfOriginConditions } from 'src/pages/worksheet/common/WorkSheetFilter/util';
-import { FROM, FORM_ERROR_TYPE } from './config';
+import { FROM, FORM_ERROR_TYPE, UN_TEXT_TYPE } from './config';
 import { isEnableScoreOption } from 'src/pages/widgetConfig/widgetSetting/components/DynamicDefaultValue/util';
+import { getStringBytes, accMul, browserIsMobile } from 'src/util';
+import { getStrBytesLength } from 'src/pages/Role/PortalCon/tabCon/util-pure.js';
+import { getShowFormat, getDatePickerConfigs } from 'src/pages/widgetConfig/util/setting';
+import _ from 'lodash';
+import moment from 'moment';
+import renderText from 'src/pages/worksheet/components/CellControls/renderText';
 
 export const convertControl = type => {
   switch (type) {
@@ -31,6 +37,7 @@ export const convertControl = type => {
       return 'CHECKBOX'; // 多选
 
     case 11:
+    case 44:
       return 'DROP_DOWN'; // 下拉框
 
     case 14:
@@ -101,7 +108,17 @@ export const convertControl = type => {
     case 43:
       return 'OCR'; // 文字识别
     case 45:
-      return 'Embed'; // 文字识别
+      return 'Embed'; // 嵌入
+    case 46:
+      return 'Time'; // 时间
+    case 47:
+      return 'BarCode'; // 嵌入
+    case 48:
+      return 'OrgRole'; // 组织角色
+    case 49:
+      return 'Search'; // api查询--按钮
+    case 50:
+      return 'Search'; // api查询--下拉框
   }
 };
 
@@ -148,12 +165,18 @@ function formatRowToServer(row, controls = []) {
       if (!c) {
         return undefined;
       } else {
-        return _.pick(
-          c.type === 14
-            ? { ...c, editType: 1, value: row[key] }
-            : formatControlToServer({ ...c, value: row[key] }, { isSubListCopy: row.isCopy }),
-          ['controlId', 'value', 'editType'],
-        );
+        if (c.type === 14 && (row[key] || '')[0] === '[') {
+          try {
+            row[key] = JSON.stringify(JSON.parse(row[key]).map(c => c.fileId));
+          } catch (err) {
+            console.log(err);
+          }
+        }
+        return _.pick(formatControlToServer({ ...c, value: row[key] }, { isSubListCopy: row.isCopy }), [
+          'controlId',
+          'value',
+          'editType',
+        ]);
       }
     })
     .filter(c => c && c.controlId && !_.isUndefined(c.value));
@@ -203,7 +226,9 @@ export function formatControlToServer(control, { isSubListCopy } = {}) {
 
       (parsed.attachmentData || []).forEach(item => {
         item = Object.assign({}, item, { fileExt: item.ext }, { isEdit: true });
-
+        if (item.fileId && !item.fileID) {
+          item.fileID = item.fileId;
+        }
         if (item.refType || item.refId) {
           oldKnowledgeAtts.push(item);
         } else {
@@ -233,10 +258,12 @@ export function formatControlToServer(control, { isSubListCopy } = {}) {
       parsedValue = JSON.parse(control.value);
       result.value = _.isArray(parsedValue)
         ? JSON.stringify(
-            parsedValue.map(item => ({
-              name: item.name,
-              sid: item.sid,
-            })),
+            parsedValue
+              .map(item => ({
+                name: item.name,
+                sid: item.sid,
+              }))
+              .filter(item => !_.isEmpty(item.sid)),
           )
         : '';
       break;
@@ -287,6 +314,14 @@ export function formatControlToServer(control, { isSubListCopy } = {}) {
           );
         }
         result.value = JSON.stringify(resultvalue);
+        if (_.isEmpty(resultvalue) && control && typeof control.value === 'string') {
+          try {
+            const rows = JSON.parse(control.value);
+            result.value = JSON.stringify(
+              rows.map(row => Object.keys(row).map(key => ({ controlId: key, value: row[key] }))),
+            );
+          } catch (err) {}
+        }
       }
       break;
   }
@@ -299,7 +334,7 @@ export function formatControlToServer(control, { isSubListCopy } = {}) {
  * @param  {} controls 所有控件
  * @param  {} data 控件所在记录数据[可选]
  */
-export function getTitleTextFromControls(controls, data, titleSourceControlType) {
+export function getTitleTextFromControls(controls, data, titleSourceControlType, options = {}) {
   let titleControl = _.find(controls, control => control.attribute === 1) || {};
   if (titleSourceControlType) {
     titleControl.sourceControlType = titleSourceControlType;
@@ -307,7 +342,7 @@ export function getTitleTextFromControls(controls, data, titleSourceControlType)
   if (titleControl && data) {
     titleControl = Object.assign({}, titleControl, { value: data[titleControl.controlId] || data.titleValue });
   }
-  return titleControl ? renderCellText(titleControl) || _l('未命名') : _l('未命名');
+  return titleControl ? renderCellText(titleControl, options) || _l('未命名') : _l('未命名');
 }
 
 /**
@@ -315,12 +350,18 @@ export function getTitleTextFromControls(controls, data, titleSourceControlType)
  * @param  {} controls 所有控件
  * @param  {} data 控件所在记录数据[可选]
  */
-export function getTitleTextFromRelateControl(control = {}, data) {
-  return getTitleTextFromControls(control.relationControls, data, control.sourceControlType);
+export function getTitleTextFromRelateControl(control = {}, data, options = {}) {
+  if (data.name) {
+    return data.name;
+  }
+  return getTitleTextFromControls(control.relationControls, data, control.sourceControlType, options);
 }
 
 // 控件状态
 export const controlState = (data, from) => {
+  if (!data) {
+    return {};
+  }
   const controlPermissions = data.controlPermissions || '111';
   const fieldPermission = data.fieldPermission || '111';
   let state = {
@@ -370,13 +411,20 @@ const FILTER_TYPE = {
   26: 'accountId',
   27: 'departmentId',
   29: 'sid',
+  35: 'sid',
+  48: 'organizeId',
 };
 
-export const formatFiltersValue = (filters = [], data = []) => {
+export const formatFiltersValue = (filters = [], data = [], recordId) => {
   let conditions = formatValuesOfOriginConditions(filters) || [];
+  let hasCurrent = false;
   conditions.forEach(item => {
     if (item.dynamicSource && item.dynamicSource.length > 0) {
       const cid = _.get(item.dynamicSource[0] || {}, 'cid');
+      if (cid === 'current-rowid' && item.dataType === 29) {
+        item.values = [recordId];
+        hasCurrent = !recordId;
+      }
       const currentControl = _.find(data, da => da.controlId === cid);
       //排除为空、不为空、在范围，不在范围类型
       if (currentControl && currentControl.value && !_.includes([7, 8, 11, 12, 31, 32], item.filterType)) {
@@ -392,11 +440,14 @@ export const formatFiltersValue = (filters = [], data = []) => {
         }
         //日期特殊处理
         if (
-          _.includes([15, 16], currentControl.type) ||
+          _.includes([15, 16, 46], currentControl.type) ||
           (currentControl.type === 38 && currentControl.enumDefault === 2)
         ) {
           item.dateRange = 18;
-          item.value = currentControl.value;
+          if (currentControl.value) {
+            const valueFormat = getDatePickerConfigs(currentControl).formatMode;
+            item.value = moment(currentControl.value).format(valueFormat);
+          }
           return;
         }
         //单选
@@ -404,9 +455,17 @@ export const formatFiltersValue = (filters = [], data = []) => {
           item.values = JSON.parse(currentControl.value) || [];
           return;
         }
-        //人员、部门、关联表
-        if (_.includes([26, 27, 29], currentControl.type)) {
+        //人员、部门、关联表、组织角色
+        if (_.includes([26, 27, 35, 48], currentControl.type)) {
           item.values = JSON.parse(currentControl.value || '[]').map(ac => ac[FILTER_TYPE[currentControl.type]]);
+          return;
+        }
+        if (_.includes([29], currentControl.type)) {
+          if (_.isArray(JSON.parse(currentControl.value || '[]'))) {
+            item.values = JSON.parse(currentControl.value || '[]').map(ac => ac[FILTER_TYPE[currentControl.type]]);
+          } else {
+            item.values = (currentControl.data || []).map(ac => ac.rowid);
+          }
           return;
         }
       }
@@ -418,7 +477,7 @@ export const formatFiltersValue = (filters = [], data = []) => {
       }
     }
   });
-  return conditions;
+  return hasCurrent ? [] : conditions;
 };
 
 // 工作表查询部门、地区、用户赋值特殊处理
@@ -427,6 +486,9 @@ export const getCurrentValue = (item, data, control) => {
   switch (control.type) {
     //当前控件文本
     case 2:
+      if (_.includes([6, 31, 37], item.type) && item.advancedSetting && item.advancedSetting.numshow === '1' && data) {
+        data = accMul(parseFloat(data), 100);
+      }
       switch (item.type) {
         //用户
         case 26:
@@ -438,6 +500,11 @@ export const getCurrentValue = (item, data, control) => {
           return JSON.parse(data || '[]')
             .map(item => item.departmentName)
             .join('、');
+        //组织角色
+        case 48:
+          return JSON.parse(data || '[]')
+            .map(item => item.organizeName)
+            .join('、');
         //地区
         case 19:
         case 23:
@@ -448,18 +515,58 @@ export const getCurrentValue = (item, data, control) => {
         case 10:
         case 11:
           const ids = JSON.parse(data || '[]');
-          return (item.options || [])
-            .filter(item => _.includes(ids, item.key) && !item.isDeleted)
-            .map(i => i.value)
+          return ids
+            .map(i => {
+              let d = '';
+
+              try {
+                const da = JSON.parse(i);
+                if (typeof da === 'object') {
+                  return da.value;
+                } else {
+                  d = i;
+                }
+              } catch (e) {
+                d = i;
+              }
+              if (d.toString().indexOf('add_') > -1) {
+                return d.split('add_')[1];
+              }
+              if (d === 'other') {
+                return _l('其他');
+              }
+              if (d.toString().indexOf('other:') > -1) {
+                return _.replace(d, 'other:', '') || _l('其他');
+              }
+              return (
+                _.get(
+                  _.find(item.options || [], t => t.key === d && !t.isDeleted),
+                  'value',
+                ) || ''
+              );
+            })
             .join('、');
+        case 15:
+        case 16:
+          const showFormat = getShowFormat(item);
+          return data ? moment(data).format(showFormat) : '';
         //关联记录单条
         case 29:
           const formatData = JSON.parse(data || '[]')[0] || {};
-          return formatData.name;
+          let titleControl;
+          if (_.get(item, 'relationControls.length')) {
+            titleControl = _.find(item.relationControls, r => r.attribute === 1) || {};
+          } else if (_.get(window, 'worksheetControlsCache.' + item.dataSource)) {
+            titleControl =
+              _.find(_.get(window, 'worksheetControlsCache.' + item.dataSource) || [], r => r.attribute === 1) || {};
+          }
+          return titleControl ? renderText({ ...titleControl, value: formatData.name }) : formatData.name;
         //公式
         case 31:
           const dot = item.dot || 0;
           return Number(data || 0).toFixed(dot);
+        case 46:
+          return data ? moment(data, 'HH:mm:ss').format(item.unit === '6' ? 'HH:mm:ss' : 'HH:mm') : '';
         default:
           return data;
       }
@@ -484,9 +591,7 @@ export const getCurrentValue = (item, data, control) => {
 
 // 特殊手机号验证是否合法
 export const specialTelVerify = value => {
-  return /\+8526262\d{4}$|\+8526660\d{4}$|\+86146\d{8}$|\+86148\d{8}$|\+5551\d{8}$|\+8536855\d{4}$|\+8536856\d{4}$|\+8536857\d{4}$|\+8536858\d{4}$|\+8536859\d{4}$/.test(
-    value || '',
-  );
+  return /\+234\d{10}$|\+63\d{10}$|\+852\d{8}$|\+85368\d{6}$|\+861\d{10}$|\+5551\d{8}$/.test(value || '');
 };
 
 export const compareWithTime = (start, end, type) => {
@@ -502,4 +607,134 @@ export const compareWithTime = (start, end, type) => {
     case 'isSameAndAfter':
       return startTime >= endTime;
   }
+};
+
+export const getEmbedValue = (embedData = {}, id) => {
+  switch (id) {
+    case 'userId':
+      return md.global.Account.accountId;
+    case 'phone':
+      return md.global.Account.mobilePhone;
+    case 'email':
+      return md.global.Account.email;
+    case 'ua':
+      return window.navigator.userAgent;
+    case 'timestamp':
+      return new Date().getTime();
+    default:
+      return embedData[id] || '';
+  }
+};
+
+export const getBarCodeValue = ({ data, control, codeInfo }) => {
+  const { enumDefault, enumDefault2, dataSource } = control;
+  const { appId, worksheetId, viewId, recordId } = codeInfo;
+  if ((enumDefault === 1 || (enumDefault === 2 && enumDefault2 === 3)) && !dataSource) return '';
+  if (dataSource === 'rowid') return recordId;
+  if (enumDefault === 2) {
+    // 记录内部访问链接
+    if (enumDefault2 === 1) {
+      return recordId
+        ? `${location.origin}/app/${appId}/${worksheetId}/${viewId}/row/${recordId}`
+        : `${md.global.Config.WebUrl}app/${appId}/newrecord/${worksheetId}/${viewId}/`;
+    }
+  }
+  const selectControl = _.find(data, i => i.controlId === dataSource);
+  if (!(selectControl || {}).value) return '';
+  if (enumDefault === 1) {
+    const repVal = String(selectControl.value).replace(
+      /[(\u4e00-\u9fa5)(\u3002|\uff1f|\uff01|\uff0c|\u3001|\uff1b|\uff1a|\u201c|\u201d|\u2018|\u2019|\uff08|\uff09|\u300a|\u300b|\u3010|\u3011|\u007e)]+/g,
+      '',
+    );
+    return getStringBytes(repVal) <= 128 ? repVal : getStrBytesLength(repVal, 128);
+  }
+  return String(selectControl.value).substr(0, 300);
+};
+
+// 是否需要校验短信验证码
+export const checkMobileVerify = (data, smsVerificationFiled) => {
+  if (!smsVerificationFiled) return false;
+  const selectControl = _.find(data, i => i.controlId === smsVerificationFiled);
+  if (!selectControl) return false;
+  // 手机号是否是电话 | 手机号只读 ｜ 手机号隐藏
+  if (selectControl.type !== 3) return false;
+  if (!controlState(selectControl, FROM.PUBLIC).editable || !controlState(selectControl, FROM.PUBLIC).visible)
+    return false;
+  if (!selectControl.value) return false;
+  return true;
+};
+
+// 选项其他类型处理
+export const getCheckAndOther = value => {
+  let checkIds = [];
+  let otherValue = '';
+
+  JSON.parse(value || '[]').forEach(item => {
+    if ((item || '').toString().indexOf('other:') > -1) {
+      otherValue = _.replace(item, 'other:', '');
+      checkIds.push('other');
+    } else {
+      checkIds.push(item);
+    }
+  });
+
+  return { checkIds, otherValue };
+};
+
+// 查询文本类失焦校验(文本扫码特殊处理)
+export const unTextSearch = item => {
+  return (
+    _.includes(UN_TEXT_TYPE, item.type) ||
+    (item.type === 2 && browserIsMobile() && (item.strDefault || '10').split('')[1] === '1')
+  );
+};
+
+// 渲染计数
+export const renderCount = item => {
+  const { type, enumDefault, value, advancedSetting } = item;
+  let count;
+
+  // 人员多选、部门多选、多条卡片
+  if (
+    (_.includes([26, 27], type) && enumDefault === 1) ||
+    (type === 29 && enumDefault === 2 && advancedSetting.showtype === '1')
+  ) {
+    count = JSON.parse(value || '[]').length;
+  }
+
+  // 附件
+  if (type === 14) {
+    const files = JSON.parse(value || '[]');
+
+    if (_.isArray(files)) {
+      count = files.length;
+    } else {
+      count = files.attachments.length + files.knowledgeAtts.length + files.attachmentData.length;
+    }
+  }
+
+  // 子表
+  if (type === 34) {
+    if (typeof value === 'object') {
+      count = value.num || (value.rows || []).length;
+    } else if (!_.isNaN(parseInt(item.value, 10))) {
+      count = parseInt(item.value, 10);
+    }
+  }
+
+  return count ? `(${count})` : null;
+};
+
+//控件切换成size情况，兼容老数据
+export const halfSwitchSize = (item, from) => {
+  const half =
+    item.half ||
+    (item.type === 28 && item.enumDefault === 1) ||
+    (item.type === 29 &&
+      item.enumDefault === 1 &&
+      parseInt(item.advancedSetting.showtype, 10) === 3 &&
+      from !== FROM.H5_ADD &&
+      from !== FROM.PUBLIC);
+
+  return half ? 6 : 12;
 };

@@ -2,7 +2,6 @@
 import PropTypes from 'prop-types';
 import cx from 'classnames';
 
-import $ from 'jquery';
 import { AT_ALL_TEXT } from './config';
 
 import Icon from 'ming-ui/components/Icon';
@@ -17,12 +16,13 @@ import postAjax from 'src/api/post';
 
 import { SOURCE_TYPE } from './config';
 
-import 'autoTextarea';
-import 'mentioninput';
-import 'emotion';
-import 'selectGroup';
+import 'src/components/autoTextarea/autoTextarea';
+import 'src/components/mentioninput/mentionsInput';
+import 'src/components/emotion/emotion';
+import 'src/components/selectGroup/selectAllGroup';
 import './css/commenter.less';
 import { getRandomString } from 'src/util';
+import _ from 'lodash';
 
 const ClickAwayable = createDecoratedComponent(withClickAway);
 
@@ -118,7 +118,7 @@ class Commenter extends React.Component {
         if (!text) {
           window.localStorage.removeItem('commenter-' + comp.props.storageId);
         } else {
-          window.localStorage.setItem('commenter-' + comp.props.storageId, text);
+          safeLocalStorageSetItem('commenter-' + comp.props.storageId, text);
         }
       });
     }
@@ -126,7 +126,7 @@ class Commenter extends React.Component {
     // @
     if (!this.props.disableMentions) {
       const { sourceType } = this.props;
-      localStorage.setItem('atData', JSON.stringify(this.props.atData || []));
+      safeLocalStorageSetItem('atData', JSON.stringify(this.props.atData || []));
       $textarea.mentionsInput(
         Object.assign(
           {
@@ -186,7 +186,7 @@ class Commenter extends React.Component {
       !_.isEqual(this.props.atData, nextProps.atData) &&
       nextProps.forReacordDiscussion
     ) {
-      localStorage.setItem('atData', JSON.stringify(nextProps.atData || []));
+      safeLocalStorageSetItem('atData', JSON.stringify(nextProps.atData || []));
     }
   }
 
@@ -276,7 +276,7 @@ class Commenter extends React.Component {
 
       this.setState({ disabled: true });
 
-      const { sourceId, sourceType, replyId, appId, remark, extendsId } = this.props;
+      const { sourceId, sourceType, replyId, appId, remark, extendsId, entityType, forReacordDiscussion } = this.props;
 
       let promise = null;
 
@@ -333,6 +333,7 @@ class Commenter extends React.Component {
             knowledgeAtts: JSON.stringify(kcAttachmentData),
             appId,
             extendsId,
+            entityType: forReacordDiscussion && entityType === 2 ? 2 : 0, //后端接口只区分0 2
           })
           .then(
             res => {
@@ -467,7 +468,7 @@ class Commenter extends React.Component {
           >
             <Icon className="Hand" icon="smile" />
           </span>
-          {!this.props.disableShareToPost ? (
+          {!this.props.disableShareToPost && !md.global.Account.isPortal ? (
             <span className="tip-top commentIconBtn" data-tip={_l('同时转发此条')}>
               <i
                 className={cx('icon-forward2 Font19 ThemeColor3', { hoverRelayBtn: !this.state.isReshare })}

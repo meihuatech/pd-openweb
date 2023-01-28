@@ -1,15 +1,16 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
 import styled from 'styled-components';
-import { getRequest } from 'src/util';
+import { getRequest, mdAppResponse } from 'src/util';
 import preall from 'src/common/preall';
-import ChartContent from 'src/pages/Mobile/CustomPage/ChartContent';
+import ChartContent from 'mobile/CustomPage/ChartContent';
+import { Flex, ActivityIndicator } from 'antd-mobile';
 import { Provider } from 'react-redux';
 import { configureStore } from 'src/redux/configureStore';
-import 'src/common/mdcss/inStyle.css';
 import 'src/common/mdcss/basic.css';
 import 'src/common/mdcss/Themes/theme.less';
 import 'src/common/mdcss/iconfont/mdfont.css';
+import _ from 'lodash';
 
 const store = configureStore();
 
@@ -21,13 +22,33 @@ const LayoutContent = styled.div`
   background-color: #fff;
 `;
 
-const { reportId, access_token } = getRequest();
+const { reportId, access_token, getFilters } = getRequest();
 
 class MobileChart extends React.Component {
   constructor(props) {
     super(props);
+    this.state = {
+      loading: true,
+      filters: []
+    }
+  }
+  componentDidMount() {
+    if (getFilters === 'true') {
+      mdAppResponse({ type: 'getFilters' }).then(data => {
+        const { value } = data;
+        this.setState({
+          loading: false,
+          filters: _.isArray(value) && value.length ? value : []
+        });
+      });
+    } else {
+      this.setState({
+        loading: false
+      });
+    }
   }
   render() {
+    const { loading, filters } = this.state;
     const paddingHorizontal = 15 * 2;
     const paddingVertical = 8 * 2;
     const dimensions = {
@@ -36,9 +57,20 @@ class MobileChart extends React.Component {
     };
     return (
       <Provider store={store}>
-        <LayoutContent className="mobileAnalysis flexColumn">
-          <ChartContent reportId={reportId} accessToken={access_token} dimensions={dimensions} />
-        </LayoutContent>
+        {loading ? (
+          <Flex justify="center" align="center" className="h100">
+            <ActivityIndicator size="large" />
+          </Flex>
+        ) : (
+          <LayoutContent className="mobileAnalysis flexColumn">
+            <ChartContent
+              reportId={reportId}
+              accessToken={access_token}
+              dimensions={dimensions}
+              filters={filters}
+            />
+          </LayoutContent>
+        )}
       </Provider>
     );
   }

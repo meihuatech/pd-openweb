@@ -12,6 +12,7 @@ export const ROUTE_CONFIG = {
   groupValidate: {
     path: '/group/groupValidate',
     component: () => import('src/components/group/groupValidate/GroupValidateComponent'),
+    title: _l('群组资料'),
   },
 
   // 动态
@@ -70,6 +71,11 @@ export const ROUTE_CONFIG = {
     component: () => import('src/pages/kc/share'),
     title: _l('知识'),
   },
+  recordFile: {
+    path: '/land/record/file',
+    component: () => import('src/pages/kc/share'),
+    title: _l('记录附件'),
+  },
 
   // 工作表
   newRecord: {
@@ -91,8 +97,12 @@ export const ROUTE_CONFIG = {
     path: '/worksheet/:worksheetId/row/:rowId',
     component: () => import('src/pages/worksheet/pages/WorksheetRowLand'),
   },
+  viewDetail: {
+    path: '/embed/view/:appId/:worksheetId/:viewId',
+    component: () => import('src/pages/ViewLand'),
+  },
   workflowRecordLand: {
-    path: '/app/:appId/workflow/record/:id/:workId',
+    path: '/app/:appId/workflowdetail/record/:id/:workId',
     component: () => import('src/pages/worksheet/pages/WorkflowRecordLand'),
   },
   worksheetCustomFiled: {
@@ -115,6 +125,10 @@ export const ROUTE_CONFIG = {
     path: '/printForm/:appId/:printType/:type/:from/:key?',
     component: () => import('src/pages/Print'),
   },
+  printPivotTable: {
+    path: '/printPivotTable/:reportId',
+    component: () => import('src/pages/Statistics/PrintPivotTable'),
+  },
   uploadTemplateSheet: {
     path: '/worksheet/uploadTemplateSheet/:worksheetId?',
     component: () => import('src/pages/UploadTemplateSheet'),
@@ -130,8 +144,8 @@ export const ROUTE_CONFIG = {
     title: _l('个人账户'),
   },
   privateDeployment: {
-    path: '/privateDeployment',
-    component: () => import('src/pages/privateDeployment'),
+    path: '/privateDeployment/:routeType?',
+    component: () => import('src/pages/NewPrivateDeployment'),
     title: _l('系统配置'),
   },
   appInstallSetting: {
@@ -201,22 +215,21 @@ export const ROUTE_CONFIG = {
   myProcess: {
     path: '/myprocess/:type?/:secondType?',
     component: () => import('src/pages/workflow/MyProcess'),
-    title: _l('我的流程'),
+    title: _l('流程待办'),
   },
   gunterExport: {
     path: '/app/:appId/:worksheetId/:viewId/gunterExport',
     component: () => import('src/pages/worksheet/views/GunterView/components/GunterExport'),
     title: _l('正在导出，请稍候...'),
   },
-
   my: {
-    path: '/app/my',
-    component: () => import('src/pages/AppHomepage/MyApp'),
+    path: '/app/my/(group)?/:projectId?/:groupType?/:groupId?',
+    component: () => import('src/pages/AppHomepage/AppCenter'),
     title: _l('我的应用'),
   },
   lib: {
     path: '/app/lib/',
-    component: () => import('src/pages/AppHomepage/AppLib'),
+    component: () => import('src/pages/AppHomepage/AppCenter'),
     title: _l('应用库'),
   },
   app: {
@@ -229,7 +242,21 @@ export const ROUTE_CONFIG = {
     component: () => import('src/pages/Demos'),
     title: _l('应用'),
   },
-
+  integration: {
+    path: '/integration/:type?/:listType?',
+    component: () => import('src/pages/integration'),
+    title: _l('集成中心'),
+  },
+  integrationConnect: {
+    path: '/integrationConnect/:projectId?/:id?',
+    component: () => import('src/pages/integration/integrationConnect'),
+    title: _l('集成中心'),
+  },
+  integrationApi: {
+    path: '/integrationApi/:projectId?/:apiId?',
+    component: () => import('src/pages/integration/integrationApi'),
+    title: _l('集成中心'),
+  },
   default: {
     path: '/app',
     redirect: '/app/my',
@@ -249,6 +276,7 @@ const withoutHeaderPathList = [
   'worksheet/public/query',
   'printForm',
   'print',
+  'workflow',
   'workflowEdit',
   'workflow/checksheet',
   'worksheet/field/edit',
@@ -258,6 +286,8 @@ const withoutHeaderPathList = [
   'mobile',
   'worksheet/uploadTemplateSheet',
   'gunterExport',
+  'integrationConnect',
+  'role',
 ];
 const withoutChatPathList = [
   'demo',
@@ -273,6 +303,7 @@ const withoutChatPathList = [
   'worksheet/public/query',
   'printForm',
   'print',
+  'printPivotTable',
   'workflow/checksheet',
   'dingSyncCourse',
   'wxappSyncCourse',
@@ -283,6 +314,9 @@ const withoutChatPathList = [
   'mobile',
   'worksheet/uploadTemplateSheet',
   'gunterExport',
+  'land',
+  'integrationConnect',
+  'integrationApi',
 ];
 export const withoutHeaderUrl = `/(.*)(${withoutHeaderPathList.join('|')})`;
 export const withoutChatUrl = `/(.*)(${withoutChatPathList.join('|')})`;

@@ -1,16 +1,18 @@
 import React, { Fragment } from 'react';
-import Clipboard from 'clipboard';
+import copy from 'copy-to-clipboard';
 import './style.less';
 import Ajax from 'src/api/workWeiXin';
 import projectAjax from 'src/api/project';
 import Api from 'api/homeApp';
 import color from 'color';
-import { Icon, LoadDiv, Button } from 'ming-ui';
+import { Icon, LoadDiv, Button, Input } from 'ming-ui';
 import cx from 'classnames';
 import html2canvas from 'html2canvas';
 import { navigateTo } from '../../../../router/navigateTo';
 import { compareProps } from 'pages/PageHeader/util.js';
 import SvgIcon from 'src/components/SvgIcon';
+import CreateLinkDialog from './CreateLinkDialog';
+import moment from 'moment';
 
 const passApplyConfig = {
   1: 'dingAppCourse',
@@ -35,6 +37,8 @@ export default class DingSyncCourse extends React.Component {
       isWX: false,
       AgentId: null,
       Secret: null,
+      baseUrl: '',
+      createLinkVisible: false
     };
   }
 
@@ -97,6 +101,7 @@ export default class DingSyncCourse extends React.Component {
             homeUrlN: res.item2,
             AgentId: res.item3,
             Secret: res.item4,
+            baseUrl: res.item6,
           });
           this.getDetail(apkId);
         } else {
@@ -117,6 +122,7 @@ export default class DingSyncCourse extends React.Component {
             serverIp: res.ip,
             pcHomeUrl: res.pcHomeUrl,
             AgentId: res.agentId,
+            baseUrl: res.baseUrl,
           });
           if (this.state.addApp) {
             this.getDetail(apkId);
@@ -153,18 +159,9 @@ export default class DingSyncCourse extends React.Component {
     $('html').removeClass('dingSyncBox');
   }
 
-  bindClipboard = (btn, str) => {
-    if (this.clipboard && this.clipboard.destroy) {
-      this.clipboard.destroy();
-    }
-    this.clipboard = new Clipboard(btn, {
-      text: () => {
-        return str;
-      },
-    });
-    this.clipboard.on('success', function () {
-      alert(_l('已经复制到粘贴板，你可以使用Ctrl+V 贴到需要的地方去了哦'));
-    });
+  bindClipboard = (str) => {
+    copy(str);
+    alert(_l('已经复制到粘贴板，你可以使用Ctrl+V 贴到需要的地方去了哦'));
   };
 
   /**
@@ -201,10 +198,14 @@ export default class DingSyncCourse extends React.Component {
         height: height,
         canvas: canvas,
       }).then(canvas => {
-        $('.download').attr('href', canvas.toDataURL())[0].click();
+        $('.download')
+          .attr('href', canvas.toDataURL())[0]
+          .click();
       });
     } else {
-      $('.download').attr('href', `${md.global.FileStoreConfig.pubHost}logo_app.png`)[0].click();
+      $('.download')
+        .attr('href', `${md.global.FileStoreConfig.pubHost}logo_app.png`)[0]
+        .click();
     }
   };
 
@@ -247,15 +248,7 @@ export default class DingSyncCourse extends React.Component {
         <div className="inputList mTop20">
           <span className="inputTitle">{_l('可信域名：')}</span>
           <input type="text" className="inputBox" readOnly value={this.state.domainName} />
-          <span
-            className="copyBtn"
-            onClick={() => {
-              this.bindClipboard(this.domainName, this.state.domainName);
-            }}
-            ref={el => {
-              this.domainName = el;
-            }}
-          >
+          <span className="copyBtn" onClick={() => this.bindClipboard(this.state.domainName)}>
             {_l('复制')}
           </span>
         </div>
@@ -274,18 +267,16 @@ export default class DingSyncCourse extends React.Component {
         <div className="inputList mTop20">
           <span className="inputTitle">{_l('应用主页：')}</span>
           <input type="text" className="inputBox" readOnly value={this.state.homeUrlN} />
-          <span
-            className="copyBtn"
-            onClick={() => {
-              this.bindClipboard(this.homeUrlN, this.state.homeUrlN);
-            }}
-            ref={el => {
-              this.homeUrlN = el;
-            }}
-          >
+          <span className="copyBtn" onClick={() => this.bindClipboard(this.state.homeUrlN)}>
             {_l('复制')}
           </span>
         </div>
+        <p className="Font14 Gray_75 mTop24 LineHeight22">
+          <span className="Red mRight2">*</span>
+          {_l('如您想个性化部署应用，把某一张表部署为一个应用，可把链接复制到输入框内直接')}
+          <a onClick={() => { this.setState({ createLinkVisible: true }) }}>{_l('生成企业微信链接，')}</a>
+          {_l('生成链接后复制进”应用首页链接“、”PC端首页地址“即可使用')}
+        </p>
         <img src="/src/pages/Admin/ding/dingSyncCourse/img/wx/6.png" alt={_l('点击“应用主页”，填写“网页地址”')} />
         <img src="/src/pages/Admin/ding/dingSyncCourse/img/wx/7.png" alt={_l('点击“应用主页”，填写“网页地址”')} />
         <h3 className="Font18 Gray mTop40">{_l('5. 配置完成后，即可在客户端使用此应用')}</h3>
@@ -339,48 +330,30 @@ export default class DingSyncCourse extends React.Component {
         <div className="inputList mTop20">
           <span className="inputTitle">{_l('应用首页地址：')}</span>
           <input type="text" className="inputBox" readOnly value={this.state.homeUrl} />
-          <span
-            className="copyBtn"
-            onClick={() => {
-              this.bindClipboard(this.homeUrl, this.state.homeUrl);
-            }}
-            ref={el => {
-              this.homeUrl = el;
-            }}
-          >
+          <span className="copyBtn" onClick={() => this.bindClipboard(this.state.homeUrl)}>
             {_l('复制')}
           </span>
         </div>
         <div className="inputList mTop20">
           <span className="inputTitle">{_l('服务器出口IP：')}</span>
           <input type="text" className="inputBox" readOnly value={this.state.serverIp} />
-          <span
-            className="copyBtn"
-            onClick={() => {
-              this.bindClipboard(this.serverIp, this.state.serverIp);
-            }}
-            ref={el => {
-              this.serverIp = el;
-            }}
-          >
+          <span className="copyBtn" onClick={() => this.bindClipboard(this.state.serverIp)}>
             {_l('复制')}
           </span>
         </div>
         <div className="inputList mTop20">
           <span className="inputTitle">{_l('PC端首页地址：')}</span>
           <input type="text" className="inputBox" readOnly value={this.state.pcHomeUrl} />
-          <span
-            className="copyBtn"
-            onClick={() => {
-              this.bindClipboard(this.pcHomeUrl, this.state.pcHomeUrl);
-            }}
-            ref={el => {
-              this.pcHomeUrl = el;
-            }}
-          >
+          <span className="copyBtn" onClick={() => this.bindClipboard(this.state.pcHomeUrl)}>
             {_l('复制')}
           </span>
         </div>
+        <p className="Font14 Gray_75 mTop24 LineHeight22">
+          <span className="Red mRight2">*</span>
+          {_l('如您想个性化部署应用，把某一张表部署为一个应用，可把链接复制到输入框内直接')}
+          <a onClick={() => { this.setState({ createLinkVisible: true }) }}>{_l('生成钉钉链接，')}</a>
+          {_l('生成链接后复制进”应用首页链接“、”PC端首页地址“即可使用')}
+        </p>
         <img src="/src/pages/Admin/ding/dingSyncCourse/img/4-1.png" alt={_l('完善接口信息')} />
         {this.state.addApp ? null : (
           <Fragment>
@@ -475,7 +448,7 @@ export default class DingSyncCourse extends React.Component {
               {_l('因企业微信规则调整，新的对接方案正在开发，支持线下完成对接。')}
             </p>
             <p className="Font14 mBottom30 Gray_75 LineHeight22">
-              {_l('您可以在线咨询客服或者电话咨询客服，联系电话：010-53153053')}
+              {_l('您可以在线咨询客服或者电话咨询客服，联系电话：400-665-6655')}
             </p>
             <Button
               type="primary"
@@ -515,6 +488,15 @@ export default class DingSyncCourse extends React.Component {
             </div>
           </div>
         )}
+        <CreateLinkDialog
+          visible={this.state.createLinkVisible}
+          isWX={this.state.isWX}
+          baseUrl={this.state.baseUrl}
+          projectId={this.state.projectId}
+          onCancel={() => {
+            this.setState({ createLinkVisible: false });
+          }}
+        />
       </div>
     );
   }

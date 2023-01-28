@@ -8,9 +8,16 @@ import EmptyCon from './noData';
 import LoadDiv from 'ming-ui/components/LoadDiv';
 import './worksheetListShare.less';
 import { SHARE_TYPE } from './config';
+import { WORKFLOW_SYSTEM_CONTROL } from 'src/pages/widgetConfig/config/widget';
 import { controlState } from 'src/components/newCustomFields/tools/utils';
 import { SYS } from 'src/pages/widgetConfig/config/widget.js';
 import { Tooltip } from 'ming-ui';
+import { isOpenPermit } from 'src/pages/FormSet/util.js';
+import { permitList } from 'src/pages/FormSet/config.js';
+import _ from 'lodash';
+
+const hiddenIds = WORKFLOW_SYSTEM_CONTROL.map(c => c.controlId);
+
 class WorksheetListShare extends React.Component {
   componentDidMount() {
     const { relationRowsName, viewName, appName, worksheetName, step, loading, loadSheet, isPublicquery, pageSize } =
@@ -97,10 +104,14 @@ class WorksheetListShare extends React.Component {
       getRowRelationRowDetailData,
       printId,
       viewSet = {},
-      dataTitle = ''
+      dataTitle = '',
+      sheetSwitchPermit = [],
+      viewIdForPermit,
     } = this.props;
     let Controls = this.getSortAndVisible(viewSet.showControls || [], cardControls);
-    Controls = Controls.filter(item => !['uaid', 'daid'].includes(item.controlId) && ![43].includes(item.type));
+    Controls = Controls.filter(
+      item => !['uaid', 'daid'].concat(hiddenIds).includes(item.controlId) && ![43].includes(item.type),
+    );
     let coverCidData = Controls.filter(item => item.type === 14);
     let showControls = Controls.filter(item => item.type !== 14 && controlState(item).visible); // 排除附件的数据
     let showControlsNoTitle = showControls.filter(it => it.attribute !== 1); // 排除标题的数据
@@ -111,6 +122,10 @@ class WorksheetListShare extends React.Component {
     let showControlsMin = coverCidData.length
       ? showControlsNoTitle.slice(0, 2).map(item => item.controlId)
       : showControlsData;
+    // 下载附件权限
+    const recordAttachmentSwitch = !!viewIdForPermit
+      ? isOpenPermit(permitList.recordAttachmentSwitch, sheetSwitchPermit, viewIdForPermit)
+      : true;
     return (
       <React.Fragment>
         <div
@@ -176,6 +191,7 @@ class WorksheetListShare extends React.Component {
                   rowsList.map((record, i) => {
                     return (
                       <RecordCard
+                        disableDownload={!recordAttachmentSwitch}
                         key={i}
                         from={window.innerWidth > 600 ? 2 : 3}
                         disabled={true}

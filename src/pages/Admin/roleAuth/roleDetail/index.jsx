@@ -2,19 +2,19 @@ import React from 'react';
 import PropTypes from 'prop-types';
 import classNames from 'classnames';
 import RoleController from 'src/api/role';
-import Button from 'ming-ui/components/Button';
+import { Dialog, Button } from 'ming-ui';
 import RoleAuthCommon from '../common/common';
-import Confirm from 'confirm';
 import { navigateTo } from 'src/router/navigateTo';
 
 import UserList from './userList';
 import PermissionsList from './permissionList';
 
 import EditRoleDialog from '../createEditRole';
-import { Input } from 'antd'
+import { Input } from 'antd';
 
-import 'dialogSelectUser';
+import 'src/components/dialogSelectUser/dialogSelectUser';
 import './style.less';
+import _ from 'lodash';
 const { Search } = Input;
 class RoleDetail extends React.Component {
   static propTypes = {
@@ -42,7 +42,7 @@ class RoleDetail extends React.Component {
       isSuperAdmin: false,
       permissionTypes: [],
       hasMember: undefined,
-      keywords: ''
+      keywords: '',
     };
 
     this.getRolePermission = this.getRolePermission.bind(this);
@@ -58,7 +58,7 @@ class RoleDetail extends React.Component {
     $({}).dialogSelectUser({
       sourceId: 0,
       fromType: 0,
-      showMoreInvite: false,
+      fromAdmin: true,
       SelectUserSettings: {
         filterAll: true, // 过滤全部
         filterFriend: true, // 是否过滤好友
@@ -96,7 +96,7 @@ class RoleDetail extends React.Component {
     }).then(roleDetail => {
       RoleAuthCommon.formatRoleAuth(roleDetail);
       const { roleName, auth, addAuth, isSuperAdmin, permissionTypes } = roleDetail;
-      this.props.setDetailTitle(roleName)
+      this.props.setDetailTitle(roleName);
       this.setState({
         roleName,
         addAuth,
@@ -111,10 +111,11 @@ class RoleDetail extends React.Component {
 
   render() {
     const { projectId, roleId, isApply } = this.props;
-    const { hasMember, userOpAuth, editOpAuth, deleteOpAuth, isSuperAdmin, addAuth, permissionTypes, tab, keywords } = this.state;
+    const { hasMember, userOpAuth, editOpAuth, deleteOpAuth, isSuperAdmin, addAuth, permissionTypes, tab, keywords } =
+      this.state;
     const isHrVisible = md.global.Account.projects.find(o => o.projectId === projectId).isHrVisible;
 
-    const path = isApply ? '/admin/index/' + projectId : '/admin/rolelist/' + projectId;
+    const path = isApply ? '/admin/index/' + projectId : '/admin/sysroles/' + projectId;
     return (
       <div className="roleAuthDetailContainer">
         <div className="clearfix pTop20 pBottom20">
@@ -129,9 +130,11 @@ class RoleDetail extends React.Component {
                     projectId: projectId,
                     roleId,
                   }).then(function (data) {
-                    if (data) {
+                    if (data === 1) {
                       alert(_l('申请成功'));
-                    } else {
+                    } else if (data === -1) {
+                      alert(_l('不允许申请管理员'), 3);
+                    } else if (data === 0) {
                       alert(_l('申请失败'), 2);
                     }
                   });
@@ -147,25 +150,24 @@ class RoleDetail extends React.Component {
                   type="danger"
                   size="small"
                   onClick={() => {
-                    new Confirm(
-                      {
-                        content: '<span></span>',
-                        title: _l('您确定删除该角色？'),
-                      },
-                      function () {
+                    Dialog.confirm({
+                      title: _l('您确定删除该角色？'),
+                      description: '',
+                      onOk: () => {
                         RoleController.removeRole({
                           projectId: projectId,
                           roleId,
                         }).then(data => {
-                          if (data) {
+                          const { message, deleteSuccess } = data;
+                          if (deleteSuccess) {
                             alert(_l('操作成功'));
-                            navigateTo(path);
                           } else {
-                            alert(_l('操作失败'), 2);
+                            alert(message || _l('操作失败'), 2);
                           }
+                          navigateTo('/admin/sysroles/' + projectId);
                         });
-                      }
-                    );
+                      },
+                    });
                   }}
                 >
                   {_l('删除')}
@@ -184,12 +186,18 @@ class RoleDetail extends React.Component {
                   {_l('编辑角色权限')}
                 </Button>
               ) : null}
-              <Button type="primary" disabled={!userOpAuth} size="small" className="mLeft20" onClick={this.addMemberHander}>
+              <Button
+                type="primary"
+                disabled={!userOpAuth}
+                size="small"
+                className="mLeft20"
+                onClick={this.addMemberHander}
+              >
                 {_l('添加成员')}
               </Button>
             </div>
           )}
-          <div className="Right" style={{ width: '192px'}}>
+          <div className="Right" style={{ width: '192px' }}>
             <Search allowClear placeholder={_l('搜索')} onSearch={keywords => this.setState({ keywords })} />
           </div>
         </div>
@@ -239,7 +247,9 @@ class RoleDetail extends React.Component {
           >
             {_l('权限详情')}
           </span>
-          {addAuth && tab === 'permissions' ? <span className="Right LineHeight30 Gray_9e">{_l('允许角色成员授予他人拥有相同权限（已开启）')}</span> : null}
+          {addAuth && tab === 'permissions' ? (
+            <span className="Right LineHeight30 Gray_9e">{_l('允许角色成员授予他人拥有相同权限（已开启）')}</span>
+          ) : null}
         </div>
         {tab !== 'permissions' ? (
           <UserList

@@ -6,6 +6,8 @@ export const sheetDiscussions = (state = [], action) => {
       return action.data;
     case 'MOBILE_ADD_SHEET_DISCUSSION':
       return Object.assign([], state.concat(action.data));
+    case 'MOBILE_UNSHIFT_SHEET_DISCUSSION':
+      return [action.data].concat(state);
     default:
       return state;
   }
@@ -25,15 +27,6 @@ export const sheetLogs = (state = [], action) => {
 export const sheetAttachments = (state = [], action) => {
   switch (action.type) {
     case 'MOBILE_SET_SHEET_ATTACHMENTS':
-      return action.data;
-    default:
-      return state;
-  }
-}
-
-export const discussionCount = (state = 0, action) => {
-  switch (action.type) {
-    case 'MOBILE_SET_DISCUSSION_COUNT':
       return action.data;
     default:
       return state;

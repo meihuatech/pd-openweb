@@ -1,6 +1,7 @@
 import { isEmpty, head, pick } from 'lodash';
 import { v4 as uuidv4 } from 'uuid';
 import { WHOLE_SIZE } from './Drag';
+import { NUM_5_SETTINGS } from './score';
 
 const getDefaultOptions = () => {
   return [
@@ -59,6 +60,11 @@ export const WIDGETS_TO_API_TYPE_ENUM = {
   SIGNATURE: 42,
   OCR: 43,
   EMBED: 45,
+  TIME: 46,
+  BAR_CODE: 47,
+  ORG_ROLE: 48,
+  SEARCH_BTN: 49,
+  SEARCH: 50,
   REMARK: 10010,
 };
 
@@ -108,16 +114,19 @@ export const DEFAULT_CONFIG = {
     icon: 'arrow_drop_down_circle',
     widgetName: _l('单选'),
     intro: _l('从预设的下拉菜单中选择一项，可设为将选项平铺'),
+    moreIntroLink: 'https://help.mingdao.com/sheet21.html',
   },
   MULTI_SELECT: {
     icon: 'multi_select',
     widgetName: _l('多选'),
     intro: _l('从预设的选项中选择一项或者多项'),
+    moreIntroLink: 'https://help.mingdao.com/sheet21.html',
   },
   DROP_DOWN: {
     icon: 'arrow_drop_down_circle',
     widgetName: _l('单选'),
     intro: _l('从预设的下拉菜单中选择一项，可设为将选项平铺'),
+    moreIntroLink: 'https://help.mingdao.com/sheet21.html',
   },
   ATTACHMENT: {
     icon: 'attachment',
@@ -135,7 +144,12 @@ export const DEFAULT_CONFIG = {
     widgetName: _l('日期'),
     intro: _l('可设为日期 或 日期+时间'),
   },
-  AREA_PROVINCE: { icon: 'map', widgetName: _l('地区'), intro: _l('从预设的地址中进行选择') },
+  AREA_PROVINCE: {
+    icon: 'map',
+    widgetName: _l('地区'),
+    intro: _l('从预设的地址中进行选择'),
+    moreIntroLink: 'https://help.mingdao.com/diqu.html',
+  },
   RELATION: {
     icon: 'device_hub',
     widgetName: _l('自由连接'),
@@ -154,8 +168,18 @@ export const DEFAULT_CONFIG = {
     intro: _l('对表单进行分段'),
     minSize: WHOLE_SIZE,
   },
-  AREA_CITY: { icon: 'map', widgetName: _l('地区'), intro: _l('从预设的地址中进行选择') },
-  AREA_COUNTY: { icon: 'map', widgetName: _l('地区'), intro: _l('从预设的地址中进行选择') },
+  AREA_CITY: {
+    icon: 'map',
+    widgetName: _l('地区'),
+    intro: _l('从预设的地址中进行选择'),
+    moreIntroLink: 'https://help.mingdao.com/diqu.html',
+  },
+  AREA_COUNTY: {
+    icon: 'map',
+    widgetName: _l('地区'),
+    intro: _l('从预设的地址中进行选择'),
+    moreIntroLink: 'https://help.mingdao.com/diqu.html',
+  },
   MONEY_CN: {
     icon: 'amount_capital',
     widgetName: _l('大写金额'),
@@ -166,52 +190,62 @@ export const DEFAULT_CONFIG = {
     icon: 'account_circle',
     widgetName: _l('成员'),
     intro: _l('加入的成员将收到通知并允许查看记录。还可以通过角色来控制权限'),
-    moreIntroLink: 'https://help.mingdao.com/sheet2.html',
+    moreIntroLink: 'https://help.mingdao.com/sheet27.html',
   },
   DEPARTMENT: { icon: 'department', widgetName: _l('部门'), intro: _l('选择组织中的部门') },
-  SCORE: { icon: 'star', widgetName: _l('等级'), intro: _l('标记为5星或10级') },
+  SCORE: { icon: 'star', widgetName: _l('等级'), intro: _l('可输入1～10的数值') },
   RELATE_SHEET: {
     icon: 'link_record',
     widgetName: _l('关联记录'),
     intro: _l('关联相关工作表，可以从中引用或创建记录，如：订单关联商品'),
-    moreIntroLink: 'https://help.mingdao.com/sheet2.html',
+    moreIntroLink: 'https://help.mingdao.com/sheet11.html',
     tip: _l(
       '关联多个工作表，联动数据，以反映实际业务关系。例如:《订单》表中，每个订单的“客户”字段从关联的《客户》表里选择1条“客户”记录来填入。',
     ),
   },
-  SHEET_FIELD: { icon: 'lookup', widgetName: _l('他表字段'), intro: _l('从关联的记录中选择字段显示在当前表中') },
+  SHEET_FIELD: {
+    icon: 'lookup',
+    widgetName: _l('他表字段'),
+    intro: _l('从关联的记录中选择字段显示在当前表中'),
+    moreIntroLink: 'https://help.mingdao.com/sheet17.html',
+  },
   CONCATENATE: {
     icon: 'category',
     widgetName: _l('文本组合'),
     intro: _l('将当前记录中的字段进行组合'),
+    moreIntroLink: 'https://help.mingdao.com/sheet10.html',
   },
   AUTO_ID: {
     icon: 'auto_number',
     widgetName: _l('自动编号'),
     intro: _l('为每条记录生成自定义规则的编号'),
+    moreIntroLink: 'https://help.mingdao.com/sheet15.html',
   },
   SUB_LIST: {
     icon: 'table',
     widgetName: _l('子表'),
     intro: _l('支持在表单中一次填入多条信息、比如一次填写多条费用明细'),
     minSize: WHOLE_SIZE,
+    moreIntroLink: 'https://help.mingdao.com/sheet22.html',
   },
-  SWITCH: { icon: 'checkbox_01', widgetName: _l('检查框'), intro: _l('可以选中或取消选中') },
+  SWITCH: { icon: 'checkbox_01', widgetName: _l('检查项'), intro: _l('可以选中或取消选中') },
   SUBTOTAL: {
     icon: 'sigma',
     widgetName: _l('汇总'),
     intro: _l('汇总关联记录或子表中的数据，如：汇总订单明细中的商品总价，最大支持汇总1000行数据。'),
-    moreIntroLink: 'https://help.mingdao.com/sheet2.html',
+    moreIntroLink: 'https://help.mingdao.com/sheet19.html',
   },
   FORMULA_NUMBER: {
     icon: 'formula',
     widgetName: _l('公式'),
     intro: _l('将当前记录中的字段进行数值或日期计算'),
+    moreIntroLink: 'https://help.mingdao.com/sheet18.html',
   },
   FORMULA_DATE: {
     icon: 'formula',
     widgetName: _l('公式'),
     intro: _l('将当前记录中的字段进行数值或日期计算'),
+    moreIntroLink: 'https://help.mingdao.com/sheet18.html',
   },
   LOCATION: {
     icon: 'location_on',
@@ -239,13 +273,13 @@ export const DEFAULT_CONFIG = {
     icon: 'cascade_selection',
     widgetName: _l('级联选择'),
     intro: _l('以层级视图作为数据源来选择目标表的记录,仅支持本表关联'),
-    moreIntroLink: 'https://help.mingdao.com/sheet2.html',
+    moreIntroLink: 'https://help.mingdao.com/sheet26.html',
   },
   OCR: {
     icon: 'ocr',
     widgetName: _l('文本识别'),
     intro: _l('识别输入图片，将识别结果填充到对应字段。'),
-    moreIntroLink: 'https://help.mingdao.com/sheet2.html',
+    moreIntroLink: 'https://help.mingdao.com/ocr.html',
   },
   REMARK: {
     widgetName: _l('备注'),
@@ -260,6 +294,33 @@ export const DEFAULT_CONFIG = {
     icon: 'code',
     intro: _l('在表单中嵌入URL，支持使用其他字段值传参'),
   },
+  BAR_CODE: {
+    widgetName: _l('条码'),
+    icon: 'a-barcode',
+    intro: _l('可将关联的数据源转成条形码或二维码显示'),
+  },
+  TIME: {
+    icon: 'access_time',
+    widgetName: _l('时间'),
+    intro: _l('可设为小时分钟秒'),
+    moreIntroLink: 'https://help.mingdao.com/sheet2.html#时间',
+  },
+  ORG_ROLE: {
+    icon: 'user',
+    widgetName: _l('组织角色'),
+    intro: _l('选择组织中的角色，支持配置选择的组织角色的权限。'),
+    moreIntroLink: 'https://help.mingdao.com/sheet42.html',
+  },
+  SEARCH_BTN: {
+    icon: 'api',
+    widgetName: _l('API查询'),
+    featureId: 5,
+  },
+  SEARCH: {
+    icon: 'api',
+    widgetName: _l('API查询'),
+    featureId: 5,
+  },
 };
 
 export const DEFAULT_DATA = {
@@ -268,6 +329,9 @@ export const DEFAULT_DATA = {
     size: 12,
     enumDefault: 2,
     hint: _l('请填写文本内容'),
+    advancedSetting: {
+      analysislink: '1',
+    },
   },
   MOBILE_PHONE: {
     controlName: _l('手机'),
@@ -295,6 +359,9 @@ export const DEFAULT_DATA = {
     size: 6,
     dot: 0,
     hint: _l('请填写数值'),
+    advancedSetting: {
+      showtype: '0',
+    },
   },
   CRED: {
     controlName: _l('证件'),
@@ -307,7 +374,7 @@ export const DEFAULT_DATA = {
     size: 6,
     enumDefault: 0,
     enumDefault2: 2,
-    unit: _l('元'),
+    // unit: _l('元'),
     dot: 2,
     hint: _l('请填写金额'),
     advancedSetting: {
@@ -327,6 +394,7 @@ export const DEFAULT_DATA = {
     enumDefault2: 1,
     advancedSetting: {
       direction: '0',
+      checktype: '0',
     },
   },
   DROP_DOWN: {
@@ -334,6 +402,10 @@ export const DEFAULT_DATA = {
     controlName: _l('单选'),
     size: 6,
     enumDefault2: 1,
+    hint: _l('请选择'),
+    advancedSetting: {
+      showtype: '0',
+    },
   },
   ATTACHMENT: {
     controlName: _l('附件'),
@@ -343,11 +415,17 @@ export const DEFAULT_DATA = {
     controlName: _l('日期'),
     size: 6,
     hint: _l('请选择日期'),
+    advancedSetting: {
+      showtype: '3',
+    },
   },
   DATE_TIME: {
     controlName: _l('日期'),
     size: 6,
     hint: _l('请选择日期'),
+    advancedSetting: {
+      showtype: '1',
+    },
   },
   AREA_PROVINCE: {
     controlName: _l('地区'),
@@ -359,8 +437,11 @@ export const DEFAULT_DATA = {
     enumDefault: 0,
   },
   SPLIT_LINE: {
-    controlName: _l(''),
+    controlName: _l('分割线'),
     size: 12,
+    advancedSetting: {
+      hidetitle: '1',
+    },
   },
   AREA_CITY: {
     controlName: _l('地区'),
@@ -380,20 +461,25 @@ export const DEFAULT_DATA = {
     hint: _l('请选择成员'),
     enumDefault: 0,
     userPermission: 1,
-    noticeItem: 1,
+    noticeItem: 0,
   },
   DEPARTMENT: {
     controlName: _l('部门'),
     size: 6,
     enumDefault: 0,
+    userPermission: 1,
   },
   SCORE: {
     controlName: _l('等级'),
     size: 6,
     enumDefault: 1,
+    advancedSetting: NUM_5_SETTINGS,
   },
   RELATE_SHEET: {
     controlName: _l('关联记录'),
+    advancedSetting: {
+      allowlink: '1',
+    },
     size: 12,
     strDefault: '000',
     enumDefault: 1,
@@ -403,12 +489,16 @@ export const DEFAULT_DATA = {
     controlName: _l('他表字段'),
     size: 6,
     enumDefault: 1,
+    strDefault: '10',
     dataSource: '',
     sourceControlId: '', // 字段id
   },
   CONCATENATE: {
     controlName: _l('文本组合'),
     size: 12,
+    advancedSetting: {
+      analysislink: '1',
+    },
   },
   AUTO_ID: {
     advancedSetting: {
@@ -430,10 +520,11 @@ export const DEFAULT_DATA = {
     },
   },
   SWITCH: {
-    controlName: _l('检查框'),
+    controlName: _l('检查项'),
     size: 6,
     advancedSetting: {
       defsource: '[{"cid":"","rcid":"","staticValue":"0"}]',
+      showtype: '0',
     },
   },
   SUBTOTAL: {
@@ -458,6 +549,7 @@ export const DEFAULT_DATA = {
     controlName: _l('定位'),
     size: 6,
     enumDefault2: 0,
+    strDefault: '00',
   },
   RICH_TEXT: {
     controlName: _l('富文本'),
@@ -466,6 +558,9 @@ export const DEFAULT_DATA = {
   SIGNATURE: {
     controlName: _l('签名'),
     size: 6,
+    advancedSetting: {
+      uselast: '1',
+    },
   },
   CASCADER: {
     controlName: _l('级联选择'),
@@ -473,7 +568,10 @@ export const DEFAULT_DATA = {
   },
   REMARK: {
     size: 12,
-    controlName: _l(''),
+    controlName: _l('备注'),
+    advancedSetting: {
+      hidetitle: '1',
+    },
   },
   OCR: {
     size: 6,
@@ -488,8 +586,47 @@ export const DEFAULT_DATA = {
       height: 400,
     },
   },
+  BAR_CODE: {
+    size: 12,
+    controlName: _l('条码'),
+    enumDefault: 1,
+    advancedSetting: {
+      width: 160,
+    },
+  },
+  TIME: {
+    size: 6,
+    controlName: _l('时间'),
+    unit: '1',
+  },
+  ORG_ROLE: {
+    controlName: _l('组织角色'),
+    size: 6,
+    enumDefault: 0,
+    userPermission: 1,
+  },
+  SEARCH_BTN: {
+    controlName: _l('API查询'),
+    size: 6,
+    enumDefault: 0,
+    hint: _l('查询'),
+  },
+  SEARCH: {
+    controlName: _l('API查询'),
+    size: 6,
+  },
 };
-
+export const WORKFLOW_SYSTEM_CONTROL = [
+  { controlId: 'wfname', controlName: _l('流程名称'), type: 2, display: true },
+  { controlId: 'wfstatus', controlName: _l('状态'), type: 2, display: true },
+  { controlId: 'wfcuaids', controlName: _l('节点负责人'), type: 26, display: true },
+  { controlId: 'wfrtime', controlName: _l('节点开始时间'), type: 16, display: true },
+  { controlId: 'wfftime', controlName: _l('剩余时间'), type: 38, display: true },
+  { controlId: 'wfcaid', controlName: _l('发起人'), type: 26, display: true },
+  { controlId: 'wfctime', controlName: _l('发起时间'), type: 16, display: true },
+  { controlId: 'rowid', controlName: _l('记录ID'), type: 2, display: true },
+];
+export const SYSTEM_PERSON_CONTROL = [{ controlId: 'uaid', controlName: _l('最近修改人'), type: 26, display: true }];
 export const SYSTEM_DATE_CONTROL = [
   {
     controlId: 'ctime',
@@ -507,6 +644,13 @@ export const SYSTEM_DATE_CONTROL = [
   },
 ];
 export const SYSTEM_CONTROL = [
+  // {
+  //   controlId: 'caid',
+  //   controlName: _l('创建者'),
+  //   controlPermissions: '100',
+  //   type: 26,
+  //   display: true,
+  // },
   {
     controlId: 'ownerid',
     controlName: _l('拥有者'),
@@ -518,11 +662,49 @@ export const SYSTEM_CONTROL = [
   {
     controlId: 'caid',
     controlName: _l('创建者'),
-    controlPermissions: '100',
     type: 26,
     display: true,
   },
   ...SYSTEM_DATE_CONTROL,
+];
+
+export const SYSTEM_CONTROL_WITH_UAID = [
+  {
+    controlId: 'ownerid',
+    controlName: _l('拥有者'),
+    controlPermissions: '111',
+    type: 26,
+    enumDefault: 0,
+    display: true,
+  },
+  {
+    controlId: 'caid',
+    controlName: _l('创建者'),
+    type: 26,
+    display: true,
+  },
+  {
+    controlId: 'ctime',
+    controlName: _l('创建时间'),
+    controlPermissions: '100',
+    type: 16,
+    display: true,
+  },
+  {
+    controlId: 'uaid',
+    controlName: _l('最近修改人'),
+    controlPermissions: '111',
+    type: 26,
+    enumDefault: 0,
+    display: true,
+  },
+  {
+    controlId: 'utime',
+    controlName: _l('最近修改时间'),
+    controlPermissions: '100',
+    type: 16,
+    display: true,
+  },
 ];
 
 // 表单内需要排除的系统字段
@@ -531,20 +713,25 @@ export const FORM_HIDDEN_CONTROL_IDS = ['ownerid', 'caid', 'ctime', 'utime', 'da
 // 系统字段
 export const SYS = SYSTEM_CONTROL.map(o => o.controlId);
 
+// 全部系统字段
+export const ALL_SYS = SYS.concat(WORKFLOW_SYSTEM_CONTROL.map(o => o.controlId)).concat('uaid');
+
 export const COMMON_USE_WIDGETS = pick(DEFAULT_CONFIG, [
   'TEXT',
   'NUMBER',
   'MONEY',
   'EMAIL',
   'DATE',
-  // 'DATE_TIME_RANGE',
+  'TIME',
   'MOBILE_PHONE',
+  'AREA_COUNTY',
+  // 'DATE_TIME_RANGE',
   'DROP_DOWN',
   'MULTI_SELECT',
   'USER_PICKER',
+  'DEPARTMENT',
+  'ORG_ROLE',
   'ATTACHMENT',
-  'AREA_COUNTY',
-  'LOCATION',
 ]);
 
 export const ADVANCE_WIDGETS = pick(DEFAULT_CONFIG, [
@@ -555,9 +742,11 @@ export const ADVANCE_WIDGETS = pick(DEFAULT_CONFIG, [
   'AUTO_ID',
   'RICH_TEXT',
   'CRED',
-  'DEPARTMENT',
+  'LOCATION',
   'SIGNATURE',
   'OCR',
+  'SEARCH_BTN',
+  'BAR_CODE',
 ]);
 
 export const RELATE_WIDGETS = pick(DEFAULT_CONFIG, ['RELATE_SHEET', 'SUB_LIST', 'CASCADER', 'SHEET_FIELD', 'SUBTOTAL']);
@@ -570,3 +759,16 @@ export const WIDGET_GROUP_TYPE = {
   RELATE: { widgets: RELATE_WIDGETS, title: _l('关联') },
   SPECIAL: { widgets: SPECIAL_WIDGETS, title: _l('特殊控件') },
 };
+
+export const NORMAL_CONTROLS = ['uaid', 'rowid'];
+
+export const SYS_CONTROLS = [
+  ...NORMAL_CONTROLS,
+  'wfname',
+  'wfcuaids',
+  'wfcaid',
+  'wfctime',
+  'wfrtime',
+  'wfftime',
+  'wfstatus',
+];

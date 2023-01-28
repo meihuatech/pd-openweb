@@ -8,6 +8,7 @@ import { TABS } from '../index';
 import SvgIcon from 'src/components/SvgIcon';
 import { getDateScope } from '../config';
 import './index.less';
+import _ from 'lodash';
 
 const selectArrowIcon = <Icon icon="expand_more" className="Gray_9e Font20" />;
 
@@ -302,7 +303,8 @@ export default class Filter extends Component {
       <div className="mBottom16">
         <div className="Font12 mBottom10">{_l('处理结果')}</div>
         <Select
-          value={value ? value : <span className="Gray_c">{_l('请选择')}</span>}
+          value={value}
+          placeholder={_l('请选择')}
           className="w100 selectWrapper"
           suffixIcon={selectArrowIcon}
           onChange={index => {
@@ -326,7 +328,8 @@ export default class Filter extends Component {
       <div className="mBottom16">
         <div className="Font12 mBottom10">{_l('状态')}</div>
         <Select
-          value={value !== null ? value : <span className="Gray_c">{_l('请选择')}</span>}
+          value={value}
+          placeholder={_l('请选择')}
           className="w100 selectWrapper"
           suffixIcon={selectArrowIcon}
           onChange={index => {

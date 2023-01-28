@@ -1,6 +1,7 @@
+import _ from 'lodash';
 /* 可以作为文本拼接的控件 */
 export const CAN_AS_TEXT_DYNAMIC_FIELD = [
-  2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 15, 16, 19, 23, 24, 25, 26, 27, 28, 31, 32, 33,
+  2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 15, 16, 19, 23, 24, 25, 26, 27, 28, 31, 32, 33, 46, 50,
 ];
 
 /* 可以作为嵌入的控件 */
@@ -14,8 +15,11 @@ export const CAN_AS_DEPARTMENT_DYNAMIC_FIELD = [26, 27];
 // 可以作为数值动态值的控件
 export const CAN_AS_NUMBER_DYNAMIC_FIELD = [6, 8, 28];
 
+// 可以作为日期|时间动态值的控件
+export const CAN_AS_DATE_TIME_DYNAMIC_FIELD = [15, 16];
+
 // 可以作为时间动态值的控件
-export const CAN_AS_TIME_DYNAMIC_FIELD = [15, 16];
+export const CAN_AS_TIME_DYNAMIC_FIELD = [15, 16, 46];
 
 // 可以作为地区动态值的控件
 export const CAN_AS_AREA_DYNAMIC_FIELD = [19, 23, 24];
@@ -29,8 +33,11 @@ export const CAN_AS_SCORE_DYNAMIC_FIELD = [6, 8, 28];
 // 可以作为检查框动态值的控件
 export const CAN_AS_SWITCH_DYNAMIC_FIELD = [36];
 
+// 可以作为组织角色的控件
+export const CAN_AS_ORG_ROLE_DYNAMIC_FIELD = [48, 26];
+
 // 有其他动态值的控件
-export const CAN_AS_OTHER_DYNAMIC_FIELD = [15, 16, 26, 27];
+export const CAN_AS_OTHER_DYNAMIC_FIELD = [15, 16, 26, 27, 46, 48];
 
 // 有函数动态值的控件
 export const CAN_AS_FX_DYNAMIC_FIELD = [2, 3, 4, 5, 6, 8, 15, 16, 36];
@@ -39,7 +46,13 @@ export const CAN_AS_FX_DYNAMIC_FIELD = [2, 3, 4, 5, 6, 8, 15, 16, 36];
 export const CAN_NOT_AS_FIELD_DYNAMIC_FIELD = [34];
 
 //日期
-export const CAN_SHOW_CLEAR_FIELD = [15, 16];
+export const CAN_SHOW_CLEAR_FIELD = [15, 16, 46];
+
+// 普通数组
+export const CAN_AS_ARRAY_DYNAMIC_FIELD = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 15, 16, 19, 23, 24, 28, 46];
+
+// 对象数组
+export const CAN_AS_ARRAY_OBJECT_DYNAMIC_FIELD = [29, 34];
 
 export const SYSTEM_TIME = [
   {
@@ -58,26 +71,55 @@ export const SYSTEM_FIELD_TO_TEXT = {
   caid: _l('创建者'),
   utime: _l('最近修改时间'),
   ownerid: _l('拥有者'),
+  rowid: _l('记录ID'),
+  uaid: _l('最近修改人'),
+  wfname: _l('流程名称'),
+  wfcuaids: _l('节点负责人'),
+  wfcaid: _l('发起人'),
+  wfctime: _l('发起时间'),
+  wfrtime: _l('节点开始时间'),
+  wfftime: _l('剩余时间'),
+  wfstatus: _l('状态'),
 };
 
 // 控件规则匹配规则 未保存的控件正则 匹配uuid 已保存的控件正则 形如 $5e047c2ab2bfdd0001e9b8f9$
 export const FIELD_REG_EXP =
-  /\$((\w{8}(-\w{4}){3}-\w{12})|(\w{24}|caid|ownerid|utime|ctime)?)(~((\w{8}(-\w{4}){3}-\w{12})|(\w{24}|caid|ownerid|utime|ctime)?))?\$/g;
+  /\$((\w{8}(-\w{4}){3}-\w{12})|(\w{24}|caid|ownerid|utime|ctime|userId|phone|email|projectId|appId|groupId|worksheetId|viewId|recordId|ua|timestamp|search-keyword|wfname|wfcuaids|wfcaid|wfctime|wfrtime|wfftime|wfstatus|rowid|uaid)?)(~((\w{8}(-\w{4}){3}-\w{12})|(\w{24}|caid|ownerid|utime|ctime|userId|phone|email|projectId|appId|groupId|worksheetId|viewId|recordId|ua|timestamp|search-keyword|wfname|wfcuaids|wfcaid|wfctime|wfrtime|wfftime|wfstatus|rowid|uaid)?))?\$/g;
 
 export const TIME_TYPES = [
   {
     value: '2',
     id: 'current',
-    text: _l('当前时间'),
+    text: _l('此刻'),
     key: 'date',
+    icon: 'icon-event',
   },
 ];
 export const DATE_TYPES = [
   {
     value: '2',
     id: 'current',
-    text: _l('当前日期'),
+    text: _l('此刻'),
     key: 'date',
+    icon: 'icon-event',
+  },
+];
+export const CUR_TIME_TYPES = [
+  {
+    value: '2',
+    id: 'current',
+    text: _l('此刻'),
+    key: 'time',
+    icon: 'icon-access_time',
+  },
+];
+
+export const CUR_SEARCH_TYPES = [
+  {
+    icon: 'icon-search',
+    key: 'keyword',
+    id: 'search-keyword',
+    text: _l('搜索内容'),
   },
 ];
 
@@ -97,6 +139,7 @@ export const CONTROL_TYPE = {
   9: 'option',
   10: 'option',
   11: 'option',
+  14: 'attachment',
   15: 'date',
   16: 'date',
   19: 'area',
@@ -108,6 +151,12 @@ export const CONTROL_TYPE = {
   29: 'relateSheet',
   34: 'subList',
   36: 'switch',
+  46: 'time',
+  48: 'role',
+
+  // 来自api查询的特殊类型
+  10000007: 'array',
+  10000008: 'array_object',
 };
 
 export const VALIDATE_REG = {
@@ -131,17 +180,91 @@ export const OTHER_FIELD_TYPE = {
   DEPT: 'dept',
   USER: 'user',
   DATE: 'date',
+  TIME: 'time',
+  ROLE: 'role',
+  KEYWORD: 'keyword',
 };
 
 export const CURRENT_TYPES = {
   15: DATE_TYPES,
   16: TIME_TYPES,
-  26: [{ key: 'user', id: 'caid', text: _l('当前用户') }],
-  27: [{ key: 'dept', id: 'user-departments', text: _l('当前用户所在部门') }],
+  26: [{ icon: 'icon-account_circle', key: 'user', id: 'user-self', text: _l('当前用户') }],
+  27: [{ icon: 'icon-department', key: 'dept', id: 'user-departments', text: _l('当前用户所在部门') }],
+  46: CUR_TIME_TYPES,
+  48: [{ icon: 'icon-group', key: 'role', id: 'user-role', text: _l('当前用户的组织角色') }],
+  2: CUR_SEARCH_TYPES,
+  6: CUR_SEARCH_TYPES,
 };
 
 export const DEFAULT_TYPES = {
   0: 'dynamiccustom',
   1: 'defaultfunc',
   2: 'dynamicsrc',
+};
+
+export const USER_LIST = [
+  {
+    text: _l('用户ID'),
+    id: 'userId',
+  },
+  {
+    text: _l('手机号'),
+    id: 'phone',
+  },
+
+  {
+    text: _l('邮箱'),
+    id: 'email',
+  },
+];
+
+export const SYSTEM_LIST = [
+  {
+    text: _l('组织门牌号'),
+    id: 'projectId',
+  },
+  {
+    text: _l('应用ID'),
+    id: 'appId',
+  },
+  {
+    text: _l('分组ID'),
+    id: 'groupId',
+  },
+  {
+    text: _l('工作表ID'),
+    id: 'worksheetId',
+  },
+  {
+    text: _l('视图ID'),
+    id: 'viewId',
+  },
+  {
+    text: _l('记录ID'),
+    id: 'recordId',
+  },
+  {
+    text: _l('UserAgent'),
+    id: 'ua',
+  },
+  {
+    text: _l('时间戳'),
+    id: 'timestamp',
+  },
+];
+
+export const EMEBD_FIELDS = [
+  {
+    name: _l('当前用户信息'),
+    list: USER_LIST,
+  },
+  {
+    name: _l('系统信息'),
+    list: SYSTEM_LIST,
+  },
+];
+
+export const DYNAMIC_FROM_MODE = {
+  CREATE_CUSTOM: 1, // 自定义
+  SEARCH_PARAMS: 2, // 查询输入参数
 };

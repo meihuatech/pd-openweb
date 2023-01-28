@@ -11,6 +11,7 @@ import * as actions from 'worksheet/redux/actions/gunterview';
 import NewRecord from 'worksheet/common/newRecord/NewRecord';
 import { isOpenPermit } from 'src/pages/FormSet/util.js';
 import { permitList } from 'src/pages/FormSet/config.js';
+import _ from 'lodash';
 
 const GroupingItem = styled.div`
   width: 100%;
@@ -68,13 +69,13 @@ export default class Grouping extends Component {
     } else {
       const defaultFormData = {};
       if (viewControl) {
-        const groupControl = _.find(controls, { controlId: viewControl });
-        let { key: value, name } = _.find(grouping, { key: groupId });
+        const groupControl = _.find(controls, { controlId: viewControl }) || {};
+        let { key: value, name } = _.find(grouping, { key: groupId }) || {};
         if ([29].includes(groupControl.type)) {
           value = JSON.stringify([{ sid: groupId, name }]);
         }
         if ([9, 11].includes(groupControl.type)) {
-          const { key } = _.find(groupControl.options, { key: groupId });
+          const { key } = _.find(groupControl.options, { key: groupId }) || {};
           value = JSON.stringify([key]);
         }
         if (value === '-1') {

@@ -1,7 +1,8 @@
 import React, { Component, Fragment } from 'react';
 import cx from 'classnames';
 import { CreateNode, NodeOperate } from '../components';
-import { TRIGGER_ID_TYPE } from '../../enum';
+import { ACTION_ID } from '../../enum';
+import _ from 'lodash';
 
 export default class GetMoreRecord extends Component {
   constructor(props) {
@@ -14,12 +15,16 @@ export default class GetMoreRecord extends Component {
   renderContent() {
     const { item } = this.props;
     const text = {
-      [TRIGGER_ID_TYPE.FROM_WORKSHEET]: _l('从工作表获取多条记录'),
-      [TRIGGER_ID_TYPE.FROM_RECORD]: _l('从一条记录获取多条关联记录'),
-      [TRIGGER_ID_TYPE.FROM_ADD]: _l('从新增记录节点获取多条记录'),
-      [TRIGGER_ID_TYPE.FROM_ARRAY]: _l('从Webhook数组获取数据'),
-      [TRIGGER_ID_TYPE.FROM_CODE]: _l('从代码块数组获取数据'),
-      [TRIGGER_ID_TYPE.FROM_ARTIFICIAL]: _l('从人工节点获取操作明细数据'),
+      [ACTION_ID.FROM_WORKSHEET]: _l('从工作表获取多条记录'),
+      [ACTION_ID.FROM_RECORD]: _l('从一条记录获取多条关联记录'),
+      [ACTION_ID.FROM_ADD]: _l('从新增记录节点获取多条记录'),
+      [ACTION_ID.FROM_ARRAY]: _l('从发送API请求数组获取数据'),
+      [ACTION_ID.FROM_CODE_ARRAY]: _l('从代码块数组获取数据'),
+      [ACTION_ID.FROM_ARTIFICIAL]: _l('从人工节点获取操作明细数据'),
+      [ACTION_ID.FROM_PBC_INPUT_ARRAY]: _l('从业务流程输入数组获取数据'),
+      [ACTION_ID.FROM_PBC_OUTPUT_ARRAY]: _l('从业务流程输出数组获取数据'),
+      [ACTION_ID.FROM_API_ARRAY]: _l('从API数组获取数据'),
+      [ACTION_ID.FROM_JSON_PARSE_ARRAY]: _l('从JSON解析数组获取数据'),
     };
 
     if (!item.appId && !item.selectNodeId) {
@@ -35,7 +40,19 @@ export default class GetMoreRecord extends Component {
       );
     }
 
-    if (_.includes([TRIGGER_ID_TYPE.FROM_ARRAY, TRIGGER_ID_TYPE.FROM_CODE], item.actionId)) {
+    if (
+      _.includes(
+        [
+          ACTION_ID.FROM_ARRAY,
+          ACTION_ID.FROM_CODE_ARRAY,
+          ACTION_ID.FROM_PBC_INPUT_ARRAY,
+          ACTION_ID.FROM_PBC_OUTPUT_ARRAY,
+          ACTION_ID.FROM_API_ARRAY,
+          ACTION_ID.FROM_JSON_PARSE_ARRAY,
+        ],
+        item.actionId,
+      )
+    ) {
       return <div className="pLeft8 pRight8 ellipsis Gray_75">{text[item.actionId]}</div>;
     }
 
@@ -50,7 +67,7 @@ export default class GetMoreRecord extends Component {
   }
 
   render() {
-    const { item, disabled, selectNodeId, openDetail } = this.props;
+    const { processId, item, disabled, selectNodeId, openDetail } = this.props;
 
     return (
       <div className="flexColumn">
@@ -62,7 +79,7 @@ export default class GetMoreRecord extends Component {
               { errorShadow: (item.appId || item.selectNodeId) && item.isException },
               { active: selectNodeId === item.id },
             )}
-            onMouseDown={() => !disabled && openDetail(item.id, item.typeId)}
+            onMouseDown={() => !disabled && openDetail(processId, item.id, item.typeId)}
           >
             <div className="workflowAvatars flexRow">
               <i

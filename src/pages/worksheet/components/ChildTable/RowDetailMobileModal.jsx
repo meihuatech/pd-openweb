@@ -8,7 +8,7 @@ const alert = Modal.alert;
 
 export default function RowDetailModal(props) {
   const {
-    disabled,
+    mobileIsEdit,
     className,
     data,
     title,
@@ -20,7 +20,8 @@ export default function RowDetailModal(props) {
     allowDelete
   } = props;
   const formContent = useRef(null);
-  const type = (!_.isEmpty(data.updatedControlIds) || !data.rowid.includes('temp')) ? 'edit' : 'new';
+  const type = mobileIsEdit ? (data.rowid.includes('temp') || data.rowid.includes('default')) ? 'new' : 'edit' : 'edit';
+  const disabled = mobileIsEdit ? props.disabled : true;
   const content = (
     <div className="rowDetailCon flexColumn" style={{ height: '100%' }}>
       <div className={cx('header flexRow valignWrapper', type)}>
@@ -28,16 +29,16 @@ export default function RowDetailModal(props) {
         {type === 'edit' && (
           <div className="flex leftAlign">
             <i
-              className={cx('headerBtn icon icon-arrow-up-border mRight8 Font18', { Gray_df: switchDisabled.prev })}
-              onClick={() => !switchDisabled.prev && onSwitch({ prev: true })}
+              className={cx('headerBtn icon icon-arrow-up-border mRight8 Font18', { Gray_df: switchDisabled.prev || mobileIsEdit })}
+              onClick={() => !(switchDisabled.prev || mobileIsEdit) && onSwitch({ prev: true })}
             ></i>
             <i
-              className={cx('headerBtn icon icon-arrow-down-border Font18', { Gray_df: switchDisabled.next })}
-              onClick={() => !switchDisabled.next && onSwitch({ next: true })}
+              className={cx('headerBtn icon icon-arrow-down-border Font18', { Gray_df: switchDisabled.next || mobileIsEdit })}
+              onClick={() => !(switchDisabled.next || mobileIsEdit) && onSwitch({ next: true })}
             ></i>
           </div>
         )}
-        {type === 'edit' && !disabled && allowDelete && (
+        {!props.disabled && allowDelete && (
           <i
             className="headerBtn icon icon-task-new-delete mRight10 Font18"
             onClick={() => {

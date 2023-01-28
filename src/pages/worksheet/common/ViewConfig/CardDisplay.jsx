@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { getWorksheetInfo, saveWorksheetControls } from 'src/api/worksheet';
+import worksheetAjax from 'src/api/worksheet';
 import Abstract from './components/Abstract';
 import CoverSetting from './components/CoverSettingCon';
 import DisplayControl from './components/DisplayControl';
+import _ from 'lodash';
 
 export default function CardDisplay(props) {
   const {
@@ -28,7 +29,7 @@ export default function CardDisplay(props) {
   };
   useEffect(() => {
     if (!worksheetId) return;
-    getWorksheetInfo({ worksheetId, getTemplate: true }).then(data => {
+    worksheetAjax.getWorksheetInfo({ worksheetId, getTemplate: true }).then(data => {
       const controls = _.get(data, ['template', 'controls']);
       const excludedTitle = excludeTitleControls(controls);
       const defaultShowControls = getDefaultShowControls(excludedTitle);
@@ -86,7 +87,6 @@ export default function CardDisplay(props) {
             coverCid: value === 'notDisplay' ? '' : value,
           })
         }
-        fromRelative={true} // 关联表的相关设置
         // 显示位置
         handleChangePosition={(value, coverTypeValue) => {
           handleDisplayChange(

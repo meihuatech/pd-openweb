@@ -1,21 +1,26 @@
-import React from 'react';
+import React, { Fragment } from 'react';
 import { bindActionCreators } from 'redux';
 import { connect } from 'react-redux';
 import { Icon, ScrollView } from 'ming-ui';
-import { Select } from 'antd';
+import { Select, Tooltip } from 'antd';
 import * as actions from '../../redux/actions/action';
 import * as columnRules from '../../redux/actions/columnRules';
-import SingleFilter from './singleFilter/SingleFilter';
 import ActionDropDown from './actionDropdown/ActionDropDown';
 import handleSetMsg from './errorMsgDialog/ErrorMsg';
 import { actionsListData, originActionItem, getActionLabelByType, filterUnAvailable } from './config';
+import FilterConfig from 'src/pages/worksheet/common/WorkSheetFilter/common/FilterConfig';
+import { redefineComplexControl } from 'src/pages/worksheet/common/WorkSheetFilter/util';
+import { SYS_CONTROLS, SYS } from 'src/pages/widgetConfig/config/widget';
 import cx from 'classnames';
+import Trigger from 'rc-trigger';
+import _ from 'lodash';
 
 class EditBox extends React.Component {
   constructor(props) {
     super(props);
     this.state = {
-      name: '',
+      name: (props.selectRules || {}).name || '',
+      visible: false,
     };
   }
 
@@ -48,20 +53,40 @@ class EditBox extends React.Component {
       updateFilters,
       ruleError = {},
       updateFilterError,
-      editingId,
+      appId,
     } = this.props;
+    const filterControls = worksheetControls
+      .filter(i => !_.includes(['wfname', 'wfcuaids', 'wfcaid', 'wfctime', 'wfrtime', 'wfftime', 'rowid'], i.controlId))
+      .map(redefineComplexControl);
     return (
       <div className="conditionContainer">
         <div className="Font14 Bold">{_l('当满足以下条件时')}</div>
-        <SingleFilter
+        <FilterConfig
+          canEdit
+          feOnly
+          isRules={true}
+          supportGroup={true}
           projectId={projectId}
-          columns={worksheetControls}
-          filters={selectRules.filters}
-          editingId={editingId}
-          filterError={ruleError.filterError}
-          updateFilterError={updateFilterError}
-          onConditionsChange={conditions => {
-            updateFilters(conditions);
+          appId={appId}
+          from={'rule'}
+          columns={filterControls}
+          currentColumns={filterControls}
+          conditions={selectRules.filters}
+          filterError={ruleError.filterError || []}
+          onConditionsChange={(conditions = []) => {
+            const newConditions = conditions.some(item => item.groupFilters)
+              ? conditions
+              : [
+                  {
+                    spliceType: 2,
+                    isGroup: true,
+                    groupFilters: conditions,
+                  },
+                ];
+            updateFilters(newConditions);
+            if ((_.flatten(ruleError.filterError) || []).filter(i => i).length) {
+              updateFilterError(newConditions);
+            }
           }}
         />
       </div>
@@ -70,6 +95,7 @@ class EditBox extends React.Component {
 
   renderAction = () => {
     const { selectRules = {}, updateAction, worksheetControls, ruleError = {}, updateActionError } = this.props;
+    const { visible } = this.state;
     let { ruleItems = [] } = selectRules;
     let listData;
 
@@ -80,7 +106,7 @@ class EditBox extends React.Component {
     ) {
       listData = actionsListData;
     } else {
-      listData = actionsListData.filter(it => _.includes([1, 2, 3, 4, 5, 6], it.value));
+      listData = actionsListData.filter(it => _.includes([1, 2, 3, 4, 5, 6, 7], it.value));
     }
 
     return (
@@ -141,7 +167,7 @@ class EditBox extends React.Component {
                   actionError={actionError}
                   actionType={actionItem.type}
                   values={actionItem.controls}
-                  dropDownData={worksheetControls}
+                  dropDownData={worksheetControls.filter(i => !_.includes(SYS_CONTROLS.concat(SYS), i.controlId))}
                   onChange={(key, value) => {
                     let currentActionData = { ...ruleItems[actionIndex] };
                     currentActionData[key] = value;
@@ -163,10 +189,41 @@ class EditBox extends React.Component {
             </div>
           );
         })}
-        <div className="addCondition" onClick={() => updateAction(ruleItems.concat(originActionItem), true)}>
-          <Icon icon="plus" className="mRight8" />
-          {_l('添加动作')}
-        </div>
+        <Trigger
+          popupVisible={visible}
+          onPopupVisibleChange={visible => {
+            this.setState({ visible });
+          }}
+          popupClassName="addConditionTrigger"
+          action={['click']}
+          mouseEnterDelay={0.1}
+          popupAlign={{ points: ['tl', 'bl'], offset: [0, 4] }}
+          popup={() => (
+            <Fragment>
+              {listData.map(i => (
+                <div onClick={() => updateAction(ruleItems.concat({ ...originActionItem, type: i.value }), true)}>
+                  {i.label}
+                  {i.value === 7 && (
+                    <Tooltip
+                      placement="bottom"
+                      title={_l(
+                        '锁定状态在记录保存后生效。锁定的记录不允许用户直接编辑，但可以通过自定义动作和工作流进行填写',
+                      )}
+                    >
+                      <i className="icon-info_outline Gray_9e Font16"></i>
+                    </Tooltip>
+                  )}
+                </div>
+              ))}
+            </Fragment>
+          )}
+          getPopupContainer={() => this.addAction}
+        >
+          <div className="addCondition" ref={con => (this.addAction = con)}>
+            <Icon icon="plus" className="mRight8" />
+            {_l('添加动作')}
+          </div>
+        </Trigger>
       </div>
     );
   };
@@ -199,6 +256,7 @@ const mapStateToProps = state => ({
   columnRulesListData: state.formSet.columnRulesListData,
   selectRules: state.formSet.selectRules,
   projectId: state.formSet.worksheetInfo.projectId,
+  appId: state.formSet.worksheetInfo.appId,
   ruleError: state.formSet.ruleError,
   editingId: state.formSet.editingId,
 });

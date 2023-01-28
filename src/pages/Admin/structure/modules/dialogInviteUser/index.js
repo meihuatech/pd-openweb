@@ -1,7 +1,6 @@
 import './style.less';
-var mdDialog = require('mdDialog').index;
-var render = require('./main');
-var util = require('../util');
+import { index as mdDialog} from 'src/components/mdDialog/dialog';
+import render from './main';
 
 var DialogInviteUser = function (opts) {
   var defaults = {
@@ -31,7 +30,7 @@ DialogInviteUser.prototype.init = function () {
       options.callback.call(null);
     },
     readyFn: function () {
-      let renderFn = (data) => {
+      let renderFn = data => {
         render($('.dialogInviteUser .app')[0], {
           projectId: options.projectId,
           jobInfos: options.jobInfos,
@@ -43,12 +42,12 @@ DialogInviteUser.prototype.init = function () {
             _this.dialog.dialogCenter();
           },
         });
-      }
-      renderFn()
+      };
+      renderFn();
     },
   });
 };
 
-module.exports = function (opts) {
+export default function (opts) {
   return new DialogInviteUser(opts);
 };

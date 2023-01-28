@@ -3,10 +3,10 @@ import { Dialog, Menu, MenuItem, LoadDiv, Dropdown, Checkbox } from 'ming-ui';
 import { useSetState } from 'react-use';
 import { Tooltip } from 'antd';
 import update from 'immutability-helper';
-import uuid from 'uuid/v4';
+import { v4 as uuidv4 } from 'uuid';
 import cx from 'classnames';
-import { getWorksheetInfo } from 'src/api/worksheet';
-import { changeSheet } from 'src/api/appManagement';
+import worksheetAjax from 'src/api/worksheet';
+import appManagementAjax from 'src/api/appManagement';
 import styled from 'styled-components';
 import { getSortData } from 'src/pages/worksheet/util';
 import SortColumns from 'src/pages/worksheet/components/SortColumns/SortColumns';
@@ -14,9 +14,15 @@ import SheetComponents from '../components/relateSheet';
 import { EditInfo, InfoWrap, SettingItem, WidgetIntroWrap } from '../../styled';
 import { getControlsSorts, getDefaultShowControls, handleAdvancedSettingChange } from '../../util/setting';
 import Components from '../components';
-import { canSetAsTitle, getAdvanceSetting, resortControlByColRow, dealControlData } from '../../util';
+import {
+  canSetAsTitle,
+  getAdvanceSetting,
+  resortControlByColRow,
+  dealControlData,
+  formatSearchConfigs,
+} from '../../util';
 import subListComponents from '../components/sublist';
-import _, { isEmpty, find, filter } from 'lodash';
+import _, { isEmpty, find, filter, findIndex } from 'lodash';
 import { DEFAULT_INTRO_LINK } from '../../config';
 import { DEFAULT_SETTING_OPTIONS } from '../../config/setting';
 import DynamicDefaultValue from '../components/DynamicDefaultValue';
@@ -49,6 +55,7 @@ export default function SubListSetting(props) {
   const { allowadd, allowsingle } = advancedSetting;
   const batchcids = getAdvanceSetting(data, 'batchcids') || [];
   const [sheetInfo, setInfo] = useState({});
+  const [subQueryConfigs, setSubQueryConfigs] = useState([]);
   const [subListMode, setMode] = useState('new');
   const [loading, setLoading] = useState(false);
   const [visible, setVisible] = useState(batchcids.length > 0);
@@ -65,6 +72,11 @@ export default function SubListSetting(props) {
 
   useEffect(() => {
     setVisible(batchcids.length > 0);
+    if (dataSource && window.subListSheetConfig[controlId]) {
+      const { sheetInfo, subQueryConfigs = [] } = window.subListSheetConfig[controlId] || {};
+      setInfo(sheetInfo);
+      setSubQueryConfigs(subQueryConfigs);
+    }
   }, [controlId]);
 
   useEffect(() => {
@@ -76,34 +88,68 @@ export default function SubListSetting(props) {
 
   useEffect(() => {
     const { saveIndex } = status;
-    if ((window.subListSheetConfig[dataSource] || {}).saveIndex === saveIndex) {
+    if ((window.subListSheetConfig[controlId] || {}).saveIndex === saveIndex) {
       return;
     }
-    if (saveIndex) {
+    if (saveIndex && dataSource && !dataSource.includes('-')) {
       setLoading(true);
-      getWorksheetInfo({ worksheetId: dataSource, getTemplate: true })
+      worksheetAjax
+        .getWorksheetInfo({ worksheetId: dataSource, getTemplate: true })
         .then(res => {
           const controls = _.get(res, ['template', 'controls']);
+          const saveData = _.find(allControls, i => i.controlId === data.controlId);
+
           // 关联表子表因为无法新增字段 所以不需要更新relationControls
           if (res.type !== 2) return;
           const { showControls } = allControls.find(item => item.controlId === controlId);
           onChange({
+            ...saveData,
             relationControls: dealControlData(controls),
             showControls,
           });
           window.subListSheetConfig = {
-            [dataSource]: {
+            [controlId]: {
               status: true,
               mode: res.type === 2 ? 'new' : 'relate',
               saveIndex,
+              sheetInfo: res,
             },
           };
+          getQueryConfigs(res);
         })
         .always(() => {
           setLoading(false);
         });
     }
   }, [status.saveIndex]);
+
+  const getQueryConfigs = ({ isWorksheetQuery, worksheetId }) => {
+    if (isWorksheetQuery) {
+      worksheetAjax.getQueryBySheetId({ worksheetId }).then(res => {
+        const formatSearchData = formatSearchConfigs(res);
+        setSubQueryConfigs(formatSearchData);
+        window.subListSheetConfig[controlId] = {
+          ...(window.subListSheetConfig[controlId] || {}),
+          subQueryConfigs: formatSearchData || [],
+        };
+      });
+    }
+  };
+
+  const updateSubQueryConfigs = (value = {}, mode) => {
+    const index = findIndex(subQueryConfigs, item => item.controlId === value.controlId);
+    let newQueryConfigs = subQueryConfigs.slice();
+    if (mode) {
+      index > -1 && newQueryConfigs.splice(index, 1);
+    } else {
+      index > -1 ? newQueryConfigs.splice(index, 1, value) : newQueryConfigs.push(value);
+    }
+    setSubQueryConfigs(newQueryConfigs);
+  };
+
+  const filterRelationControls = info => {
+    return (_.get(info, ['template', 'controls']) || []).filter(item => !_.includes([45, 47, 49], item.type));
+  };
 
   useEffect(() => {
     if (!dataSource) return;
@@ -112,28 +158,34 @@ export default function SubListSetting(props) {
       setMode('new');
       return;
     }
-    if ((window.subListSheetConfig[dataSource] || {}).status) {
-      setMode(_.get(window.subListSheetConfig[dataSource], 'mode'));
+    if ((window.subListSheetConfig[controlId] || {}).status) {
+      setMode(_.get(window.subListSheetConfig[controlId], 'mode'));
       return;
     }
     setLoading(true);
-    getWorksheetInfo({ worksheetId: dataSource, getTemplate: true })
+    worksheetAjax
+      .getWorksheetInfo({ worksheetId: dataSource, getTemplate: true })
       .then(res => {
-        const controls = _.get(res, ['template', 'controls']).filter(item => item.controlId !== 'ownerid');
+        const controls = filterRelationControls(res);
         const defaultShowControls = getDefaultShowControls(controls);
         setInfo(res);
-        window.subListSheetConfig[dataSource] = {
+        window.subListSheetConfig[controlId] = {
           status: true,
           mode: res.type === 2 ? 'new' : 'relate',
           saveIndex: status.saveIndex,
+          sheetInfo: res,
         };
         setMode(res.type === 2 ? 'new' : 'relate');
+        let oriShowControls = isEmpty(showControls) ? defaultShowControls : showControls;
         let nextData = {
-          showControls: isEmpty(showControls) ? defaultShowControls : showControls,
+          showControls:
+            res.type === 2 ? oriShowControls.filter(i => !_.includes(['caid', 'utime', 'ctime'], i)) : oriShowControls,
         };
         // if ([0, 1].includes(res.type)) {
         nextData = { ...nextData, relationControls: dealControlData(controls) };
         // }
+        // 子表工作表查询
+        getQueryConfigs(res);
         onChange(nextData);
       })
       .always(() => {
@@ -144,7 +196,7 @@ export default function SubListSetting(props) {
   const onOk = ({ createType, sheetId, appId, controlName }) => {
     // 从空白创建时,创建一个占位dataSource
     if (createType === '1') {
-      onChange({ dataSource: uuid() });
+      onChange({ dataSource: uuidv4() });
     } else {
       onChange({ appId, dataSource: sheetId, controlName });
     }
@@ -174,18 +226,20 @@ export default function SubListSetting(props) {
         okText: _l('确定'),
         onOk: () => {
           setMode('relate');
-          if (window.subListSheetConfig[dataSource]) {
-            window.subListSheetConfig[dataSource].mode = 'relate';
+          if (window.subListSheetConfig[controlId]) {
+            window.subListSheetConfig[controlId].mode = 'relate';
           }
-          changeSheet({
-            sourceWorksheetId: currentWorksheetId,
-            worksheetId: dataSource,
-            name: data.controlName,
-          }).then(res => {
-            if (res) {
-              alert(_l('转换成功'));
-            }
-          });
+          appManagementAjax
+            .changeSheet({
+              sourceWorksheetId: currentWorksheetId,
+              worksheetId: dataSource,
+              name: data.controlName,
+            })
+            .then(res => {
+              if (res) {
+                alert(_l('转换成功'));
+              }
+            });
         },
       });
     } else {
@@ -202,6 +256,8 @@ export default function SubListSetting(props) {
           {dataSource ? (
             <ConfigureControls
               {...props}
+              subQueryConfigs={subQueryConfigs}
+              updateSubQueryConfigs={updateSubQueryConfigs}
               controls={filter(
                 showControls.map(id => find(relationControls, item => item.controlId === id)),
                 item => !isEmpty(item),
@@ -213,7 +269,7 @@ export default function SubListSetting(props) {
         </Fragment>
       );
     }
-    const sortedControls = resortControlByColRow(relationControls);
+    const sortedControls = resortControlByColRow(dealControlData(filterRelationControls(sheetInfo)));
     return (
       <Fragment>
         <div className="settingItemTitle">{_l('显示字段')}</div>
@@ -306,7 +362,7 @@ export default function SubListSetting(props) {
                     const control = sortsRelationControls.find(({ controlId }) => item.controlId === controlId) || {};
                     const flag = item.isAsc === true ? 2 : 1;
                     const { text } = getSortData(control.type, control).find(item => item.value === flag);
-                    const value = _l('%0: %1', control.controlName, text);
+                    const value = control.controlId ? _l('%0: %1', control.controlName, text) : '';
                     return p ? `${p}；${value}` : value;
                   }, '')
                 : _l('创建时间-最旧的在前')}

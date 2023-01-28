@@ -6,7 +6,8 @@ import Trigger from 'rc-trigger';
 import 'rc-trigger/assets/index.css';
 import { useToggle } from 'react-use';
 import { getEnumType } from '../../util';
-import PageMove from 'worksheet/common/Statistics/components/PageMove';
+import PageMove from 'statistics/components/PageMove';
+import _ from 'lodash';
 
 const WEB_CONTENT_TOOLS = [
   { type: 'setting', icon: 'settings', tip: _l('设置') },
@@ -61,6 +62,21 @@ const ToolsWrap = styled.ul`
         color: #f44336;
       }
     }
+    &.switchButton {
+      .next {
+        display: none;
+        position: relative;
+        top: -1px;
+      }
+      &:hover {
+        .current {
+          display: none;
+        }
+        .next {
+          display: block;
+        }
+      }
+    }
     &:first-child {
       border-right: 1px solid #bdbdbd;
     }
@@ -110,8 +126,15 @@ const DelVerify = styled.div`
 `;
 
 const getTools = ({ widgetType, layoutType }) => {
-  if (layoutType === 'mobile' && widgetType === 'button') return MOBILE_BUTTON_TOOLS;
-  if (widgetType !== 'analysis') return WEB_CONTENT_TOOLS.filter(item => item.type !== 'move');
+  if (layoutType === 'mobile') {
+    return widgetType === 'button' ? MOBILE_BUTTON_TOOLS : MOBILE_CONTENT_TOOLS;
+  };
+  if (['view', 'filter'].includes(widgetType)) {
+    return WEB_CONTENT_TOOLS.filter(item => !['move', 'copy'].includes(item.type));
+  };
+  if (widgetType !== 'analysis') {
+    return WEB_CONTENT_TOOLS.filter(item => item.type !== 'move');
+  };
   return TOOLS_BY_LAYOUT_TYPE[layoutType];
 };
 export default function Tools({ appId, pageId, widget, layoutType, handleToolClick, titleVisible, updatePageInfo }) {
@@ -130,11 +153,42 @@ export default function Tools({ appId, pageId, widget, layoutType, handleToolCli
   const TOOLS = getTools({ widgetType, layoutType });
   const getTip = (type, tip) => {
     if (type === 'insertTitle' && titleVisible) return _l('取消标题行');
-    if (isSwitchButton(type)) return _.get(widget, ['button', 'mobileCount']) === 2 ? _l('一行一个') : _l('一行两个');
+    if (isSwitchButton(type)) {
+      const value = _.get(widget, ['button', 'mobileCount']);
+      const { direction } = _.get(widget, ['button', 'config']) || {};
+      if (direction === 1) {
+        if (value === 1) return _l('一行两个');
+        if (value === 2) return _l('一行三个');
+        if (value === 3) return _l('一行四个');
+        if (value === 4) return _l('一行一个');
+      } else {
+        if (value === 1) return _l('一行两个');
+        if (value === 2) return _l('一行一个');
+      }
+    };
     return tip;
   };
-  const getIcon = (type, icon) => {
-    if (isSwitchButton(type)) return _.get(widget, ['button', 'mobileCount']) === 2 ? 'looks_two' : 'looks_one';
+  const getIcon = (type, icon, next) => {
+    if (isSwitchButton(type)) {
+      const value = _.get(widget, ['button', 'mobileCount']);
+      if (next) {
+        const { direction } = _.get(widget, ['button', 'config']) || {};
+        if (direction === 1) {
+          if (value === 1) return 'looks_two';
+          if (value === 2) return 'looks_three';
+          if (value === 3) return 'looks_four';
+          if (value === 4) return 'looks_one';
+        } else {
+          if (value === 1) return 'looks_two';
+          if (value === 2) return 'looks_one';
+        }
+      } else {
+        if (value === 1) return 'looks_one';
+        if (value === 2) return 'looks_two';
+        if (value === 3) return 'looks_three';
+        if (value === 4) return 'looks_four';
+      }
+    }
     return icon;
   };
   return (
@@ -179,7 +233,7 @@ export default function Tools({ appId, pageId, widget, layoutType, handleToolCli
           </Trigger>
         ) : (
           <li
-            className={cx(type, { highlight: isHighlight(type) })}
+            className={cx(type, { highlight: isHighlight(type), switchButton: isSwitchButton(type) })}
             key={type}
             data-tip={getTip(type, tip)}
             onClick={e => {
@@ -190,7 +244,8 @@ export default function Tools({ appId, pageId, widget, layoutType, handleToolCli
               }
             }}
           >
-            <i className={`icon-${getIcon(type, icon)} Font18`}></i>
+            <i className={`icon-${getIcon(type, icon)} Font18 current`}></i>
+            {isSwitchButton(type) && <i className={`icon-${getIcon(type, icon, true)} Font18 next`}></i>}
           </li>
         )
       )}

@@ -1,15 +1,21 @@
-import React, { Component } from 'react';
-import { Icon } from 'ming-ui';
+import React, { Component, Fragment } from 'react';
+import { Icon, Tooltip } from 'ming-ui';
 import cx from 'classnames';
 import { Checkbox } from 'antd-mobile';
 import CellControl from 'src/pages/worksheet/components/CellControls';
 import { getTitleTextFromControls } from 'src/components/newCustomFields/tools/utils';
 import worksheetAjax from 'src/api/worksheet';
-import { withRouter } from 'react-router-dom';
+import { permitList } from 'src/pages/FormSet/config.js';
+import { isOpenPermit } from 'src/pages/FormSet/util.js';
+import emptyCover from 'src/pages/worksheet/assets/emptyCover.png';
+import { WORKFLOW_SYSTEM_FIELDS_SORT } from 'src/pages/worksheet/common/ViewConfig/util';
 import './index.less';
+import previewAttachments from 'src/components/previewAttachments/previewAttachments';
+import { isDocument } from 'src/components/UploadFiles/utils';
+import _ from 'lodash';
 
 function getCoverControlData(data) {
-  return _.find(data, file => File.isPicture(file.ext));
+  return _.find(data, file => File.isPicture(file.ext) || (isDocument(file.ext) && file.previewUrl));
 }
 
 const coverTypes = {
@@ -19,13 +25,13 @@ const coverTypes = {
   3: 'rectangle',
 };
 
-@withRouter
 export default class RecordCard extends Component {
   constructor(props) {
     super(props);
     const { data, view } = props;
     this.state = {
       checked: data[view.advancedSetting.checkradioid] === '1',
+      coverError: false
     };
   }
   get cover() {
@@ -47,32 +53,51 @@ export default class RecordCard extends Component {
     const showControls = [...view.displayControls, view.advancedSetting.abstract];
     const allControls = [
       { controlId: 'ownerid', controlName: _l('拥有者'), type: 26 },
-      { controlId: 'caid', controlName: _l('创建人'), type: 26 },
+      { controlId: 'caid', controlName: _l('创建者'), type: 26 },
       { controlId: 'ctime', controlName: _l('创建时间'), type: 16 },
       { controlId: 'utime', controlName: _l('最近修改时间'), type: 16 },
     ].concat(controls);
     return showControls.map(scid => _.find(allControls, c => c.controlId === scid));
   }
+  get url() {
+    const { coverError } = this.state;
+    const { coverType } = this.props.view;
+    const { cover } = this;
+    const size = coverType ? 76 : 120;
+    const url =
+      cover && cover.previewUrl
+        ? cover.previewUrl.indexOf('imageView2') > -1
+          ? cover.previewUrl.replace(/imageView2\/\d\/w\/\d+\/h\/\d+(\/q\/\d+)?/, `imageView2/1/w/${size}/h/${size}`)
+          : `${cover.previewUrl}&imageView2/1/w/${size}/h/${size}`
+        : null;
+    if (url && !coverError) {
+      const image = new Image();
+      image.onload = () => {}
+      image.onerror = () => {
+        this.setState({ coverError: true });
+      }
+      image.src = url;
+    }
+    return url;
+  }
   previewAttachment(attachments, index) {
-    require(['previewAttachments'], previewAttachments => {
-      previewAttachments({
-        index: index || 0,
-        attachments: attachments.map(attachment => {
-          if (attachment.fileId.slice(0, 2) === 'o_') {
-            return Object.assign({}, attachment, {
-              previewAttachmentType: 'QINIU',
-              path: attachment.previewUrl,
-              name: (attachment.originalFilename || _l('图片')) + attachment.ext,
-            });
-          }
+    previewAttachments({
+      index: index || 0,
+      attachments: attachments.map(attachment => {
+        if (attachment.fileId.slice(0, 2) === 'o_') {
           return Object.assign({}, attachment, {
-            previewAttachmentType: attachment.refId ? 'KC_ID' : 'COMMON_ID',
+            previewAttachmentType: 'QINIU',
+            path: attachment.previewUrl,
+            name: (attachment.originalFilename || _l('图片')) + attachment.ext,
           });
-        }),
-        showThumbnail: true,
-        hideFunctions: ['editFileName'],
-        disableNoPeimission: true,
-      });
+        }
+        return Object.assign({}, attachment, {
+          previewAttachmentType: attachment.refId ? 'KC_ID' : 'COMMON_ID',
+        });
+      }),
+      showThumbnail: true,
+      hideFunctions: ['editFileName'],
+      disableNoPeimission: true,
     });
   }
   handleCoverClick = e => {
@@ -92,16 +117,15 @@ export default class RecordCard extends Component {
   };
   handleChangeCheckbox = e => {
     const { checked } = this.state;
-    const { data, view, controls, match } = this.props;
-    const { params } = match;
+    const { appId, data, view, controls } = this.props;
     const control = _.find(controls, { controlId: view.advancedSetting.checkradioid });
     const newChecked = !checked;
     worksheetAjax
       .updateWorksheetRow({
-        appId: params.appId,
+        appId,
         rowId: data.rowid,
-        viewId: params.viewId,
-        worksheetId: params.worksheetId,
+        viewId: view.viewId,
+        worksheetId: view.worksheetId,
         newOldControl: [
           {
             controlId: control.controlId,
@@ -119,17 +143,11 @@ export default class RecordCard extends Component {
   };
   renderCover() {
     const { coverType, advancedSetting } = this.props.view;
-    const { cover } = this;
-    const size = coverType ? 76 : 120;
-    const url =
-      cover && cover.previewUrl
-        ? cover.previewUrl.indexOf('imageView2') > -1
-          ? cover.previewUrl.replace(/imageView2\/\d\/w\/\d+\/h\/\d+(\/q\/\d+)?/, `imageView2/1/w/${size}/h/${size}`)
-          : `${cover.previewUrl}&imageView2/1/w/${size}/h/${size}`
-        : null;
+    const { coverError } = this.state;
+    const { url } = this;
     return (
       <div className={cx('recordCardCover', coverTypes[coverType], `appshowtype${advancedSetting.appshowtype || '0'}`)}>
-        {url ? (
+        {url && !coverError ? (
           coverType ? (
             <img onClick={this.handleCoverClick} className="img" src={url} role="presentation" />
           ) : (
@@ -137,7 +155,7 @@ export default class RecordCard extends Component {
           )
         ) : (
           <div className="withoutImg img flexRow valignWrapper">
-            <Icon className="Font30" icon="attach_file" />
+            <img src={emptyCover}></img>
           </div>
         )}
       </div>
@@ -149,13 +167,46 @@ export default class RecordCard extends Component {
     const visibleControl = _.find(cardControls, { controlId: id }) || {};
     return (
       <div className="controlWrapper" key={id}>
-        {nameVisible && <div className="controlName ellipsis Gray_9e">{visibleControl.controlName}</div>}
+        {(nameVisible || visibleControl.desc) && (
+          <div className="controlName ellipsis Gray_9e">
+            {visibleControl.desc ? (
+              <Tooltip
+                text={
+                  <span
+                    className="Block"
+                    style={{
+                      maxWidth: 230,
+                      maxHeight: 200,
+                      overflowY: 'auto',
+                      color: '#fff',
+                      whiteSpace: 'pre-wrap',
+                    }}
+                  >
+                    {visibleControl.desc}
+                  </span>
+                }
+                action={['click']}
+                popupPlacement={'topLeft'}
+                offset={[-12, 0]}
+              >
+                <i
+                  className="icon-workflow_error descBoxInfo pointer Font16 Gray_9e mRight5"
+                  onClick={e => e.stopPropagation()}
+                />
+              </Tooltip>
+            ) : (
+              ''
+            )}
+            {nameVisible ? visibleControl.controlName : ''}
+          </div>
+        )}
         <div className="controlContent">
           {data[visibleControl.controlId] ? (
             <CellControl
               rowHeight={34}
               cell={Object.assign({}, visibleControl, { value: data[visibleControl.controlId] })}
               from={4}
+              className={'w100'}
             />
           ) : (
             <div className="emptyTag"></div>
@@ -165,11 +216,18 @@ export default class RecordCard extends Component {
     );
   }
   renderContent() {
-    const { view, data, controls, allowAdd } = this.props;
-    const { advancedSetting, coverCid, displayControls, showControlName } = view;
+    const { data, view, allowAdd, controls, sheetSwitchPermit } = this.props;
+    const { advancedSetting, coverCid, showControlName } = view;
+    const isShowWorkflowSys = isOpenPermit(permitList.sysControlSwitch, sheetSwitchPermit);
+    let titleControl = _.find(controls, control => control.attribute === 1) || {};
     const titleText = getTitleTextFromControls(controls, data);
     const { checked } = this.state;
     const appshowtype = advancedSetting.appshowtype || '0';
+    const displayControls = isShowWorkflowSys
+      ? view.displayControls.filter(id => id !== titleControl.controlId)
+      : view.displayControls
+          .filter(id => id !== titleControl.controlId)
+          .filter(v => !_.includes(WORKFLOW_SYSTEM_FIELDS_SORT, v));
     return (
       <div className="recordCardContent flex">
         <div className="flexRow valignWrapper mBottom5">
@@ -184,14 +242,14 @@ export default class RecordCard extends Component {
               }}
             />
           )}
-          <div className="Gray Blod Font16 ellipsis">{titleText}</div>
+          <div className="Gray bold Font16 ellipsis">{titleText}</div>
         </div>
         {advancedSetting.abstract && (
-          <div className="Gray_9e Font12 mBottom8">{this.renderControl(advancedSetting.abstract)}</div>
+          <div className="Gray_9e Font12 mBottom8 abstract">{this.renderControl(advancedSetting.abstract)}</div>
         )}
         <div className={cx(`cardContent${appshowtype}`)}>
           {(appshowtype === '0' ? displayControls.slice(0, 3) : displayControls).map(id =>
-            this.renderControl(id, showControlName),
+            this.renderControl(id, ['0', '2'].includes(appshowtype) ? true : showControlName),
           )}
         </div>
       </div>

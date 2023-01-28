@@ -16,6 +16,7 @@ import Abnormal from './Abnormal';
 import RelateRecordTableNav from './RelateRecordTableNav';
 import RelateRecordBlock from './RelateRecordBlock';
 import { browserIsMobile } from 'src/util';
+import _ from 'lodash';
 
 const ShadowCon = styled.div`
   width: 100%;
@@ -24,6 +25,8 @@ const ShadowCon = styled.div`
   top: -6px;
   overflow: hidden;
 `;
+
+const HIDDEN_CONTROL_IDS = ['rowid'];
 
 const Shadow = styled.div`
   margin-top: 6px;
@@ -78,16 +81,26 @@ const StickyBar = styled.div`
     transform: translateY(0px);
   }
 `;
-export default function RecortForm(props) {
+
+function getTopHeight() {
+  let height = Number(localStorage.getItem('recordinfoSplitHeight'));
+  if (height > window.innerHeight - 140) {
+    height = window.innerHeight - 140;
+  }
+  return height;
+}
+export default function RecordForm(props) {
   const {
     formWidth,
-    ignoreHeader,
+    ignoreLock,
     type = 'edit',
     loading,
     from,
     formFlag,
     abnormal,
+    isLock,
     recordbase,
+    maskinfo,
     controlProps = {},
     recordinfo = {},
     relateRecordData,
@@ -96,8 +109,8 @@ export default function RecortForm(props) {
     iseditting,
     sheetSwitchPermit,
     mountRef,
-    registeRefreshEvents,
-    updateRecordDailogOwner,
+    addRefreshEvents,
+    updateRecordDialogOwner,
     updateRows,
     updateRelateRecordNum = () => {},
     onRelateRecordsChange = () => {},
@@ -105,7 +118,10 @@ export default function RecortForm(props) {
     onChange,
     onCancel,
     onSave,
-    reloadControls,
+    saveDraft = () => {},
+    onError,
+    masterRecordRowId,
+    onWidgetChange = () => {},
   } = props;
   let { formdata = [] } = props;
   formdata.forEach(item => {
@@ -158,7 +174,9 @@ export default function RecortForm(props) {
       from: recordId ? 3 : 2,
       rules: recordinfo.rules,
       data: formdata,
-    }).filter(control => isRelateRecordTableControl(control) && controlState(control, recordId ? 3 : 2).visible),
+    })
+      .filter(control => isRelateRecordTableControl(control) && controlState(control, recordId ? 3 : 2).visible)
+      .map(c => (isLock ? { ...c, disabled: true } : c)),
     'row',
   ).filter(c => !c.hidden);
   const scrollRef = useRef();
@@ -169,7 +187,7 @@ export default function RecortForm(props) {
     Boolean(localStorage.getItem('recordinfoSplitHeight')) && recordId && relateRecordTableControls.length,
   );
   const [formHeight, setFormHeight] = useState(0);
-  const [topHeight, setTopHeight] = useState(Number(localStorage.getItem('recordinfoSplitHeight')));
+  const [topHeight, setTopHeight] = useState(getTopHeight());
   const [dragVisible, setDragVisible] = useState();
   const [navScrollLeft, setNavScrollLeft] = useState(0);
   const [relateNumOfControl, setRelateNumOfControl] = useState({});
@@ -193,9 +211,19 @@ export default function RecortForm(props) {
     setFormHeight(recordForm.current.clientHeight);
     setNavVisible();
   });
+  useEffect(() => {
+    setRelateNumOfControl({});
+  }, [recordId]);
+  useEffect(() => {
+    setTimeout(() => {
+      if (!loading && _.get(scrollRef, 'current.triggerNanoScroller')) {
+        scrollRef.current.triggerNanoScroller();
+      }
+    }, 200);
+  }, [loading]);
   function setSplit(value) {
     if (value) {
-      localStorage.setItem('recordinfoSplitHeight', topHeight || formHeight * 0.5);
+      safeLocalStorageSetItem('recordinfoSplitHeight', topHeight || formHeight * 0.5);
     } else {
       localStorage.removeItem('recordinfoSplitHeight');
     }
@@ -249,7 +277,7 @@ export default function RecortForm(props) {
               min={formHeight * 0.2}
               max={formHeight * 0.8}
               onChange={value => {
-                localStorage.setItem('recordinfoSplitHeight', value);
+                safeLocalStorageSetItem('recordinfoSplitHeight', value);
                 setTopHeight(value);
                 setDragVisible(false);
               }}
@@ -285,46 +313,58 @@ export default function RecortForm(props) {
               {type === 'edit' && !isSubList && (
                 <FormHeader
                   view={view}
+                  isLock={isLock}
                   recordbase={recordbase}
+                  maskinfo={maskinfo}
                   recordinfo={recordinfo}
-                  updateRecordDailogOwner={updateRecordDailogOwner}
+                  updateRecordDialogOwner={updateRecordDialogOwner}
                   sheetSwitchPermit={sheetSwitchPermit}
                   viewId={viewId}
+                  from={from}
                 />
               )}
               <div className={cx('recordInfoFormContent', { noAuth: !allowEdit })}>
                 <CustomFields
+                  ignoreLock={ignoreLock}
                   forceFull={formWidth < 500 ? 1 : undefined}
                   ref={customwidget}
-                  from={recordId ? 3 : isMobile ? 5 : 2}
+                  from={from === 21 ? from : recordId ? 3 : isMobile ? 5 : 2}
                   flag={formFlag}
                   controlProps={controlProps}
-                  data={formdata}
+                  data={formdata.filter(c => !_.includes(HIDDEN_CONTROL_IDS, c.controlId))}
                   systemControlData={systemControlData}
                   rules={recordinfo.rules}
                   isWorksheetQuery={recordinfo.isWorksheetQuery}
-                  disabled={!allowEdit}
-                  projectId={recordinfo.projectId}
+                  disabled={!allowEdit && from !== 21}
+                  projectId={recordinfo.projectId || props.projectId}
+                  groupId={recordinfo.groupId}
+                  masterRecordRowId={masterRecordRowId}
                   worksheetId={worksheetId}
                   recordId={recordId}
                   registerCell={registerCell}
                   showError={showError}
                   onChange={onChange}
+                  onSave={onSave}
+                  saveDraft={saveDraft}
+                  onError={onError}
                   sheetSwitchPermit={sheetSwitchPermit}
                   viewId={viewId}
                   appId={recordinfo.appId}
+                  isCharge={recordbase.isCharge}
                   onFormDataReady={dataFormat => {
                     setNavVisible();
                     if (!recordId) {
-                      onChange(dataFormat.getDataSource(), { noSaveTemp: true });
+                      onChange(dataFormat.getDataSource(), [], { noSaveTemp: true });
                     }
                   }}
+                  onWidgetChange={onWidgetChange}
                 />
               </div>
             </div>
             <div className={cx('relateRecordBlockCon', { flex: isSplit })}>
               {!isMobile && !!relateRecordTableControls.length && (
                 <RelateRecordBlock
+                  from={from}
                   formWidth={formWidth}
                   sideVisible={controlProps.sideVisible}
                   isSplit={isSplit}
@@ -339,22 +379,13 @@ export default function RecortForm(props) {
                   controls={relateRecordTableControls}
                   relateRecordData={relateRecordData}
                   sheetSwitchPermit={sheetSwitchPermit}
-                  registeRefreshEvents={registeRefreshEvents}
-                  setRelateNumOfControl={(value, controlId) => {
-                    reloadControls(formdata.filter(c => c.dataSource.slice(1, -1) === controlId).map(c => c.controlId));
-                    setRelateNumOfControl({ ...relateNumOfControl, ...value });
-                    updateRows(
-                      [recordId],
-                      {
-                        ...[{}, ...recordinfo.formData, value].reduce((a, b) =>
-                          Object.assign({}, a, { [b.controlId]: b.value }),
-                        ),
-                        ...value,
-                        rowid: recordId,
-                      },
-                      value,
-                    );
-                    updateRelateRecordNum(controlId, value[controlId]);
+                  addRefreshEvents={addRefreshEvents}
+                  setRelateNumOfControl={(value, controlId, updatedControl) => {
+                    const num = value;
+                    const changes = { [controlId]: num };
+                    setRelateNumOfControl({ ...relateNumOfControl, ...changes });
+                    updateRows([recordId], changes, changes);
+                    updateRelateRecordNum(controlId, num);
                   }}
                   onRelateRecordsChange={onRelateRecordsChange}
                   onActiveIdChange={controlId => {
@@ -406,7 +437,7 @@ export default function RecortForm(props) {
   );
 }
 
-RecortForm.propTypes = {
+RecordForm.propTypes = {
   type: PropTypes.string,
   loading: PropTypes.bool,
   showError: PropTypes.bool,
@@ -421,13 +452,14 @@ RecortForm.propTypes = {
   formdata: PropTypes.arrayOf(PropTypes.shape({})),
   relateRecordData: PropTypes.shape({}),
   mountRef: PropTypes.func,
-  updateRecordDailogOwner: PropTypes.func,
+  updateRecordDialogOwner: PropTypes.func,
   updateRows: PropTypes.func,
   onChange: PropTypes.func,
   onRelateRecordsChange: PropTypes.func,
   onSave: PropTypes.func,
+  saveDraft: PropTypes.func,
   onCancel: PropTypes.func,
-  registeRefreshEvents: PropTypes.func,
+  addRefreshEvents: PropTypes.func,
   reloadRecord: PropTypes.func,
   registerCell: PropTypes.func,
 };

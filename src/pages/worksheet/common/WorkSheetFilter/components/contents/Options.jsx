@@ -4,8 +4,10 @@ import { autobind } from 'core-decorators';
 import cx from 'classnames';
 import CityPicker from 'ming-ui/components/CityPicker';
 import DialogSelectGroups from 'src/components/dialogSelectDept';
+import { selectOrgRole } from 'src/components/DialogSelectOrgRole';
 import TagCon from './TagCon';
 import { FILTER_CONDITION_TYPE } from '../../enum';
+import _ from 'lodash';
 
 const SCORE_TEXT = [
   _l('一级'),
@@ -24,7 +26,7 @@ export default class Options extends Component {
     disabled: PropTypes.bool,
     onChange: PropTypes.func,
     control: PropTypes.shape({}),
-    originValues: PropTypes.arrayOf(PropTypes.string), // 未格式化的数据
+    fullValues: PropTypes.arrayOf(PropTypes.string), // 未格式化的数据
     values: PropTypes.arrayOf(PropTypes.string),
   };
   static defaultProps = {
@@ -33,14 +35,14 @@ export default class Options extends Component {
   constructor(props) {
     super(props);
     this.state = {
-      seletedOptions: this.getDefaultSelectedOptions(props.originValues, props.control),
+      selectedOptions: this.getDefaultSelectedOptions(props.fullValues, props.control),
     };
   }
   getDefaultSelectedOptions(values, control) {
     values = values || [];
     if (_.includes([19, 23, 24], control.type)) {
       return values.map(value => JSON.parse(value));
-    } else if (control.type === 27) {
+    } else if (control.type === 27 || control.type === 48) {
       return values.map(value => JSON.parse(value));
     } else if (control.type === 28) {
       return values
@@ -49,13 +51,19 @@ export default class Options extends Component {
           id: value,
           name: SCORE_TEXT[parseInt(value, 10) - 1],
         }));
-    } else {
+    } else if (_.includes([9, 10, 11], control.type)) {
       return values.length
-        ? _.compact(values.map(value => _.find(control.options, option => option.key === value))).map(option => ({
+        ? _.compact(
+            values.map(value =>
+              _.find(control.options, option => option.key === (value.startsWith('{') ? safeParse(value).id : value)),
+            ),
+          ).map(option => ({
             id: option.key,
             name: option.value,
           }))
         : [];
+    } else {
+      return [];
     }
   }
   getAreaLevel(type, filterType) {
@@ -75,27 +83,31 @@ export default class Options extends Component {
     return 3;
   }
   @autobind
-  addItem(item) {
+  addItem(item, { clearSelected } = {}) {
     this.setState(
       {
-        seletedOptions: this.state.seletedOptions.concat(item),
+        selectedOptions: clearSelected
+          ? _.isArray(item)
+            ? item
+            : [item]
+          : _.uniqBy(this.state.selectedOptions.concat(item), 'id'),
       },
       () => {
         this.props.onChange({
-          values: this.state.seletedOptions.map(option => option.id),
-          fullValues: this.state.seletedOptions.map(v => JSON.stringify(v)),
+          values: this.state.selectedOptions.map(option => option.id),
+          fullValues: this.state.selectedOptions.map(v => JSON.stringify(v)),
         });
       },
     );
   }
   @autobind
   updateItem(id, item) {
-    const newOptions = this.state.seletedOptions.map(option =>
+    const newOptions = this.state.selectedOptions.map(option =>
       option.id === id ? _.assign({}, option, item) : option,
     );
     this.setState(
       {
-        seletedOptions: newOptions,
+        selectedOptions: newOptions,
       },
       () => {
         this.props.onChange({
@@ -107,10 +119,10 @@ export default class Options extends Component {
   }
   @autobind
   clearTemp() {
-    const newOptions = this.state.seletedOptions.map(option => _.omit(option, ['temp']));
+    const newOptions = this.state.selectedOptions.map(option => _.omit(option, ['temp']));
     this.setState(
       {
-        seletedOptions: newOptions,
+        selectedOptions: newOptions,
       },
       () => {
         this.props.onChange({
@@ -124,19 +136,22 @@ export default class Options extends Component {
   removeItem(item) {
     this.setState(
       {
-        seletedOptions: this.state.seletedOptions.filter(seletedOption => item.id !== seletedOption.id),
+        selectedOptions: this.state.selectedOptions.filter(seletedOption => item.id !== seletedOption.id),
       },
       () => {
-        this.props.onChange({ values: this.state.seletedOptions.map(option => option.id) });
+        this.props.onChange({
+          values: this.state.selectedOptions.map(option => option.id),
+          fullValues: this.state.selectedOptions.map(v => JSON.stringify(v)),
+        });
       },
     );
   }
   @autobind
-  rendertSelect(TagComp) {
-    const { type, disabled, folded, control, projectId, onChange } = this.props;
-    const { seletedOptions } = this.state;
+  renderSelect(TagComp) {
+    const { type, disabled, folded, control, projectId, onChange, from } = this.props;
+    const { selectedOptions } = this.state;
     if (disabled) {
-      return <TagCon disabled={disabled} data={seletedOptions} onRemove={this.removeItem} />;
+      return <TagCon disabled={disabled} data={selectedOptions} onRemove={this.removeItem} />;
     }
     if (_.includes([19, 23, 24], control.type)) {
       const areaLevel = this.getAreaLevel(control.type, type);
@@ -148,7 +163,7 @@ export default class Options extends Component {
             level={areaLevel}
             callback={area => {
               const code = _.last(area).id;
-              const tempItem = _.find(seletedOptions, o => o.temp);
+              const tempItem = _.find(selectedOptions, o => o.temp);
               if (!tempItem) {
                 this.addItem({
                   temp: true,
@@ -166,47 +181,82 @@ export default class Options extends Component {
               setTimeout(this.clearTemp, 10);
             }}
           >
-            <TagCon data={seletedOptions} onRemove={this.removeItem} />
+            <TagCon data={selectedOptions} onRemove={this.removeItem} />
           </CityPicker>
         </div>
       );
     } else if (control.type === 27) {
+      const selectSingle =
+        control.enumDefault === 0 && _.includes([FILTER_CONDITION_TYPE.ARREQ, FILTER_CONDITION_TYPE.ARRNE], type);
       return (
         <div
           className="filterSelectDepartment"
           onClick={() => {
-            new DialogSelectGroups({
+            const D = new DialogSelectGroups({
+              unique: selectSingle,
               projectId,
               isIncludeRoot: false,
-              showCurrentUserDept: true,
+              showCurrentUserDept: !_.includes(['rule', 'portal'], from),
               selectFn: data => {
                 if (!data.length) {
                   return;
                 }
-                if (_.find(seletedOptions, option => option.id === data[0].departmentId)) {
-                  alert(_l('该部门已存在'), 3);
-                  return;
-                }
-                this.addItem({
-                  id: (data[0] || {}).departmentId,
-                  name: (data[0] || {}).departmentName,
-                });
+                this.addItem(
+                  (selectSingle ? data.slice(0, 1) : data).map(item => ({
+                    id: item.departmentId,
+                    name: item.departmentName,
+                  })),
+                  { clearSelected: selectSingle },
+                );
               },
             });
           }}
         >
-          <TagCon data={seletedOptions} onRemove={this.removeItem} />
+          <TagCon data={selectedOptions} onRemove={this.removeItem} />
+        </div>
+      );
+    } else if (control.type === 48) {
+      const selectSingle =
+        control.enumDefault === 0 && _.includes([FILTER_CONDITION_TYPE.ARREQ, FILTER_CONDITION_TYPE.ARRNE], type);
+      return (
+        <div
+          className="filterSelectDepartment"
+          onClick={() => {
+            selectOrgRole({
+              projectId,
+              unique: selectSingle,
+              showCurrentOrgRole: !_.includes(['rule', 'portal'], from),
+              showCompanyName: true,
+              onSave: data => {
+                if (!data.length) {
+                  return;
+                }
+                this.addItem(
+                  (selectSingle ? data.slice(0, 1) : data).map(item => ({
+                    id: item.organizeId,
+                    name: item.organizeName,
+                  })),
+                  { clearSelected: selectSingle },
+                );
+              },
+            });
+          }}
+        >
+          <TagCon data={selectedOptions} onRemove={this.removeItem} />
         </div>
       );
     } else {
+      const controlIsSingle = _.includes([9, 11], control.type);
+      const selectSingle =
+        _.includes([FILTER_CONDITION_TYPE.ARREQ, FILTER_CONDITION_TYPE.ARRNE], type) && controlIsSingle;
       let options = [];
       if (_.includes([9, 10, 11], control.type)) {
         options = control.options
-          .filter(option => !option.isDeleted)
+          .filter(option => !option.isDeleted || _.find(selectedOptions, o => o.id === option.key))
           .sort((a, b) => a.index - b.index)
           .map(option => ({ id: option.key, name: option.value }));
       } else if (control.type === 28) {
-        options = [...new Array(control.enumDefault === 1 ? 5 : 10)].map((v, i) => ({
+        options = Array.from({ length: (control.advancedSetting || {}).max }).map((v, i) => ({
           id: i + 1 + '',
           name: SCORE_TEXT[i],
         }));
@@ -220,11 +270,16 @@ export default class Options extends Component {
           {shortOptions.map((option, i) => (
             <div
               className={cx('optionCheckbox ellipsis', {
-                'ThemeBGColor3 ThemeBorderColor3 checked': _.find(seletedOptions, o => o.id === option.id),
+                'ThemeBGColor3 ThemeBorderColor3 checked': _.find(selectedOptions, o => o.id === option.id),
               })}
               key={i}
               onClick={() => {
-                const checked = _.find(seletedOptions, o => o.id === option.id);
+                if (selectSingle) {
+                  this.addItem(option, { clearSelected: true });
+                  return;
+                }
+
+                const checked = _.find(selectedOptions, o => o.id === option.id);
                 if (checked) {
                   this.removeItem(option);
                 } else {
@@ -252,7 +307,7 @@ export default class Options extends Component {
   render() {
     return (
       <div className="worksheetFilterOptionsCondition" ref={con => (this.con = con)}>
-        {this.rendertSelect()}
+        {this.renderSelect()}
       </div>
     );
   }

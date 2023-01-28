@@ -4,17 +4,24 @@ import { Button, Dialog } from 'ming-ui';
 import { Modal } from 'antd-mobile';
 import Trigger from 'rc-trigger';
 import 'rc-trigger/assets/index.css';
-import previewAttachments from 'previewAttachments';
+import previewAttachments from 'src/components/previewAttachments/previewAttachments';
 import * as SignaturePad from 'signature_pad/dist/signature_pad';
 import axios from 'axios';
 import cx from 'classnames';
 import withClickAway from 'ming-ui/decorators/withClickAway';
 import createDecoratedComponent from 'ming-ui/decorators/createDecoratedComponent';
 import { browserIsMobile, getToken } from 'src/util';
+import accountSettingAjax from 'src/api/accountSetting';
 import { Base64 } from 'js-base64';
 
 const ClickAwayable = createDecoratedComponent(withClickAway);
 
+const ModalWrap = styled(Modal)`
+  height: 300px !important;
+  overflow: hidden;
+  border-top-right-radius: 15px;
+  border-top-left-radius: 15px;
+`;
 const SignatureBox = styled.div`
   cursor: pointer;
   height: ${props => props.autoHeight && 'auto !important'};
@@ -52,6 +59,7 @@ const SignaturePopup = styled.div`
   .signatureCanvas {
     width: 100%;
     height: 200px;
+    display: block;
   }
 `;
 const SignatureWrap = styled.div`
@@ -91,6 +99,9 @@ const Footer = styled.div`
     color: #9e9e9e;
     cursor: pointer;
   }
+  .lastSignature {
+    margin: 0 auto 0 0;
+  }
 `;
 
 export default class Signature extends Component {
@@ -106,11 +117,12 @@ export default class Signature extends Component {
     isEdit: false,
     signature: null,
     popupVisible: false,
+    lastInfo: '',
   };
 
   componentWillReceiveProps(nextProps) {
-    if (!nextProps.value && this.state.signature) {
-      this.setState({ signature: null, isEdit: false });
+    if (nextProps.flag !== this.props.flag && !nextProps.value && this.state.signature) {
+      this.setState({ signature: null, isEdit: false, lastInfo: '' });
     }
   }
 
@@ -173,7 +185,16 @@ export default class Signature extends Component {
   };
 
   saveSignature = event => {
-    event.stopPropagation();
+    if (event) {
+      event.stopPropagation();
+    }
+
+    if (this.state.lastInfo) {
+      this.setState({ popupVisible: false, signature: this.state.lastInfo.url });
+      this.props.onChange(JSON.stringify({ bucket: 4, key: this.state.lastInfo.key }));
+      return;
+    }
+
     const data = this.signaturePad.toDataURL('image/png');
     this.setState({ popupVisible: false, signature: data });
     getToken([{ bucket: 4, ext: '.png' }]).then(res => {
@@ -190,7 +211,15 @@ export default class Signature extends Component {
           })
           .then(({ data }) => {
             const { key = '' } = data || {};
-            this.props.onChange(JSON.stringify({ bucket: 4, key: key }));
+            if (md.global.Account.isPortal || window.isPublicWorksheet) {
+              this.props.onChange(JSON.stringify({ bucket: 4, key: key }));
+            } else {
+              accountSettingAjax.editSign({ bucket: 4, key: key }).then(res => {
+                if (res) {
+                  this.props.onChange(JSON.stringify({ bucket: 4, key: key }));
+                }
+              });
+            }
           })
           .catch(error => {
             console.log(error);
@@ -200,15 +229,26 @@ export default class Signature extends Component {
     });
   };
 
+  useLastSignature = () => {
+    accountSettingAjax.getSign().then(res => {
+      if (!res.url) return alert(_l('暂无签名记录'));
+      this.setState({ isEdit: true, lastInfo: res });
+    });
+  };
+
   clear = () => {
     this.signaturePad.clear();
-    this.setState({ isEdit: false });
+    this.setState({ isEdit: false, signature: null, lastInfo: '' }, () => {
+      setTimeout(() => {
+        this.initCanvas();
+      }, 100);
+    });
   };
 
   removeSignature = e => {
     e.stopPropagation();
     this.props.onChange('');
-    this.setState({ signature: null, isEdit: false });
+    this.setState({ signature: null, isEdit: false, lastInfo: '' });
   };
 
   getAlign = () => {
@@ -238,10 +278,16 @@ export default class Signature extends Component {
   };
 
   renderFooter() {
+    const { advancedSetting: { uselast } = {} } = this.props;
     const { isEdit } = this.state;
 
     return (
       <Footer>
+        {uselast === '1' && !(md.global.Account.isPortal || window.isPublicWorksheet) && (
+          <div className="ThemeColor3 ThemeHoverColor2 pointer lastSignature" onClick={this.useLastSignature}>
+            {_l('使用上次签名')}
+          </div>
+        )}
         {isEdit && (
           <div className="clearSignature" onClick={this.clear}>
             {_l('清除')}
@@ -256,7 +302,7 @@ export default class Signature extends Component {
 
   renderSignature = () => {
     const { onlySignature, children, visible, popupContainer, destroyPopupOnHide, popupAlign } = this.props;
-    const { popupVisible } = this.state;
+    const { popupVisible, lastInfo } = this.state;
 
     return browserIsMobile() ? (
       <Fragment>
@@ -264,7 +310,7 @@ export default class Signature extends Component {
           className="addSignature"
           onClick={e => {
             this.setState({ popupVisible: true });
-            setTimeout(this.initCanvas, 100);
+            setTimeout(this.initCanvas, 500);
             e.nativeEvent.stopImmediatePropagation();
           }}
         >
@@ -272,16 +318,22 @@ export default class Signature extends Component {
           <span className="mLeft5">{_l('添加签名')}</span>
         </div>
 
-        <Modal popup visible={popupVisible} animationType="slide-up" className="mobileNewRecordDialog">
+        <ModalWrap popup visible={popupVisible} animationType="slide-up">
           <div className="flexColumn leftAlign h100">
             <div className="flexRow pTop15 pLeft20 pRight20 pBottom8">
-              <div className="Font18 Gray flex bold ellipsis">{_l('请在下方空白区域书写签名')}</div>
+              <div className="Font18 Gray flex bold ellipsis">{_l('请在下方空白区域横向书写签名')}</div>
               <i className="icon-close Gray_9e Font20" onClick={this.closePopup}></i>
             </div>
-            <canvas id="signatureCanvas" className="signatureCanvas flex"></canvas>
+            {lastInfo ? (
+              <div className="signatureCanvas flex">
+                <img src={lastInfo.url} className="w100 h100" />
+              </div>
+            ) : (
+              <canvas id="signatureCanvas" className="signatureCanvas flex"></canvas>
+            )}
             {this.renderFooter()}
           </div>
-        </Modal>
+        </ModalWrap>
       </Fragment>
     ) : (
       <Trigger
@@ -295,10 +347,16 @@ export default class Signature extends Component {
           <ClickAwayable onClickAway={this.clickEvent}>
             <SignaturePopup onClick={e => e.nativeEvent.stopImmediatePropagation()}>
               <div className="header">
-                <span className="Gray">{_l('请在下方空白区域书写签名')}</span>
+                <span className="Gray">{_l('请在下方空白区域横向书写签名')}</span>
                 <i onClick={this.closePopup} className="Font18 icon-close"></i>
               </div>
-              <canvas id="signatureCanvas" className="signatureCanvas"></canvas>
+              {lastInfo ? (
+                <div className="signatureCanvas">
+                  <img src={lastInfo.url} className="w100 h100" />
+                </div>
+              ) : (
+                <canvas id="signatureCanvas" className="signatureCanvas"></canvas>
+              )}
               {this.renderFooter()}
             </SignaturePopup>
           </ClickAwayable>

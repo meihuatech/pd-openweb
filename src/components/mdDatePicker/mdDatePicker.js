@@ -1,7 +1,7 @@
-(function ($) {
-  var moment = require('moment');
-  require('./css/mdDatePicker.css');
+import moment from 'moment';
+import './css/mdDatePicker.css';
 
+(function ($) {
   $.fn.mdDatePicker = function () {
     var method = arguments[0];
     var args = arguments;

@@ -1,4 +1,5 @@
 import React, { Component, Fragment } from 'react';
+import _ from 'lodash';
 import cx from 'classnames';
 import { ScrollView, Menu, Radio, MenuItem, LoadDiv, TagTextarea } from 'ming-ui';
 import flowNode from '../../../api/flowNode';
@@ -127,7 +128,7 @@ export default class Message extends Component {
       <Fragment>
         <div className="mTop20 bold">{_l('发送给')}</div>
 
-        <Member type={NODE_TYPE.MESSAGE} accounts={data.accounts} updateSource={this.updateSource} />
+        <Member accounts={data.accounts} updateSource={this.updateSource} />
 
         <div
           className="flexRow mTop15 ThemeColor3 workflowDetailAddBtn"
@@ -205,7 +206,7 @@ export default class Message extends Component {
               defaultValue={data.messageTemplate.messageContent.replace(/\$\(.*?\)/g, '$-$')}
               readonly
               renderTag={(tag, options) => {
-                const ids = tag.split('-');
+                const ids = tag.split(/([a-zA-Z0-9#]{24,32})-/).filter(item => item);
                 const nodeObj = data.formulaMap[ids[0]] || {};
                 const controlObj = data.formulaMap[ids[1]] || {};
 
@@ -438,11 +439,11 @@ export default class Message extends Component {
         />
 
         <div className="Gray_75 mTop10">
-          {_l(
+          {/*_l(
             '已输入 %0 个字（含签名），按 %1 条计费',
             this.statisticalWordNumber(),
             Math.ceil(this.statisticalWordNumber() / 70),
-          )}
+          )*/}
         </div>
         <div className="mTop30">
           <span className="saveTplBtn ThemeBGColor3 ThemeHoverBGColor2" onClick={this.onSaveTemplate}>
@@ -472,9 +473,9 @@ export default class Message extends Component {
    */
   statisticalWordNumber() {
     const { sign, messageContent } = this.state;
-    const tagSize = (messageContent.match(/\$.*?\$/g) || []).length * 8;
+    const tagSize = (messageContent.match(/\$[^ \r\n]+?\$/g) || []).length * 8;
 
-    return sign.length + messageContent.replace(/\$.*?\$/g, '').length + tagSize;
+    return sign.length + messageContent.replace(/\$[^ \r\n]+?\$/g, '').length + tagSize;
   }
 
   /**
@@ -568,7 +569,10 @@ export default class Message extends Component {
               this.tagtextarea = tagtextarea;
             }}
             renderTag={(tag, options) => {
-              const ids = (this.mapData[tag] || '').replace(/\$/g, '').split('-');
+              const ids = (this.mapData[tag] || '')
+                .replace(/\$/g, '')
+                .split(/([a-zA-Z0-9#]{24,32})-/)
+                .filter(item => item);
               const nodeObj = data.formulaMap[ids[0]] || {};
               const controlObj = data.formulaMap[ids[1]] || {};
 
@@ -685,7 +689,7 @@ export default class Message extends Component {
     let { cacheTemplateContent } = this.state;
     const messageTemplate = _.cloneDeep(this.state.data.messageTemplate);
 
-    (cacheTemplateContent.match(/\$.*?\$/g) || []).forEach(item => {
+    (cacheTemplateContent.match(/\$[^ \r\n]+?\$/g) || []).forEach(item => {
       cacheTemplateContent = cacheTemplateContent.replace(item, this.mapData[item.replace(/\$/g, '')]);
     });
 
@@ -704,10 +708,10 @@ export default class Message extends Component {
     return (
       <Fragment>
         <DetailHeader
-          data={{ ...data, selectNodeType: this.props.selectNodeType }}
+          {...this.props}
+          data={{ ...data }}
           icon="icon-workflow_sms"
           bg="BGBlue"
-          closeDetail={this.props.closeDetail}
           updateSource={this.updateSource}
         />
         <div className="flex mTop20">
@@ -721,9 +725,9 @@ export default class Message extends Component {
         </div>
         {!addNewTemplate && !showSetTemplate && (
           <DetailFooter
+            {...this.props}
             isCorrect={data.accounts.length && data.messageTemplate.id}
             onSave={this.onSave}
-            closeDetail={this.props.closeDetail}
           />
         )}
       </Fragment>

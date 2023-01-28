@@ -1,8 +1,7 @@
 import React, { Component } from 'react';
-import DialogLayer from 'mdDialog';
+import DialogLayer from 'src/components/mdDialog/dialog';
 import ReactDom from 'react-dom';
 import { connect } from 'react-redux';
-import { bindActionCreators } from 'redux';
 import api from 'api/homeApp';
 import 'src/pages/PageHeader/AppNameHeader/index.less';
 import { navigateTo } from 'src/router/navigateTo.jsx';
@@ -14,23 +13,28 @@ import withClickAway from 'ming-ui/decorators/withClickAway';
 import createDecoratedComponent from 'ming-ui/decorators/createDecoratedComponent';
 const ClickAwayable = createDecoratedComponent(withClickAway);
 import cx from 'classnames';
-import UserInfoDialog from 'src/pages/Roles/Portal/components/UserInfoDialog';
+import UserInfoDialog from 'src/pages/Role/PortalCon/components/UserInfoDialog';
 import './index.less';
-import { getDetail, saveUserDetail } from 'src/api/externalPortal';
+import externalPortalAjax from 'src/api/externalPortal';
 import { browserIsMobile } from 'src/util';
 import { formatControlToServer } from 'src/components/newCustomFields/tools/utils.js';
 import { getIds } from 'src/pages/PageHeader/util';
 import { updateSheetListLoading } from 'src/pages/worksheet/redux/actions/sheetList';
 import login from 'src/api/login';
 import { removePssId } from 'src/util/pssId';
-import { renderText } from 'src/pages/Roles/Portal/list/util';
+import { renderText } from 'src/pages/Role/PortalCon/tabCon/util';
 import AvatorInfo from 'src/pages/Personal/personalInfo/modules/AvatorInfo.jsx';
 import 'src/pages/Personal/personalInfo/modules/index.less';
 import account from 'src/api/account';
 import 'src/pages/PageHeader/AppPkgHeader/index.less';
 import { updateAppGroup, syncAppDetail } from 'src/pages/PageHeader/redux/action';
 import AppGroup from 'src/pages/PageHeader/AppPkgHeader/AppGroup';
-
+import ChangeAccountDialog from './ChangeAccountDialog';
+import DelDialog from './DelDialog';
+import FindPwdDialog from './FindPwdDialog';
+import PortalMessage from './PortalMessage';
+import { getAppId } from 'src/pages/PortalAccount/util.js';
+import _ from 'lodash';
 const WrapHeader = styled.div`
   .cover {
     position: fixed;
@@ -49,13 +53,13 @@ const WrapHeader = styled.div`
   .appNameHeaderBoxPortal {
     top: 0;
     width: 100%;
-    z-index: 1;
+    z-index: 2;
     display: flex;
     position: relative;
     &.isMobile {
-      height: 80px;
+      height: 70px;
       .avatarM {
-        line-height: 80px;
+        line-height: 70px;
       }
     }
     .appName {
@@ -73,7 +77,7 @@ const WrapHeader = styled.div`
         font-weight: bold;
         font-size: 24px !important;
         padding-left: 16px;
-        line-height: 80px;
+        line-height: 70px;
       }
     }
     .appItemsOuterWrap {
@@ -161,7 +165,15 @@ const Wrap = styled.div`
   &.isMobile {
     top: 0;
     height: 100%;
-    min-width: calc(100% - 40px) !important;
+    min-width: 100% !important;
+    .back {
+      height: 70px;
+      line-height: 70px;
+    }
+    .infoConBox {
+      height: calc(100% - 140px);
+      padding: 6px 24px 24px;
+    }
   }
   .closeBtnN {
     position: absolute;
@@ -184,16 +196,40 @@ const Wrap = styled.div`
   }
   .rInfo {
     width: calc(100% - 56px);
+    &.isOption {
+      .editableCellCon {
+        padding-left: 0px !important;
+      }
+    }
+  }
+  .logoutBox {
+    display: flex;
+  }
+  .del {
+    flex: 4;
+    height: 36px;
+    background: rgba(243, 33, 33, 0.1);
+    color: #f44336;
+    border-radius: 36px;
+    line-height: 36px;
+    text-align: center;
+    margin: 16px 16px 16px 8px;
+    .icon:before {
+      vertical-align: middle;
+    }
+    &:hover {
+      // background: #ebf6fe;
+    }
   }
   .logout {
-    width: calc(100% - 50px);
+    flex: 6;
     height: 36px;
     background: rgba(33, 150, 243, 0.1);
     color: #2196f3;
     border-radius: 36px;
     line-height: 36px;
     text-align: center;
-    margin: 16px auto;
+    margin: 16px 8px 16px 16px;
     .icon:before {
       vertical-align: middle;
     }
@@ -259,6 +295,15 @@ export default class PortalAppHeader extends Component {
       appSectionId: '',
       isAppItemOverflow: false,
       disabledPointer: 'left',
+      showTelDialog: false,
+      showDelDialog: false,
+      allowExAccountDiscuss: false, //允许外部用户讨论
+      exAccountDiscussEnum: 0, //外部用户的讨论类型 0：所有讨论 1：不可见内部讨论
+      url: '',
+      baseInfo: {},
+      type: '',
+      showChangePwd: false,
+      hasPassword: false,
     };
     if (!browserIsMobile()) {
       const { groupId, worksheetId } = getIds(props) || {};
@@ -285,7 +330,7 @@ export default class PortalAppHeader extends Component {
    * 参数补齐
    */
   completePara = () => {
-    const appId = this.props.appId || this.props.match.params.appId;
+    const appId = this.props.appId || getAppId(this.props.match.params);
     api.getAppFirstInfo({ appId }).then(({ appSectionId, workSheetId }) => {
       if (appSectionId) {
         this.setState({
@@ -309,8 +354,12 @@ export default class PortalAppHeader extends Component {
 
   getInfo = () => {
     const { name, syncAppDetail } = this.props;
+    const appId = this.props.appId || getAppId(this.props.match.params);
+    if (!appId) {
+      return;
+    }
     if (!name) {
-      api.getAppDetail({ appId: this.props.appId || this.props.match.params.appId }, { silent: true }).then(data => {
+      api.getAppDetail({ appId: appId }, { silent: true }).then(data => {
         this.setState({
           iconUrl: data.iconUrl,
           name: data.name,
@@ -318,28 +367,64 @@ export default class PortalAppHeader extends Component {
           data,
         });
         syncAppDetail(
-          _.pick(data, ['iconColor', 'projectId', 'name', 'id', 'fixed', 'fixRemark', 'fixAccount', 'permissionType']),
+          _.pick(data, [
+            'iconColor',
+            'projectId',
+            'name',
+            'id',
+            'fixed',
+            'appDisplay',
+            'webMobileDisplay',
+            'pcDisplay',
+            'fixRemark',
+            'fixAccount',
+            'permissionType',
+          ]),
         );
         window.appInfo = data;
         this.buildFavicon(data);
       });
     }
-    api.getAppInfo({ appId: this.props.appId || this.props.match.params.appId }).then(data => {
+    externalPortalAjax.getLoginUrl({
+      appId: appId,
+    }).then(res => {
+      this.setState({
+        url: res,
+      });
+    });
+    api.getAppInfo({ appId: appId }).then(data => {
       this.props.updateAppGroup(data);
       const { appSectionDetail = [] } = data;
       this.setState({
         appSectionDetail,
       });
     });
-    getDetail({
+    this.getPortalDetail(appId);
+    externalPortalAjax.getPortalSetByAppId({
+      appId,
+    }).then(baseInfo => {
+      this.setState({
+        baseInfo,
+      });
+    });
+  };
+
+  getPortalDetail = appId => {
+    externalPortalAjax.getDetail({
       exAccountId: md.global.Account.accountId,
-      appId: this.props.appId || this.props.match.params.appId,
+      appId: appId,
     }).then(res => {
       const avatarData = res.receiveControls.find(o => o.controlId === 'portal_avatar') || {};
-      this.setState({
-        currentData: res.receiveControls,
-        avatar: avatarData.value || md.global.Account.avatar,
-      });
+      this.setState(
+        {
+          currentData: res.receiveControls,
+          avatar: avatarData.value || md.global.Account.avatar,
+          hasPassword: res.hasPassword,
+        },
+        () => {
+          md.global.Account.avatar = avatarData.value || md.global.Account.avatar;
+        },
+      );
     });
   };
 
@@ -348,18 +433,16 @@ export default class PortalAppHeader extends Component {
     login.loginOut().then(data => {
       if (data) {
         removePssId();
+        //删除自动登录的key
+        const appId = this.props.appId || getAppId(this.props.match.params);
+        window.localStorage.removeItem(`PortalLoginInfo-${appId}`);
         window.localStorage.removeItem('LoginCheckList'); // accountId 和 encryptPassword 清理掉
-        const appId = this.props.appId || this.props.match.params.appId;
-        const url = `${location.origin}${window.subPath || ''}/app/${appId}`;
-        location.href = `${window.subPath || ''}/login?ReturnUrl=${encodeURIComponent(url)}`; // 跳转到登录
+        location.href = `${window.subPath || ''}/login?ReturnUrl=${encodeURIComponent(this.state.url)}`; // 跳转到登录
       }
     });
   };
   //编辑详细资料
   handleUploadImg = () => {
-    if (browserIsMobile()) {
-      return;
-    }
     const options = {
       container: {
         content: '',
@@ -368,8 +451,7 @@ export default class PortalAppHeader extends Component {
         header: _l('上传头像'),
       },
       dialogBoxID: 'uploadAvatorDialogId',
-      width: '460px',
-      height: '365px',
+      width: browserIsMobile() ? '100%' : '460px',
     };
     const { currentData, avatar = '' } = this.state;
     ReactDom.render(
@@ -377,8 +459,8 @@ export default class PortalAppHeader extends Component {
         <AvatorInfo
           editAvatar={res => {
             ///更新数据 /////
-            saveUserDetail({
-              appId: this.props.appId || this.props.match.params.appId,
+            externalPortalAjax.saveUserDetail({
+              appId: this.props.appId || getAppId(this.props.match.params),
               exAccountId: md.global.Account.accountId,
               newCell: currentData
                 .filter(o => ['avatar'].includes(o.alias))
@@ -387,12 +469,15 @@ export default class PortalAppHeader extends Component {
                 }),
             }).then(res => {
               this.setState({ avatar: res.data.portal_avatar }, () => {
+                md.global.Account.avatar = res.data.portal_avatar;
                 $('#uploadAvatorDialogId_container,#uploadAvatorDialogId_mask').remove();
               });
             });
           }}
           avatar={avatar.split('imageView2')[0]}
-          closeDialog={() => {}}
+          closeDialog={() => {
+            $('#uploadAvatorDialogId_container,#uploadAvatorDialogId_mask').remove();
+          }}
         />
       </DialogLayer>,
       document.createElement('div'),
@@ -405,16 +490,36 @@ export default class PortalAppHeader extends Component {
   }
 
   render() {
-    console.log(this.props);
-    const { iconUrl, name, iconColor = '#2196f3', showUserInfo, showUserInfoDialog, currentData, data } = this.state;
+    const {
+      iconUrl,
+      name,
+      iconColor = '#2196f3',
+      showUserInfo,
+      showUserInfoDialog,
+      currentData,
+      data,
+      showTelDialog,
+      showDelDialog,
+      baseInfo,
+      type,
+      showChangePwd,
+    } = this.state;
     const { isMobile, match = {}, appStatus, noAvatar } = this.props;
     const info = currentData.filter(
-      o => !['name', 'mobilephone', 'avatar', 'firstLoginTime', 'roleid', 'status', 'openid'].includes(o.alias),
+      o =>
+        !['name', 'mobilephone', 'avatar', 'firstLoginTime', 'roleid', 'status', 'openid', 'portal_email'].includes(
+          o.alias,
+        ),
     );
     const { params = {} } = match;
     const color = this.props.iconColor || iconColor;
     const icon = this.props.iconUrl || iconUrl;
-    const { fixed } = data || {};
+    const { fixed, pcDisplay } = data || {};
+    const account =
+      (currentData.find(o => [type !== 'email' ? 'portal_mobile' : 'portal_email'].includes(o.controlId)) || {})
+        .value ||
+      (currentData.find(o => ['portal_mobile'].includes(o.controlId)) || {}).value ||
+      (currentData.find(o => ['portal_email'].includes(o.controlId)) || {}).value;
     return (
       <WrapHeader>
         <div
@@ -441,7 +546,7 @@ export default class PortalAppHeader extends Component {
                           }
                     }
                   >
-                    <SvgIcon url={icon} fill={!isMobile ? '#fff' : color} size={24} />
+                    <SvgIcon url={icon} fill={!isMobile ? '#fff' : color} size={30} />
                   </span>
                 )}
               </div>
@@ -453,14 +558,15 @@ export default class PortalAppHeader extends Component {
               >
                 {this.props.name || name}
               </div>
-              {fixed && <div className="appFixed">{_l('维护中')}</div>}
-              {!isMobile && !fixed && (
+              {fixed && !pcDisplay && <div className="appFixed">{_l('维护中')}</div>}
+              {!isMobile && !fixed && !pcDisplay && (
                 <AppGroup appStatus={appStatus} {...this.props} {..._.pick(data, ['permissionType', 'isLock'])} />
               )}
             </div>
+            <PortalMessage color={color} isMobile={isMobile} />
             {!noAvatar && (
               <div
-                className={cx('InlineBlock mRight16', { avatarM: isMobile })}
+                className={cx('InlineBlock mRight16 Hand', { avatarM: isMobile })}
                 ref={avatar => {
                   this.avatar = avatar;
                 }}
@@ -472,7 +578,7 @@ export default class PortalAppHeader extends Component {
               >
                 <img
                   src={(this.state.avatar || '').split('imageView2')[0]}
-                  style={{ width: isMobile ? 32 : 24, height: isMobile ? 32 : 24, borderRadius: '50%' }}
+                  style={{ width: isMobile ? 32 : 30, height: isMobile ? 32 : 30, borderRadius: '50%' }}
                 />
               </div>
             )}
@@ -484,7 +590,9 @@ export default class PortalAppHeader extends Component {
             className={''}
             onClickAway={() => this.setState({ showUserInfo: false })}
             // 知识文件选择层 点击时不收起
-            onClickAwayExceptions={['#uploadAvatorDialogId,.mui-dialog-container,.rc-trigger-popup']}
+            onClickAwayExceptions={[
+              '#uploadAvatorDialogId,.mui-dialog-container,.rc-trigger-popup,#uploadAvatorDialogId_mask',
+            ]}
           >
             <CSSTransitionGroup
               component={'div'}
@@ -495,6 +603,19 @@ export default class PortalAppHeader extends Component {
             >
               {
                 <Wrap className={cx({ isMobile })}>
+                  {isMobile && (
+                    <React.Fragment>
+                      <span
+                        className="Font17 Hand InlineBlock back pLeft16"
+                        onClick={() => {
+                          this.setState({ showUserInfo: false });
+                        }}
+                      >
+                        <Icon icon="backspace mRight8 Gray_9e" />
+                        {_l('我的账户')}
+                      </span>
+                    </React.Fragment>
+                  )}
                   <div className="infoConBox">
                     <div className="account flexRow">
                       <div className="userImage" onClick={this.handleUploadImg}>
@@ -503,34 +624,78 @@ export default class PortalAppHeader extends Component {
                           src={(this.state.avatar || '').split('imageView2')[0]}
                           style={{ width: 56, height: 56, borderRadius: '50%' }}
                         />
-                        {!browserIsMobile() && (
-                          <div className="hoverAvatar">
-                            <span className="Font20 icon-upload_pictures"></span>
-                          </div>
-                        )}
+                        <div className="hoverAvatar">
+                          <span className="Font20 icon-upload_pictures"></span>
+                        </div>
                       </div>
                       <span className="userName flex mLeft20 Font17">
                         {(currentData.find(o => o.alias === 'name') || {}).value}
                       </span>
-                      {/* <Icon
-                      icon="clear_1"
-                      className="closeBtnN Font18 Hand"
-                      onClick={() => {
-                        this.setState({
-                          showUserInfo: false,
-                        });
-                      }}
-                    /> */}
                     </div>
-                    <div className="tel flexRow mTop32">
+                    <div className={cx('email flexRow mTop32')}>
                       <span className="title InlineBlock Gray_9e">{_l('手机号')}</span>
                       <span className="telNumber flex">
                         {(currentData.find(o => o.alias === 'mobilephone') || {}).value}
+                        <span
+                          className={cx('edit ThemeColor3 Hand InlineBlock', {
+                            mLeft10: (currentData.find(o => o.alias === 'mobilephone') || {}).value,
+                          })}
+                          onClick={() => {
+                            this.setState({
+                              showTelDialog: true,
+                              type: 'phone',
+                            });
+                          }}
+                        >
+                          {(currentData.find(o => o.alias === 'mobilephone') || {}).value ? _l('修改') : _l('绑定')}
+                        </span>
                       </span>
                     </div>
-                    <h6 className="mTop32 Font16">{_l('我的信息')}</h6>
+                    <div className={cx('tel flexRow mTop24')}>
+                      <span className="title InlineBlock Gray_9e">{_l('邮箱')}</span>
+                      <span className="telNumber flex">
+                        {(currentData.find(o => o.controlId === 'portal_email') || {}).value}
+                        <span
+                          className={cx('edit ThemeColor3 Hand InlineBlock', {
+                            mLeft10: (currentData.find(o => o.controlId === 'portal_email') || {}).value,
+                          })}
+                          onClick={() => {
+                            this.setState({
+                              showTelDialog: true,
+                              type: 'email',
+                            });
+                          }}
+                        >
+                          {(currentData.find(o => o.controlId === 'portal_email') || {}).value
+                            ? _l('修改')
+                            : _l('绑定')}
+                        </span>
+                      </span>
+                    </div>
+                    <div className={cx('tel flexRow mTop24')}>
+                      <span className="title InlineBlock Gray_9e">{_l('密码')}</span>
+                      <span
+                        className={cx('telNumber flex', {
+                          Gray_bd: !this.state.hasPassword,
+                        })}
+                      >
+                        {this.state.hasPassword ? _l('已设置') : _l('未设置')}
+                        <span
+                          className="edit ThemeColor3 Hand mLeft10 InlineBlock"
+                          onClick={() => {
+                            this.setState({
+                              showChangePwd: true,
+                            });
+                          }}
+                        >
+                          {_l('修改')}
+                        </span>
+                      </span>
+                    </div>
+                    <h6 className={cx('Font16', { mTop32: !isMobile, mTop24: isMobile })}>{_l('我的信息')}</h6>
                     <div className="infoBox">
                       {info
+                        .filter(o => o.fieldPermission[2] !== '1') //不收集的信息，用户个人信息不显示
                         .sort((a, b) => {
                           return a.row - b.row;
                         })
@@ -538,12 +703,14 @@ export default class PortalAppHeader extends Component {
                           return (
                             <div className="tel flexRow mTop10">
                               <span className="title InlineBlock Gray_9e WordBreak">{o.controlName}</span>
-                              <span className="flex mLeft24 rInfo">{renderText({ ...o })}</span>
+                              <span className={cx('flex mLeft24 rInfo', { isOption: [9, 10, 11].includes(o.type) })}>
+                                {renderText({ ...o })}
+                              </span>
                             </div>
                           );
                         })}
                       <span
-                        className="edit ThemeColor3 Hand mTop6 InlineBlock"
+                        className="edit ThemeColor3 Hand mTop12 InlineBlock"
                         onClick={() => {
                           this.setState({
                             showUserInfoDialog: true,
@@ -554,14 +721,27 @@ export default class PortalAppHeader extends Component {
                       </span>
                     </div>
                   </div>
-                  <div
-                    className="logout Hand Font14 Bold"
-                    onClick={() => {
-                      this.logout();
-                    }}
-                  >
-                    <Icon icon="exit_to_app" className="mRight5 Font18" />
-                    {_l('安全退出')}
+                  <div className="logoutBox">
+                    <div
+                      className="logout Hand Font14 Bold"
+                      onClick={() => {
+                        this.logout();
+                      }}
+                    >
+                      <Icon icon="exit_to_app" className="mRight5 Font18" />
+                      {_l('安全退出')}
+                    </div>
+
+                    <div
+                      className="del Hand Font14 Bold"
+                      onClick={() => {
+                        this.setState({
+                          showDelDialog: true,
+                        });
+                      }}
+                    >
+                      {_l('注销账户')}
+                    </div>
                   </div>
                 </Wrap>
               }
@@ -570,13 +750,16 @@ export default class PortalAppHeader extends Component {
         )}
         {showUserInfoDialog && (
           <UserInfoDialog
-            appId={this.props.appId || this.props.match.params.appId}
+            appId={this.props.appId || getAppId(this.props.match.params)}
             classNames={browserIsMobile() ? 'forMobilePortal' : ''}
             show={showUserInfoDialog}
             currentData={currentData
-              .filter(o => !['avatar', 'firstLoginTime', 'roleid', 'status'].includes(o.alias))
+              .filter(
+                o =>
+                  !['avatar', 'firstLoginTime', 'roleid', 'status'].includes(o.alias) && o.fieldPermission[2] !== '1', //不收集的信息，用户个人信息不显示
+              )
               .map(o => {
-                if (['portal_mobile'].includes(o.controlId)) {
+                if (['portal_mobile', 'portal_email'].includes(o.controlId)) {
                   return { ...o, disabled: true };
                 } else {
                   return o;
@@ -586,13 +769,76 @@ export default class PortalAppHeader extends Component {
             setShow={() => this.setState({ showUserInfoDialog: false })}
             onOk={(data, ids) => {
               ///更新数据 /////
-              saveUserDetail({
-                appId: this.props.appId || this.props.match.params.appId,
+              externalPortalAjax.saveUserDetail({
+                appId: this.props.appId || getAppId(this.props.match.params),
                 exAccountId: md.global.Account.accountId,
                 newCell: data.filter(o => ids.includes(o.controlId)).map(formatControlToServer),
               }).then(res => {
                 this.setState({ showUserInfoDialog: false, currentData: data });
               });
+            }}
+          />
+        )}
+        {showTelDialog && (
+          //更换手机号|邮箱
+          <ChangeAccountDialog
+            type={type}
+            baseInfo={baseInfo}
+            isBind={
+              (!(currentData.find(o => o.controlId === 'portal_email') || {}).value && type === 'email') ||
+              (!(currentData.find(o => o.controlId === 'portal_mobile') || {}).value && type === 'phone')
+            }
+            appId={this.props.appId || getAppId(this.props.match.params)}
+            classNames={browserIsMobile() ? 'forMobilePortal' : ''}
+            show={showTelDialog}
+            account={account}
+            exAccountId={md.global.Account.accountId}
+            setShow={() => this.setState({ showTelDialog: false, type: '' })}
+            onOk={() => {
+              //绑定
+              if (
+                (!(currentData.find(o => o.controlId === 'portal_email') || {}).value && type === 'email') ||
+                (!(currentData.find(o => o.controlId === 'portal_mobile') || {}).value && type === 'phone')
+              ) {
+                this.setState({ showTelDialog: false, type: '' }, () => {
+                  this.getPortalDetail(this.props.appId || getAppId(this.props.match.params));
+                });
+              } else {
+                // 修改
+                this.logout();
+              }
+            }}
+          />
+        )}
+        {showChangePwd && (
+          //更换密码
+          <FindPwdDialog
+            type={type}
+            baseInfo={baseInfo}
+            appId={this.props.appId || getAppId(this.props.match.params)}
+            classNames={browserIsMobile() ? 'forMobilePortal' : ''}
+            show={showChangePwd}
+            account={account}
+            exAccountId={md.global.Account.accountId}
+            setShow={() => this.setState({ showChangePwd: false })}
+            onOk={() => {
+              this.logout();
+            }}
+          />
+        )}
+        {showDelDialog && (
+          //注销
+          <DelDialog
+            url={this.state.url}
+            type={!(currentData.find(o => ['portal_mobile'].includes(o.controlId)) || {}).value ? 'email' : 'phone'}
+            appId={this.props.appId || getAppId(this.props.match.params)}
+            classNames={browserIsMobile() ? 'forMobilePortal' : ''}
+            show={showDelDialog}
+            account={account}
+            exAccountId={md.global.Account.accountId}
+            setShow={() => this.setState({ showDelDialog: false })}
+            onOk={() => {
+              this.logout();
             }}
           />
         )}

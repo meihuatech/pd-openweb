@@ -1,8 +1,8 @@
 import PropTypes from 'prop-types';
 import React, { Component } from 'react';
 import { Modal } from 'antd-mobile';
-import { Tooltip, LoadDiv, Dialog } from 'ming-ui';
-import { checkFieldUnique } from 'src/api/worksheet';
+import { LoadDiv, Dialog } from 'ming-ui';
+import worksheetAjax from 'src/api/worksheet';
 import sheetAjax from 'src/api/worksheet';
 import cx from 'classnames';
 import { isRelateRecordTableControl } from 'worksheet/util';
@@ -10,11 +10,15 @@ import './style.less';
 import widgets from './widgets';
 import RelateRecordMuster from './components/RelateRecordMuster';
 import WidgetsDesc from './components/WidgetsDesc';
-import { convertControl, controlState } from './tools/utils';
-import { FORM_ERROR_TYPE, FORM_ERROR_TYPE_TEXT, FROM } from './tools/config';
+import WidgetsVerifyCode from './components/WidgetsVerifyCode';
+import { convertControl, controlState, halfSwitchSize } from './tools/utils';
+import { FORM_ERROR_TYPE, FROM } from './tools/config';
 import { updateRulesData, checkAllValueAvailable } from './tools/filterFn';
 import DataFormat, { checkRequired } from './tools/DataFormat';
 import { browserIsMobile } from 'src/util';
+import { formatSearchConfigs } from 'src/pages/widgetConfig/util';
+import _ from 'lodash';
+import FormLabel from './components/FormLabel';
 
 export default class CustomFields extends Component {
   static propTypes = {
@@ -30,7 +34,6 @@ export default class CustomFields extends Component {
     disabled: PropTypes.bool,
     forceFull: PropTypes.bool,
     onChange: PropTypes.func,
-    showError: PropTypes.bool,
     disableRules: PropTypes.bool,
     rules: PropTypes.arrayOf(PropTypes.shape({})),
     getMasterFormData: PropTypes.func,
@@ -39,6 +42,7 @@ export default class CustomFields extends Component {
     registerCell: PropTypes.func,
     checkCellUnique: PropTypes.func,
     onFormDataReady: PropTypes.func,
+    onWidgetChange: PropTypes.func,
   };
 
   static defaultProps = {
@@ -58,25 +62,32 @@ export default class CustomFields extends Component {
       renderData: [],
       errorItems: [],
       uniqueErrorItems: [],
-      descMore: [],
       rules: props.rules || [],
       rulesLoading: !props.disableRules && !props.rules,
-      searchConfig: [],
+      searchConfig: props.searchConfig || [],
+      loadingItems: {},
+      verifyCode: '', // 验证码
     };
+
+    this.controlRefs = {};
   }
 
   componentWillMount() {
     const { data, disabled, isWorksheetQuery } = this.props;
-    const { rulesLoading, rules, searchConfig } = this.state;
+    const { rulesLoading, searchConfig } = this.state;
 
     if (!rulesLoading && !isWorksheetQuery) {
       this.initSource(data, disabled);
-    } else if (rulesLoading && _.isEmpty(rules)) {
-      this.getRules(undefined, () => {
-        if (isWorksheetQuery && !searchConfig.length) {
-          this.getSearchConfig();
-        }
-      });
+    } else if (rulesLoading) {
+      this.getRules(
+        undefined,
+        () => {
+          if (isWorksheetQuery && !searchConfig.length) {
+            this.getSearchConfig();
+          }
+        },
+        isWorksheetQuery && !searchConfig.length,
+      );
     } else if (isWorksheetQuery && !searchConfig.length) {
       this.getSearchConfig();
     }
@@ -93,16 +104,18 @@ export default class CustomFields extends Component {
 
   componentWillReceiveProps(nextProps, nextState) {
     if (this.props.flag !== nextProps.flag || this.props.data.length !== nextProps.data.length) {
-      this.initSource(nextProps.data, nextProps.disabled);
+      this.initSource(nextProps.data, nextProps.disabled, {
+        setStateCb: () => {
+          this.updateErrorState(false);
+          this.changeStatus = false;
+        },
+      });
     }
     if (this.props.worksheetId !== nextProps.worksheetId) {
       this.getRules(nextProps);
     }
     if (this.props.isWorksheetQuery !== nextProps.isWorksheetQuery && nextProps.isWorksheetQuery) {
       this.getSearchConfig(nextProps);
-    }
-    if (nextProps.showError !== this.props.showError && !nextProps.showError) {
-      this.updateErrorState(false);
     }
   }
 
@@ -111,24 +124,61 @@ export default class CustomFields extends Component {
   /**
    * 初始化数据
    */
-  initSource(data, disabled) {
-    const { projectId, initSource, recordId, recordCreateTime, from, worksheetId, isWorksheetQuery, onFormDataReady } =
-      this.props;
+  initSource(data, disabled, { setStateCb = () => {} } = {}) {
+    const {
+      isCreate,
+      projectId,
+      initSource,
+      recordId,
+      recordCreateTime,
+      from,
+      onFormDataReady,
+      masterRecordRowId,
+      ignoreLock,
+      verifyAllControls,
+    } = this.props;
+    const { rules = [] } = this.state;
 
     this.dataFormat = new DataFormat({
       projectId,
       data,
-      isCreate: initSource || !recordId,
+      isCreate: _.isUndefined(isCreate) ? initSource || !recordId : isCreate,
       disabled,
       recordCreateTime,
+      masterRecordRowId,
+      ignoreLock,
+      rules,
       from,
+      verifyAllControls,
+      embedData: {
+        ..._.pick(this.props, ['projectId', 'appId', 'groupId', 'worksheetId', 'recordId', 'viewId']),
+      },
       searchConfig: this.state.searchConfig,
+      updateLoadingItems: loadingItems => {
+        this.setState({ loadingItems });
+      },
+      activeTrigger: () => {
+        if (!this.changeStatus && this.dataFormat) {
+          this.props.onChange(this.dataFormat.getDataSource(), this.dataFormat.getUpdateControlIds(), {
+            noSaveTemp: true,
+          });
+          this.changeStatus = true;
+        }
+      },
       onAsyncChange: ({ controlId, value }) => {
         this.props.onChange(this.dataFormat.getDataSource(), [controlId]);
-        this.setState({
-          renderData: this.getFilterDataByRule(true),
-          errorItems: this.dataFormat.getErrorControls(),
-        });
+        this.changeStatus = true;
+        this.setState(
+          {
+            renderData: this.getFilterDataByRule(true),
+            errorItems: this.dataFormat.getErrorControls(),
+          },
+          () => {
+            if (_.every(Object.values(this.state.loadingItems), i => !i) && this.submitBegin) {
+              this.submitFormData();
+            }
+          },
+        );
       },
     });
 
@@ -140,6 +190,7 @@ export default class CustomFields extends Component {
         rulesLoading: false,
       },
       () => {
+        setStateCb();
         onFormDataReady(this.dataFormat);
       },
     );
@@ -158,8 +209,8 @@ export default class CustomFields extends Component {
       from: this.props.from,
       updateControlIds: this.dataFormat.getUpdateRuleControlIds(),
       ignoreHideControl,
-      checkRuleValidator: (controlId, errorType, errorMessage) => {
-        this.dataFormat.setErrorControl(controlId, errorType, errorMessage, isInit);
+      checkRuleValidator: (controlId, errorType, errorMessage, ruleId) => {
+        this.dataFormat.setErrorControl(controlId, errorType, errorMessage, ruleId, isInit);
       },
     });
   }
@@ -167,12 +218,16 @@ export default class CustomFields extends Component {
   /**
    * 获取字段显示规则
    */
-  getRules = (nextProps, cb = () => {}) => {
-    const { worksheetId, data, disabled } = nextProps || this.props;
+  getRules = (nextProps, cb = () => {}, noInitSource) => {
+    const { worksheetId, disabled, onRulesLoad = () => {} } = nextProps || this.props;
 
     sheetAjax.getControlRules({ worksheetId, type: 1 }).then(rules => {
+      const { data } = nextProps || this.props;
+      onRulesLoad(rules);
       this.setState({ rules }, () => {
-        this.initSource(data, disabled);
+        if (!noInitSource) {
+          this.initSource(data, disabled);
+        }
         cb();
       });
     });
@@ -182,35 +237,21 @@ export default class CustomFields extends Component {
    * 获取查询配置
    */
   getSearchConfig = nextProps => {
-    const { worksheetId, data, disabled } = nextProps || this.props;
+    const { worksheetId, disabled } = nextProps || this.props;
 
-    sheetAjax.getQueryBySheetId({ worksheetId }).then(searchConfig => {
-      this.setState({ searchConfig }, () => this.initSource(data, disabled));
+    sheetAjax.getQueryBySheetId({ worksheetId }).then(res => {
+      this.setState({ searchConfig: formatSearchConfigs(res) }, () =>
+        this.initSource((nextProps || this.props).data, disabled),
+      );
     });
   };
-
-  /**
-   * 控件切换成size情况，兼容老数据
-   */
-  halfSwitchSize(item) {
-    let { from } = this.props;
-    const half =
-      item.half ||
-      (item.type === 28 && item.enumDefault === 1) ||
-      (item.type === 29 &&
-        item.enumDefault === 1 &&
-        parseInt(item.advancedSetting.showtype, 10) === 3 &&
-        from !== FROM.H5_ADD &&
-        from !== FROM.PUBLIC);
-
-    return half ? 6 : 12;
-  }
 
   /**
    * 渲染表单
    */
   renderForm() {
-    const { from, recordId, forceFull, controlProps } = this.props;
+    const { from, worksheetId, recordId, forceFull, controlProps } = this.props;
+    const { errorItems, uniqueErrorItems, loadingItems } = this.state;
     const isMobile = browserIsMobile();
     const formList = [];
     let prevRow = -1;
@@ -223,7 +264,7 @@ export default class CustomFields extends Component {
       }
       return a.row - b.row;
     });
-
+    const richTextControlCount = data.filter(c => c.type === 41).length;
     data
       .filter(
         item =>
@@ -235,7 +276,7 @@ export default class CustomFields extends Component {
         recordId
           ? !(
               isRelateRecordTableControl(item) &&
-              (_.includes([FROM.SHARE, FROM.H5_EDIT, FROM.WORKFLOW], from) || isMobile)
+              (_.includes([FROM.SHARE, FROM.H5_EDIT, FROM.WORKFLOW, FROM.CUSTOM_BUTTON], from) || isMobile)
             )
           : true,
       )
@@ -246,7 +287,7 @@ export default class CustomFields extends Component {
 
         // 兼容老数据没有size的情况
         if (!item.size) {
-          item.size = this.halfSwitchSize(item);
+          item.size = halfSwitchSize(item, from);
         }
 
         const isFull = isMobile || forceFull || item.size === 12;
@@ -254,7 +295,10 @@ export default class CustomFields extends Component {
         formList.push(
           <div
             className="customFormItem"
-            style={{ width: isFull ? '100%' : `${(item.size / 12) * 100}%` }}
+            style={{
+              width: isFull ? '100%' : `${(item.size / 12) * 100}%`,
+              display: item.type === 49 && this.props.disabled ? 'none' : 'block',
+            }}
             key={`item-${item.row}-${item.col}`}
           >
             {item.type === 22 && _.includes([FROM.H5_ADD, FROM.H5_EDIT], from) && (
@@ -263,8 +307,24 @@ export default class CustomFields extends Component {
               </div>
             )}
 
-            {!_.includes([10010, 45], item.type) && this.getControlLabel(item)}
-            <div className="customFormItemControl">{this.getWidgets(Object.assign({}, item, controlProps))}</div>
+            {!_.includes([45], item.type) && (
+              <FormLabel
+                from={from}
+                worksheetId={worksheetId}
+                recordId={recordId}
+                item={item}
+                errorItems={errorItems}
+                uniqueErrorItems={uniqueErrorItems}
+                loadingItems={loadingItems}
+                updateErrorState={this.updateErrorState}
+                handleChange={this.handleChange}
+              />
+            )}
+
+            <div className="customFormItemControl">
+              {this.getWidgets(Object.assign({}, item, controlProps, { richTextControlCount }))}
+              {this.renderVerifyCode(item)}
+            </div>
 
             {item.type === 22 && !_.includes([FROM.H5_ADD, FROM.H5_EDIT], from) && (
               <div className="customFormLine" style={{ background: '#ccc', margin: 0 }} />
@@ -280,9 +340,35 @@ export default class CustomFields extends Component {
   }
 
   /**
+   * 渲染短信验证码
+   */
+  renderVerifyCode(item) {
+    const { controlId, type } = item;
+    const { smsVerificationFiled, smsVerification } = this.props;
+
+    if (
+      window.isPublicWorksheet &&
+      smsVerification &&
+      type === 3 &&
+      smsVerificationFiled === controlId &&
+      controlState(item, 4).editable
+    ) {
+      return (
+        <WidgetsVerifyCode
+          {...item}
+          verifyCode={this.state.verifyCode}
+          worksheetId={this.props.worksheetId}
+          handleChange={verifyCode => this.setState({ verifyCode })}
+        />
+      );
+    }
+    return null;
+  }
+
+  /**
    * 更新error显示状态
    */
-  updateErrorState(isShow, controlId) {
+  updateErrorState = (isShow, controlId) => {
     if (controlId) {
       this.setState({
         errorItems: this.state.errorItems.map(item =>
@@ -294,7 +380,7 @@ export default class CustomFields extends Component {
         errorItems: this.state.errorItems.map(item => Object.assign({}, item, { showError: isShow })),
       });
     }
-  }
+  };
 
   /**
    * 更新errorItems,包含表单和业务规则必填错误
@@ -311,151 +397,34 @@ export default class CustomFields extends Component {
   };
 
   /**
-   * 控件label
+   * 组件onChange方法
    */
-  getControlLabel(item) {
-    const { from } = this.props;
-    const { errorItems, uniqueErrorItems } = this.state;
-    const currentErrorItem = _.find(errorItems.concat(uniqueErrorItems), obj => obj.controlId === item.controlId) || {};
-    const errorText = currentErrorItem.errorText || '';
-    const isEditable = controlState(item, from).editable;
-    let errorMessage = '';
+  handleChange = (value, cid, item) => {
+    const { onWidgetChange = () => {} } = this.props;
+    const { uniqueErrorItems } = this.state;
 
-    if (currentErrorItem.showError && isEditable) {
-      if (currentErrorItem.errorType === FORM_ERROR_TYPE.UNIQUE) {
-        errorMessage = currentErrorItem.errorMessage || FORM_ERROR_TYPE_TEXT.UNIQUE(item);
-      } else {
-        errorMessage = errorText || currentErrorItem.errorMessage;
-      }
+    if (!_.get(value, 'rows')) {
+      onWidgetChange();
     }
-
-    return (
-      <React.Fragment>
-        <div
-          className={cx(
-            'customFormItemLabel',
-            item.type === 22 || item.type === 34
-              ? `Gray Font15 ${item.type === 34 ? 'mTop20' : 'mTop10'}`
-              : 'Gray_75 Font13',
-          )}
-        >
-          {item.required && !item.disabled && isEditable && (
-            <div className="Absolute" style={{ margin: '3px 0px 0px -8px', top: 0, color: '#f44336' }}>
-              *
-            </div>
-          )}
-
-          {errorMessage && (
-            <div className="customFormErrorMessage">
-              <span>
-                {errorMessage}
-                <i
-                  className="icon-close mLeft6 Bold delIcon"
-                  onClick={() => this.updateErrorState(false, item.controlId)}
-                />
-              </span>
-              <i className="customFormErrorArrow" />
-            </div>
-          )}
-
-          <div title={item.controlName}>
-            {item.controlName}
-            {this.renderCount(item)}
-          </div>
-          {_.includes([FROM.RECORDINFO, FROM.H5_EDIT, FROM.WORKFLOW], from) && this.renderDesc(item)}
-        </div>
-      </React.Fragment>
-    );
-  }
-
-  /**
-   * 渲染计数
-   */
-  renderCount(item) {
-    const { type, enumDefault, value, advancedSetting } = item;
-    let count;
-
-    // 人员多选、部门多选、多条卡片
-    if (
-      (_.includes([26, 27], type) && enumDefault === 1) ||
-      (type === 29 && enumDefault === 2 && advancedSetting.showtype === '1')
-    ) {
-      count = JSON.parse(value || '[]').length;
-    }
-
-    // 附件
-    if (type === 14) {
-      const files = JSON.parse(value || '[]');
-
-      if (_.isArray(files)) {
-        count = files.length;
-      } else {
-        count = files.attachments.length + files.knowledgeAtts.length + files.attachmentData.length;
-      }
-    }
-
-    // 子表
-    if (type === 34) {
-      if (typeof value === 'object') {
-        count = value.num || (value.rows || []).length;
-      } else if (!_.isNaN(parseInt(item.value, 10))) {
-        count = parseInt(item.value, 10);
-      }
-    }
-
-    return count ? `(${count})` : null;
-  }
-
-  /**
-   * 渲染描述
-   */
-  renderDesc = item => {
-    const { from } = this.props;
-    const isMobile = browserIsMobile();
-    const action = [isMobile ? 'click' : 'hover'];
-
-    if (!item.desc || item.type === 22 || item.type === 10010) {
-      return null;
-    }
-
-    if (_.includes([FROM.NEWRECORD, FROM.PUBLIC, FROM.H5_ADD], from)) {
-      return (
-        <WidgetsDesc
-          isDescMore={this.state.descMore}
-          controlId={item.controlId}
-          desc={item.desc}
-          setData={arrNew =>
-            this.setState({
-              descMore: arrNew,
-            })
-          }
-        />
+    if (item.value !== value || cid !== item.controlId) {
+      this.dataFormat.updateDataSource({
+        controlId: cid,
+        value,
+        removeUniqueItem: id => {
+          _.remove(uniqueErrorItems, o => o.controlId === id && o.errorType === FORM_ERROR_TYPE.UNIQUE);
+        },
+        searchByChange: true,
+      });
+      this.setState({ renderData: this.getFilterDataByRule() }, () =>
+        this.setErrorItemsByRule(cid, { ...item, value }),
       );
-    }
 
-    return (
-      <Tooltip
-        text={
-          <span
-            className="Block"
-            style={{
-              maxWidth: 230,
-              maxHeight: 200,
-              overflowY: 'auto',
-              color: '#fff',
-              whiteSpace: 'pre-wrap',
-            }}
-          >
-            {item.desc}
-          </span>
-        }
-        action={action}
-        popupPlacement={'topLeft'}
-        offset={[-12, 0]}
-      >
-        <i className="icon-workflow_error descBoxInfo pointer Font16 Gray_9e mLeft3" />
-      </Tooltip>
-    );
+      const ids = this.dataFormat.getUpdateControlIds();
+      if (ids.length) {
+        this.props.onChange(this.dataFormat.getDataSource(), ids);
+        this.changeStatus = true;
+      }
+    }
   };
 
   /**
@@ -463,6 +432,7 @@ export default class CustomFields extends Component {
    */
   getWidgets(item) {
     const {
+      initSource,
       flag,
       projectId,
       worksheetId,
@@ -476,8 +446,8 @@ export default class CustomFields extends Component {
       systemControlData,
       popupContainer,
       getMasterFormData,
+      isCharge,
     } = this.props;
-    const { uniqueErrorItems } = this.state;
 
     // 他表字段
     if (convertControl(item.type) === 'SHEET_FIELD') {
@@ -500,19 +470,21 @@ export default class CustomFields extends Component {
     }
 
     const isEditable = controlState(item, from).editable;
+    const maskPermissions = isCharge || _.get(item, 'advancedSetting.isdecrypt[0]') === '1';
 
     // (禁用或只读) 且 内容不存在
     if (
       (item.disabled || _.includes([25, 31, 32, 33, 37, 38], item.type) || !isEditable) &&
-      ((!item.value && item.value !== 0) ||
-        (_.includes([21, 26, 27, 29], item.type) &&
+      ((!item.value && item.value !== 0 && !_.includes([28, 47], item.type)) ||
+        (_.includes([21, 26, 27, 29, 48], item.type) &&
           _.isArray(JSON.parse(item.value)) &&
-          !JSON.parse(item.value).length))
+          !JSON.parse(item.value).length)) &&
+      from !== 21
     ) {
       return (
         <React.Fragment>
           <div className="customFormNull" />
-          {_.includes([FROM.NEWRECORD, FROM.PUBLIC, FROM.H5_ADD], from) && this.renderDesc(item)}
+          {!recordId && <WidgetsDesc item={item} from={from} />}
         </React.Fragment>
       );
     }
@@ -522,51 +494,42 @@ export default class CustomFields extends Component {
         <Widgets
           {...item}
           flag={flag}
+          isCharge={isCharge}
+          maskPermissions={maskPermissions}
           popupContainer={popupContainer}
           sheetSwitchPermit={sheetSwitchPermit} // 工作表业务模板权限
-          disabled={item.disabled || !isEditable}
+          disabled={(item.disabled || !isEditable) && from !== 21}
           projectId={projectId}
           from={from}
           worksheetId={worksheetId}
           recordId={recordId}
           appId={appId}
           viewIdForPermit={viewId}
+          initSource={initSource}
           onChange={(value, cid = controlId) => {
-            if (item.value !== value) {
-              this.dataFormat.updateDataSource({
-                controlId: cid,
-                value,
-                removeUniqueItem: id => {
-                  _.remove(uniqueErrorItems, o => o.controlId === id && o.errorType === FORM_ERROR_TYPE.UNIQUE);
-                },
-                searchByChange: true,
-              });
-              this.setState({ renderData: this.getFilterDataByRule() }, () =>
-                this.setErrorItemsByRule(cid, { ...item, value }),
-              );
-
-              const ids = this.dataFormat.getUpdateControlIds();
-              if (ids.length) {
-                this.props.onChange(this.dataFormat.getDataSource(), ids);
-              }
-            }
+            this.handleChange(value, cid, item);
           }}
-          onBlur={() => {
-            if (item.unique && item.value && item.value.trim()) {
-              this.checkControlUnique(controlId, type, item.value.trim());
+          onBlur={originValue => {
+            const newValue = `${item.value}` ? `${item.value}`.trim() : '';
+            if (item.unique && newValue) {
+              this.checkControlUnique(controlId, type, newValue);
             }
-            if (item.value && item.value.trim()) {
+            if (newValue && newValue !== originValue) {
               this.dataFormat.updateDataBySearchConfigs({ control: item, searchType: 'onBlur' });
             }
           }}
           openRelateSheet={openRelateSheet}
-          registerCell={cell => registerCell({ item, cell })}
+          registerCell={cell => {
+            this.controlRefs[controlId] = cell;
+            registerCell({ item, cell });
+          }}
+          getControlRef={key => this.controlRefs[key]}
           formData={this.dataFormat
             .getDataSource()
             .concat(systemControlData || [])
             .concat(getMasterFormData() || [])}
         />
-        {_.includes([FROM.NEWRECORD, FROM.PUBLIC, FROM.H5_ADD], from) && item.type !== 34 && this.renderDesc(item)}
+        {!recordId && item.type !== 34 && <WidgetsDesc item={item} from={from} />}
       </React.Fragment>
     );
   }
@@ -575,8 +538,8 @@ export default class CustomFields extends Component {
    * 验证唯一值
    */
   checkControlUnique(controlId, controlType, controlValue) {
-    const { worksheetId, recordId, checkCellUnique } = this.props;
-    const { uniqueErrorItems } = this.state;
+    const { worksheetId, recordId, checkCellUnique, onError = () => {} } = this.props;
+    const { uniqueErrorItems, loadingItems } = this.state;
 
     if (_.isFunction(checkCellUnique)) {
       if (checkCellUnique(controlId, controlValue)) {
@@ -592,24 +555,33 @@ export default class CustomFields extends Component {
       return;
     }
 
-    checkFieldUnique({
-      worksheetId,
-      controlId,
-      controlType,
-      controlValue,
-    }).then(res => {
-      if (!res.isSuccess && res.data && res.data.rowId !== recordId) {
-        uniqueErrorItems.push({
-          controlId,
-          errorType: FORM_ERROR_TYPE.UNIQUE,
-          showError: true,
-        });
-      } else if (res.isSuccess) {
-        _.remove(uniqueErrorItems, item => item.controlId === controlId && item.errorType === FORM_ERROR_TYPE.UNIQUE);
-      }
+    this.setState({ loadingItems: { ...loadingItems, [controlId]: true } });
 
-      this.setState({ uniqueErrorItems });
-    });
+    worksheetAjax
+      .checkFieldUnique({
+        worksheetId,
+        controlId,
+        controlType,
+        controlValue,
+      })
+      .then(res => {
+        if (!res.isSuccess && res.data && res.data.rowId !== recordId) {
+          uniqueErrorItems.push({
+            controlId,
+            errorType: FORM_ERROR_TYPE.UNIQUE,
+            showError: true,
+          });
+          onError();
+        } else if (res.isSuccess) {
+          _.remove(uniqueErrorItems, item => item.controlId === controlId && item.errorType === FORM_ERROR_TYPE.UNIQUE);
+        }
+
+        this.setState({ uniqueErrorItems, loadingItems: { ...loadingItems, [controlId]: false } }, () => {
+          if (res.isSuccess && this.submitBegin) {
+            this.submitFormData();
+          }
+        });
+      });
   }
 
   /**
@@ -618,9 +590,9 @@ export default class CustomFields extends Component {
   uniqueErrorUpdate(uniqueErrorIds) {
     const { uniqueErrorItems } = this.state;
 
-    uniqueErrorIds.forEach(controlId => {
-      alert(_l('记录提交失败：数据重复'), 2);
+    alert(_l('记录提交失败：数据重复'), 2);
 
+    (uniqueErrorIds || []).forEach(controlId => {
       if (
         !_.find(uniqueErrorItems, item => item.controlId === controlId && item.errorType === FORM_ERROR_TYPE.UNIQUE)
       ) {
@@ -675,7 +647,7 @@ export default class CustomFields extends Component {
   /**
    * 获取提交数据
    */
-  getSubmitData({ silent } = {}) {
+  getSubmitData({ silent, ignoreAlert, verifyAllControls } = {}) {
     const { from, recordId, ignoreHideControl } = this.props;
     const { errorItems, uniqueErrorItems, rules = [] } = this.state;
     const updateControlIds = this.dataFormat.getUpdateControlIds();
@@ -685,24 +657,56 @@ export default class CustomFields extends Component {
       checkAllUpdate: true,
       ignoreHideControl,
     });
-    const errors = updateControlIds.length || !recordId ? checkAllValueAvailable(rules, list, from) : [];
-    const ids = list
-      .filter(item => controlState(item, from).visible && controlState(item, from).editable)
-      .map(it => it.controlId);
+    // 保存时必走，防止无字段变更判断错误
+    const errors =
+      updateControlIds.length || !recordId || this.submitBegin || verifyAllControls
+        ? checkAllValueAvailable(rules, list, from)
+        : [];
+    const ids = verifyAllControls
+      ? list.map(it => it.controlId)
+      : list
+          .filter(item => controlState(item, from).visible && controlState(item, from).editable)
+          .map(it => it.controlId);
     const hasError = !!errorItems.concat(uniqueErrorItems).filter(it => _.includes(ids, it.controlId)).length;
+    const hasRuleError = errors.length;
 
-    if (!hasError && errors.length && !silent) {
-      this.errorDialog(errors);
-    }
     // 提交时所有错误showError更新为true
     this.updateErrorState(hasError);
 
-    return {
-      data: list,
-      updateControlIds,
-      hasError,
-      hasRuleError: errors.length,
-    };
+    let error;
+
+    if (hasError) {
+      if (!ignoreAlert && !silent) alert(_l('请正确填写记录'), 3);
+      error = true;
+    } else if ($(this.con.current, '.workSheetRecordInfo').find('.Progress--circle').length > 0) {
+      alert(_l('附件正在上传，请稍后'), 3);
+      error = true;
+    } else if (hasRuleError) {
+      error = true;
+    }
+
+    if (!hasError && hasRuleError && !silent) {
+      this.errorDialog(errors);
+    }
+
+    return { data: list, updateControlIds, hasError, hasRuleError, error };
+  }
+
+  /**
+   * 表单提交数据
+   */
+  submitFormData(options) {
+    this.submitBegin = true;
+    const { loadingItems } = this.state;
+    const { onSave } = this.props;
+    const { data, updateControlIds, error } = this.getSubmitData(options);
+
+    if (!error && _.some(Object.values(loadingItems), i => i)) {
+      return;
+    }
+
+    onSave(error, { data, updateControlIds });
+    this.submitBegin = false;
   }
 
   render() {

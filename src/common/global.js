@@ -2,6 +2,10 @@ __webpack_public_path__ = window.__webpack_public_path__;
 
 import { lang } from 'src/util/enum';
 import { getPssId } from 'src/util/pssId';
+import langConfig from './langConfig';
+import alert from 'src/components/alert/alert';
+import _ from 'lodash';
+import moment from 'moment';
 
 /**
  * 获取浏览器默认语言
@@ -21,6 +25,8 @@ window.getNavigatorLang = () => {
       case 'zh-Hant-TW':
       case 'zh-Hant':
         return 'zh-Hant';
+      case 'ja':
+        return 'ja';
       default:
         return 'zh-Hans';
     }
@@ -81,7 +87,7 @@ window.delCookie = function delCookie(name) {
 /**
  * 多语言翻译
  */
-window._l = function () {
+window._l = function() {
   let args = arguments;
   if (args) {
     let key = args[0];
@@ -131,13 +137,12 @@ md.staticglobal = md.global = {
     pubHost: 'https://fp1.mingdaoyun.cn/',
   },
   Config: {
-    ServiceTel: '010-53153053',
+    ServiceTel: '400-665-6655',
     IsLocal: true,
   },
   /** 内部各应用的 ID */
   APPInfo: {
     taskAppID: 'ab99d0bb-3249-46f9-8a60-6952cb76cac2',
-    kcAppID: '42c96ef1-3ab6-4269-9824-e21436f34a31',
     taskFolderAppID: '66d51996-6a56-41ba-be15-0d388b548f00',
     calendarAppID: '42c96ef1-3ab6-4269-9824-e21436f34a38',
     worksheetAppID: '1e31c859-1605-4d8d-b3be-437ff871f02d',
@@ -155,7 +160,8 @@ md.staticglobal = md.global = {
   domainSuffix: 'mingdao.com',
   SysSettings: {
     passwordRegex: /^(?=.*\d)(?=.*[a-zA-Z]).{8,20}$/,
-    passwordRegexTip: window._l('8-20位，需包含字母和数字'),
+    passwordRegexTip: '',
+    hideHelpTip: true,
   },
 };
 
@@ -163,14 +169,12 @@ md.staticglobal = md.global = {
  * 自定义alert
  */
 window._alert = window.alert;
-window.alert = function () {
+window.alert = function() {
   let dfd = $.Deferred();
   let args = Array.prototype.slice.call(arguments);
-  require(['alert'], function (alert) {
-    if (!document.getElementsByClassName('logoutWrapper').length) {
-      alert.apply(alert, args).then(dfd.resolve, dfd.reject);
-    }
-  });
+  if (!document.getElementsByClassName('logoutWrapper').length) {
+    alert.apply(alert, args).then(dfd.resolve, dfd.reject);
+  }
   return dfd.promise();
 };
 
@@ -179,17 +183,17 @@ window.alert = function () {
  */
 window.File = typeof File === 'undefined' ? {} : File;
 /** 获取后缀名 */
-File.GetExt = function (fileName) {
+File.GetExt = function(fileName) {
   let t = (fileName || '').split('.');
   return t.length > 1 ? t[t.length - 1] : '';
 };
 /* 获取文件名 */
-File.GetName = function (fileName) {
+File.GetName = function(fileName) {
   let t = (fileName || '').split('.');
   t.pop();
   return t.length >= 1 ? t.join('.') : '';
 };
-File.isValid = function (fileExt) {
+File.isValid = function(fileExt) {
   let fileExts = ['.exe', '.vbs', '.bat', '.cmd', '.com', '.url'];
   if (fileExt) {
     fileExt = fileExt.toLowerCase();
@@ -197,7 +201,7 @@ File.isValid = function (fileExt) {
   }
   return true;
 };
-File.isPicture = function (fileExt) {
+File.isPicture = function(fileExt) {
   let fileExts = ['.jpg', '.gif', '.png', '.jpeg', '.bmp', '.webp', '.heic', '.svg', '.tif', '.tiff'];
   if (fileExt) {
     fileExt = fileExt.toLowerCase();
@@ -212,7 +216,7 @@ File.isPicture = function (fileExt) {
  * @deprecated 使用 utils 模块中的方法
  * @param {string} modifier 加载圈圈的大小，big 或 small 或 middle，默认 middle
  */
-window.LoadDiv = function (modifier) {
+window.LoadDiv = function(modifier) {
   let size;
   if (modifier === 'big') {
     size = 36;
@@ -255,9 +259,18 @@ window.safeParse = (str, type) => {
   }
 };
 
+window.safeLocalStorageSetItem = (...args) => {
+  try {
+    window.localStorage.setItem(...args);
+  } catch (err) {
+    console.log(err);
+  }
+};
+
 window.safeParseArray = str => {
   return window.safeParse(str, 'array');
 };
+
 /**
  * 格式化时间
  * @param {string} dateStr 具体的日期字符串，格式为 yyyy-MM-dd HH:mm:ss
@@ -270,8 +283,14 @@ window.createTimeSpan = dateStr => {
   let year = dateTime.getFullYear();
   let month = dateTime.getMonth();
   let day = dateTime.getDate();
-  let hour = dateTime.getHours().toString().padStart(2, '0');
-  let minute = dateTime.getMinutes().toString().padStart(2, '0');
+  let hour = dateTime
+    .getHours()
+    .toString()
+    .padStart(2, '0');
+  let minute = dateTime
+    .getMinutes()
+    .toString()
+    .padStart(2, '0');
 
   let now = new Date();
 
@@ -312,25 +331,25 @@ window.createTimeSpan = dateStr => {
 /**
  * 订阅发布模式，用于Chat和PageHead的数据传递
  */
-(function ($) {
+(function($) {
   if (!$) return;
   let o = $({});
 
-  $.subscribe = function () {
+  $.subscribe = function() {
     o.on.apply(o, arguments);
   };
 
-  $.unsubscribe = function () {
+  $.unsubscribe = function() {
     o.off.apply(o, arguments);
   };
 
-  $.publish = function () {
+  $.publish = function() {
     o.trigger.apply(o, arguments);
   };
 })(jQuery);
 
 /** 通用请求 */
-(function ($) {
+(function($) {
   /**
    * 根据错误码 / HTTP状态码获取错误信息
    * @param  {Number} statusCode 错误码或 HTTP 状态码
@@ -421,7 +440,7 @@ window.createTimeSpan = dateStr => {
 
     if (typeof paramObj !== 'string') {
       if ((ajaxOptions.type || '').toUpperCase() === 'GET') {
-        Object.keys(paramObj).forEach(function (key, i) {
+        Object.keys(paramObj).forEach(function(key, i) {
           let val = paramObj[key];
           if (typeof val === 'function') {
             val = val();
@@ -433,7 +452,7 @@ window.createTimeSpan = dateStr => {
         });
       } else {
         // 如果参数值有方法，先执行方法
-        Object.keys(paramObj).forEach(function (key, i) {
+        Object.keys(paramObj).forEach(function(key, i) {
           let val = paramObj[key];
           if (typeof val === 'function') {
             val = val();
@@ -445,8 +464,8 @@ window.createTimeSpan = dateStr => {
     }
 
     let alert = options.silent
-      ? function () {}
-      : function (msg, level) {
+      ? function() {}
+      : function(msg, level) {
           level = level || 3;
           window.alert(msg, level);
         };
@@ -459,23 +478,36 @@ window.createTimeSpan = dateStr => {
     let queueName = controllerName + '.' + actionName;
     let fireImmediately = options.fireImmediately;
     let pssId = getPssId();
+    let access_token = window.access_token;
     let headers = {
       ...(!ajaxOptions.url ? { 'X-Requested-With': 'XMLHttpRequest' } : {}),
       Authorization: pssId ? `md_pss_id ${pssId}` : '',
       AccountId: md.global.Account && md.global.Account.accountId ? md.global.Account.accountId : '',
     };
-    let serverPath = __api_server__;
+    let serverPath = __api_server__.main;
+
+    if (window.share) {
+      headers.share = window.share;
+      headers.Authorization = '';
+    }
 
     if (window.publicAppAuthorization) {
       headers.shareAuthor = window.publicAppAuthorization;
       const { global = {} } = md;
-      const { Config = {} } = global;
+      const { Config = {}, SysSettings = {} } = global;
       const { IsLocal } = Config;
-      if (IsLocal) {
+      const { templateLibraryTypes } = SysSettings;
+      if (IsLocal && !/#isPrivateBuild/.test(location.hash) && templateLibraryTypes !== '2') {
         serverPath = 'https://www.mingdao.com/api/';
       }
     }
 
+    if (access_token) {
+      // 工作流&统计服务
+      headers.access_token = access_token;
+      // 主站服务
+      headers.Authorization = `access_token ${access_token}`;
+    }
     if (ajaxOptions.url) {
       delete headers.AccountId;
     }
@@ -503,7 +535,7 @@ window.createTimeSpan = dateStr => {
                 }
               : null,
             converters: {
-              'text json': function (result) {
+              'text json': function(result) {
                 result = result.replace(/"controlName":"(.*?)"/g, ($1, $2) => `"controlName":"${lang()[$2] || $2}"`);
                 return JSON.parse(result);
               },
@@ -513,7 +545,7 @@ window.createTimeSpan = dateStr => {
         ),
       );
       let ajaxPromise = ajax
-        .then(undefined, function (jqXHR, textStatus) {
+        .then(undefined, function(jqXHR, textStatus) {
           if (!jqXHR.responseText) {
             return alertError(jqXHR, textStatus);
           } else {
@@ -521,8 +553,8 @@ window.createTimeSpan = dateStr => {
               const res = JSON.parse(jqXHR.responseText);
               if (jqXHR.status === 402 && res.state === 13 && res.data) {
                 if (md.global.Account.accountId && location.href.indexOf('mobile') === -1) {
-                  require(['../pages/PageHeader/components/NetState'], ({ default: netState }) => {
-                    netState(res.data);
+                  import('../pages/PageHeader/components/NetState').then(netState => {
+                    netState.default(res.data);
                   });
                 }
                 return dfd.reject(_.pick(res, ['state', 'exception']));
@@ -533,7 +565,9 @@ window.createTimeSpan = dateStr => {
               }
             } catch (error) {
               try {
-                let textErrorMessage = $(jqXHR.responseText).find('#textErrorMessage').val();
+                let textErrorMessage = $(jqXHR.responseText)
+                  .find('#textErrorMessage')
+                  .val();
                 if (textErrorMessage) {
                   /* TODO: 处理服务端返回的错误信息*/
                 }
@@ -541,7 +575,7 @@ window.createTimeSpan = dateStr => {
             }
           }
         })
-        .then(function (res) {
+        .then(function(res) {
           let errorCode, errorMessage;
           if (typeof res !== 'object') {
             errorCode = -1;
@@ -558,7 +592,7 @@ window.createTimeSpan = dateStr => {
             errorMessage: errorMessage,
           });
         })
-        .then(function () {
+        .then(function() {
           try {
             dfd.resolve.apply(this, arguments);
           } catch (err) {
@@ -569,11 +603,11 @@ window.createTimeSpan = dateStr => {
           }
         }, dfd.reject);
       if (fireImmediately) {
-        ajaxPromise.abort = function () {
+        ajaxPromise.abort = function() {
           ajax.abort.apply(ajax, arguments);
         };
       } else {
-        ajaxPromise = ajaxPromise.always(function () {
+        ajaxPromise = ajaxPromise.always(function() {
           if (next) {
             next();
           }
@@ -590,7 +624,7 @@ window.createTimeSpan = dateStr => {
     } else {
       ajaxQueue.queue(queueName, doRequest);
 
-      promise.abort = function (statusText) {
+      promise.abort = function(statusText) {
         // proxy abort to the ajax if it is active
         if (ajax) {
           return ajax.abort(statusText);
@@ -613,7 +647,7 @@ window.createTimeSpan = dateStr => {
     return promise;
   }
 
-  requestApi.abortAll = function () {
+  requestApi.abortAll = function() {
     ajaxQueue.clearQueue();
     requesting = {};
   };
@@ -624,16 +658,13 @@ window.createTimeSpan = dateStr => {
 /**
  * 加载多语言文件
  */
-(function () {
+(function() {
   const lang = getCookie('i18n_langtag') || getNavigatorLang();
-  const langPath = {
-    en: '/staticfiles/lang/en/mdTranslation.js',
-    'zh-Hant': '/staticfiles/lang/zh-Hant/mdTranslation.js',
-  };
+  const currentLang = langConfig.find(item => item.key === lang);
 
-  if (lang === 'en' || lang === 'zh-Hant') {
+  if (!!currentLang) {
     let xhrObj = new XMLHttpRequest();
-    xhrObj.open('GET', langPath[lang], false);
+    xhrObj.open('GET', currentLang.path, false);
     xhrObj.send('');
     let script = document.createElement('script');
     script.type = 'text/javascript';
@@ -642,13 +673,38 @@ window.createTimeSpan = dateStr => {
   }
 })();
 
+/**
+ * 兼容企业微信windows客户端低版本没有prepend方法报错的问题
+ */
+(function(arr) {
+  arr.forEach(function(item) {
+    item.prepend =
+      item.prepend ||
+      function() {
+        var argArr = Array.prototype.slice.call(arguments),
+          docFrag = document.createDocumentFragment();
+
+        argArr.forEach(function(argItem) {
+          var isNode = argItem instanceof Node;
+          docFrag.appendChild(isNode ? argItem : document.createTextNode(String(argItem)));
+        });
+
+        this.insertBefore(docFrag, this.firstChild);
+      };
+  });
+})([Element.prototype, Document.prototype, DocumentFragment.prototype]);
+
 // 兼容钉钉内核63 问题
 if (!Object.fromEntries) {
   Object.fromEntries = function(entries) {
     let entriesObj = {};
-    (entries || []).forEach(element => {
-      entriesObj[element[0]] = element[1];
-    });
+
+    if (Array.isArray(entries)) {
+      (entries || []).forEach(element => {
+        entriesObj[element[0]] = element[1];
+      });
+    }
+
     return entriesObj;
   };
 }

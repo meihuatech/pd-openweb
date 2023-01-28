@@ -13,8 +13,13 @@ import {
   DetailFooter,
   CustomTextarea,
   SelectNodeObject,
+  FindMode,
 } from '../components';
-import { TRIGGER_ID_TYPE } from '../../enum';
+import { ACTION_ID } from '../../enum';
+import CodeEdit from 'src/pages/widgetConfig/widgetSetting/components/FunctionEditorDialog/Func/common/CodeEdit';
+import FunctionEditorDialog from 'src/pages/widgetConfig/widgetSetting/components/FunctionEditorDialog';
+import _ from 'lodash';
+import moment from 'moment';
 
 export default class Formula extends Component {
   constructor(props) {
@@ -26,6 +31,9 @@ export default class Formula extends Component {
       fnmatchPos: null,
       fnmatch: '',
       isFocus: false,
+      showFormulaDialog: false,
+      fieldsData: [],
+      functionError: false,
     };
   }
 
@@ -72,7 +80,7 @@ export default class Formula extends Component {
    * 保存
    */
   onSave = () => {
-    const { data, saveRequest } = this.state;
+    const { data, saveRequest, functionError } = this.state;
     const {
       name,
       actionId,
@@ -85,30 +93,41 @@ export default class Formula extends Component {
       endTime,
       outUnit,
       selectNodeId,
+      execute,
     } = data;
 
     // 日期/时间
-    if (actionId === TRIGGER_ID_TYPE.DATE_FORMULA && !fieldValue && !fieldControlId) {
+    if (actionId === ACTION_ID.DATE_FORMULA && !fieldValue && !fieldControlId) {
       alert(_l('日期/时间字段不能为空'), 2);
       return;
     }
 
-    if (_.includes([TRIGGER_ID_TYPE.NUMBER_FORMULA, TRIGGER_ID_TYPE.DATE_FORMULA], actionId) && !formulaValue) {
+    if (_.includes([ACTION_ID.NUMBER_FORMULA, ACTION_ID.DATE_FORMULA], actionId) && !formulaValue) {
       alert(_l('运算公式不能为空'), 2);
       return;
     }
 
     if (
-      actionId === TRIGGER_ID_TYPE.DATE_DIFF_FORMULA &&
+      actionId === ACTION_ID.DATE_DIFF_FORMULA &&
       ((!startTime.fieldValue && !startTime.fieldControlId) || (!endTime.fieldValue && !endTime.fieldControlId))
     ) {
       alert(_l('开始日期和结束日期不能为空'), 2);
       return;
     }
 
-    if (actionId === TRIGGER_ID_TYPE.TOTAL_STATISTICS && !selectNodeId) {
+    if (actionId === ACTION_ID.TOTAL_STATISTICS && !selectNodeId) {
       alert(_l('必须先选择一个对象'), 2);
       return;
+    }
+
+    if (actionId === ACTION_ID.FUNCTION_CALCULATION) {
+      if (functionError) {
+        alert(_l('函数有误'), 2);
+        return;
+      } else if (!formulaValue) {
+        alert(_l('函数不能为空'), 2);
+        return;
+      }
     }
 
     if (saveRequest) {
@@ -131,6 +150,7 @@ export default class Formula extends Component {
         endTime,
         outUnit,
         selectNodeId,
+        execute,
       })
       .then(result => {
         this.props.updateNodeData(result);
@@ -148,19 +168,16 @@ export default class Formula extends Component {
 
     return (
       <CustomTextarea
-        className="minH100"
+        className={cx('minH100', { errorBorder: !!data.formulaValue && data.isException && !isFocus })}
         processId={this.props.processId}
         selectNodeId={this.props.selectNodeId}
         operatorsSetMargin={true}
-        className={!!data.formulaValue && data.isException && !isFocus ? 'errorBorder' : ''}
         type={6}
         content={data.formulaValue}
         formulaMap={data.formulaMap}
         getRef={tagtextarea => (this.tagtextarea = tagtextarea)}
         onFocus={() => this.setState({ isFocus: true })}
-        onChange={(err, value, obj) =>
-          this.handleChange(err, value, obj, data.actionId === TRIGGER_ID_TYPE.NUMBER_FORMULA)
-        }
+        onChange={(err, value, obj) => this.handleChange(err, value, obj, data.actionId === ACTION_ID.NUMBER_FORMULA)}
         updateSource={this.updateSource}
       />
     );
@@ -281,6 +298,7 @@ export default class Formula extends Component {
                 appType={data.fieldAppType}
                 actionId={data.fieldActionId}
                 nodeName={data.fieldNodeName}
+                controlId={data.fieldControlId}
                 controlName={data.fieldControlName}
               />
             </span>
@@ -303,8 +321,8 @@ export default class Formula extends Component {
               selectedValue={data.fieldValue ? moment(data.fieldValue) : null}
               timePicker
               timeMode="minute"
+              allowClear={false}
               onOk={e => callback({ fieldValue: e.format('YYYY-MM-DD HH:mm') })}
-              onClear={() => callback({ fieldValue: '' })}
             >
               {data.fieldValue ? (
                 moment(data.fieldValue).format('YYYY-MM-DD HH:mm')
@@ -366,10 +384,7 @@ export default class Formula extends Component {
 
         <Dropdown
           className="flowDropdown mTop10"
-          data={[
-            { text: _l('日期+时间'), value: 1 },
-            { text: _l('日期'), value: 2 },
-          ]}
+          data={[{ text: _l('日期+时间'), value: 1 }, { text: _l('日期'), value: 2 }]}
           value={data.number}
           border
           onChange={number => this.updateSource({ number })}
@@ -445,8 +460,8 @@ export default class Formula extends Component {
             { text: _l('年'), value: 1 },
             { text: _l('月'), value: 2 },
             { text: _l('天'), value: 3 },
-            { text: _l('小时'), value: 4 },
-            { text: _l('分钟'), value: 5 },
+            { text: _l('时'), value: 4 },
+            { text: _l('分'), value: 5 },
           ]}
           value={data.outUnit}
           border
@@ -481,6 +496,118 @@ export default class Formula extends Component {
     );
   }
 
+  /**
+   * 渲染函数计算
+   */
+  renderFunctionExecContent() {
+    const { data, showFormulaDialog, fieldsData, functionError } = this.state;
+
+    return (
+      <Fragment>
+        <div className="Font14 Gray_75 workflowDetailDesc">{_l('通过函数对 文本/数值 等流程节点对象的值进行处理')}</div>
+        <div className="mTop20 bold">{_l('计算')}</div>
+
+        <div
+          className="mTop10 boderRadAll_4 BorderGrayD pointer formulaEditorBox minH100"
+          style={{ borderColor: functionError ? '#f44336' : '#ddd' }}
+        >
+          <CodeEdit
+            value={data.formulaValue}
+            mode="read"
+            placeholder={_l('点击编辑函数')}
+            renderTag={this.renderTag}
+            onClick={this.editFormulaDialog}
+          />
+        </div>
+
+        {showFormulaDialog && (
+          <FunctionEditorDialog
+            className="workflowDialogBox"
+            value={{ expression: data.formulaValue }}
+            title={_l('结果')}
+            controlGroups={fieldsData}
+            renderTag={this.renderTag}
+            onClose={() => this.setState({ showFormulaDialog: false })}
+            onSave={({ expression, status }) => {
+              this.updateSource({ formulaValue: expression });
+              this.setState({ showFormulaDialog: false, functionError: status !== 1 });
+            }}
+          />
+        )}
+      </Fragment>
+    );
+  }
+
+  /**
+   * 渲染单个标签
+   */
+  renderTag = tag => {
+    const { data } = this.state;
+    const ids = tag.split(/([a-zA-Z0-9#]{24,32})-/).filter(item => item);
+    const nodeObj = data.formulaMap[ids[0]] || {};
+    const controlObj = data.formulaMap[ids[1]] || {};
+
+    return (
+      <Tag
+        className="pointer"
+        flowNodeType={nodeObj.type}
+        appType={nodeObj.appType}
+        actionId={nodeObj.actionId}
+        nodeName={nodeObj.name}
+        controlId={ids[1]}
+        controlName={controlObj.name}
+      />
+    );
+  };
+
+  /**
+   * 编辑函数弹层
+   */
+  editFormulaDialog = event => {
+    const { processId, selectNodeId } = this.props;
+
+    if ($(event.target).closest('.ant-tooltip').length) return;
+
+    if (!this.state.fieldsData.length) {
+      flowNode
+        .getFlowNodeAppDtos({
+          processId,
+          nodeId: selectNodeId,
+          type: 2,
+        })
+        .then(result => {
+          let formulaMap = {};
+          const fieldsData = result.map(obj => {
+            return {
+              name: obj.nodeName,
+              id: obj.nodeId,
+              controls: obj.controls,
+            };
+          });
+
+          result.forEach(obj => {
+            formulaMap[obj.nodeId] = {
+              type: obj.nodeTypeId,
+              appType: obj.appType,
+              actionId: obj.actionId,
+              name: obj.nodeName,
+            };
+
+            obj.controls.forEach(o => {
+              if (!formulaMap[o.controlId]) {
+                formulaMap[o.controlId] = { type: o.type, name: o.controlName };
+              }
+            });
+          });
+
+          this.setState({ fieldsData, showFormulaDialog: true });
+          this.updateSource({ formulaMap });
+        });
+    } else {
+      this.setState({ showFormulaDialog: true });
+    }
+  };
+
   render() {
     const { data } = this.state;
 
@@ -491,34 +618,38 @@ export default class Formula extends Component {
     return (
       <Fragment>
         <DetailHeader
-          data={{ ...data, selectNodeType: this.props.selectNodeType }}
+          {...this.props}
+          data={{ ...data }}
           icon="icon-workflow_function"
           bg="BGBlueAsh"
-          closeDetail={this.props.closeDetail}
           updateSource={this.updateSource}
         />
         <div className="flex mTop20">
           <ScrollView>
             <div className="workflowDetailBox">
-              {data.actionId === TRIGGER_ID_TYPE.NUMBER_FORMULA && this.renderNumberContent()}
-              {data.actionId === TRIGGER_ID_TYPE.DATE_FORMULA && this.renderDateContent()}
-              {data.actionId === TRIGGER_ID_TYPE.DATE_DIFF_FORMULA && this.renderDateDiffContent()}
-              {data.actionId === TRIGGER_ID_TYPE.TOTAL_STATISTICS && this.renderTotalStatisticsContent()}
+              {data.actionId === ACTION_ID.NUMBER_FORMULA && this.renderNumberContent()}
+              {data.actionId === ACTION_ID.DATE_FORMULA && this.renderDateContent()}
+              {data.actionId === ACTION_ID.DATE_DIFF_FORMULA && this.renderDateDiffContent()}
+              {data.actionId === ACTION_ID.TOTAL_STATISTICS && this.renderTotalStatisticsContent()}
+              {data.actionId === ACTION_ID.FUNCTION_CALCULATION && this.renderFunctionExecContent()}
+
+              <FindMode isFormula execute={data.execute} onChange={execute => this.updateSource({ execute })} />
             </div>
           </ScrollView>
         </div>
         <DetailFooter
+          {...this.props}
           isCorrect={
-            (data.actionId === TRIGGER_ID_TYPE.NUMBER_FORMULA && data.formulaValue) ||
-            (data.actionId === TRIGGER_ID_TYPE.DATE_FORMULA &&
+            (data.actionId === ACTION_ID.NUMBER_FORMULA && data.formulaValue) ||
+            (data.actionId === ACTION_ID.DATE_FORMULA &&
               ((data.fieldValue && data.fieldControlId) || data.formulaValue)) ||
-            (data.actionId === TRIGGER_ID_TYPE.DATE_DIFF_FORMULA &&
+            (data.actionId === ACTION_ID.DATE_DIFF_FORMULA &&
               (data.startTime.fieldValue || data.startTime.fieldControlId) &&
               (data.endTime.fieldValue || data.endTime.fieldControlId)) ||
-            (data.actionId === TRIGGER_ID_TYPE.TOTAL_STATISTICS && data.selectNodeId)
+            (data.actionId === ACTION_ID.TOTAL_STATISTICS && data.selectNodeId) ||
+            (data.actionId === ACTION_ID.FUNCTION_CALCULATION && data.formulaValue)
           }
           onSave={this.onSave}
-          closeDetail={this.props.closeDetail}
         />
       </Fragment>
     );

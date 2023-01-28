@@ -2,26 +2,29 @@ import React, { Component } from 'react';
 import { bindActionCreators } from 'redux';
 import { connect } from 'react-redux';
 import CalendarView from 'src/pages/worksheet/views/CalendarView';
+import { isIllegalFormat } from 'src/pages/worksheet/views/CalendarView/util';
 import ScheduleModal from './components/ScheduleModal';
 import ViewErrorPage from '../components/ViewErrorPage';
 import * as calendarActions from 'src/pages/worksheet/redux/actions/calendarview';
-import * as actions from 'src/pages/Mobile/RecordList/redux/actions';
+import * as actions from 'mobile/RecordList/redux/actions';
+import { RecordInfoModal } from 'mobile/Record';
 import { getAdvanceSetting } from 'src/util';
 import { Icon } from 'ming-ui';
 import './index.less';
+import _ from 'lodash';
+import moment from 'moment';
 
 class MobileCalendarView extends Component {
   constructor(props) {
     super(props);
     this.state = {
       scheduleVisible: false,
+      previewRecordId: undefined
     };
   }
-  componentDidMount() {
-    this.props.getCalendarData();
-  }
+  componentDidMount() { }
   showschedule = () => {
-    window.localStorage.setItem('CalendarShowExternalTypeEvent', 'eventAll');
+    safeLocalStorageSetItem('CalendarShowExternalTypeEvent', 'eventAll');
     this.setState({ scheduleVisible: !this.state.scheduleVisible });
     this.props.fetchExternal();
   };
@@ -48,13 +51,24 @@ class MobileCalendarView extends Component {
   };
 
   render() {
-    let { scheduleVisible } = this.state;
+    let { scheduleVisible, previewRecordId } = this.state;
     const { view, currentSheetRows, calendarview = {}, base = {} } = this.props;
     const { calendarData = {} } = calendarview;
-    const { begindate = '', calendarType = '0' } = getAdvanceSetting(view);
-    const { startData } = calendarData;
-    const isDelete = begindate && (!startData || !startData.controlId);
-    let isHaveSelectControl = !begindate || isDelete; // 是否选中了开始时间 //开始时间字段已删除
+    const { calendarInfo = [] } = calendarData;
+    let { begindate = '', enddate = '', calendarType = '0', calendarcids = '[]' } = getAdvanceSetting(view);
+    try {
+      calendarcids = JSON.parse(calendarcids);
+    } catch (error) {
+      calendarcids = [];
+    }
+    if (calendarcids.length <= 0) {
+      calendarcids = [{ begin: begindate, end: enddate }]; //兼容老数据
+    }
+    const isDelete =
+      calendarcids[0].begin &&
+      calendarInfo.length > 0 &&
+      (!calendarInfo[0].startData || !calendarInfo[0].startData.controlId);
+    let isHaveSelectControl = !calendarcids[0].begin || isDelete; // 是否选中了开始时间 //开始时间字段已删除
     const mobileCalendarSetting = {
       // views: {},
       // headerToolbar:{
@@ -71,21 +85,25 @@ class MobileCalendarView extends Component {
       },
       eventClick: eventInfo => {
         if (calendarType === '2') {
-          let { appId, worksheetId, viewId } = base;
           const { extendedProps } = eventInfo.event._def;
-          let url = `/mobile/record/${appId}/${worksheetId}/${viewId}/${extendedProps.rowid}`;
-          window.mobileNavigateTo(url);
+          const isMingdao = navigator.userAgent.toLowerCase().indexOf('mingdao application') >= 0;
+          if (isMingdao) {
+            const { base } = this.props;
+            window.location.href = `/mobile/record/${base.appId}/${base.worksheetId}/${base.viewId}/${extendedProps.rowid}`;
+            return;
+          }
+          this.setState({ previewRecordId: extendedProps.rowid });
         } else {
           const { range = {} } = eventInfo.event._instance;
           range.start && this.getMoreClickData(range.start);
           this.props.mobileIsShowMoreClick(true);
         }
       },
-      eventMouseEnter: () => {},
-      eventMouseLeave: () => {},
+      eventMouseEnter: () => { },
+      eventMouseLeave: () => { },
     };
     // 视图配置错误
-    if (isHaveSelectControl) {
+    if (isHaveSelectControl || isIllegalFormat(calendarInfo)) {
       return <ViewErrorPage icon="event" viewName={_l('日历视图')} color="#f64082" />;
     }
     return (
@@ -101,6 +119,19 @@ class MobileCalendarView extends Component {
         )) ||
           null}
         {scheduleVisible && <ScheduleModal visible={scheduleVisible} showschedule={this.showschedule} />}
+        <RecordInfoModal
+          className="full"
+          visible={!!previewRecordId}
+          appId={base.appId}
+          worksheetId={base.worksheetId}
+          viewId={base.viewId}
+          rowId={previewRecordId}
+          onClose={() => {
+            this.setState({
+              previewRecordId: undefined
+            });
+          }}
+        />
       </div>
     );
   }

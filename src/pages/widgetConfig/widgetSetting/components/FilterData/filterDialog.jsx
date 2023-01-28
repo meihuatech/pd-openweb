@@ -1,16 +1,22 @@
 import React, { Fragment, useState } from 'react';
 import { Dialog, LoadDiv, Support } from 'ming-ui';
 import { isEmpty, isEqual } from 'lodash';
-import SingleFilter from 'src/pages/worksheet/common/WorkSheetFilter/common/SingleFilter';
+import FilterConfig from 'src/pages/worksheet/common/WorkSheetFilter/common/FilterConfig';
 import 'src/pages/worksheet/common/WorkSheetFilter/WorkSheetFilter.less';
 import { CONTROL_FILTER_WHITELIST } from 'src/pages/worksheet/common/WorkSheetFilter/enum';
-import { checkConditionAvailable, getTypeKey } from 'src/pages/worksheet/common/WorkSheetFilter/util';
+import {
+  filterUnavailableConditions,
+  getTypeKey,
+  redefineComplexControl,
+} from 'src/pages/worksheet/common/WorkSheetFilter/util';
 import { getAdvanceSetting, isSingleRelateSheet } from '../../../util/setting';
 import { filterControlsFromAll } from '../../../util';
 import './filterDialog.less';
 
 export default function FilterDialog(props) {
   const {
+    allowEmpty,
+    supportGroup,
     data,
     onChange,
     onClose,
@@ -24,8 +30,8 @@ export default function FilterDialog(props) {
     globalSheetControls, //主标控件 用于 子表中的关联记录字段筛选选择范围，支持使用主表中的字段
   } = props;
 
-  const { sourceControlId } = data;
-  const [filters, setFilters] = useState(getAdvanceSetting(data, 'filters'));
+  const { sourceControlId, type } = data;
+  const [filters, setFilters] = useState(props.filters || getAdvanceSetting(data, 'filters'));
 
   const relateSheetList = filterControlsFromAll(
     allControls,
@@ -36,23 +42,31 @@ export default function FilterDialog(props) {
     <Dialog
       visible
       title={title || _l('筛选关联记录')}
-      okDisabled={isEmpty(filters)}
+      okDisabled={isEmpty(filters) && !allowEmpty}
       okText={_l('确定')}
       cancelText={_l('取消')}
       className="filterDialog"
+      overlayClosable={props.overlayClosable}
       onCancel={onClose}
       onOk={() => {
-        let data = [];
-        filters.map(item => {
-          const control = _.find(relationControls, column => item.controlId === column.controlId) || {};
-          // type为关联他表，type取sourceControlType的值 -1//无值
-          let { sourceControlType = -1 } = control;
-          const conditionGroupKey = getTypeKey(control.type === 30 ? sourceControlType : control.type);
+        function formatCondition(condition) {
+          if (condition.groupFilters) {
+            return {
+              ...condition,
+              groupFilters: condition.groupFilters.map(formatCondition),
+            };
+          }
+          const control = _.find(relationControls, column => condition.controlId === column.controlId) || {};
+          // type为关联他表，type取sourceControlType的值 -1//无值, 通用方法转换redefineComplexControl
+
+          const conditionGroupKey = getTypeKey(redefineComplexControl(control).type);
           const conditionGroupType = (CONTROL_FILTER_WHITELIST[conditionGroupKey] || {}).value;
+          const dataRangeInfo = fromCondition === 'subTotal' && conditionGroupKey === 'DATE' ? { dateRange: 18 } : {};
           let initialDynamicSource = {
-            ...item,
+            ...condition,
+            ...dataRangeInfo,
             conditionGroupType,
-            type: item.filterType,
+            type: condition.filterType,
             values: [],
             maxValue: undefined,
             minValue: undefined,
@@ -61,44 +75,48 @@ export default function FilterDialog(props) {
             isDynamicsource: true,
           };
           let initialSource = {
-            ...item,
+            ...condition,
+            ...dataRangeInfo,
             conditionGroupType,
-            type: item.filterType,
+            type: condition.filterType,
             dynamicSource: [],
             isDynamicsource: false,
           };
-          if (item.isDynamicsource === undefined) {
-            if (item.dynamicSource.length > 0) {
-              data.push(initialDynamicSource);
+          if (condition.isDynamicsource === undefined) {
+            if (condition.dynamicSource.length > 0) {
+              return initialDynamicSource;
             } else {
-              data.push(initialSource);
+              return initialSource;
             }
           } else {
-            if (!item.isDynamicsource) {
-              data.push(initialSource);
+            if (!condition.isDynamicsource) {
+              return initialSource;
             } else {
-              data.push(initialDynamicSource);
+              return initialDynamicSource;
             }
           }
-        });
+        }
+        const data = filters.map(formatCondition).filter(_.identity);
         onChange({
-          filters: data.filter(condition => checkConditionAvailable(condition)),
+          filters: filterUnavailableConditions(data),
         });
       }}
     >
       <Fragment>
         {showSubtotalTip && <div className="Gray_9e">{_l('设置筛选字段后，汇总结果需要在表单提交后才能显示')}</div>}
-        <SingleFilter
+        <FilterConfig
+          supportGroup={supportGroup}
           canEdit
           feOnly
-          filterDept={true}
-          filterColumnClassName="showBtnFilter"
+          filterColumnClassName="sheetViewFilterColumnOption"
           projectId={globalSheetInfo.projectId}
           appId={globalSheetInfo.appId}
           columns={relationControls}
-          currentColumns={allControls}
           conditions={filters}
+          filterDept={type !== 29}
+          currentColumns={allControls}
           from={fromCondition}
+          filterResigned={false}
           sourceControlId={sourceControlId}
           relateSheetList={relateSheetList} // 除去自身的本表的关联单条的数据
           onConditionsChange={conditions => {

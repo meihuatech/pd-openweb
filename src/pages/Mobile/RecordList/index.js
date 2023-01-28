@@ -1,30 +1,46 @@
-import React, { Component } from 'react';
+import React, { Fragment, Component } from 'react';
 import DocumentTitle from 'react-document-title';
-import { Tabs, Flex, ActivityIndicator, Drawer } from 'antd-mobile';
+import { Tabs, Flex, ActivityIndicator } from 'antd-mobile';
 import { withRouter } from 'react-router-dom';
 import { bindActionCreators } from 'redux';
 import { Icon, Button, WaterMark } from 'ming-ui';
 import { connect } from 'react-redux';
 import * as actions from './redux/actions';
+import { addNewRecord } from 'src/pages/worksheet/redux/actions';
 import Back from '../components/Back';
 import AppPermissions from '../components/AppPermissions';
-import QuickFilter from './QuickFilter';
 import State from './State';
 import View from './View';
+import { RecordInfoModal } from 'mobile/Record';
 import './index.less';
 import { isOpenPermit } from 'src/pages/FormSet/util.js';
 import { permitList } from 'src/pages/FormSet/config.js';
 import { getAdvanceSetting } from 'src/util';
 import cx from 'classnames';
+import FixedPage from 'mobile/App/FixedPage.jsx';
+import { openAddRecord } from 'mobile/Record/addRecord';
+import alreadyDelete from './State/assets/alreadyDelete.png';
+import _ from 'lodash';
 
 @withRouter
 @AppPermissions
 class RecordList extends Component {
   constructor(props) {
     super(props);
+    this.state = {
+      previewRecordId: undefined,
+      tempViewIdForRecordInfo: undefined,
+    };
   }
   componentDidMount() {
+    const { params } = this.props.match || {};
+    this.props.changeMobileGroupFilters([]);
     this.getApp(this.props);
+    if (_.get(this.props, ['filters', 'visible'])) {
+      this.props.updateFilters({
+        visible: false,
+      });
+    }
   }
   getApp(props) {
     const { params } = props.match;
@@ -52,15 +68,15 @@ class RecordList extends Component {
   componentWillUnmount() {
     this.props.emptySheetControls();
   }
+  sheetViewOpenRecord = (recordId, viewId) => {
+    this.setState({
+      previewRecordId: recordId,
+      tempViewIdForRecordInfo: viewId,
+    });
+  };
   setCache = params => {
     const { worksheetId, viewId } = params;
-    localStorage.setItem(`mobileViewSheet-${worksheetId}`, viewId);
-  };
-  handleOpenDrawer = () => {
-    const { filters } = this.props;
-    this.props.updateFilters({
-      visible: !filters.visible,
-    });
+    safeLocalStorageSetItem(`mobileViewSheet-${worksheetId}`, viewId);
   };
   handleChangeView = view => {
     const { match, now } = this.props;
@@ -75,18 +91,6 @@ class RecordList extends Component {
       );
     }
   };
-  renderSidebar(view) {
-    const { fastFilters = [] } = view;
-    const { worksheetInfo } = this.props;
-    const sheetControls = _.get(worksheetInfo, ['template', 'controls']);
-    const filters = fastFilters
-      .map(filter => ({
-        ...filter,
-        control: _.find(sheetControls, c => c.controlId === filter.controlId),
-      }))
-      .filter(c => c.control);
-    return <QuickFilter view={view} filters={filters} controls={sheetControls} onHideSidebar={this.handleOpenDrawer} />;
-  }
   renderContent() {
     const {
       base,
@@ -106,51 +110,72 @@ class RecordList extends Component {
     const { viewId } = base;
     const { detail } = appDetail;
     const { appNaviStyle } = detail;
-    const { views, name } = worksheetInfo;
+
+    const { views, name, advancedSetting = {} } = worksheetInfo;
     const view = _.find(views, { viewId }) || (!viewId && views[0]) || {};
     const { params } = match;
     const viewIndex = viewId ? _.findIndex(views, { viewId }) : 0;
 
     const { calendarData = {} } = calendarview;
-    const { begindate = '' } = getAdvanceSetting(view);
-    const { startData } = calendarData;
-    const isDelete = begindate && (!startData || !startData.controlId);
+    let { begindate = '', enddate = '', calendarcids = '[]' } = getAdvanceSetting(view);
+    const { calendarInfo = [] } = calendarData;
     const { viewControl, viewControls } = view;
+
+    try {
+      calendarcids = JSON.parse(calendarcids);
+    } catch (error) {
+      calendarcids = [];
+    }
+    if (calendarcids.length <= 0) {
+      calendarcids = [{ begin: begindate, end: enddate }]; //兼容老数据
+    }
+    const isDelete =
+      calendarcids[0].begin &&
+      calendarInfo.length > 0 &&
+      (!calendarInfo[0].startData || !calendarInfo[0].startData.controlId);
     const isHaveSelectControl = _.includes([1, 2, 4, 5], view.viewType)
       ? viewControl === 'create' ||
         (viewControl && _.find(controls, item => item.controlId === viewControl)) ||
         !_.isEmpty(viewControls) ||
-        !(!begindate || isDelete)
+        !(!calendarcids[0].begin || isDelete)
       : true;
     const { hash } = history.location;
     const isHideTabBar = hash.includes('hideTabBar') || !!sessionStorage.getItem('hideTabBar');
+    const canDelete = isOpenPermit(permitList.delete, sheetSwitchPermit, view.viewId);
+    const showCusTomBtn = isOpenPermit(permitList.execute, sheetSwitchPermit, view.viewId);
+    if (_.isEmpty(views)) {
+      return (
+        <div className="flexColumn h100 justifyContentCenter alignItemsCenter Font16 Gray_9e">
+          <img style={{ width: 70 }} src={alreadyDelete} />
+          {_l('视图已隐藏')}
+        </div>
+      );
+    }
     return (
-      <Drawer
-        className="filterStepListWrapper"
-        position="right"
-        sidebar={_.isEmpty(view) ? null : this.renderSidebar(view)}
-        open={filters.visible}
-        onOpenChange={this.handleOpenDrawer}
-      >
-        <div className="flexColumn h100">
+      <Fragment>
+        <div
+          className={cx('flexColumn h100', {
+            portalWrapHeight: md.global.Account.isPortal && appNaviStyle === 2,
+          })}
+        >
           <DocumentTitle title={name} />
           {!batchOptVisible && (
-            <div className="viewTabs z-depth-1">
+            <div className={cx('viewTabs z-depth-1', { isPortal: md.global.Account.isPortal })}>
               <Tabs
-                tabBarInactiveTextColor="#9e9e9e"
+                tabBarInactiveTextColor="#757575"
                 tabs={views}
                 page={viewIndex === -1 ? 999 : viewIndex}
                 onTabClick={view => {
                   this.setCache({ viewId: view.viewId, worksheetId: params.worksheetId });
                   this.handleChangeView(view);
                   this.props.changeMobileGroupFilters([]);
-                  localStorage.setItem(`mobileViewSheet-${view.viewId}`, view.viewType);
+                  safeLocalStorageSetItem(`mobileViewSheet-${view.viewId}`, view.viewType);
                 }}
-                renderTab={tab => <span className="ellipsis">{tab.name}</span>}
+                renderTab={tab => <span className="tabName ellipsis bold">{tab.name}</span>}
               ></Tabs>
             </div>
           )}
-          <View view={view} key={worksheetInfo.worksheetId} />
+          <View view={view} key={worksheetInfo.worksheetId} routerParams={params} />
           {!batchOptVisible && (!md.global.Account.isPortal || (md.global.Account.isPortal && appNaviStyle !== 2)) && (
             <Back
               style={
@@ -159,21 +184,35 @@ class RecordList extends Component {
                     (appNaviStyle === 2 && !_.isEmpty(view.navGroup) && view.navGroup.length)
                     ? { bottom: '78px' }
                     : { bottom: '130px' }
-                  : [1, 3, 4].includes(view.viewType) || (!_.isEmpty(view.navGroup) && view.navGroup.length)
+                  : [1, 3, 4].includes(view.viewType) ||
+                    (!_.isEmpty(view.navGroup) && view.navGroup.length) ||
+                    !(canDelete || showCusTomBtn)
                   ? { bottom: '20px' }
                   : { bottom: '78px' }
               }
               onClick={() => {
                 if (!isHideTabBar && location.href.includes('mobile/app')) {
-                  window.mobileNavigateTo('/mobile/appHome');
+                  let currentGroupInfo =
+                    localStorage.getItem('currentGroupInfo') && JSON.parse(localStorage.getItem('currentGroupInfo'));
+                  if (_.isEmpty(currentGroupInfo)) {
+                    window.mobileNavigateTo('/mobile/appHome');
+                  } else {
+                    window.mobileNavigateTo(
+                      `/mobile/groupAppList/${currentGroupInfo.id}/${currentGroupInfo.groupType}`,
+                    );
+                  }
+                  localStorage.removeItem('currentNavWorksheetId');
                 } else {
                   window.mobileNavigateTo(`/mobile/app/${params.appId}`);
                 }
               }}
             />
           )}
-          {view.viewType === 0 && !batchOptVisible && _.isEmpty(view.navGroup) && (
-            <div className="batchOperation" onClick={() => this.props.changeBatchOptVisible(true)}>
+          {(canDelete || showCusTomBtn) && view.viewType === 0 && !batchOptVisible && _.isEmpty(view.navGroup) && (
+            <div
+              className={cx('batchOperation', { bottom70: appNaviStyle === 2 && location.href.includes('mobile/app') })}
+              onClick={() => this.props.changeBatchOptVisible(true)}
+            >
               <Icon icon={'task-complete'} className="Font24" />
             </div>
           )}
@@ -189,9 +228,31 @@ class RecordList extends Component {
                   mRight16: ([2, 5].includes(view.viewType) && currentSheetRows.length) || [2].includes(view.viewType),
                 })}
                 onClick={() => {
-                  window.mobileNavigateTo(
-                    `/mobile/addRecord/${params.appId}/${worksheetInfo.worksheetId}/${view.viewId}`,
-                  );
+                  openAddRecord({
+                    className: 'full',
+                    worksheetInfo,
+                    appId: params.appId,
+                    worksheetId: worksheetInfo.worksheetId,
+                    viewId: view.viewId,
+                    addType: 2,
+                    entityName: worksheetInfo.entityName,
+                    needCache: true,
+                    openRecord: this.sheetViewOpenRecord,
+                    onAdd: data => {
+                      if (_.isEmpty(data)) {
+                        return;
+                      }
+
+                      if (view.viewType) {
+                        this.props.addNewRecord(data, view);
+                      } else {
+                        this.props.unshiftSheetRow(data);
+                      }
+                    },
+                    showDraft: advancedSetting.closedrafts !== '1',
+                    showDraftsEntry: true,
+                    sheetSwitchPermit,
+                  });
                 }}
               >
                 <Icon icon="add" className="Font22 mRight5" />
@@ -200,13 +261,39 @@ class RecordList extends Component {
             </div>
           ) : null}
         </div>
-      </Drawer>
+        <RecordInfoModal
+          className="full"
+          visible={!!this.state.previewRecordId}
+          appId={params.appId}
+          worksheetId={worksheetInfo.worksheetId}
+          viewId={this.state.tempViewIdForRecordInfo}
+          rowId={this.state.previewRecordId}
+          onClose={() => {
+            this.setState({
+              previewRecordId: undefined,
+              tempViewIdForRecordInfo: undefined,
+            });
+          }}
+        />
+      </Fragment>
     );
   }
   render() {
-    const { base, worksheetInfo, workSheetLoading } = this.props;
+    const { base, worksheetInfo, workSheetLoading, appDetail = {} } = this.props;
     const { viewId } = base;
+    const { detail = {}, appName } = appDetail;
+    const { webMobileDisplay } = detail;
 
+    if (webMobileDisplay) {
+      return (
+        <div style={{ background: '#fff', height: '100%' }}>
+          <div className="flex WordBreak overflow_ellipsis pLeft20 pRight20 Height80">
+            <span className="Gray Font24 LineHeight80 InlineBlock Bold">{appName}</span>
+          </div>
+          <FixedPage isNoPublish={webMobileDisplay} />
+        </div>
+      );
+    }
     if (workSheetLoading) {
       return (
         <Flex justify="center" align="center" className="h100">
@@ -243,16 +330,20 @@ export default connect(
   }),
   dispatch =>
     bindActionCreators(
-      _.pick(actions, [
-        'updateBase',
-        'loadWorksheet',
-        'resetSheetView',
-        'emptySheetControls',
-        'emptySheetRows',
-        'updateFilters',
-        'changeMobileGroupFilters',
-        'changeBatchOptVisible',
-      ]),
+      {
+        ..._.pick(actions, [
+          'updateBase',
+          'loadWorksheet',
+          'unshiftSheetRow',
+          'resetSheetView',
+          'emptySheetControls',
+          'emptySheetRows',
+          'updateFilters',
+          'changeMobileGroupFilters',
+          'changeBatchOptVisible',
+        ]),
+        addNewRecord,
+      },
       dispatch,
     ),
 )(RecordList);

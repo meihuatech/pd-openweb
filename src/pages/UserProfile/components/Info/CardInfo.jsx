@@ -1,7 +1,9 @@
 import React, { Component } from 'react';
 import cx from 'classnames';
 import projectAjax from 'src/api/project';
+import departmentController from 'src/api/department';
 import { Tooltip } from 'ming-ui';
+import _ from 'lodash';
 
 class CardInfo extends Component {
   constructor() {
@@ -11,6 +13,7 @@ class CardInfo extends Component {
       cadrIndex: 0,
       isMore: false,
       cardList: [],
+      fullDepartmentInfo: {},
     };
   }
 
@@ -67,7 +70,27 @@ class CardInfo extends Component {
     });
   };
 
+  getDepartmentFullName = (departmentData = []) => {
+    let { fullDepartmentInfo } = this.state;
+    const departmentIds = departmentData.map(item => item.departmentId).filter(it => !fullDepartmentInfo[it]);
+    if (_.isEmpty(departmentIds)) {
+      return;
+    }
+    departmentController
+      .getDepartmentFullNameByIds({
+        projectId: this.state.cardList.projectId,
+        departmentIds,
+      })
+      .then(res => {
+        res.forEach(it => {
+          fullDepartmentInfo[it.id] = it.name;
+        });
+        this.setState({ fullDepartmentInfo });
+      });
+  };
+
   cardsList = (cardsLists = {}) => {
+    const { fullDepartmentInfo = {} } = this.state;
     return (
       <li className="Left LineHeight30 pTop10 pBottom20" key={cardsLists.projectId}>
         <span className="Left Width300">
@@ -84,6 +107,7 @@ class CardInfo extends Component {
           <span className="Left">{_l('职位')}：&nbsp;</span>
           {cardsLists.jobInfos && cardsLists.jobInfos.length > 0 ? (
             <Tooltip
+              style={{ maxWidth: '400px' }}
               offset={[-50, 0]}
               text={<span>{cardsLists.jobInfos.map(it => it.jobName).join(';')}</span>}
               action={['hover']}
@@ -111,15 +135,36 @@ class CardInfo extends Component {
         <span className="Left Width300">
           <span className="Left">{_l('部门')}：&nbsp;</span>
           {cardsLists.departmentInfos && cardsLists.departmentInfos.length > 0 ? (
-            <Tooltip
-              offset={[-80, 0]}
-              text={<span>{cardsLists.departmentInfos.map(it => it.departmentName).join(';')}</span>}
-              action={['hover']}
+            <span
+              className="department overflow_ellipsis Width200 Left"
+              onMouseEnter={() => this.getDepartmentFullName(cardsLists.departmentInfos)}
             >
-              <span className="department overflow_ellipsis Width200 Left">
-                {cardsLists.departmentInfos.map(it => it.departmentName).join(';')}
-              </span>
-            </Tooltip>
+              <Tooltip
+                action={['hover']}
+                tooltipClass="departmentFullNametip"
+                popupPlacement="bottom"
+                text={
+                  <div>
+                    {cardsLists.departmentInfos.map((v, depIndex) => {
+                      const fullName = (this.state.fullDepartmentInfo[v.departmentId] || '').split('/');
+                      return (
+                        <div className={cx({ mBottom8: depIndex < cardsLists.departmentInfos.length - 1 })}>
+                          {fullName.map((n, i) => (
+                            <span>
+                              {n}
+                              {fullName.length - 1 > i && <span className="mLeft8 mRight8">/</span>}
+                            </span>
+                          ))}
+                        </div>
+                      );
+                    })}
+                  </div>
+                }
+                mouseEnterDelay={0.5}
+              >
+                <span>{cardsLists.departmentInfos.map(it => it.departmentName).join(';')}</span>
+              </Tooltip>
+            </span>
           ) : (
             <span className="department overflow_ellipsis Width200 Left">{_l('未填写')}</span>
           )}
@@ -181,22 +226,27 @@ class CardInfo extends Component {
           <h5 className="Font16 Normal mp0">{_l('名片')}</h5>
           <div className="tabCardTitle">
             <ul className="BorderBottom borderColor_d8 clearfix">
-              {userInfo.userCards.map((item, index) => {
-                if (index < 3) {
-                  return (
-                    <li
-                      className={cx('Left LineHeight40 tabCardTitleLi', cadrIndex == index ? 'ThemeBorderColor3' : '')}
-                      title={item.companyName}
-                      key={index}
-                      onClick={() => this.selectCard(index)}
-                    >
-                      {item.companyName}
-                    </li>
-                  );
-                }
-              })}
+              {userInfo.userCards
+                .filter(item => item.companyName)
+                .map((item, index) => {
+                  if (index < 3) {
+                    return (
+                      <li
+                        className={cx(
+                          'Left LineHeight40 tabCardTitleLi',
+                          cadrIndex == index ? 'ThemeBorderColor3' : '',
+                        )}
+                        title={item.companyName}
+                        key={index}
+                        onClick={() => this.selectCard(index)}
+                      >
+                        {item.companyName}
+                      </li>
+                    );
+                  }
+                })}
 
-              {userInfo.userCards.length > 3 && (
+              {userInfo.userCards.filter(item => item.companyName).length > 3 && (
                 <div
                   className="Left LineHeight40 TxtCenter Hand showMorecards mLeft30 Relative"
                   onClick={this.showMoreCard}

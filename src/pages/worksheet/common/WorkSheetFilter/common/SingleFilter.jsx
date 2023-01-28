@@ -14,6 +14,8 @@ import {
   compareControlType,
   redefineComplexControl,
 } from '../util';
+import { filterOnlyShowField, isOtherShowFeild } from 'src/pages/widgetConfig/util';
+import _ from 'lodash';
 
 // setting编辑字段，关联他表筛选/汇总 rule字段显示规则=> 不需要验证的from
 const noCheckConditionAvailable = ['relateSheet', 'rule', 'subTotal', 'custombutton'];
@@ -101,14 +103,14 @@ export default class SingleFilter extends Component {
   handleConditionsChange(conditions, relationType) {
     const { onConditionsChange, feOnly } = this.props;
     const formatedConditions = conditions.map(condition => ({
-      controlId: condition.controlId,
-      dataType: condition.controlType,
+      controlId: condition.controlType === 25 ? condition.control.dataSource.slice(1, -1) : condition.controlId,
+      dataType: condition.controlType === 25 ? 8 : condition.controlType,
       spliceType: _.isUndefined(relationType) ? this.state.relationType : relationType,
       filterType: condition.type,
       dateRange: condition.dateRange,
       dateRangeType: condition.dateRangeType,
       values:
-        feOnly && _.includes([26, 27, 29, 19, 23, 24, 35], condition.controlType)
+        feOnly && _.includes([26, 27, 29, 19, 23, 24, 35, 48], condition.controlType)
           ? condition.fullValues
           : condition.values,
       maxValue: condition.maxValue,
@@ -138,12 +140,14 @@ export default class SingleFilter extends Component {
       sourceControlId,
       globalSheetControls,
       filterDept,
+      filterResigned = true,
     } = this.props;
     const { relationType, conditions } = this.state;
     return conditions.map((condition, index) => {
       const control = _.find(columns, column => condition.controlId === column.controlId);
       const conditionGroupKey = control && getTypeKey(control.type);
       const conditionGroupType = conditionGroupKey && CONTROL_FILTER_WHITELIST[conditionGroupKey].value;
+      const isSheetFieldError = isOtherShowFeild(control);
       return (
         <Condition
           isRules={isRules}
@@ -158,8 +162,10 @@ export default class SingleFilter extends Component {
           condition={condition}
           conditionsLength={conditions.length}
           conditionGroupType={conditionGroupType}
+          isSheetFieldError={isSheetFieldError}
           relationType={relationType}
           control={control}
+          filterResigned={filterResigned}
           columns={this.props.columns}
           currentColumns={currentColumns}
           relateSheetList={relateSheetList} // 除去自身的本表的关联单条的数据
@@ -178,7 +184,7 @@ export default class SingleFilter extends Component {
     });
   }
   render() {
-    const { from, canEdit, showSystemControls, filterColumnClassName } = this.props;
+    const { from, canEdit, showSystemControls, filterColumnClassName, offset } = this.props;
     let { columns = [] } = this.props;
     const { conditions } = this.state;
     const filterWhiteKeys = _.flatten(
@@ -189,6 +195,7 @@ export default class SingleFilter extends Component {
         .filter(column => !_.find(SYSTEM_CONTROLS, c => c.controlId === column.controlId))
         .concat(SYSTEM_CONTROLS);
     }
+
     columns = columns.map(redefineComplexControl);
     columns = columns
       .filter(c => _.includes(filterWhiteKeys, c.type))
@@ -199,11 +206,12 @@ export default class SingleFilter extends Component {
         {this.renderConditions(columns)}
         {canEdit && (
           <AddCondition
+            offset={offset}
             from={from}
             comp={this.props.comp}
             filterColumnClassName={filterColumnClassName}
             conditionCount={conditions.length}
-            columns={columns}
+            columns={filterOnlyShowField(columns)}
             onAdd={this.addCondition}
           />
         )}

@@ -1,17 +1,14 @@
 var Common = {};
-var qs = require('query-string');
-const {
-  personal: { muneLeft },
-} = window.private;
+import qs from 'query-string';
 
-Common.url = function (params) {
+Common.url = function(params) {
   return location.pathname + '?' + qs.stringify(params);
 };
 
 Common.MENULEFT = [
   {
     title: _l('个人信息'),
-    icon: 'icon-person',
+    icon: 'icon-portrait',
     typetag: ['information'],
     component: () => import('./personalInfo'),
   },
@@ -22,10 +19,16 @@ Common.MENULEFT = [
     component: () => import('./enterprise'),
   },
   {
-    title: _l('账户隐私'),
-    icon: 'icon-lock',
+    title: _l('账户与隐私'),
+    icon: 'icon-person',
     typetag: ['account', 'management'],
     component: () => import('./accountPassword'),
+  },
+  {
+    title: _l('安全设置'),
+    icon: 'icon-gpp_good',
+    typetag: ['securitySetting'],
+    component: () => import('./SecuritySetting'),
   },
   {
     title: _l('偏好设置'),
@@ -33,7 +36,7 @@ Common.MENULEFT = [
     typetag: ['system'],
     component: () => import('./systemSettings'),
   },
-].filter(item => !item.typetag.some(type => muneLeft[type]));
+];
 
 Common.PROJECT_STATUS_TYPES_LABLE = {
   // 免费
@@ -92,4 +95,17 @@ Common.guideType = {
   showGuideCourseList: 20, // 课程
 };
 
-module.exports = Common;
+Common.settingOptions = {
+  openDeskNotice: 2,
+  openWeixinLogin: 3,
+  joinFriendMode: 5,
+  lang: 6,
+  isPrivateMobile: 9,
+  isPrivateEmail: 10,
+  isTwoauthentication: 12,
+  isOpenMessageSound: 14,
+  isOpenMessageTwinkle: 15,
+  allowMultipleDevicesUse: 16,
+};
+
+export default Common;

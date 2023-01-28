@@ -1,10 +1,12 @@
 import React, { Component, Fragment, useState, useEffect } from 'react';
-import { string } from 'prop-types';
+import { Tooltip } from 'ming-ui';
 import cx from 'classnames';
 import update from 'immutability-helper';
 import { getControlType, getControls } from '../util';
 import { OtherFieldWrap } from '../styled';
-import { SYSTEM_FIELD_TO_TEXT } from '../config';
+import { SYSTEM_FIELD_TO_TEXT, USER_LIST, SYSTEM_LIST, CURRENT_TYPES, CUR_SEARCH_TYPES } from '../config';
+import _ from 'lodash';
+import { SYS_CONTROLS } from 'src/pages/widgetConfig/config/widget';
 
 export default function OtherField(props) {
   const {
@@ -26,12 +28,43 @@ export default function OtherField(props) {
   }, [data.controlId]);
 
   const getFieldName = (controls, fieldId) => {
-    if (_.includes(['ctime', 'utime', 'ownerid', 'caid'], fieldId)) return SYSTEM_FIELD_TO_TEXT[fieldId];
+    if (_.includes(['ctime', 'utime', 'ownerid', 'caid', ...SYS_CONTROLS], fieldId))
+      return SYSTEM_FIELD_TO_TEXT[fieldId];
+    if (fieldId === 'search-keyword') return CUR_SEARCH_TYPES[0].text;
+    if (
+      _.includes(
+        [
+          'userId',
+          'phone',
+          'email',
+          'projectId',
+          'appId',
+          'groupId',
+          'worksheetId',
+          'viewId',
+          'recordId',
+          'ua',
+          'timestamp',
+          'user-self',
+        ],
+        fieldId,
+      )
+    ) {
+      const formatList = _.flatten(Object.values(CURRENT_TYPES));
+      return _.get(
+        _.find(USER_LIST.concat(SYSTEM_LIST, formatList), i => i.id === fieldId),
+        'text',
+      );
+    }
     return (
       _.get(
         _.find(controls, item => _.includes([item.controlId, item.id], fieldId)),
         'controlName',
-      ) || '已删除'
+      ) || (
+        <Tooltip text={<span>{_l('ID: %0', fieldId)}</span>} popupPlacement="bottom">
+          <span>{_l('已删除')}</span>
+        </Tooltip>
+      )
     );
   };
   const getFieldNameById = (item, controls) => {
@@ -63,7 +96,27 @@ export default function OtherField(props) {
   const isFieldDeleteFn = (item, controls = []) => {
     const { cid, rcid } = item;
     const isFieldNotInControls = (controls, cid) => {
-      if (_.includes(['ctime', 'utime', 'ownerid', 'caid'], cid)) return false;
+      if (_.includes(['ctime', 'utime', 'ownerid', 'caid', 'search-keyword', ...SYS_CONTROLS], cid)) return false;
+      if (
+        _.includes(
+          [
+            'userId',
+            'phone',
+            'email',
+            'projectId',
+            'appId',
+            'groupId',
+            'worksheetId',
+            'viewId',
+            'recordId',
+            'ua',
+            'timestamp',
+            'user-self',
+          ],
+          cid,
+        )
+      )
+        return false;
       return !_.some(controls, item => _.includes([item.controlId, item.id], cid));
     };
     if (rcid) {
@@ -82,9 +135,13 @@ export default function OtherField(props) {
   const isText = getControlType(data) === 'text' || data.type === 45;
   const { fieldName, recordName } = getFieldNameById(item, controls);
   const isFieldDelete = isFieldDeleteFn(item, controls);
+  const isGreenTag = item.cid === 'search-keyword' && !item.staticValue;
   return (
-    <OtherFieldWrap className={cx(className, { pointer: !isText, haveCloseIcon: !isText, deleted: isFieldDelete })}>
+    <OtherFieldWrap
+      className={cx(className, { pointer: !isText, haveCloseIcon: !isText, deleted: isFieldDelete, isGreenTag })}
+    >
       <span className="overflow_ellipsis">
+        {isGreenTag && <i className="icon-search searchIcon"></i>}
         <span>{fieldName}</span>
         {recordName && <span className="recordName">{recordName}</span>}
       </span>

@@ -1,21 +1,22 @@
 import React, { useState, useRef, Fragment } from 'react';
 import { string } from 'prop-types';
-import { Tooltip, Icon, LoadDiv } from 'ming-ui';
+import { Tooltip, Icon, LoadDiv, RichText } from 'ming-ui';
 import DeleteConfirm from 'ming-ui/components/DeleteReconfirm';
 import cx from 'classnames';
 import Trigger from 'rc-trigger';
 import 'rc-trigger/assets/index.css';
 import update from 'immutability-helper';
-import { updatePage } from 'src/pages/worksheet/common/Statistics/api/custom';
+import customAjax from 'statistics/api/custom';
+import { Popover } from 'antd';
 import { SelectIcon } from '../../common';
 import OperateMenu from './OperateMenu';
-import PageDesc from './PageDesc';
-import ShareDialog from './ShareDialog';
+import SheetDesc from 'worksheet/common/SheetDesc';
+import Share from 'src/pages/worksheet/components/Share';
 import { pick } from 'lodash';
-import filterXSS from 'xss';
-import { exportImage } from 'src/pages/customPage/util';
+import { createFontLink, exportImage } from 'src/pages/customPage/util';
 import { saveAs } from 'file-saver';
 import SvgIcon from 'src/components/SvgIcon';
+import moment from 'moment';
 
 export default function CustomPageHeader(props) {
   const {
@@ -43,21 +44,24 @@ export default function CustomPageHeader(props) {
   const { workSheetId: pageId, icon, iconColor, workSheetName } = currentSheet;
   const [visible, updateVisible] = useState({ popupVisible: false, editNameVisible: false, editIntroVisible: false });
   const { popupVisible, editNameVisible, editIntroVisible } = visible;
-  const name = pageName || workSheetName;
+  const name = pageName !== workSheetName ? workSheetName || pageName : pageName || workSheetName;
 
   const [shareDialogVisible, setShareDialogVisible] = useState(false);
   const [exportLoading, setExportLoading] = useState(false);
+  const [descIsEditing, setDescIsEditing] = useState(false);
   const saveImage = () => {
-    const imageName = `${ appName ? `${appName}-` : '' }${name}-${moment().format('YYYYMMDD-HHmmSS')}.png`;
+    const imageName = `${appName ? `${appName}_` : ''}${name}_${moment().format('_YYYYMMDDHHmmSS')}.png`;
     setExportLoading(true);
-    exportImage().then(blob => {
-      setExportLoading(false);
-      saveAs(blob, imageName);
-    });
+    createFontLink()
+      .then(exportImage)
+      .then(blob => {
+        setExportLoading(false);
+        saveAs(blob, imageName);
+      });
   };
 
   const handleUpdatePage = obj => {
-    updatePage({ appId: pageId, ...obj }).then(isSuccess => {
+    customAjax.updatePage({ appId: pageId, ...obj }).then(isSuccess => {
       if (isSuccess) {
         updatePageInfo(obj);
       } else {
@@ -75,6 +79,7 @@ export default function CustomPageHeader(props) {
         break;
       case 'editName':
       case 'editIntro':
+        setDescIsEditing(true);
         updateVisible(update(visible, { [`${type}Visible`]: { $set: true }, popupVisible: { $set: false } }));
         break;
       case 'adjustScreen':
@@ -100,15 +105,16 @@ export default function CustomPageHeader(props) {
           title: <span className="Bold">{_l('删除自定义页面 “%0”', name)}</span>,
           description: (
             <div>
-              <span style={{ color: '#f44336' }}>{_l('注意：自定义页面下所有配置和数据将被永久删除，不可恢复。')}</span>
+              <span style={{ color: '#f44336' }}>{_l('注意：自定义页面下所有配置和数据将被删除。')}</span>
               {_l('请务必确认所有应用成员都不再需要此自定义页面后，再执行此操作。')}
             </div>
           ),
-          data: [{ text: _l('我确认永久删除页面和所有数据'), value: 1 }],
+          data: [{ text: _l('我确认删除页面和所有数据'), value: 1 }],
           onOk: () => {
             deleteSheet({
               type: 1,
               appId,
+              projectId,
               groupId,
               worksheetId: pageId,
             });
@@ -147,29 +153,36 @@ export default function CustomPageHeader(props) {
               <div className="svgWrap valignWrapper" style={{ backgroundColor: apk.iconColor }}>
                 <SvgIcon url={apk.iconUrl} fill="#fff" size={22} />
               </div>
-              <span className="pageName Font17 ellipsis">
-                {appName}-{name}
-              </span>
+              {(appName || name) && (
+                <span className="pageName Font17 ellipsis">
+                  {appName}-{name}
+                </span>
+              )}
             </div>
           ) : (
             <span className="pageName Font17">{name}</span>
           )}
           {desc && !isPublicShare && (
-            <Tooltip
-              disable={editIntroVisible}
-              onClick={() => isCharge ? handleVisibleChange(true, 'editIntroVisible') : _.noop}
-              tooltipClass="sheetDescTooltip"
-              popupPlacement="bottom"
-              text={
-                <span
-                  dangerouslySetInnerHTML={{
-                    __html: filterXSS(desc, { stripIgnoreTag: true }).replace(/\n/g, '<br />'),
-                  }}
-                />
+            <Popover
+              arrowPointAtCenter={true}
+              title={null}
+              placement="bottomLeft"
+              overlayClassName="sheetDescPopoverOverlay"
+              content={
+                <div className="popoverContent">
+                  <RichText data={desc || ''} disabled={true} />
+                </div>
               }
             >
-              <Icon icon="knowledge-message Font18 Gray_9" className="Hand customPageDesc" />
-            </Tooltip>
+              <Icon
+                icon="knowledge-message Font18 Gray_9"
+                className="Hand customPageDesc"
+                onClick={() => {
+                  setDescIsEditing(false);
+                  handleVisibleChange(true, 'editIntroVisible');
+                }}
+              />
+            </Popover>
           )}
           {isCharge && (
             <Trigger
@@ -214,16 +227,20 @@ export default function CustomPageHeader(props) {
           </Tooltip>
         )}
       </header>
-      {editIntroVisible && (
-        <PageDesc
-          desc={desc}
-          onOk={value => {
-            handleUpdatePage({ desc: value });
-            handleVisibleChange(false, 'editIntroVisible');
-          }}
-          onCancel={() => handleVisibleChange(false, 'editIntroVisible')}
-        />
-      )}
+      <SheetDesc
+        title={_l('自定义页面说明')}
+        isCharge={isCharge}
+        visible={editIntroVisible}
+        desc={desc || ''}
+        isEditing={descIsEditing}
+        onClose={() => {
+          handleVisibleChange(false, 'editIntroVisible');
+        }}
+        onSave={value => {
+          handleUpdatePage({ desc: value });
+          handleVisibleChange(false, 'editIntroVisible');
+        }}
+      />
       {editNameVisible && (
         <SelectIcon
           {...rest}
@@ -239,16 +256,23 @@ export default function CustomPageHeader(props) {
           }}
         />
       )}
-      <ShareDialog
-        title={_l('分享页面: %0', name)}
-        appId={appId}
-        isCharge={isCharge}
-        sourceId={pageId}
-        visible={shareDialogVisible}
-        onCancel={() => {
-          setShareDialogVisible(false);
-        }}
-      />
+      {shareDialogVisible && (
+        <Share
+          title={_l('分享页面: %0', name)}
+          from="customPage"
+          isCharge={isCharge}
+          params={{
+            appId,
+            sourceId: pageId,
+            worksheetId: pageId,
+            title: name,
+          }}
+          getCopyContent={(type, url) =>
+            type === 'private' ? url : `${url} ${apk.appName}-${currentSheet.workSheetName}`
+          }
+          onClose={() => setShareDialogVisible(false)}
+        />
+      )}
     </Fragment>
   );
 }

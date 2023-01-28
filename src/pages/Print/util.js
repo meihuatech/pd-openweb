@@ -1,10 +1,16 @@
 import React from 'react';
 import cx from 'classnames';
-import { renderCellText } from 'worksheet/components/CellControls';
-import { SYSTEM_CONTROL } from 'src/pages/widgetConfig/config/widget';
+import renderCellText from 'src/pages/worksheet/components/CellControls/renderText';
+import { SYSTEM_CONTROL_WITH_UAID } from 'src/pages/widgetConfig/config/widget';
+import { getAdvanceSetting } from 'src/pages/widgetConfig/util/setting.js';
+import { getSwitchItemNames } from 'src/pages/widgetConfig/util';
 import { SYSTOPRINT } from './config';
 import { RichText } from 'ming-ui';
 import _ from 'lodash';
+import Embed from 'src/components/newCustomFields/widgets/Embed';
+import BarCode from 'src/components/newCustomFields/widgets/BarCode';
+import { getBarCodeValue } from 'src/components/newCustomFields/tools/utils';
+import { parseDataSource } from 'src/pages/widgetConfig/util/setting.js';
 /*
   获取控件呈现内容
   sourceControlType: 他表字段type
@@ -29,7 +35,21 @@ export const getPrintContent = (item, sourceControlType, valueItem, relationItem
   };
   switch (type) {
     case 36:
-      return value === '1' ? '✓' : '□';
+      const { showtype } = getAdvanceSetting(item);
+      if (_.includes(['1', '2'], showtype)) {
+        const itemnames = getSwitchItemNames(item, { needDefault: true });
+        return _.get(
+          _.find(itemnames, i => i.key === value),
+          'value',
+        );
+      }
+      return (
+        <div>
+          <div className="InlineBlock mRight3">{value === '1' ? '☑' : '☐'}</div>
+          {item.hint}
+        </div>
+      );
+    //☑和☐
     case 6:
     case 8:
     case 20:
@@ -49,20 +69,12 @@ export const getPrintContent = (item, sourceControlType, valueItem, relationItem
     case 14:
       return value ? renderRecordAttachments(value, item.isRelateMultipleSheet) : '';
     case 28:
-      return value ? (
-        item.enumDefault === 1 ? (
-          // value + '星'
-          <span>
-            {_.map(new Array(5), (d, i) => {
-              return i + 1 - value > 0 ? '☆ ' : '★ ';
-            })}
-          </span>
-        ) : (
-          value + '/10'
-        )
-      ) : (
-        ''
-      );
+      return value
+        ? _.get(
+            _.find(getAdvanceSetting(item, 'itemnames') || [], i => i.key === `${value}`),
+            'value',
+          ) || _l('%0 级', value)
+        : '';
     case 29:
       if (item.advancedSetting && item.advancedSetting.showtype !== '2') {
         //非列表
@@ -111,14 +123,16 @@ export const getPrintContent = (item, sourceControlType, valueItem, relationItem
                   <div className={cx('list', { borderTop: i >= 1 })}>
                     <div className="listText">
                       {/* 关联表卡片标题显示 */}
-                      {renderCellText({
-                        ...dataItem,
-                        type:
-                          list.type && ![29, 30, item.sourceControlType].includes(list.type)
-                            ? list.type
-                            : item.sourceControlType,
-                        value: da.name,
-                      }) || _l('未命名')}
+                      {list.type === 38
+                        ? renderCellText(item.controls.find(it => it.attribute === 1))
+                        : renderCellText({
+                            ...dataItem,
+                            type:
+                              list.type && ![29, 30, item.sourceControlType].includes(list.type)
+                                ? list.type
+                                : item.sourceControlType,
+                            value: da.name,
+                          }) || _l('未命名')}
                       {showControlsList.map(it => {
                         if (it.type === 41 || it.type === 22) {
                           //富文本|分段
@@ -190,6 +204,24 @@ export const getPrintContent = (item, sourceControlType, valueItem, relationItem
     case 42: {
       return value ? <img src={value} style={{ width: 168 }} /> : '';
     }
+    case 45: {
+      return value ? <Embed {...dataItem} formData={dataItem.controls} from="print" /> : '';
+    }
+    case 47: {
+      let barCodeData = { ...dataItem, formData: dataItem.controls };
+      const { enumDefault, enumDefault2, dataSource, recordId, appId, worksheetId, viewIdForPermit, viewId, isView } =
+        barCodeData;
+      if (
+        !getBarCodeValue({
+          data: barCodeData.formData,
+          control: { enumDefault, enumDefault2, dataSource: parseDataSource(dataSource) },
+          codeInfo: { recordId, appId, worksheetId, viewId: viewId || viewIdForPermit },
+        })
+      ) {
+        return '';
+      }
+      return <BarCode {...barCodeData} />;
+    }
     case 41:
     case 10010:
       return value ? <RichText data={value} className="richText" disabled={true} /> : '';
@@ -259,9 +291,9 @@ export const renderRecordAttachments = (value, isRelateMultipleSheet) => {
                       pictureAttachments[index].previewUrl.indexOf('imageView2') > -1
                         ? pictureAttachments[index].previewUrl.replace(
                             /imageView2\/\d\/w\/\d+\/h\/\d+(\/q\/\d+)?/,
-                            'imageView2/1/w/1200/q/90',
+                            'imageView2/2/w/1200/q/90',
                           )
-                        : `${pictureAttachments[index].previewUrl}&imageView2/1/w/1200/q/90`
+                        : `${pictureAttachments[index].previewUrl}&imageView2/2/w/1200/q/90`
                     }
                     alt=""
                   />
@@ -359,7 +391,7 @@ export const getControlsForPrint = (receiveControls, relations = []) => {
 };
 
 export const sysToPrintData = data => {
-  return SYSTEM_CONTROL.map(o => {
+  return SYSTEM_CONTROL_WITH_UAID.map(o => {
     return { ...o, checked: data[SYSTOPRINT[o.controlId]] };
   });
 };

@@ -5,6 +5,7 @@ import {
   UPDATE_LAYOUT,
   UPDATE_PAGE_INFO,
   UPDATE_LOADING,
+  UPDATE_SAVE_LOADING,
   INSET_TITLE,
   UPDATE_MODIFIED,
   COPY_WIDGET,
@@ -12,6 +13,7 @@ import {
   UPDATE_EDIT_PAGE_VISIBLE,
   UPDATE_COMPONENTS,
   ADD_RECORD,
+  UPDATE_FILTERS_GROUP
 } from './actionType';
 import sheetAjax from 'src/api/worksheet';
 
@@ -35,8 +37,13 @@ export const updateLayout = genAction(UPDATE_LAYOUT);
 
 export const updateLoading = genAction(UPDATE_LOADING);
 
+export const updateSaveLoading = genAction(UPDATE_SAVE_LOADING);
+
 export const insertTitle = genAction(INSET_TITLE);
 
 export const updateModified = genAction(UPDATE_MODIFIED);
 
 export const updateComponents = genAction(UPDATE_COMPONENTS);
+
+export const updateFiltersGroup = genAction(UPDATE_FILTERS_GROUP);
+

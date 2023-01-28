@@ -1,6 +1,9 @@
 import './css/editFolder.less';
-const doT = require('dot');
-const ajaxRequest = require('src/api/taskCenter');
+import doT from '@mdfe/dot';
+import editFolderTpl from './tpl/editFolder.html';
+import 'src/components/mdDialog/dialog';
+import 'src/components/selectGroup/selectAllGroup';
+import ajaxRequest from 'src/api/taskCenter';
 
 const EditFolder = function (opts) {
   const defaults = {
@@ -20,32 +23,28 @@ $.extend(EditFolder.prototype, {
   init() {
     const _this = this;
     const settings = this.settings;
+    // 数据
+    const editFolderHtml = doT.template(editFolderTpl)(settings);
 
-    require(['./tpl/editFolder.html'], (editFolderTpl) => {
-      // 数据
-      const editFolderHtml = doT.template(editFolderTpl)(settings);
-      require(['mdDialog', 'selectGroup'], () => {
-        // 弹出层参数
-        const dialogOpts = {
-          dialogBoxID: 'editFolder',
-          container: {
-            header: settings.projectName === _l('个人') ? _l('编辑项目') : _l('在组织 “%0” 下编辑项目', settings.projectName),
-            yesText: _l('保存'),
-            content: editFolderHtml,
-            yesFn() {
-              return _this.edit();
-            },
-          },
-          width: 570,
-          isSameClose: false,
-          readyFn() {
-            _this.initEvent();
-          },
-        };
-        // 创建弹出层
-        settings.dialog = $.DialogLayer(dialogOpts);
-      });
-    });
+    // 弹出层参数
+    const dialogOpts = {
+      dialogBoxID: 'editFolder',
+      container: {
+        header: settings.projectName === _l('个人') ? _l('编辑项目') : _l('在组织 “%0” 下编辑项目', settings.projectName),
+        yesText: _l('保存'),
+        content: editFolderHtml,
+        yesFn() {
+          return _this.edit();
+        },
+      },
+      width: 570,
+      isSameClose: false,
+      readyFn() {
+        _this.initEvent();
+      },
+    };
+    // 创建弹出层
+    settings.dialog = $.DialogLayer(dialogOpts);
   },
 
   // 事件初始件
@@ -165,6 +164,6 @@ $.extend(EditFolder.prototype, {
   },
 });
 
-exports.init = function (opts) {
+export default function (opts) {
   return new EditFolder(opts);
 };

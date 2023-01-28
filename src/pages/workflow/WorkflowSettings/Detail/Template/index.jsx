@@ -1,5 +1,6 @@
 import React, { Component, Fragment } from 'react';
 import { ScrollView, LoadDiv, Dropdown, Radio } from 'ming-ui';
+import _ from 'lodash';
 import { NODE_TYPE } from '../../enum';
 import flowNode from '../../../api/flowNode';
 import {
@@ -131,7 +132,11 @@ export default class Template extends Component {
         ) : (
           <div className="Gray_75 workflowDetailDesc mTop10">
             {_l('当前应用外部门户未开通微信登录，请前往')}
-            <a href={`/app/${this.props.relationId}/role/external`} className="ThemeColor3 ThemeHoverColor2">
+            <a
+              href={`/app/${this.props.relationId}/role/external`}
+              className="ThemeColor3 ThemeHoverColor2"
+              target={location.href.indexOf('role/external') ? '_blank' : '_self'}
+            >
               {_l('门户设置')}
             </a>
             {_l('操作')}
@@ -158,12 +163,7 @@ export default class Template extends Component {
             <i className="Font16 icon-info" />
           </span>
         </div>
-        <Member
-          type={NODE_TYPE.MESSAGE}
-          accounts={data.accounts}
-          removeOrganization={true}
-          updateSource={this.updateSource}
-        />
+        <Member accounts={data.accounts} removeOrganization={true} updateSource={this.updateSource} />
         <div
           className="flexRow mTop15 ThemeColor3 workflowDetailAddBtn"
           onClick={() => this.setState({ showSelectUserDialog: true })}
@@ -177,7 +177,7 @@ export default class Template extends Component {
             companyId={this.props.companyId}
             processId={this.props.processId}
             nodeId={this.props.selectNodeId}
-            onlyNodeRole={true}
+            onlyNodeRole
             unique={false}
             accounts={data.accounts}
             updateSource={this.updateSource}
@@ -200,7 +200,10 @@ export default class Template extends Component {
         className: item.id === data.appId ? 'ThemeColor3' : '',
       };
     });
-    const list = [{ text: _l('H5链接'), value: 0 }, { text: _l('小程序路径'), value: 1 }];
+    const list = [
+      { text: _l('H5链接'), value: 0 },
+      { text: _l('小程序路径'), value: 1 },
+    ];
 
     return (
       <Fragment>
@@ -361,10 +364,10 @@ export default class Template extends Component {
     return (
       <Fragment>
         <DetailHeader
-          data={{ ...data, selectNodeType: this.props.selectNodeType }}
+          {...this.props}
+          data={{ ...data }}
           icon="icon-wechat"
           bg="BGBlue"
-          closeDetail={this.props.closeDetail}
           updateSource={this.updateSource}
         />
         <div className="flex mTop20">
@@ -376,11 +379,7 @@ export default class Template extends Component {
             </div>
           </ScrollView>
         </div>
-        <DetailFooter
-          isCorrect={data.accounts.length && data.appId}
-          onSave={this.onSave}
-          closeDetail={this.props.closeDetail}
-        />
+        <DetailFooter {...this.props} isCorrect={data.accounts.length && data.appId} onSave={this.onSave} />
       </Fragment>
     );
   }

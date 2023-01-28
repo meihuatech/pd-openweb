@@ -7,11 +7,13 @@ import { ACTION_LIST, OPERATION_LIST, SELECT_USER_TITLE, ACTION_TO_METHOD, OPERA
 import SvgIcon from 'src/components/SvgIcon';
 import OtherAction from './OtherAction';
 import AddApproveWay from './AddApproveWay';
-import 'dialogSelectUser';
+import 'src/components/dialogSelectUser/dialogSelectUser';
 import instance from '../../api/instance';
-import { add } from 'src/api/webCache';
+import webCacheAjax from 'src/api/webCache';
 import { isOpenPermit } from 'src/pages/FormSet/util.js';
 import { permitList } from 'src/pages/FormSet/config.js';
+import _ from 'lodash';
+import moment from 'moment';
 
 export default class Header extends Component {
   static propTypes = {
@@ -54,17 +56,11 @@ export default class Header extends Component {
    * 头部更多操作的处理逻辑
    */
   handleMoreOperation = action => {
-    const { projectId, id, workId, onSubmit, data } = this.props;
+    const { projectId, id, workId, data } = this.props;
     const { app } = data;
 
-    this.setState({ action });
-
-    if (action === 'sign') {
-      this.switchStatus('addApproveWayVisible', true);
-    }
-
     if (action === 'print') {
-      window.localStorage.setItem('plus_projectId', projectId);
+      safeLocalStorageSetItem('plus_projectId', projectId);
       let printId = '';
       let isDefault = true;
       let printData = {
@@ -82,34 +78,11 @@ export default class Header extends Component {
       let printKey = Math.random()
         .toString(36)
         .substring(2);
-      add({
+      webCacheAjax.add({
         key: `${printKey}`,
         value: JSON.stringify(printData),
       });
-      window.open(`${window.subPath || ''}/printForm/${app.id}/workflow/new/print/${printKey}`);
-    }
-
-    if (action === 'transferApprove' || action === 'transfer') {
-      $({}).dialogSelectUser({
-        title: SELECT_USER_TITLE[action],
-        showMoreInvite: false,
-        SelectUserSettings: {
-          projectId,
-          filterAll: true,
-          filterFriend: true,
-          filterOthers: true,
-          filterOtherProject: true,
-          filterAccountIds: [md.global.Account.accountId],
-          unique: true,
-          callback: user => {
-            const selectedUser = user[0];
-            this.setState({
-              selectedUser,
-              otherActionVisible: true,
-            });
-          },
-        },
-      });
+      window.open(`${window.subPath || ''}/printForm/${app.id}/flow/new/print/${printKey}`);
     }
 
     if (action === 'addApprove') {
@@ -125,6 +98,7 @@ export default class Header extends Component {
           filterAccountIds: [md.global.Account.accountId],
           callback: selectedUsers => {
             this.setState({
+              action,
               selectedUsers,
               otherActionVisible: true,
             });
@@ -135,10 +109,10 @@ export default class Header extends Component {
   };
 
   handleClick = id => {
-    const { onSubmit, data } = this.props;
+    const { projectId, onSubmit, data } = this.props;
     const { ignoreRequired } = (data || {}).flowNode || {};
     /**
-     * 填写节点的提交点击后直接提交,不需要出备注弹层
+     * 填写
      */
     if (id === 'submit') {
       this.request('submit');
@@ -146,15 +120,78 @@ export default class Header extends Component {
     }
 
     /**
-     * 撤回直接提交,不需要出备注弹层
+     * 撤回
      */
     if (id === 'revoke') {
       this.request('revoke');
       return;
     }
 
-    if (ignoreRequired || onSubmit({ noSave: true })) {
+    /**
+     * 催办
+     */
+    if (id === 'urge') {
+      this.request('operation', { operationType: 18 }, true);
+      return;
+    }
+
+    /**
+     * 加签
+     */
+    if (id === 'sign') {
+      this.setState({ action: id });
+      this.switchStatus('addApproveWayVisible', true);
+      return;
+    }
+
+    /**
+     * 暂存
+     */
+    if (id === 'stash') {
+      this.request('operation', { operationType: 13 });
+      return;
+    }
+
+    /**
+     * 转审 || 转交
+     */
+    if (_.includes(['transferApprove', 'transfer'], id)) {
+      $({}).dialogSelectUser({
+        title: SELECT_USER_TITLE[id],
+        showMoreInvite: false,
+        SelectUserSettings: {
+          projectId,
+          filterAll: true,
+          filterFriend: true,
+          filterOthers: true,
+          filterOtherProject: true,
+          filterAccountIds: [md.global.Account.accountId],
+          unique: true,
+          callback: user => {
+            const selectedUser = user[0];
+            this.setState({
+              action: id,
+              selectedUser,
+              otherActionVisible: true,
+            });
+          },
+        },
+      });
+
+      return;
+    }
+
+    if (ignoreRequired) {
       this.setState({ action: id, otherActionVisible: true });
+    } else {
+      onSubmit({
+        noSave: true,
+        callback: err => {
+          if (!err) {
+            this.setState({ action: id, otherActionVisible: true });
+          }
+        },
+      });
     }
   };
 
@@ -168,7 +205,7 @@ export default class Header extends Component {
     if (_.includes(['before', 'after'], action)) {
       this.request(
         ACTION_TO_METHOD[action],
-        { before: action === 'before', opinion: content, forwardAccountId: userId },
+        { before: action === 'before', opinion: content, forwardAccountId: userId, signature },
         action === 'before',
       );
     }
@@ -209,12 +246,13 @@ export default class Header extends Component {
   request = (action, restPara = {}, noSave = false) => {
     const { id, workId, onSave, onClose, onSubmit } = this.props;
     const { isRequest } = this.state;
-    const saveFunction = error => {
-      if (error) {
+    const isStash = restPara.operationType === 13;
+    const saveFunction = ({ error, logId }) => {
+      if (error && error !== 'empty') {
         this.setState({ isRequest: false });
       } else {
-        instance[action]({ id, workId, ...restPara }).then(() => {
-          onSave();
+        instance[action]({ id, workId: restPara.operationType === 18 ? '' : workId, logId, ...restPara }).then(() => {
+          onSave(isStash);
           onClose();
         });
       }
@@ -227,9 +265,9 @@ export default class Header extends Component {
     this.setState({ isRequest: true, action });
 
     if (noSave) {
-      saveFunction();
+      saveFunction({});
     } else {
-      onSubmit({ callback: saveFunction });
+      onSubmit({ callback: saveFunction, ignoreError: isStash, ignoreAlert: isStash, silent: isStash });
     }
   };
 
@@ -244,6 +282,7 @@ export default class Header extends Component {
       onSubmit,
       sheetSwitchPermit = [],
       viewId,
+      works,
     } = this.props;
     const { flowNode, operationTypeList, btnMap = {}, app, processName } = data;
     const {
@@ -269,7 +308,15 @@ export default class Header extends Component {
 
     if (flowNode) {
       const { text, color } =
-        currentWorkItem.type !== 0 ? FLOW_NODE_TYPE_STATUS[currentWorkItem.type][currentWorkItem.operationType] : {};
+        currentWorkItem && currentWorkItem.type && currentWorkItem.type !== 0
+          ? FLOW_NODE_TYPE_STATUS[currentWorkItem.type][currentWorkItem.operationType] || {}
+          : {};
+      const urgeTime = (
+        (works || [])
+          .filter(o => o.allowUrge && o.urgeTime)
+          .sort((a, b) => (moment(a.urgeTime) < moment(b.urgeTime) ? 1 : -1))[0] || {}
+      ).urgeTime;
+
       return (
         <Fragment>
           <header className="flexRow workflowStepHeader">
@@ -280,10 +327,18 @@ export default class Header extends Component {
               {`${app.name} · ${processName}`}
             </div>
 
-            {currentWorkItem.operationTime && !operationTypeList[0].length ? (
+            {currentWorkItem && currentWorkItem.operationTime && !!operationTypeList[0].length && urgeTime && (
               <div className="operationTime flexRow Gray_9e Font14">
-                {createTimeSpan(currentWorkItem.operationTime)}
-                {text && (
+                {createTimeSpan(urgeTime)}
+                <span className="mLeft5 Gray_9e">{_l('已催办')}</span>
+              </div>
+            )}
+
+            {currentWorkItem && currentWorkItem.operationTime && !operationTypeList[0].length ? (
+              <div className="operationTime flexRow Gray_9e Font14">
+                {createTimeSpan(urgeTime || currentWorkItem.operationTime)}
+                {!!urgeTime && <span className="mLeft5 Gray_9e">{_l('已催办')}</span>}
+                {text && !urgeTime && (
                   <span className="mLeft5" style={{ color }}>
                     {text}
                   </span>
@@ -291,28 +346,34 @@ export default class Header extends Component {
               </div>
             ) : (
               <div className="operation flexRow">
-                {operationTypeList[0].map(item => {
-                  let { id, text } = ACTION_LIST[item];
-                  return (
-                    <Button
-                      disabled={isRequest && id === action}
-                      key={id}
-                      size={'tiny'}
-                      onClick={() => this.handleClick(id)}
-                      className={cx('headerBtn mLeft16', id)}
-                    >
-                      {isRequest && id === action ? _l('处理中...') : btnMap[item] || text}
-                    </Button>
-                  );
-                })}
+                {operationTypeList[0]
+                  .map(key => {
+                    return Object.assign({}, ACTION_LIST[key], { key });
+                  })
+                  .sort((a, b) => a.sort - b.sort)
+                  .map(item => {
+                    let { id, text, icon, key } = item;
+                    return (
+                      <Button
+                        disabled={isRequest && id === action}
+                        key={id}
+                        size={'tiny'}
+                        onClick={() => this.handleClick(id)}
+                        className={cx('headerBtn mLeft16', id)}
+                      >
+                        {icon && <Icon type={icon} className="Font16 mRight3" />}
+                        {isRequest && id === action ? _l('处理中...') : btnMap[key] || text}
+                      </Button>
+                    );
+                  })}
               </div>
             )}
 
             <div
-              className="more flexRow tip-bottom mLeft30"
+              className="more flexRow tip-bottom mLeft15"
               onClick={() => this.setState({ moreOperationVisible: !moreOperationVisible })}
             >
-              <div className="iconWrap flexRow" data-tip="更多操作">
+              <div className="iconWrap flexRow" data-tip={_l('更多操作')}>
                 <Icon icon="more_horiz Gray_9e ThemeHoverColor3" />
               </div>
 
@@ -332,7 +393,7 @@ export default class Header extends Component {
                       ),
                   )}
 
-                  <MenuItem onClick={() => window.open(`/app/${app.id}/workflow/record/${id}/${workId}`)}>
+                  <MenuItem onClick={() => window.open(`/app/${app.id}/workflowdetail/record/${id}/${workId}`)}>
                     <Icon icon="launch" />
                     <span className="actionText">{_l('新页面打开')}</span>
                   </MenuItem>
@@ -344,6 +405,7 @@ export default class Header extends Component {
           {addApproveWayVisible && (
             <AddApproveWay
               projectId={projectId}
+              data={data}
               onOk={this.handleAction}
               onCancel={() => this.switchStatus('addApproveWayVisible', false)}
               onSubmit={onSubmit}

@@ -3,12 +3,14 @@ import { CAN_NOT_AS_TEXT_GROUP } from '../config';
 import { navigateTo } from 'src/router/navigateTo';
 import sheetAjax from 'src/api/worksheet';
 import cx from 'classnames';
-import { renderCellText } from 'src/pages/worksheet/components/CellControls';
+import { formatValuesOfCondition } from 'worksheet/common/WorkSheetFilter/util';
+import renderCellText from 'src/pages/worksheet/components/CellControls/renderText';
 import update from 'immutability-helper';
-import { includes, get, isEmpty, omit, findIndex, filter } from 'lodash';
+import _, { includes, get, isEmpty, omit, findIndex, filter, find } from 'lodash';
 import { getAdvanceSetting, handleAdvancedSettingChange } from './setting';
 import { getControlByControlId } from '.';
 import { ControlTag } from '../styled';
+import { Tooltip } from 'ming-ui';
 
 // 获取动态默认值
 export const getDynamicDefaultValue = data => {
@@ -119,8 +121,8 @@ export function dealUserId(data, dataType) {
       update(setting, {
         $apply: item => {
           const { staticValue } = item;
-          if (typeof staticValue === 'string' && staticValue) {
-            const accountId = JSON.parse(staticValue || '{}')[dataType];
+          if (staticValue && typeof staticValue === 'string') {
+            const accountId = safeParse(staticValue || '{}')[dataType];
             return { ...item, staticValue: accountId };
           }
           if (staticValue[dataType]) return { ...item, staticValue: staticValue[dataType] };
@@ -140,22 +142,47 @@ export function dealUserId(data, dataType) {
 }
 
 /**
+ * 处理 成员 部门 地区 他表字段 级联 组织角色 这几个类型的字段 values 处理成 [id, id]
+ */
+export function handleCondition(condition) {
+  if (_.includes([19, 23, 24, 26, 27, 29, 35, 48], condition.dataType) && condition.values) {
+    return {
+      ...condition,
+      values: condition.values.map(value => {
+        try {
+          const da = JSON.parse(value);
+          if (typeof da === 'object') {
+            return da.id;
+          } else {
+            return value;
+          }
+        } catch (e) {
+          return value;
+        }
+      }),
+    };
+  } else {
+    return condition;
+  }
+}
+/**
  * 处理关联表叠加筛选条件里的 成员 部门 地区 他表字段 级联 这几个类型的字段 values 处理成 [id, id]
  */
 export function handleFilters(data) {
   const filters = getAdvanceSetting(data, 'filters');
-  function handleCondition(condition) {
-    if (_.includes([19, 23, 24, 26, 27, 29, 35], condition.dataType) && condition.values) {
-      return {
-        ...condition,
-        values: condition.values.map(value => JSON.parse(value || '{}').id),
-      };
-    } else {
-      return condition;
-    }
-  }
   try {
-    const filtersValue = filters.map(handleCondition);
+    let filtersValue = [];
+    if (filters.some(item => item.groupFilters)) {
+      filtersValue = filters.map(f => {
+        return {
+          ...f,
+          groupFilters: (f.groupFilters || []).map(handleCondition),
+        };
+      });
+    } else {
+      filtersValue = filters.map(handleCondition);
+    }
+
     return handleAdvancedSettingChange(data, { filters: JSON.stringify(filtersValue) });
   } catch (err) {
     return data;
@@ -203,7 +230,7 @@ export const getFormulaControls = (controls, data) => {
       }
     }
     return (
-      includes([6, 8, 28, 31], type) ||
+      includes([6, 8, 28, 31, 46], type) ||
       // 赋分值选项
       (includes([9, 10, 11], type) && enumDefault === 1) ||
       (type === 38 && includes([1], enumDefault)) ||
@@ -235,8 +262,8 @@ export const getMoneyCnControls = (controls, data) => {
 };
 
 // 获取控件的文本呈现值
-export function formatColumnToText(column, numberOnly) {
-  return renderCellText(column, { noUnit: numberOnly, noSplit: numberOnly });
+export function formatColumnToText(column, numberOnly, noMask) {
+  return renderCellText(column, { noUnit: numberOnly, noSplit: numberOnly, noMask: noMask });
 }
 
 // 通过id 获取控件的值
@@ -303,7 +330,14 @@ export function createWorksheetColumnTag(id, options) {
 export function genControlTag(allControls, id) {
   const control = getControlByControlId(allControls, id);
   const invalid = isEmpty(control);
-  return <ControlTag className={cx({ invalid })}>{invalid ? _l('字段已删除') : control.controlName}</ControlTag>;
+  const invalidError = control && control.type === 30 && (control.strDefault || '')[0] === '1';
+  return (
+    <Tooltip text={<span>{_l('ID: %0', id)}</span>} popupPlacement="bottom" disable={!invalid}>
+      <ControlTag className={cx({ invalid: invalid || invalidError, Hand: invalid })}>
+        {invalid ? _l('字段已删除') : invalidError ? _l('%0(无效类型)', control.controlName) : control.controlName}
+      </ControlTag>
+    </Tooltip>
+  );
 }
 
 export function navigateToApp(worksheetId) {
@@ -328,13 +362,13 @@ export const dealControlPos = controls => {
   return _.flatten(sortableControls.map((item, row) => item.map((control, col) => ({ ...control, row, col }))));
 };
 
-export const formatControlsData = (controls = []) => {
+export const formatControlsData = (controls = [], fromSub = false) => {
   return controls.map(data => {
     const { type } = data;
 
     // 子表控件递归处理其中的字段
     if (type === 34) {
-      return { ...data, relationControls: formatControlsData(data.relationControls) };
+      return { ...data, relationControls: formatControlsData(data.relationControls, true) };
     }
 
     // 数字控件处理极值
@@ -347,9 +381,14 @@ export const formatControlsData = (controls = []) => {
       return dealUserId(data, 'accountId');
     }
 
-    // 用户id替换
+    // 部门id替换
     if (type === 27) {
       return dealUserId(data, 'departmentId');
+    }
+
+    // 组织角色id替换
+    if (type === 48) {
+      return dealUserId(data, 'organizeId');
     }
 
     if (type === 29) {
@@ -358,7 +397,9 @@ export const formatControlsData = (controls = []) => {
         data = handleFilters(data);
       }
       // 关联表sid处理
-      return omit(dealRelateSheetDefaultValue(data), 'relationControls', 'controls');
+      return fromSub
+        ? omit(dealRelateSheetDefaultValue(data), 'relationControls', 'controls', 'sourceControl')
+        : omit(dealRelateSheetDefaultValue(data), 'relationControls', 'controls');
     }
     // 汇总 筛选values 处理成 [id, id]
     if (type === 37) {
@@ -415,4 +456,42 @@ export const formatControlsData = (controls = []) => {
 
     return data;
   });
+};
+
+// 处理查询输入参数层级关系
+export const dealRequestControls = (controls, needChild) => {
+  if (!(controls && controls.length)) return [];
+  let newControls = [];
+
+  // 查询过滤无效数据(附件不支持)
+  const filterControls = controls
+    .filter(i => {
+      const hasFind = _.find(controls, o => i.dataSource === o.controlId);
+      return i.dataSource ? hasFind && hasFind.type !== 10000007 : true;
+    })
+    .map(item => {
+      const childControl = _.find(controls, o => o.dataSource === item.controlId);
+      if (item.type === 10000007 && childControl) {
+        return { ...item, originType: childControl.type };
+      }
+      return item;
+    });
+
+  if (needChild) {
+    filterControls.forEach(item => {
+      if (item.dataSource) {
+        const parentIndex = findIndex(newControls, i => i.controlId === item.dataSource);
+        if (parentIndex > -1) {
+          const parentControl = newControls[parentIndex];
+          newControls[parentIndex] = { ...parentControl, child: (parentControl.child || []).concat(item) };
+        } else {
+          newControls.push({ ...find(controls, i => i.controlId === item.dataSource), child: [item] });
+        }
+      } else {
+        newControls.push(item);
+      }
+    });
+  }
+
+  return needChild ? newControls : filterControls;
 };

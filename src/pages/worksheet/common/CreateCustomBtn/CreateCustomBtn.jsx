@@ -7,14 +7,18 @@ import AppointDialog from './components/AppointDialog';
 import ShowBtnFilterDialog from './components/ShowBtnFilterDialog';
 import sheetAjax from 'src/api/worksheet';
 import process from 'src/pages/workflow/api/process';
+import { FilterItemTexts } from 'src/pages/widgetConfig/widgetSetting/components/FilterData';
 import WorkflowDialog from 'src/pages/workflow/components/WorkflowDialog';
 import DoubleConfirmDialog from './components/DoubleConfirmDialog';
 import { filterData } from 'src/pages/FormSet/components/columnRules/config.js';
-import { formatValuesOfOriginConditions } from '../../common/WorkSheetFilter/util';
+import { formatValuesOfCondition } from '../../common/WorkSheetFilter/util';
 import color from 'color';
 import { COLORS, ICONS } from './config';
 import { SYS } from 'src/pages/widgetConfig/config/widget';
 import errorBoundary from 'ming-ui/decorators/errorBoundary';
+import { formatControlsData } from 'src/pages/widgetConfig/util/data';
+import _ from 'lodash';
+
 @errorBoundary
 class CreateCustomBtnCon extends React.Component {
   constructor(props) {
@@ -26,11 +30,12 @@ class CreateCustomBtnCon extends React.Component {
       workflowId: '',
       showDoubleConfirmDialog: false,
       showAppointDialog: false,
-      addRelationControl: [],
+      relationControls: [],
       showWorkflowDialog: false,
       filterItemTexts: [],
       flowName: '',
       flowEnabled: false,
+      relationWorksheetInfo: {},
     };
   }
   ajaxRequest = null;
@@ -84,7 +89,7 @@ class CreateCustomBtnCon extends React.Component {
         writeObject,
         relationControl,
         writeType,
-        addRelationControlId: addRelationControl, // 关联记录中新建的关联ID =>addRelationControl
+        addRelationControlId: addRelationControl, //get 获取=>addRelationControl
         writeControls,
         widgetList: (props.worksheetControls || []).filter(item => !SYS.includes(item.controlId)), //排除系统字段
         isEdit: props.isEdit,
@@ -99,7 +104,7 @@ class CreateCustomBtnCon extends React.Component {
         if (!props.btnId) {
           $('.nameInput').focus();
         }
-        this.getRelationControl();
+        this.getRelationControl(relationControl);
         this.formatFilterData();
         this.getProcessByTriggerId();
       },
@@ -118,16 +123,17 @@ class CreateCustomBtnCon extends React.Component {
         triggerId: btnId,
       });
 
-      this.ajaxRequest.then(data => {
+      this.ajaxRequest.then(res => {
+        const data = res[0] || {};
         this.setState(
           {
-            workflowId: data[0].id,
-            flowName: data[0].name,
-            flowEnabled: data[0].enabled,
+            workflowId: data.id,
+            flowName: data.name,
+            flowEnabled: data.enabled,
           },
           () => {
             if (callback) {
-              callback(data[0].id);
+              callback(data.id);
             }
           },
         );
@@ -135,30 +141,27 @@ class CreateCustomBtnCon extends React.Component {
     }
   };
 
-  getRelationControl = () => {
-    if (this.state.relationControl !== '' && this.state.addRelationControl.length <= 0) {
-      let worksheetData = _.find(
-        this.props.currentSheetInfo.template.controls,
-        item => item.controlId === this.state.relationControl,
-      );
-      if (!worksheetData) {
-        this.setState({
-          addRelationControl: [],
-        });
-      } else {
-        const worksheetId = worksheetData.dataSource;
-        sheetAjax
-          .getWorksheetInfo({
-            worksheetId: worksheetId,
-            getTemplate: true,
-            getViews: true,
-          })
-          .then(data => {
-            this.setState({
-              addRelationControl: data.template.controls,
-            });
+  getRelationControl = id => {
+    const { dataSource = '' } =
+      _.find(this.props.currentSheetInfo.template.controls, item => item.controlId === id) || {};
+    if (id && dataSource) {
+      sheetAjax
+        .getWorksheetInfo({
+          worksheetId: dataSource,
+          getTemplate: true,
+          getViews: true,
+        })
+        .then(data => {
+          this.setState({
+            relationControls: data.template.controls,
+            relationWorksheetInfo: data,
           });
-      }
+        });
+    } else {
+      this.setState({
+        relationControls: [],
+        relationWorksheetInfo: {},
+      });
     }
   };
 
@@ -187,7 +190,7 @@ class CreateCustomBtnCon extends React.Component {
     const {
       name,
       widgetList,
-      addRelationControl,
+      relationControls = [],
       writeControls,
       relationControl,
       addRelationControlId,
@@ -200,7 +203,7 @@ class CreateCustomBtnCon extends React.Component {
       btnId,
       filters = [],
     } = this.state;
-    const dataControls = relationControl !== '' ? addRelationControl : widgetList;
+    const dataControls = relationControl !== '' ? relationControls : widgetList;
     return (
       <div className="createBtnBox">
         <h5 className="Gray">{_l('按钮名称')}</h5>
@@ -254,39 +257,15 @@ class CreateCustomBtnCon extends React.Component {
           checkedValue={showType}
         />
         {filters.length > 0 && showType === 2 && (
-          <div className="filterTextCon">
-            <div className="txtFilter">
-              {filterItemTexts.length > 0 ? (
-                filterItemTexts.map((item, index) => (
-                  <div key={item.id} className="flexRow pRight10 mTop5">
-                    {index ? (
-                      <span className="mRight10 Gray_75 Font13">
-                        {filterItemTexts[index - 1] && filterItemTexts[index - 1].spliceType == 1 ? _l('且') : _l('或')}
-                      </span>
-                    ) : null}
-                    <span className="mRight10">{item.name}</span>
-                    {item.type ? (
-                      <span className="Bold LineHeight19 mRight10 Gray Font13">{item.type.text}</span>
-                    ) : null}
-                    <span>{item.value}</span>
-                  </div>
-                ))
-              ) : (
-                <div className="flexRow pRight10 mTop5">
-                  <span className="mRight10 Gray_9e">{_l('设为筛选条件的字段已删除')}</span>
-                </div>
-              )}
-            </div>
-            <Icon
-              icon="hr_edit"
-              className="Gray_9d Font18 editFilter Hand"
-              onClick={() => {
-                this.setState({
-                  isShowBtnFilterDialog: true,
-                });
-              }}
-            />
-          </div>
+          <FilterItemTexts
+            filterItemTexts={filterItemTexts}
+            loading={false}
+            editFn={() =>
+              this.setState({
+                isShowBtnFilterDialog: true,
+              })
+            }
+          />
         )}
         <h5 className="Gray mTop6">{_l('点击后')}</h5>
         <RadioGroup
@@ -394,7 +373,7 @@ class CreateCustomBtnCon extends React.Component {
               </span>
               {writeType === 1 &&
                 dataControls.length > 0 &&
-                writeControls.map(item => {
+                writeControls.map((item, i) => {
                   const writeControlsData = _.find(dataControls, items => items.controlId === item.controlId);
                   if (!writeControlsData) {
                     return '';
@@ -405,7 +384,7 @@ class CreateCustomBtnCon extends React.Component {
                         <span className="Bold">
                           {controlName || (writeControlsData.type === 22 ? _l('分段') : _l('备注'))}
                         </span>
-                        、
+                        {writeControls.length > i + 1 ? '、' : ''}
                       </React.Fragment>
                     );
                   }
@@ -552,8 +531,8 @@ class CreateCustomBtnCon extends React.Component {
   };
 
   renderActionFooter = () => {
-    const { worksheetId, appId, viewId, from } = this.props;
-    const { btnId } = this.state;
+    const { worksheetId, appId, currentSheetInfo } = this.props;
+    const { btnId, writeControls = [], relationControl = '', relationWorksheetInfo = {} } = this.state;
     return (
       <div className="createActionCon">
         <span
@@ -573,31 +552,49 @@ class CreateCustomBtnCon extends React.Component {
             this.setState({
               saveLoading: true,
             });
+            const sheetInfo = !relationControl ? currentSheetInfo : relationWorksheetInfo;
+            let writeControlsFormat = writeControls.map(o => {
+              let control = _.find(sheetInfo.template.controls, item => item.controlId === o.controlId) || {};
+              return {
+                ...o,
+                defsource: _.get(
+                  formatControlsData([
+                    {
+                      ...control,
+                      advancedSetting: { defsource: o.defsource },
+                    },
+                  ])[0],
+                  ['advancedSetting', 'defsource'],
+                ),
+              };
+            });
             let params = {
               btnId: btnId || '',
               name: this.state.name.replace(/(^\s*)|(\s*$)/g, ''),
               worksheetId,
-              showType: this.state.showType, //1: 一直 2：满足筛选条件
-              filters: formatValuesOfOriginConditions(this.state.filters), //筛选条件
-              clickType: this.state.clickType, //1：立即执行 2：二次确认 3：填写
+              filters: this.state.filters.map(formatValuesOfCondition), //筛选条件
               confirmMsg: this.state.doubleConfirm.confirmMsg, //确认信息
               sureName: this.state.doubleConfirm.sureName, //确认按钮
               cancelName: this.state.doubleConfirm.cancelName, //取消按钮
-              writeObject: this.state.writeObject, //1：本记录 2：关联记录
-              writeType: this.state.writeType, //类型 1：填写字段 2：新建关联记录
-              relationControl: this.state.relationControl, //关联记录ID
-              addRelationControlId: this.state.addRelationControlId, //新建关联记录ID
               workflowType: this.state.clickType !== 3 ? 1 : this.state.workflowType, // 1:执行 2：不执行
               workflowId: this.state.workflowId || '', //工作流ID
-              writeControls: this.state.writeControls, //填写控件 type - 1：只读 2：填写 3：必填
-              icon: this.state.icon,
-              color: this.state.color,
               desc: this.state.desc.trim(),
               appId,
-              displayViews: this.state.displayViews, //显示视图
-              isAllView: this.state.isAllView,
+              ..._.pick(this.state, [
+                'isAllView',
+                'displayViews',
+                'color',
+                'icon',
+                'writeControls', //填写控件 type - 1：只读 2：填写 3：必填
+                'addRelationControlId', //新建关联记录ID
+                'relationControl', //关联记录ID
+                'writeType', //类型 1：填写字段 2：新建关联记录
+                'writeObject', //1：本记录 2：关联记录
+                'clickType', //1：立即执行 2：二次确认 3：填写
+                'showType', //1: 一直 2：满足筛选条件
+              ]),
             };
-            sheetAjax.saveWorksheetBtn(params).then(data => {
+            sheetAjax.saveWorksheetBtn({ ...params, writeControls: writeControlsFormat }).then(data => {
               this.setState({
                 saveLoading: false,
               });
@@ -607,11 +604,6 @@ class CreateCustomBtnCon extends React.Component {
                 btnId: data,
                 addRelationControl: this.state.addRelationControlId,
               };
-
-              // this.props.refreshFn(worksheetId, appId, viewId, '');
-              // if (!btnId) {
-              //   this.props.refreshFn(worksheetId, appId, '', '');
-              // }
               // 创建按钮(创建时，除“填写指定内容+不执行”外，直接进入编辑流）
               if (!btnId && !(this.state.workflowType === 2 && this.state.clickType === 3)) {
                 this.setState(
@@ -634,8 +626,8 @@ class CreateCustomBtnCon extends React.Component {
                 if (!btnId) {
                   params = { ...params, btnId: data };
                 }
-                this.props.updateCustomButtons(params, !btnId);
                 this.props.onClose();
+                this.props.updateCustomButtons(params, !btnId);
               }
             });
           }}
@@ -662,7 +654,7 @@ class CreateCustomBtnCon extends React.Component {
 
   render() {
     const { appId, worksheetId, rowId, projectId, columns, isClickAway } = this.props;
-    const { btnId } = this.state;
+    const { btnId, relationWorksheetInfo } = this.state;
     return (
       <React.Fragment>
         <div style={{ height: document.documentElement.clientHeight - 166, backgroundColor: '#fff' }}>
@@ -705,10 +697,22 @@ class CreateCustomBtnCon extends React.Component {
         )}
         {this.state.showAppointDialog && (
           <AppointDialog
+            relationWorksheetInfo={relationWorksheetInfo}
             btnId={btnId}
+            projectId={projectId}
             showAppointDialog={this.state.showAppointDialog}
             writeObject={this.state.writeObject}
             relationControl={this.state.relationControl}
+            updateRelationControl={relationControl => {
+              this.setState(
+                {
+                  relationControl,
+                },
+                () => {
+                  this.getRelationControl(relationControl);
+                },
+              );
+            }}
             writeType={this.state.writeType}
             addRelationControlId={this.state.addRelationControlId}
             writeControls={this.state.writeControls}
@@ -716,13 +720,11 @@ class CreateCustomBtnCon extends React.Component {
             appId={appId}
             worksheetId={worksheetId}
             rowId={rowId}
-            addRelationControl={this.state.addRelationControl}
+            relationControls={this.state.relationControls}
             setValue={value => {
               this.setState({
-                addRelationControl: value.addRelationControl,
                 showAppointDialog: value.showAppointDialog,
                 writeObject: value.writeObject,
-                relationControl: value.relationControl,
                 writeType: value.writeType,
                 addRelationControlId: value.addRelationControlId,
                 writeControls: value.writeControls,

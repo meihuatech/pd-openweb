@@ -1,8 +1,8 @@
 import React, { Component, Fragment } from 'react';
 import { ScrollView, Dropdown, Checkbox, LoadDiv, Radio, Icon, Tooltip } from 'ming-ui';
 import cx from 'classnames';
-import { NODE_TYPE } from '../../enum';
 import flowNode from '../../../api/flowNode';
+import _ from 'lodash';
 import {
   SelectUserDropDown,
   Member,
@@ -11,7 +11,19 @@ import {
   DetailFooter,
   WriteFields,
   ButtonName,
+  Schedule,
 } from '../components';
+import styled from 'styled-components';
+
+const GraduallyMember = styled.div`
+  .actionFields {
+    width: 752px !important;
+    left: 0;
+  }
+  .flowDetailMemberDel {
+    display: block !important;
+  }
+`;
 
 export default class Approval extends Component {
   constructor(props) {
@@ -46,10 +58,14 @@ export default class Approval extends Component {
    * 获取节点详情
    */
   getNodeDetail(props) {
-    const { processId, selectNodeId, selectNodeType } = props;
+    const { processId, selectNodeId, selectNodeType, isApproval } = props;
 
     flowNode.getNodeDetail({ processId, nodeId: selectNodeId, flowNodeType: selectNodeType }).then(result => {
       this.setState({ data: result });
+
+      if (isApproval && !result.selectNodeId) {
+        this.onChange(result.flowNodeList[0].nodeId);
+      }
     });
   }
 
@@ -75,6 +91,7 @@ export default class Approval extends Component {
       ignoreRequired,
       isCallBack,
       callBackType,
+      callBackMultipleLevel,
       formProperties,
       passBtnName,
       overruleBtnName,
@@ -83,6 +100,8 @@ export default class Approval extends Component {
       multipleLevelType,
       multipleLevel,
       batch,
+      schedule,
+      passSendMessage,
     } = data;
 
     if (!selectNodeId) {
@@ -115,11 +134,14 @@ export default class Approval extends Component {
         ignoreRequired,
         isCallBack,
         callBackType,
+        callBackMultipleLevel,
         formProperties,
         passBtnName: passBtnName.trim() || _l('通过'),
         overruleBtnName: overruleBtnName.trim() || _l('否决'),
         auth,
         batch,
+        schedule,
+        passSendMessage,
       })
       .then(result => {
         this.props.updateNodeData(result);
@@ -153,19 +175,28 @@ export default class Approval extends Component {
     return (
       <Fragment>
         <div className="Font13 bold mTop20">{_l('审批人')}</div>
+
         <div className="flexRow mTop10">
           {list.map((item, i) => (
             <div className="flex" key={i}>
               <Radio
                 text={item.text}
                 checked={data.multipleLevelType === item.value || (item.value === 1 && data.multipleLevelType === 2)}
-                onClick={() => this.updateSource({ multipleLevelType: item.value, accounts: [], multipleLevel: -1 })}
+                onClick={() =>
+                  this.updateSource({
+                    multipleLevelType: item.value,
+                    callBackType: 0,
+                    accounts: [],
+                    multipleLevel: -1,
+                    schedule: Object.assign({}, data.schedule, { enable: false }),
+                  })
+                }
               />
             </div>
           ))}
         </div>
 
-        {data.multipleLevelType === 0 ? this.renderMember() : this.renderApprovalEnd()}
+        {data.multipleLevelType === 0 ? this.renderMember() : this.renderApprovalStartAndEnd()}
       </Fragment>
     );
   }
@@ -184,7 +215,7 @@ export default class Approval extends Component {
 
     return (
       <div className="mTop15">
-        <Member type={NODE_TYPE.APPROVAL} accounts={accounts} updateSource={updateAccounts} />
+        <Member accounts={accounts} updateSource={updateAccounts} />
 
         <div
           className="flexRow mTop12 ThemeColor3 workflowDetailAddBtn"
@@ -209,10 +240,10 @@ export default class Approval extends Component {
   }
 
   /**
-   * 渲染审批终点
+   * 渲染审批起点和终点
    */
-  renderApprovalEnd() {
-    const { data } = this.state;
+  renderApprovalStartAndEnd() {
+    const { data, showSelectUserDialog } = this.state;
     const multipleLevelList = [
       { text: _l('最高级'), value: -1 },
       { text: _l('2级'), value: 2 },
@@ -238,12 +269,40 @@ export default class Approval extends Component {
 
     return (
       <Fragment>
-        <div className="Font13 bold mTop20">{_l('审批终点')}</div>
+        <div className="Font13 bold mTop20">{_l('起点')}</div>
+
+        <GraduallyMember className="flexRow alignItemsCenter">
+          {(data.accounts || []).length ? (
+            <Member accounts={data.accounts} removeOrganization={true} updateSource={this.updateSource} />
+          ) : (
+            <div
+              className="mTop12 flexRow ThemeColor3 workflowDetailAddBtn"
+              onClick={() => this.setState({ showSelectUserDialog: true })}
+            >
+              <i className="Font28 icon-task-add-member-circle mRight10" />
+              {_l('指定成员')}
+              <SelectUserDropDown
+                appId={this.props.relationType === 2 ? this.props.relationId : ''}
+                visible={showSelectUserDialog}
+                companyId={this.props.companyId}
+                processId={this.props.processId}
+                nodeId={this.props.selectNodeId}
+                onlyNodeRole
+                unique
+                accounts={data.accounts}
+                updateSource={this.updateSource}
+                onClose={() => this.setState({ showSelectUserDialog: false })}
+              />
+            </div>
+          )}
+          <div className="mLeft10 mTop12">{_l('的直属部门负责人')}</div>
+        </GraduallyMember>
+
+        <div className="Font13 bold mTop20">{_l('终点')}</div>
         <div className="flexRow alignItemsCenter mTop10">
-          {_l('触发者在通讯录中的')}
+          {_l('该成员在通讯录中的')}
           <Dropdown
-            className="flowDropdown mLeft10 mRight10"
-            style={{ width: 120 }}
+            className="flowDropdown mLeft10 mRight10 flex"
             data={multipleLevelList}
             value={data.multipleLevel}
             border
@@ -344,6 +403,15 @@ export default class Approval extends Component {
    */
   renderApprovalSettings() {
     const { data } = this.state;
+    const CALL_BACK = [
+      { text: _l('重新执行流程'), value: 0 },
+      { text: data.multipleLevelType === 0 ? _l('直接返回审批节点') : _l('返回此节点的第一级'), value: 1 },
+      { text: _l('直接返回退回的层级'), value: 2 },
+    ];
+
+    if (data.multipleLevelType === 0) {
+      _.remove(CALL_BACK, o => o.value === 2);
+    }
 
     return (
       <Fragment>
@@ -374,7 +442,13 @@ export default class Approval extends Component {
         )}
         <Checkbox
           className="mTop15 flexRow"
-          text={_l('否决时，无需填写')}
+          text={_l('允许审批人暂存')}
+          checked={_.includes(data.operationTypeList, 13)}
+          onClick={checked => this.switchApprovalSettings(!checked, 13)}
+        />
+        <Checkbox
+          className="mTop15 flexRow"
+          text={_l('否决时，无需填写表单字段')}
           checked={data.ignoreRequired}
           onClick={checked => this.updateSource({ ignoreRequired: !checked })}
         />
@@ -387,7 +461,7 @@ export default class Approval extends Component {
                 disabled={data.countersignType === 2}
                 checked={data.isCallBack}
                 onClick={checked => {
-                  this.updateSource({ isCallBack: !checked, callBackType: 0 });
+                  this.updateSource({ isCallBack: !checked, callBackType: 0, callBackMultipleLevel: -1 });
                   if (data.selectNodeId && !checked) {
                     this.getCallBackNodeNames(data.selectNodeId, 0);
                   }
@@ -400,12 +474,15 @@ export default class Approval extends Component {
                   <Dropdown
                     menuStyle={{ left: 'inherit', right: 0 }}
                     style={{ marginTop: -1 }}
-                    data={[{ text: _l('重新执行流程'), value: 0 }, { text: _l('直接返回审批节点'), value: 1 }]}
-                    value={data.callBackType}
-                    onChange={callBackType => {
-                      this.updateSource({ callBackType });
+                    data={CALL_BACK}
+                    value={data.callBackType === 1 && data.callBackMultipleLevel === 1 ? 2 : data.callBackType}
+                    onChange={type => {
+                      this.updateSource({
+                        callBackType: type === 2 ? 1 : type,
+                        callBackMultipleLevel: type === 2 ? 1 : -1,
+                      });
                       if (data.selectNodeId) {
-                        this.getCallBackNodeNames(data.selectNodeId, callBackType);
+                        this.getCallBackNodeNames(data.selectNodeId, type === 2 ? 1 : type);
                       }
                     }}
                   />
@@ -413,35 +490,13 @@ export default class Approval extends Component {
               )}
             </div>
             {data.isCallBack && (
-              <div className="backBox">
+              <div className="flowBackBox">
                 <div className="Font12 Gray_9e">{_l('允许退回的节点')}</div>
                 <div className="mTop4">{data.callBackNodeList.join('、') || _l('无可退回节点')}</div>
               </div>
             )}
           </Fragment>
         )}
-        <Checkbox
-          className="mTop15 flexRow"
-          text={
-            <span>
-              {_l('允许批量审批')}
-              <Tooltip
-                popupPlacement="bottom"
-                text={
-                  <span>
-                    {_l(
-                      '允许审批人批量处理审批任务（在移动端可以直接点击待审批列表上的按钮进行审批）。在批量处理审批时将忽略表单中的必填内容（字段、审批意见）字段。',
-                    )}
-                  </span>
-                }
-              >
-                <Icon className="Font16 Gray_9e mLeft5" style={{ verticalAlign: 'text-bottom' }} icon="info" />
-              </Tooltip>
-            </span>
-          }
-          checked={data.batch}
-          onClick={checked => this.updateSource({ batch: !checked })}
-        />
       </Fragment>
     );
   }
@@ -523,14 +578,66 @@ export default class Approval extends Component {
     this.updateSource({ auth: { passTypeList, overruleTypeList } });
   };
 
+  /**
+   * 高级功能设置
+   */
+  renderSeniorSettings() {
+    const { isApproval } = this.props;
+    const { data } = this.state;
+
+    return (
+      <Fragment>
+        <Checkbox
+          className="mTop15 flexRow"
+          text={
+            <span>
+              {_l('允许批量 / 快速审批')}
+              <Tooltip
+                popupPlacement="bottom"
+                text={
+                  <span>
+                    {_l(
+                      '允许审批人批量、快速处理审批任务（在移动端可以直接点击待审批列表上的按钮进行审批）。在批量处理审批时将忽略表单中的必填字段。',
+                    )}
+                  </span>
+                }
+              >
+                <Icon className="Font16 Gray_9e mLeft5" style={{ verticalAlign: 'text-bottom' }} icon="info" />
+              </Tooltip>
+            </span>
+          }
+          checked={data.batch}
+          onClick={checked => this.updateSource({ batch: !checked })}
+        />
+
+        {data.multipleLevelType === 0 && (
+          <Fragment>
+            <Checkbox
+              className="mTop15 flexRow"
+              text={<span>{_l('开启限时处理')}</span>}
+              checked={(data.schedule || {}).enable}
+              onClick={checked =>
+                this.updateSource({ schedule: Object.assign({}, data.schedule, { enable: !checked }) })
+              }
+            />
+            <Schedule schedule={data.schedule} updateSource={this.updateSource} {...this.props} />
+          </Fragment>
+        )}
+
+        {isApproval && (
+          <Checkbox
+            className="mTop15 flexRow"
+            text={<span>{_l('此节点通过后，向发起人推送站内通知')}</span>}
+            checked={data.passSendMessage}
+            onClick={checked => this.updateSource({ passSendMessage: !checked })}
+          />
+        )}
+      </Fragment>
+    );
+  }
+
   render() {
     const { data } = this.state;
-    const personsPassing = [
-      { text: _l('或签（一名审批人通过或否决即可）'), value: 3 },
-      { text: _l('会签（需所有审批人通过）'), value: 1 },
-      { text: _l('会签（只需一名审批人通过，否决需全员否决）'), value: 2 },
-      { text: _l('会签（按比例投票通过）'), value: 4 },
-    ];
     const authTypeListText = {
       1: _l('签名'),
       2: _l('四级：实名'),
@@ -538,6 +645,7 @@ export default class Approval extends Component {
       4: _l('二级：实名+实人+网证（开发中...）'),
       5: _l('一级：实名+实人+网证+实证（开发中...）'),
     };
+
     if (_.isEmpty(data)) {
       return <LoadDiv className="mTop15" />;
     }
@@ -545,19 +653,18 @@ export default class Approval extends Component {
     return (
       <Fragment>
         <DetailHeader
-          data={{ ...data, selectNodeType: this.props.selectNodeType }}
+          {...this.props}
+          data={{ ...data }}
           icon="icon-workflow_ea"
           bg="BGViolet"
-          closeDetail={this.props.closeDetail}
           updateSource={this.updateSource}
         />
         <div className="flex mTop20">
           <ScrollView>
             <div className="workflowDetailBox">
-              <div className="Font13 bold">{_l('审批对象')}</div>
-              <div className="Font13 Gray_9e mTop10">{_l('当前流程中的节点对象')}</div>
-
+              <div className="Font13 bold">{_l('数据对象')}</div>
               <SelectNodeObject
+                disabled={this.props.isApproval}
                 appList={data.appList}
                 selectNodeId={data.selectNodeId}
                 selectNodeObj={data.selectNodeObj}
@@ -620,6 +727,9 @@ export default class Approval extends Component {
                 </Fragment>
               )}
 
+              <div className="Font13 bold mTop25">{_l('其他')}</div>
+              {this.renderSeniorSettings()}
+
               {data.selectNodeId && (
                 <Fragment>
                   <div className="Font13 bold mTop25">{_l('设置字段')}</div>
@@ -651,12 +761,12 @@ export default class Approval extends Component {
           </ScrollView>
         </div>
         <DetailFooter
+          {...this.props}
           isCorrect={
             data.selectNodeId &&
             ((!!data.accounts.length && data.multipleLevelType === 0) || data.multipleLevelType !== 0)
           }
           onSave={this.onSave}
-          closeDetail={this.props.closeDetail}
         />
       </Fragment>
     );

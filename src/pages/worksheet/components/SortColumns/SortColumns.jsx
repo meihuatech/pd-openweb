@@ -3,10 +3,12 @@ import PropTypes from 'prop-types';
 import DropdownWrapper from 'worksheet/components/DropdownWrapper';
 import ChangeColumn from 'worksheet/common/ChangeColumn';
 import './index.less';
+import _ from 'lodash';
 
 export default class SortColumns extends React.Component {
   static propTypes = {
     // 无显示字段时展示内容
+    placeholder: PropTypes.string,
     layout: PropTypes.number, // 呈现方式 1 dropdown 2 平铺
     empty: PropTypes.node,
     noShowCount: PropTypes.bool,
@@ -37,6 +39,7 @@ export default class SortColumns extends React.Component {
 
   render() {
     const {
+      placeholder,
       layout,
       empty,
       noShowCount,
@@ -60,6 +63,7 @@ export default class SortColumns extends React.Component {
           className="sortColumnWrap"
           downElement={
             <ChangeColumn
+              placeholder={placeholder}
               noShowCount={noShowCount}
               noempty={noempty}
               dragable={dragable}
@@ -90,6 +94,7 @@ export default class SortColumns extends React.Component {
       return (
         <div className="sortColumnWrap mTop10 layout2">
           <ChangeColumn
+            placeholder={placeholder}
             layout={layout}
             showColumnLength={displayControls.length}
             noempty={noempty}

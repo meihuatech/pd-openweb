@@ -1,18 +1,17 @@
 import React, { Fragment, Component } from 'react';
+import { connect } from 'react-redux';
 import { List } from 'antd-mobile';
 import { Icon } from 'ming-ui';
 import TabBar from '../components/TabBar';
 import login from 'src/api/login';
+import { getProject } from 'src/util';
 // import './index.less';
 
 const { Item } = List;
 const isWxWork = window.navigator.userAgent.toLowerCase().includes('wxwork');
 const isDingTalk = window.navigator.userAgent.toLowerCase().includes('dingtalk');
-const {
-  app: { commonUserHandle },
-} = window.private;
 
-export default class MyHome extends Component {
+class MyHome extends Component {
   constructor(props) {
     super(props);
   }
@@ -27,6 +26,7 @@ export default class MyHome extends Component {
     });
   };
   render() {
+    let currentProject = getProject(localStorage.getItem('currentProjectId')) || {};
     return (
       <div className="MyHome flexColumn h100">
         <div className="flex flexColumn WhiteBG">
@@ -47,13 +47,14 @@ export default class MyHome extends Component {
                 </div>
               }
               arrow="horizontal"
+              extra={<span className="Font17 Gray_75">{currentProject.companyName}</span>}
               onClick={() => {
                 this.props.history.push(`/mobile/enterprise`);
               }}
             >
-              {_l('组织')}
+              {_l('切换组织')}
             </Item>
-            {commonUserHandle.help || md.global.Config.IsLocal || isWxWork || isDingTalk ? null : (
+            {md.global.Config.IsLocal || isWxWork || isDingTalk ? null : (
               <Fragment>
                 <Item
                   thumb={<Icon icon="workflow_help" className="Font26" />}
@@ -67,14 +68,14 @@ export default class MyHome extends Component {
               </Fragment>
             )}
           </List>
-          {isWxWork || isDingTalk ? null : (
-            <a className="logOutBtn" onClick={this.logout} rel="external">
-              {_l('退出登录')}
-            </a>
-          )}
+          <a className="logOutBtn" onClick={this.logout} rel="external">
+            {_l('退出登录')}
+          </a>
         </div>
         <TabBar action="myHome" />
       </div>
     );
   }
 }
+
+export default MyHome;

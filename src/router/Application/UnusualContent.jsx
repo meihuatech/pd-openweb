@@ -6,6 +6,7 @@ import api from 'api/appManagement';
 import unauthorizedPic from './assets/unauthorized.png';
 import turnoffPic from './assets/turnoff.png';
 import './index.less';
+import _ from 'lodash';
 
 const STATUS_TO_TEXT = {
   2: { src: turnoffPic, text: _l('应用已关闭') },
@@ -52,7 +53,10 @@ export default class UnusualContent extends Component {
             <img src={src} alt={_l('错误图片')} />
           </div>
           <div className="explainText">{text}</div>
-          {_.includes([4], status) && <Button onClick={() => this.setState({ applyJoinAppVisible: true })}>{_l('申请加入')}</Button>}
+          {_.includes([4], status) &&
+            !md.global.Account.isPortal && ( //外部门户无法申请
+              <Button onClick={() => this.setState({ applyJoinAppVisible: true })}>{_l('申请加入')}</Button>
+            )}
         </div>
         {applyJoinAppVisible && (
           <Dialog
@@ -63,7 +67,12 @@ export default class UnusualContent extends Component {
             onCancel={() => this.setState({ applyJoinAppVisible: false })}
             okText={_l('申请加入')}
           >
-            <Textarea height={120} value={remark} onChange={value => this.setState({ remark: value })} placeholder={_l('填写申请说明')} />
+            <Textarea
+              height={120}
+              value={remark}
+              onChange={value => this.setState({ remark: value })}
+              placeholder={_l('填写申请说明')}
+            />
           </Dialog>
         )}
       </div>
