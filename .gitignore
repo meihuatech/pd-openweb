@@ -24,3 +24,7 @@ node_modules/*
 package-lock.json
 
 .scannerwork
+
+.idea/
+
+moho-web-md.iml

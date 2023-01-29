@@ -30,7 +30,7 @@ const POSTCSS_LOADER = {
 const generateCssLoader = (isModule = false) => [
   {
     loader: 'css-loader',
-    options: isModule ? { module: true, localIdentName: '[local]___[hash:base64:5]' } : undefined,
+    options: isModule ? {module: true, localIdentName: '[local]___[hash:base64:5]'} : undefined,
   },
   POSTCSS_LOADER,
 ];
@@ -38,7 +38,7 @@ const generateCssLoader = (isModule = false) => [
 const CSS_LOADERS = generateCssLoader();
 
 const SCRIPT_VENDORS = config.entry.vendors.map(p => path.resolve(__dirname, '../', p + '.js'));
-const SCRIPT_LOADER_BASE = [{ loader: 'script-loader' }];
+const SCRIPT_LOADER_BASE = [{loader: 'script-loader'}];
 const VENDORS_LOADERS = SCRIPT_LOADER_BASE;
 
 module.exports = {
@@ -52,17 +52,17 @@ module.exports = {
       prettyPrint: true,
       removeFullPathAutoPrefix: true,
     }),
-    new InjectPlugin(function() {
+    new InjectPlugin(function () {
       return `__webpack_public_path__ = window.__webpack_public_path__;`;
     }),
   ].concat(
     isProduction
       ? [
-          new MiniCssExtractPlugin({
-            filename: '[contenthash].css',
-            ignoreOrder: true,
-          }),
-        ]
+        new MiniCssExtractPlugin({
+          filename: '[contenthash].css',
+          ignoreOrder: true,
+        }),
+      ]
       : [new CaseSensitivePathsPlugin()],
   ),
   optimization: {
@@ -97,7 +97,7 @@ module.exports = {
   },
   module: {
     rules: (isProduction
-      ? [
+        ? [
           {
             test: /\.css$/,
             use: [MiniCssExtractPlugin.loader].concat(CSS_LOADERS),
@@ -145,7 +145,7 @@ module.exports = {
             },
           },
         ]
-      : [
+        : [
           {
             test: /\.(gif|jpg|png|svg|woff|woff2|eot|ttf)(\?[^?]*)?$/,
             use: {
@@ -164,11 +164,11 @@ module.exports = {
               },
               {
                 loader: 'css-loader',
-                options: { sourceMap: true },
+                options: {sourceMap: true},
               },
               {
                 loader: 'postcss-loader',
-                options: { sourceMap: true },
+                options: {sourceMap: true},
               },
             ],
           },
@@ -189,6 +189,12 @@ module.exports = {
             enforce: 'pre',
             use: ['source-map-loader'],
           },
+          {
+            test: /\.m?js/,
+            resolve: {
+              fullySpecified: false,
+            },
+          }
         ]
     ).concat([
       {
