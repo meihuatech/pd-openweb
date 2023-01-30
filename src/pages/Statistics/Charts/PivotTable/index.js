@@ -283,7 +283,8 @@ export default class extends Component {
               // let tagClass = isNaN(txt) ? '' : txtNum > 0 ? 'green' : txtNum < 0 ? 'red' : ''
               // let valueView = isNaN(txt) ? txt : `${!txtNum ? txtNum : txt}%`
               let tagClass = ''
-              let valueView = isNaN(txt) ? txt : (!txtNum ? '--' : `${txt}%`)
+              // let valueView = isNaN(txt) ? txt : (!txtNum ? '--' : `${txt}%`)
+              let valueView = isNaN(txt) ? txt : (isNaN(txtNum) ? '--' : `${txt}%`)
 
               if (name === 'Value') {
                 tagClass = isNaN(txtNum) ? '' : txtNum > 0 ? 'blue' : txtNum < 0 ? 'red' : ''
