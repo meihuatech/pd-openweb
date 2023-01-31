@@ -50,9 +50,11 @@ class LoginContainer extends React.Component {
       loginData: {
         dialCode: '',
         warnningData: {},
-        emailOrTel: '420089327@qq.com', // 邮箱或手机
+        // emailOrTel: '420089327@qq.com', // 邮箱或手机
+        emailOrTel: '', // 邮箱或手机
         verifyCode: '', // 验证码
-        password: 'loreal02', // 8-20位，需包含字母和数字
+        // password: 'loreal02', // 8-20位，需包含字母和数字
+        password: '', // 8-20位，需包含字母和数字
         fullName: '', // 姓名
         regcode: '', // 企业码
         isCheck: true,
@@ -77,6 +79,21 @@ class LoginContainer extends React.Component {
   componentDidMount() {
     $('html').addClass('loginContainerCon');
     document.title = _l('登录');
+
+    const lorSSO = getCookie(md.staticglobal.CookieKeys.LOREAL_SSO)
+    if (!lorSSO) {
+      location.href = '/404'
+      return
+    } else {
+      this.setState({
+        loginData: {
+          ...this.state.loginData,
+          emailOrTel: '420089327@qq.com', // 邮箱或手机
+          password: 'loreal02', // 8-20位，需包含字母和数字
+        },
+      });
+    }
+    
     if (checkLogin()) {
       if (request.ReturnUrl) {
         location.replace(getDataByFilterXSS(request.ReturnUrl));

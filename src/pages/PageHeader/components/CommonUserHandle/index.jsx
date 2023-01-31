@@ -106,7 +106,7 @@ export default class CommonUserHandle extends Component {
           </div>
         )*/}
         <Tooltip
-          text={<UserMenu handleUserVisibleChange={this.handleUserVisibleChange.bind(this)} />}
+          //text={<UserMenu handleUserVisibleChange={this.handleUserVisibleChange.bind(this)} />}
           mouseEnterDelay={0.2}
           action={['click']}
           themeColor="white"

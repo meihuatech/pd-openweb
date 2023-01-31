@@ -163,6 +163,10 @@ md.staticglobal = md.global = {
     passwordRegexTip: '',
     hideHelpTip: true,
   },
+
+  CookieKeys: {
+    LOREAL_SSO: 'lor_sso',
+  },
 };
 
 /**
