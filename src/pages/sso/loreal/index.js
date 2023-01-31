@@ -16,5 +16,6 @@ if (isReferrer() || location.href === 'http://localhost:30001/sso/loreal') {
     location.href = '/app/my'
   }, 100)
 } else {
-  location.href = '/404'
+  // location.href = '/404'
+  location.href = md.staticglobal.SourceUrls.LOREAL_SSO_URL
 }

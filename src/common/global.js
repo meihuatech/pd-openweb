@@ -167,6 +167,10 @@ md.staticglobal = md.global = {
   CookieKeys: {
     LOREAL_SSO: 'lor_sso',
   },
+
+  SourceUrls: {
+    LOREAL_SSO_URL: 'https://data-report-cn.loreal.wans/index#/one-access'
+  },
 };
 
 /**
