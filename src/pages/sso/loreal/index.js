@@ -29,7 +29,7 @@ if (isReferrer() || location.href === 'http://localhost:30001/sso/loreal') {
   setCookie(md.staticglobal.CookieKeys.LOREAL_SSO, '1', expire)
   setCookie(md.staticglobal.CookieKeys.LOREAL_SSO_SOURCE, referrerValue, sourceExpire)
   setTimeout(() => {
-    location.href = '/app/my'
+    location.href = '/app/31ec8d09-d39f-4683-8fb3-b60974963bf3/'
   }, 100)
 } else {
   if (referrerValue === 'tool') {
