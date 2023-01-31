@@ -166,10 +166,12 @@ md.staticglobal = md.global = {
 
   CookieKeys: {
     LOREAL_SSO: 'lor_sso',
+    LOREAL_SSO_SOURCE: 'lor_sso_source',
   },
 
   SourceUrls: {
-    LOREAL_SSO_URL: 'https://data-report-cn.loreal.wans/index#/one-access'
+    LOREAL_SSO_URL: 'https://data-report-cn.loreal.wans/index#/one-access',
+    TOOL_SSO_URL: 'https://tool.mohodata.com'
   },
 };
 

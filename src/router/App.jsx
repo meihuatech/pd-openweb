@@ -59,7 +59,12 @@ export default class App extends Component {
     // console.log('sso', lorSSO)
     if (!lorSSO) {
       // location.href = '/404'
-      location.href = md.staticglobal.SourceUrls.LOREAL_SSO_URL
+      const lorSource = getCookie(md.staticglobal.CookieKeys.LOREAL_SSO_SOURCE)
+      if (lorSource === 'tool') {
+        location.href = md.staticglobal.SourceUrls.TOOL_SSO_URL
+      } else {
+        location.href = md.staticglobal.SourceUrls.LOREAL_SSO_URL
+      }
       return
     }
 
