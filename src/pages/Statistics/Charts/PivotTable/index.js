@@ -236,8 +236,8 @@ export default class extends Component {
     const { columnSummary = {}, showColumnTotal } = pivotTable || reportData;
     const dataList = [];
 
-    console.log('lines', lines)
-    console.log('reportData', reportData)
+    // console.log('lines', lines)
+    // console.log('reportData', reportData)
 
     const maxYearQuarter = result.reduce((max, item) => {
       return max > item.y[0] ? max : item.y[0]
