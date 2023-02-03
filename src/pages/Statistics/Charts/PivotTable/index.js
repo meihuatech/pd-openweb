@@ -178,6 +178,7 @@ export default class extends Component {
       const { controlType, fields = [] } = control;
       const showControl = controlType === 29 && !_.isEmpty(fields);
       const data = item.data;
+      // console.log('head col', item)
       return {
         title: () => {
           if (showControl) {
@@ -235,6 +236,9 @@ export default class extends Component {
     const { columnSummary = {}, showColumnTotal } = pivotTable || reportData;
     const dataList = [];
 
+    console.log('lines', lines)
+    console.log('reportData', reportData)
+
     const maxYearQuarter = result.reduce((max, item) => {
       return max > item.y[0] ? max : item.y[0]
     }, '')
@@ -276,7 +280,7 @@ export default class extends Component {
           // className: cx('cell-content', displaySetup.showRowList && isViewOriginalData ? 'contentValue' : undefined),
           className,
           width: this.getColumnWidth(dragIndex),
-          render: (txt) => {
+          render: (txt, record) => {
             // 对Evol列加标签显示处理
             if (['Evol','Evol%','%','Value'].includes(name)) {
               const txtNum = parseFloat(txt)
@@ -287,11 +291,29 @@ export default class extends Component {
               let valueView = isNaN(txt) ? txt : (isNaN(txtNum) ? '--' : `${txt}%`)
 
               if (name === 'Value') {
-                tagClass = isNaN(txtNum) ? '' : txtNum > 0 ? 'blue' : txtNum < 0 ? 'red' : ''
+                // console.log('record', item.controlId,record)
+                // tagClass = isNaN(txtNum) ? '' : txtNum > 0 ? 'v-blue' : txtNum < 0 ? 'v-red' : ''
+                valueView = isNaN(txt) ? txt : (isNaN(txtNum) ? '--' : parseFloat(txt))
+                // console.log('value view', txt, valueView)
+                if (txtNum > 0) {
+                  switch (record['6362a77a1d176488ea6c1a81']) {
+                    case 'AAU':
+                      tagClass = 'v-red'
+                      break;
+                    case 'MAU':
+                      tagClass = 'v-cyan'
+                      break
+                    case 'DAU':
+                      tagClass = 'v-blue'
+                      break
+                  }
+                } else {
+                  tagClass = ''
+                }
+                
               } else {
                 tagClass = isNaN(txtNum) ? '' : txtNum > 0 ? 'green' : txtNum < 0 ? 'red' : ''
               }
-
               
               return <span className={cx(['cell-tag',tagClass])}>{valueView}</span>
             }
