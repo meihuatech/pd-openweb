@@ -276,7 +276,7 @@ export default class extends Component {
           // className: cx('cell-content', displaySetup.showRowList && isViewOriginalData ? 'contentValue' : undefined),
           className,
           width: this.getColumnWidth(dragIndex),
-          render: (txt) => {
+          render: (txt, record) => {
             // 对Evol列加标签显示处理
             if (['Evol','Evol%','%','Value'].includes(name)) {
               const txtNum = parseFloat(txt)
@@ -287,7 +287,25 @@ export default class extends Component {
               let valueView = isNaN(txt) ? txt : (isNaN(txtNum) ? '--' : `${txt}%`)
 
               if (name === 'Value') {
-                tagClass = isNaN(txtNum) ? '' : txtNum > 0 ? 'blue' : txtNum < 0 ? 'red' : ''
+                // console.log('record', item.controlId,record)
+                // tagClass = isNaN(txtNum) ? '' : txtNum > 0 ? 'v-blue' : txtNum < 0 ? 'v-red' : ''
+                valueView = isNaN(txt) ? txt : (isNaN(txtNum) ? '--' : parseFloat(txt))
+                // console.log('value view', txt, valueView)
+                if (txtNum > 0) {
+                  switch (record['6362a77a1d176488ea6c1a81']) {
+                    case 'AAU':
+                      tagClass = 'v-red'
+                      break;
+                    case 'MAU':
+                      tagClass = 'v-cyan'
+                      break
+                    case 'DAU':
+                      tagClass = 'v-blue'
+                      break
+                  }
+                } else {
+                  tagClass = ''
+                }
               } else {
                 tagClass = isNaN(txtNum) ? '' : txtNum > 0 ? 'green' : txtNum < 0 ? 'red' : ''
               }

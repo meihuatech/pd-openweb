@@ -134,9 +134,16 @@ const PivotTableContent = styled.div`
       &.green {
         background-color: #BCD197;
       }
-      &.blue {
-        background-color: #cbdbea;
+      &.v-red {
+        background-color: #F5B5B2;
       }
+      &.v-blue {
+        background-color: #CBDBEB;
+      }
+      &.v-cyan {
+        background-color: #BBD3CB;
+      }
+
     }
 
     &.ant-table-cell.column-head {
