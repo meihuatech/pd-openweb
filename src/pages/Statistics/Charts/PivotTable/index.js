@@ -178,6 +178,7 @@ export default class extends Component {
       const { controlType, fields = [] } = control;
       const showControl = controlType === 29 && !_.isEmpty(fields);
       const data = item.data;
+      // console.log('head col', item)
       return {
         title: () => {
           if (showControl) {
@@ -234,6 +235,9 @@ export default class extends Component {
     const { columns, lines, valueMap, yaxisList, pivotTable, data, displaySetup } = reportData;
     const { columnSummary = {}, showColumnTotal } = pivotTable || reportData;
     const dataList = [];
+
+    // console.log('lines', lines)
+    // console.log('reportData', reportData)
 
     const maxYearQuarter = result.reduce((max, item) => {
       return max > item.y[0] ? max : item.y[0]
@@ -306,10 +310,10 @@ export default class extends Component {
                 } else {
                   tagClass = ''
                 }
+                
               } else {
                 tagClass = isNaN(txtNum) ? '' : txtNum > 0 ? 'green' : txtNum < 0 ? 'red' : ''
               }
-
               
               return <span className={cx(['cell-tag',tagClass])}>{valueView}</span>
             }
