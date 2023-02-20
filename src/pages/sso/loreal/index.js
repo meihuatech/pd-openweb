@@ -44,6 +44,7 @@ function decodeRsa() {
         console.log('data',resData.username,resData)
         saveLoginLog({
           email: resData.username,
+          remark: resData.timestamp,
         })
         saveLocal()
       } else {
