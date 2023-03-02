@@ -50,10 +50,10 @@ class LoginContainer extends React.Component {
       loginData: {
         dialCode: '',
         warnningData: {},
-        // emailOrTel: '420089327@qq.com', // 邮箱或手机
+        // emailOrTel: 'loreal.CFR@meihua.info', // 邮箱或手机
         emailOrTel: '', // 邮箱或手机
         verifyCode: '', // 验证码
-        // password: 'loreal02', // 8-20位，需包含字母和数字
+        // password: 'Loreal2023~', // 8-20位，需包含字母和数字
         password: '', // 8-20位，需包含字母和数字
         fullName: '', // 姓名
         regcode: '', // 企业码
@@ -94,8 +94,10 @@ class LoginContainer extends React.Component {
       this.setState({
         loginData: {
           ...this.state.loginData,
-          emailOrTel: '420089327@qq.com', // 邮箱或手机
-          password: 'loreal02', // 8-20位，需包含字母和数字
+          // emailOrTel: '420089327@qq.com', // 邮箱或手机
+          // password: 'loreal02', // 8-20位，需包含字母和数字
+          emailOrTel: 'loreal.CFR@meihua.info', // 邮箱或手机
+          password: 'Loreal2023~', // 8-20位，需包含字母和数字
         },
       });
     }
