@@ -41,12 +41,16 @@ function decodeRsa() {
       console.log('result', result)
       if (result.success) {
         const resData = JSON.parse(result.data || '{}');
-        console.log('data',resData.username,resData)
+        // console.log('data',resData.username,resData)
+        const saveInfo = {
+          ...resData,
+        }
         saveLoginLog({
           email: resData.username,
-          remark: resData.timestamp,
+          remark: '登录token时间：' + resData.timestamp,
+          refferr: resData.sourceFrom,
         })
-        saveLocal()
+        saveLocal(saveInfo)
       } else {
         alert('登录失败');
         setTimeout(() => {
@@ -76,12 +80,12 @@ function saveLoginLog(option) {
   })
 }
 
-function saveLocal() {
+function saveLocal(saveInfo) {
   const expire = new Date()
   const sourceExpire = new Date()
   expire.setDate(expire.getDate() + 1)
   sourceExpire.setFullYear(sourceExpire.getFullYear() + 100)
-  setCookie(md.staticglobal.CookieKeys.LOREAL_SSO, token, expire)
+  setCookie(md.staticglobal.CookieKeys.LOREAL_SSO, JSON.stringify(saveInfo), expire)
   setCookie(md.staticglobal.CookieKeys.LOREAL_SSO_SOURCE, referrerValue, sourceExpire)
   setTimeout(() => {
     location.href = '/app/31ec8d09-d39f-4683-8fb3-b60974963bf3/'
