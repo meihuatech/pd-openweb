@@ -33,7 +33,7 @@ function decodeRsa() {
     type: 'POST',
     data: {
       private_key: rsaKey,
-      text: token,
+      text: decodeURIComponent(token),
     },
     // async: true,
     contentType: 'application/x-www-form-urlencoded',
@@ -47,7 +47,7 @@ function decodeRsa() {
         }
         saveLoginLog({
           email: resData.username,
-          remark: '登录token时间：' + resData.timestamp,
+          remark: '登录token 时间：' + resData.timestamp,
           refferr: resData.sourceFrom,
         })
         saveLocal(saveInfo)
