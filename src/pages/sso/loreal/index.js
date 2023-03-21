@@ -1,4 +1,4 @@
-import { ajax, login, browserIsMobile, getRequest, getCurrentTime, checkLogin, replenishRet } from 'src/util/sso';
+import { ajax, login, browserIsMobile, getRequest, getCurrentTime, checkLogin, replenishRet, saveLog } from 'src/util/sso';
 
 const lorealReferrer = 'https://data-report-cn.loreal.wans/index'
 const toolReferrer = 'https://tool.mohodata.com'
@@ -45,7 +45,7 @@ function decodeRsa() {
         const saveInfo = {
           ...resData,
         }
-        saveLoginLog({
+        saveLog({
           email: resData.username,
           remark: '登录token 时间：' + resData.timestamp,
           refferr: resData.sourceFrom,
@@ -64,21 +64,21 @@ function decodeRsa() {
   })
 }
 
-function saveLoginLog(option) {
-  $.ajax({
-    url: 'https://app.mohodata.com/api/workflow/hooks/NjNlZjRjNmM4OThmY2UzMTAyYjEyZjk2',
-    type: 'GET',
-    data: {
-      type: 'Login',
-      ...option,
-    },
-    contentType: 'application/x-www-form-urlencoded',
-  }).done(res => {
-    console.log('log success', res)
-  }).fail(err => {
-    console.log('err', err)
-  })
-}
+// function saveLoginLog(option) {
+//   $.ajax({
+//     url: 'https://app.mohodata.com/api/workflow/hooks/NjNlZjRjNmM4OThmY2UzMTAyYjEyZjk2',
+//     type: 'GET',
+//     data: {
+//       type: 'Login',
+//       ...option,
+//     },
+//     contentType: 'application/x-www-form-urlencoded',
+//   }).done(res => {
+//     console.log('log success', res)
+//   }).fail(err => {
+//     console.log('err', err)
+//   })
+// }
 
 function saveLocal(saveInfo) {
   const expire = new Date()
@@ -87,6 +87,7 @@ function saveLocal(saveInfo) {
   sourceExpire.setFullYear(sourceExpire.getFullYear() + 100)
   setCookie(md.staticglobal.CookieKeys.LOREAL_SSO, JSON.stringify(saveInfo), expire)
   setCookie(md.staticglobal.CookieKeys.LOREAL_SSO_SOURCE, referrerValue, sourceExpire)
+  localStorage.setItem(md.staticglobal.StorageKeys.LOREAL_SSO_INFO, JSON.stringify(saveInfo))
   setTimeout(() => {
     location.href = '/app/31ec8d09-d39f-4683-8fb3-b60974963bf3/'
   }, 100)

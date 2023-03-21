@@ -169,6 +169,10 @@ md.staticglobal = md.global = {
     LOREAL_SSO_SOURCE: 'lor_sso_source',
   },
 
+  StorageKeys: {
+    LOREAL_SSO_INFO: 'loreal_sso_info',
+  },
+
   SourceUrls: {
     LOREAL_SSO_URL: 'https://data-report-cn.loreal.wans/index#/one-access',
     TOOL_SSO_URL: 'https://tool.mohodata.com'

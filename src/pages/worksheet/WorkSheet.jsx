@@ -18,6 +18,7 @@ import { addWorkSheet, updateSheetListLoading } from 'src/pages/worksheet/redux/
 import CustomPageContent from 'worksheet/components/CustomPageContent';
 import './worksheet.less';
 import _ from 'lodash';
+import { saveLog } from 'src/util/sso';
 
 @connect(undefined, dispatch => ({
   addWorkSheet: bindActionCreators(addWorkSheet, dispatch),
@@ -88,6 +89,7 @@ class WorkSheet extends Component {
       });
     }
     this.setCache(nextProps.match.params);
+    this.saveViewLog(nextProps.match.params)
   }
   shouldComponentUpdate(nextProps) {
     return nextProps.sheetListLoading !== this.props.sheetListLoading || !/\/app\/[\w-]+$/.test(location.pathname);
@@ -97,6 +99,32 @@ class WorkSheet extends Component {
     this.props.updateSheetListLoading(true);
     // 取消禁止浏览器触摸板触发的前进后退
     document.body.style.overscrollBehaviorX = null;
+  }
+  // 提交浏览日志
+  saveViewLog(params) {
+    const appPkg = store.getState().appPkg;
+    const pathname = location.pathname
+    if (!appPkg.appGroups) {
+      return
+    }
+    if (this.originPathname === pathname) {
+      return;
+    }
+    this.originPathname = pathname
+    let { appId, groupId, worksheetId } = params;
+    const appGroups = appPkg.appGroups || []
+    const appGroup = appGroups[0] || {}
+    const worksheetItem = (appGroup.workSheetInfo || []).find(item => item.workSheetId === worksheetId) || {}
+    const lorealSSOInfo = localStorage.getItem(md.staticglobal.StorageKeys.LOREAL_SSO_INFO)
+    const ssoInfo = lorealSSOInfo ? JSON.parse(lorealSSOInfo) : {}
+    // console.log('worksheet appGroups', this.props, appGroup, worksheetId,worksheetItem)
+    saveLog({
+      type: 'View',
+      email: ssoInfo.username,
+      refferr: ssoInfo.sourceFrom,
+      section: appGroup.name,
+      page: `${appGroup.name} - ${worksheetItem.workSheetName}`,
+    })
   }
   /**
    * 设置缓存
