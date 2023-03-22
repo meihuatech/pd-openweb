@@ -115,8 +115,15 @@ class WorkSheet extends Component {
     const appGroups = appPkg.appGroups || []
     const appGroup = appGroups[0] || {}
     const worksheetItem = (appGroup.workSheetInfo || []).find(item => item.workSheetId === worksheetId) || {}
-    const lorealSSOInfo = localStorage.getItem(md.staticglobal.StorageKeys.LOREAL_SSO_INFO)
-    const ssoInfo = lorealSSOInfo ? JSON.parse(lorealSSOInfo) : {}
+    const referrerSource = getCookie(md.staticglobal.CookieKeys.LOREAL_SSO_SOURCE)
+    // const lorealSSOInfo = localStorage.getItem(md.staticglobal.StorageKeys.LOREAL_SSO_INFO)
+    const lorealSSOInfo = getCookie(md.staticglobal.CookieKeys.LOREAL_SSO)
+    const lorInfo = lorealSSOInfo ? JSON.parse(lorealSSOInfo) : {}
+    const toolInfo = {
+      username: 'mhtest@meihua.info',
+      sourceFrom: 'tool',
+    }
+    const ssoInfo = referrerSource === 'tool' ? toolInfo : lorInfo
     // console.log('worksheet appGroups', this.props, appGroup, worksheetId,worksheetItem)
     saveLog({
       type: 'View',

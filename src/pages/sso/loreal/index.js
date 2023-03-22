@@ -87,7 +87,7 @@ function saveLocal(saveInfo) {
   sourceExpire.setFullYear(sourceExpire.getFullYear() + 100)
   setCookie(md.staticglobal.CookieKeys.LOREAL_SSO, JSON.stringify(saveInfo), expire)
   setCookie(md.staticglobal.CookieKeys.LOREAL_SSO_SOURCE, referrerValue, sourceExpire)
-  localStorage.setItem(md.staticglobal.StorageKeys.LOREAL_SSO_INFO, JSON.stringify(saveInfo))
+  // localStorage.setItem(md.staticglobal.StorageKeys.LOREAL_SSO_INFO, JSON.stringify(saveInfo))
   setTimeout(() => {
     location.href = '/app/31ec8d09-d39f-4683-8fb3-b60974963bf3/'
   }, 100)

@@ -213,7 +213,7 @@ export const saveLog = (option) => {
     },
     contentType: 'application/x-www-form-urlencoded',
   }).done(res => {
-    console.log('log success', res)
+    // console.log('log success', res)
   }).fail(err => {
     console.log('err', err)
   })
