@@ -322,6 +322,7 @@ export default class extends Component {
         showCrosshairs: true,
         formatter: ({ value, groupName }) => {
           const { name, id } = formatControlInfo(groupName);
+          // console.log('line chart formatter 1', isPercentStackedArea, value ,groupName, name)
           if (isPercentStackedArea) {
             return {
               name,
@@ -329,6 +330,7 @@ export default class extends Component {
             }
           } else {
             const { dot } = _.find(yaxisList, { controlId: id }) || {};
+            // console.log('line chart formatter dot', dot, value ,groupName, name)
             return {
               name,
               value: _.isNumber(value) ? value.toLocaleString('zh', { minimumFractionDigits: dot }) : '--'
@@ -403,6 +405,7 @@ export default class extends Component {
             formatter: ({ value, groupName, originalId: xName }) => {
               const { name, id } = formatControlInfo(groupName);
               const { dot } = _.find(yaxisList, { controlId: id }) || {};
+              // console.log('line chart formatter 2', dot, value ,groupName,xName, name)
               const newValue = _.isNumber(value) ? value.toLocaleString('zh', { minimumFractionDigits: dot }) : '--';
               if (name === lastDateText) {
                 const { originalName } = _.find(contrastData, { originalId: xName }) || {};

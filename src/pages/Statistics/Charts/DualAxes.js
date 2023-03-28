@@ -321,16 +321,20 @@ export default class extends Component {
           const { name, id } = formatControlInfo(groupName);
           if (_.isNumber(value)) {
             const { dot } = _.find(yaxisList, { controlId: id }) || {};
+            // console.log('tooltip formatter 1', dot, value, rightValue, groupName, name, id)
             return {
               name,
-              value: _.isNumber(value) ? value.toLocaleString('zh', { minimumFractionDigits: dot }) : '--',
+              value: _.isNumber(value) ? value.toLocaleString('zh', { maximumFractionDigits: dot }) : '--',
+              // value: _.isNumber(value) ? value.toLocaleString('zh', { minimumFractionDigits: dot }) : '--',
             };
           }
           if (_.isNumber(rightValue)) {
             const { dot } = _.find(rightY.yaxisList, { controlId: id }) || {};
+            // console.log('tooltip formatter 2', dot, value, rightValue, groupName, name, id)
             return {
               name,
-              value: _.isNumber(rightValue) ? rightValue.toLocaleString('zh', { minimumFractionDigits: dot }) : '--',
+              value: _.isNumber(rightValue) ? rightValue.toLocaleString('zh', { maximumFractionDigits: dot > 2 ? 2 : dot }) : '--',
+              // value: _.isNumber(rightValue) ? rightValue.toLocaleString('zh', { minimumFractionDigits: dot }) : '--',
             };
           }
           return {

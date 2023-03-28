@@ -323,7 +323,6 @@ export const formatYaxisList = (map, yaxisList, id) => {
     }
   });
 
-  console.log('foamta yAxis list 2', maxValue, newYaxisList)
   return newYaxisList;
 }
 
