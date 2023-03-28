@@ -171,13 +171,20 @@ export default class WorkSheetItem extends Component {
     );
   }
   render() {
-    const { sheetInfo, match, isCharge, appPkg, sheetListVisible, projectId } = this.props;
+    const { sheetInfo, match, isCharge, appPkg, sheetListVisible, projectId, indentationBrands=[] } = this.props;
     const { workSheetId, workSheetName, icon, iconUrl, status, type } = sheetInfo;
     const { iconColor } = appPkg;
     let { appId, groupId } = match.params;
     if (md.global.Account.isPortal) {
       appId = md.global.Account.appId;
     }
+    /**
+     * ##修改## 
+     * 针对菜单缩进
+     */
+    // const pLeft = icon === 'table' ? 'pLeft20' : 'pLeft40'
+    const pLeft = indentationBrands.includes(workSheetName) ? 'pLeft40' : 'pLeft20'
+    
     return (
       <Tooltip
         popupAlign={{ offset: [-10, 0] }}
@@ -194,7 +201,7 @@ export default class WorkSheetItem extends Component {
           )}
           data-id={workSheetId}
         >
-          <MdLink className="NoUnderline valignWrapper pLeft20 ThemeColor10 h100 nameWrap" to={this.getNavigateUrl(appId, groupId, workSheetId)}>
+          <MdLink className={`NoUnderline valignWrapper ${pLeft} ThemeColor10 h100 nameWrap`} to={this.getNavigateUrl(appId, groupId, workSheetId)}>
             <div className="iconWrap">
               <SvgIcon url={iconUrl} fill={iconColor} size={22} />
             </div>

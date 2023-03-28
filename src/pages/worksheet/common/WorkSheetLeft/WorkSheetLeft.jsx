@@ -179,6 +179,31 @@ const SortableList = SortableContainer(({ sheetList, ...other }) => {
   );
 });
 
+const getIndentationBrandConfig = () => {
+  return new Promise((resolve, reject) => {
+    $.ajax({
+      url: `https://app.mohodata.com/api/v2/open/worksheet/getRowByIdPost`,
+      type: 'POST',
+      dataType: 'json',
+      timeout: 3000,
+      contentType: 'application/json',
+      data: JSON.stringify({
+        "appKey": "80b065391c247505",
+        "sign": "ZGFlODY5ODgxYjk2YmFkMjljZWI5MTA4ZjgzYmI3NWI5Zjk0ODY5ODI2NmFlMzY0MTU4Y2U1YWI4Nzk2MDU0Yg==",
+        "worksheetId": "config",
+        "rowId": "036815e9-64d8-43b1-9903-15a02d67574f",
+        "getSystemControl": true
+      }),
+      success: function(payload) {
+        resolve(payload);
+      },
+      error: function (error) {
+        reject(error);
+      },
+    });
+  })
+}
+
 class WorkSheetLeft extends Component {
   static propTypes = {
     id: PropTypes.string,
@@ -192,11 +217,21 @@ class WorkSheetLeft extends Component {
       projectFolded: getProjectfoldedFromStorage(),
       createType: '',
       createMenuVisible: false,
+
+      indentationBrands: [],
     };
     this.getSheetList = this.getSheetList.bind(this);
   }
   componentWillMount = function () {
     this.getSheetList(this.props);
+
+    getIndentationBrandConfig().then(res => {
+      if (res.success) {
+        const resData = res.data || {}
+        const indentationBrands = JSON.parse(resData.value || '[]')
+        this.setState({indentationBrands})
+      }
+    })
   };
   componentDidMount = function () {
     window.__worksheetLeftReLoad = this.getSheetList;
@@ -360,7 +395,7 @@ class WorkSheetLeft extends Component {
   }
   renderContent() {
     const { id, data, isCharge, isUnfold, appPkg } = this.props;
-    const { createMenuVisible } = this.state;
+    const { createMenuVisible, indentationBrands } = this.state;
     const workSheetItemProps = {
       disabled: browserIsMobile() ? true : !isCharge,
       helperClass: 'sortableWorkSheetItem',
@@ -381,6 +416,7 @@ class WorkSheetLeft extends Component {
       isCharge,
       sheetListVisible: isUnfold,
       appPkg,
+      indentationBrands,
       ..._.pick(appPkg, ['projectId']),
     };
     return (
