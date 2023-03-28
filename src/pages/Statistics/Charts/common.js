@@ -323,6 +323,7 @@ export const formatYaxisList = (map, yaxisList, id) => {
     }
   });
 
+  console.log('foamta yAxis list 2', maxValue, newYaxisList)
   return newYaxisList;
 }
 
@@ -399,7 +400,9 @@ export const formatrChartAxisValue = (value, isPerPile, yaxisList) => {
       return fixType ? `${suffix}${result}` : `${result}${suffix}`;
     } else if (magnitude) {
       const result = Number(toFixed(format(value), ydot));
-      return magnitude === 1 ? result : fixType ? `${suffix}${result}` : `${result}${suffix}`;
+      // 没有单位时候，数字用千分位格式
+      return magnitude === 1 ? result.toLocaleString() : fixType ? `${suffix}${result}` : `${result}${suffix}`;
+      // return magnitude === 1 ? result : fixType ? `${suffix}${result}` : `${result}${suffix}`;
     } else {
       return format(value);
     }

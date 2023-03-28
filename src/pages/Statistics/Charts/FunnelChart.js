@@ -136,6 +136,7 @@ export default class extends Component {
     this.FunnelChart = null;
   }
   componentDidMount() {
+    console.log('funnel chart')
     import('@antv/g2plot').then(data => {
       this.FunnelComponent = data.Funnel;
       this.renderFunnelChart();

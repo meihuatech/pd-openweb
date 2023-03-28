@@ -51,6 +51,7 @@ export default class extends Component {
     this.RadarChart = null;
   }
   componentDidMount() {
+    console.log('radar chart')
     import('@antv/g2plot').then(data => {
       this.RadarComponent = data.Radar;
       this.renderRadarChart();

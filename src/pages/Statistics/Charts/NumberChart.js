@@ -218,6 +218,7 @@ export default class extends Component {
     super(props);
   }
   componentDidMount() {
+    console.log('number chart')
     const { reportId, xaxes, yaxisList, style } = this.props.reportData;
     const { numberChartStyle = {} } = style;
     if (yaxisList.length === 1 && !xaxes.controlId) {

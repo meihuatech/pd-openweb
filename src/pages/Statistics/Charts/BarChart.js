@@ -85,6 +85,7 @@ export default class extends Component {
     this.BarChart = null;
   }
   componentDidMount() {
+    console.log('bar chart')
     import('@antv/g2plot').then(data => {
       this.g2plotComponent = data;
       this.renderBarChart(this.props);

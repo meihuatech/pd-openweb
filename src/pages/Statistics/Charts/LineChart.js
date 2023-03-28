@@ -127,6 +127,7 @@ export default class extends Component {
     this.LineChart = null;
   }
   componentDidMount() {
+    console.log('line chart')
     import('@antv/g2plot').then(data => {
       this.g2plotComponent = data;
       this.renderLineChart(this.props);

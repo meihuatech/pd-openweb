@@ -87,6 +87,7 @@ export default class extends Component {
     this.CountryLayerChart = null;
   }
   componentDidMount() {
+    console.log('country layer')
     Promise.all([import('@antv/l7'), import('@antv/l7-maps'), import('@antv/l7-district')]).then(
       ([l7, l7Maps, l7District]) => {
         const { Scene } = l7;

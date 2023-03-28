@@ -56,6 +56,7 @@ export default class extends Component {
     this.DualAxes = null;
   }
   componentDidMount() {
+    console.log('dual axes')
     import('@antv/g2plot').then(data => {
       this.DualAxesComponent = data.DualAxes;
       this.renderDualAxesChart();
@@ -274,10 +275,19 @@ export default class extends Component {
           label: ydisplay.showDial
             ? {
                 formatter: value => {
+                  console.log('format value showDial',value, Number(value).toLocaleString())
+                  // console.log('label value 11',value, value ? Number(value).toLocaleString() : null, value ? formatrChartAxisValue(Number(value), false, newYaxisList) : null)
                   return value ? formatrChartAxisValue(Number(value), false, newYaxisList) : null;
                 },
               }
             : null,
+          // label: ydisplay.showDial
+          //   ? {
+          //       formatter: value => {
+          //         return value ? formatrChartAxisValue(Number(value), false, newYaxisList) : null;
+          //       },
+          //     }
+          //   : null,
         },
         rightValue: {
           // min: rightMinValue > 0 ? 0 : rightMinValue,

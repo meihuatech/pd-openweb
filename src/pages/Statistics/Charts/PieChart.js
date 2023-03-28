@@ -45,6 +45,7 @@ export default class extends Component {
     this.PieChart = null;
   }
   componentDidMount() {
+    console.log('pie chart')
     import('@antv/g2plot').then(data => {
       this.PieComponent = data.Pie;
       this.renderPieChart();
