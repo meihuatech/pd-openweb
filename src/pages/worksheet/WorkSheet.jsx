@@ -103,6 +103,7 @@ class WorkSheet extends Component {
   // 提交浏览日志
   saveViewLog(params) {
     const appPkg = store.getState().appPkg;
+    // console.log('app pkg', appPkg, store.getState())
     const pathname = location.pathname
     if (!appPkg.appGroups) {
       return
@@ -113,9 +114,10 @@ class WorkSheet extends Component {
     this.originPathname = pathname
     let { appId, groupId, worksheetId } = params;
     const appGroups = appPkg.appGroups || []
-    const appGroup = appGroups[0] || {}
+    const appGroup = appGroups.find(item => item.appSectionId === groupId) || {}
     const worksheetItem = (appGroup.workSheetInfo || []).find(item => item.workSheetId === worksheetId) || {}
     const referrerSource = getCookie(md.staticglobal.CookieKeys.LOREAL_SSO_SOURCE)
+    const querySourceFrom = getCookie(md.staticglobal.CookieKeys.LOREAL_SSO_FROM)
     // const lorealSSOInfo = localStorage.getItem(md.staticglobal.StorageKeys.LOREAL_SSO_INFO)
     const lorealSSOInfo = getCookie(md.staticglobal.CookieKeys.LOREAL_SSO)
     const lorInfo = lorealSSOInfo ? JSON.parse(lorealSSOInfo) : {}
@@ -124,11 +126,11 @@ class WorkSheet extends Component {
       sourceFrom: 'tool',
     }
     const ssoInfo = referrerSource === 'tool' ? toolInfo : lorInfo
-    // console.log('worksheet appGroups', this.props, appGroup, worksheetId,worksheetItem)
+    // console.log('worksheet appGroups', this.props, appGroup,appId,groupId, worksheetId,worksheetItem)
     saveLog({
       type: 'View',
       email: ssoInfo.username,
-      refferr: ssoInfo.sourceFrom,
+      refferr: ssoInfo.sourceFrom || querySourceFrom,
       section: appGroup.name,
       page: `${appGroup.name} - ${worksheetItem.workSheetName}`,
     })
