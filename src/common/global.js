@@ -167,6 +167,7 @@ md.staticglobal = md.global = {
   CookieKeys: {
     LOREAL_SSO: 'lor_sso',
     LOREAL_SSO_SOURCE: 'lor_sso_source',
+    LOREAL_SSO_FROM: 'lor_sso_from',
   },
 
   StorageKeys: {

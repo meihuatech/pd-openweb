@@ -5,12 +5,13 @@ const toolReferrer = 'https://tool.mohodata.com'
 const referrers = [lorealReferrer, toolReferrer]
 // console.log('loreal referrer',document.referrer)
 
-const { token } = getRequest();
+const { token, from } = getRequest();
 // const token = 'E5/OJ/9mhD+pUeMV+i7TNR/8aK1dtu+fs0KkB4/dSUZiAMcvTYlLiFWSUxCoNmdfAItmZ2tazj6q78zuD1PJtFBWRhj863cVZz6Cx+FHOJrXtsxhV/mda4Go+iZQCsbDXWzMPdw5onhE9dZs2/9/D667xc/l7UDuIgmUo5uFrZk='
 
 const rsaKey = 'MIICdwIBADANBgkqhkiG9w0BAQEFAASCAmEwggJdAgEAAoGBAKZvIfkdPN7xIzA/sFeIVEqzhfeQNWZbp5qshVjp/FmJf6z33cUJgznUNt9LDzuMKwEH5lMLefgk0W0yVehLc7NdtIq7uzwWjxkYLGmsITJD235/R+BnlL1olFbsnpUpTDrTs6joVrXyiviS75oILiZrDY1mABJ+dYgptrZnxAPdAgMBAAECgYAhEUGBukJm1Sg1pOHHcmm08dgzKK7DaIBzZcWUteCSdZQtbI3eYRZ2fehtEv+yyBWfPc+QPl58Y+xMMs0Iuz0AWs1XRNQkPLlsCrISPWFkbjinC2+ZGQgihFvHqgkxi+CWdxET4XLvyKhg7V648SBELwA//XqHaKe8Fr/JBsM9LQJBAOFt9g4Y9xwgTFoTQ9ceKPk48k5hvVYpX8AWwiNI7FL210RdzHgQTUkqNPKEj4TnXwBOC9gkS+0ZmGmvY4M0IIsCQQC9ARRPqwRgVxL3vaETPqaaanNqv1EKq9d3GPA7NhfHwy+zwXbcoL6WEXEn08RExYE5O/ooQyIknSLMjgrTfdI3AkBc4u5MCMVpdXWAeAewD+FaL7jHy0Y0xn+Jqtb7qwSVethgdzXVEwKFbzq54x0v6hYfDgmbWflfDPjcM0SRv1zZAkEAgqpIXHui3ufT2SpkPWXG0GJfwKDbakE7CL9Y9daDwjsSs3dAsW7/08fjLuGcgt74Y5UvcL5Y0G9CK6DXozcNKQJBAM7XWqvsgyDyorGGQ/fEnbVzPQItCt27mZo6OM1w5lAGbbhVKaT7QOSuCvZXyeXJ1dCRxZS4GZnijwyNkCAzSNI='
 
 const referrerValue = getReferrerValue()
+const fromSource = from || ''
 
 function isReferrer() {
   const referrer = document.referrer
@@ -87,9 +88,14 @@ function saveLocal(saveInfo) {
   sourceExpire.setFullYear(sourceExpire.getFullYear() + 100)
   setCookie(md.staticglobal.CookieKeys.LOREAL_SSO, JSON.stringify(saveInfo), expire)
   setCookie(md.staticglobal.CookieKeys.LOREAL_SSO_SOURCE, referrerValue, sourceExpire)
+  setCookie(md.staticglobal.CookieKeys.LOREAL_SSO_FROM, fromSource, sourceExpire)
   // localStorage.setItem(md.staticglobal.StorageKeys.LOREAL_SSO_INFO, JSON.stringify(saveInfo))
   setTimeout(() => {
-    location.href = '/app/31ec8d09-d39f-4683-8fb3-b60974963bf3/'
+    if (fromSource === 'retailers') {
+      location.href = '/app/31ec8d09-d39f-4683-8fb3-b60974963bf3/63f57c4a9649172b3e2b7d57/63f57e499649172b3e2b7d58?from=insite'
+    } else {
+      location.href = '/app/31ec8d09-d39f-4683-8fb3-b60974963bf3/'
+    }
   }, 100)
 }
 
