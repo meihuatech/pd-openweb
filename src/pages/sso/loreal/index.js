@@ -49,7 +49,7 @@ function decodeRsa() {
         saveLog({
           email: resData.username,
           remark: '登录token 时间：' + resData.timestamp,
-          refferr: resData.sourceFrom,
+          refferr: resData.sourceFrom || fromSource,
         })
         saveLocal(saveInfo)
       } else {
