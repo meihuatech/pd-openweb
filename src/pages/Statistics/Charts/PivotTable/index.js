@@ -238,9 +238,10 @@ export default class extends Component {
 
     // console.log('lines', lines)
     // console.log('reportData', reportData)
-
+    // console.log('result', result)
     const maxYearQuarter = result.reduce((max, item) => {
-      return max > item.y[0] ? max : item.y[0]
+      const nextQuarter = item.y[0]
+      return nextQuarter.includes('H') ? max : max > nextQuarter ? max : nextQuarter
     }, '')
     
     const getTitle = (id, data) => {
