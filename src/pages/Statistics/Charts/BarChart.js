@@ -290,7 +290,9 @@ export default class extends Component {
             const { dot } = _.find(yaxisList, { controlId: id }) || {};
             return {
               name,
-              value: _.isNumber(value) ? value.toLocaleString('zh', { minimumFractionDigits: dot }) : '--'
+              // 图表tooltip强制保留1位小数
+              value: _.isNumber(value) ? value.toLocaleString('zh', { maximumFractionDigits: 1, minimumFractionDigits: 1 }) : '--'
+              // value: _.isNumber(value) ? value.toLocaleString('zh', { minimumFractionDigits: dot }) : '--'
             }
           }
         }

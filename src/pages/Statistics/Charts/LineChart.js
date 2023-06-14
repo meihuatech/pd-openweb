@@ -333,7 +333,9 @@ export default class extends Component {
             // console.log('line chart formatter dot', dot, value ,groupName, name)
             return {
               name,
-              value: _.isNumber(value) ? value.toLocaleString('zh', { minimumFractionDigits: dot }) : '--'
+              // 图表tooltip强制保留1位小数
+              value: _.isNumber(value) ? value.toLocaleString('zh', { maximumFractionDigits: 1, minimumFractionDigits: 1 }) : '--'
+              // value: _.isNumber(value) ? value.toLocaleString('zh', { minimumFractionDigits: dot }) : '--'
             }
           }
         }

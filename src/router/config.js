@@ -290,6 +290,7 @@ const withoutHeaderPathList = [
   'role',
 ];
 const withoutChatPathList = [
+  'app',
   'demo',
   'chat',
   'apps/kcupload',
