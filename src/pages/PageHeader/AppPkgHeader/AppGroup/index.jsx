@@ -74,7 +74,8 @@ export default class extends Component {
       appId = md.global.Account.appId;
     }
     if (!appId) return;
-    api.getAppInfo({ appId }).then(({ appRoleType, isLock, appSectionDetail: data = [] }) => {
+    // api.getAppInfo({ appId }).then(({ appRoleType, isLock, appSectionDetail: data = [] }) => {
+    api.getAppInfo({ appId }).then(({ appRoleType, isLock, sections: data = [] }) => {
       const isCharge = isHaveCharge(appRoleType, isLock);
       data = isCharge
         ? data

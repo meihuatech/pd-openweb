@@ -213,8 +213,9 @@ export default {
   * @returns {Promise<Boolean, ErrorModel>}
   **/
    getAppInfo: function (args, options = {}) {
-     
-     return $.api('HomeApp', 'GetAppInfo', args, options);
+    //  console.log('getAppInfo', args, options)
+    //  return $.api('HomeApp', 'GetAppInfo', args, options);
+     return $.api('HomeApp', 'GetApp', {...args, getManager: true, getSection: true,}, options);
    },
   /**
   * 获取应用下所有工作表信息
@@ -279,7 +280,8 @@ export default {
   **/
    getAppDetail: function (args, options = {}) {
      
-     return $.api('HomeApp', 'GetAppDetail', args, options);
+    //  return $.api('HomeApp', 'GetAppDetail', args, options);
+     return $.api('HomeApp', 'GetApp', {...args, getManager: true, getSection: true,}, options);
    },
   /**
   * 验证应用有效性
