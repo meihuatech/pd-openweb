@@ -44,7 +44,7 @@ function getGlobalMeta({ allownotlogin, transfertoken } = {}, cb = () => {}) {
     }
     if (!data['md.global'].Account) {
       const host = location.host;
-      const url = `?ReturnUrl=${encodeURIComponent(location.href)}`;
+      const url = `?ReturnUrl=${encodeURIComponent(location.href)}&v=${+new Date()}`;
       location.href = `${window.subPath || ''}/network${url}`;
       return;
     }
