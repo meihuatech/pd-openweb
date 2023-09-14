@@ -80,6 +80,8 @@ class LoginContainer extends React.Component {
     $('html').addClass('loginContainerCon');
     document.title = _l('登录');
 
+    let loginData = this.state.loginData
+
     const lorSSO = getCookie(md.staticglobal.CookieKeys.LOREAL_SSO)
     if (!lorSSO) {
       // location.href = '/404'
@@ -91,14 +93,20 @@ class LoginContainer extends React.Component {
       }
       return
     } else {
+      loginData = {
+        ...loginData,
+        emailOrTel: 'loreal.CFR@meihua.info', // 邮箱或手机
+        password: 'Loreal2023~', // 8-20位，需包含字母和数字
+      }
       this.setState({
-        loginData: {
-          ...this.state.loginData,
-          // emailOrTel: '420089327@qq.com', // 邮箱或手机
-          // password: 'loreal02', // 8-20位，需包含字母和数字
-          emailOrTel: 'loreal.CFR@meihua.info', // 邮箱或手机
-          password: 'Loreal2023~', // 8-20位，需包含字母和数字
-        },
+        loginData,
+        // loginData: {
+        //   ...this.state.loginData,
+        //   // emailOrTel: '420089327@qq.com', // 邮箱或手机
+        //   // password: 'loreal02', // 8-20位，需包含字母和数字
+        //   emailOrTel: 'loreal.CFR@meihua.info', // 邮箱或手机
+        //   password: 'Loreal2023~', // 8-20位，需包含字母和数字
+        // },
       });
     }
     
@@ -132,7 +140,8 @@ class LoginContainer extends React.Component {
     if (loginName) {
       this.setState({
         loginData: {
-          ...this.state.loginData,
+          // ...this.state.loginData,
+          ...loginData,
           // emailOrTel: loginName,
           fullName: loginLDAPName,
         },
