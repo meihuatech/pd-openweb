@@ -240,7 +240,7 @@ export default class extends Component {
     // console.log('reportData', reportData)
     // console.log('result', result)
     const maxYearQuarter = result.reduce((max, item) => {
-      const nextQuarter = item.y[0]
+      const nextQuarter = item.y[0] || ''
       return nextQuarter.includes('H') ? max : max > nextQuarter ? max : nextQuarter
     }, '')
     
