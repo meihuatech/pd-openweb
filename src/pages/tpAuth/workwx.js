@@ -1,5 +1,5 @@
 import { getRequest } from 'src/util';
-import DoT from '@mdfe/dot';
+import DoT from 'dot';
 import loginController from 'src/api/login';
 import './style.css';
 import tpl from './tpl/noticeMessage.html';
@@ -26,7 +26,7 @@ WorkWeiXin.options = {
 };
 
 WorkWeiXin.init = function () {
-  $('#app').after(`<div class="header">
+  $('#app').append(`<div class="header">
     <div class="content">
         <a href="/home" target="_blank" class="InlineBlock">
             <div class="mingdaoLogo"></div>

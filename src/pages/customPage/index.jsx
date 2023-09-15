@@ -11,8 +11,9 @@ import update from 'immutability-helper';
 import ConfigHeader from './ConfigHeader';
 import WebLayout from './webLayout';
 import * as actions from './redux/action';
-import { updateSheetList } from 'src/pages/worksheet/redux/actions/sheetList';
+import { updateSheetListAppItem } from 'src/pages/worksheet/redux/actions/sheetList';
 import { enumWidgetType, reorderComponents, fillObjectId } from './util';
+import { reportTypes } from 'statistics/Charts/common';
 import MobileLayout from './mobileLayout';
 import { formatControlsData } from 'src/pages/widgetConfig/util/data';
 import { formatValuesOfCondition } from 'src/pages/worksheet/common/WorkSheetFilter/util';
@@ -47,7 +48,7 @@ const CustomPageWrap = styled.div`
 
 const mapStateToProps = ({ customPage, sheet }) => ({ ...customPage, ...sheet.base });
 
-const mapDispatchToProps = dispatch => bindActionCreators({ ...actions, updateSheetList }, dispatch);
+const mapDispatchToProps = dispatch => bindActionCreators({ ...actions, updateSheetListAppItem }, dispatch);
 
 @connect(mapStateToProps, mapDispatchToProps)
 export default class CustomPage extends Component {
@@ -63,7 +64,8 @@ export default class CustomPage extends Component {
   }
 
   getPageData = () => {
-    const { pageId, updatePageInfo, updateLoading } = this.props;
+    const { ids, updatePageInfo, updateLoading } = this.props;
+    const pageId = ids.worksheetId;
     updateLoading(true);
     customApi
       .getPage({ appId: pageId })
@@ -331,7 +333,7 @@ export default class CustomPage extends Component {
           return sheetApi.saveFiltersGroup({
             ...filter,
             appId: ids.appId,
-            pageId: ids.pageId,
+            pageId: ids.worksheetId,
             filters: filters.map(item => {
               return {
                 ...item,
@@ -402,9 +404,28 @@ export default class CustomPage extends Component {
     return components.map(item => _.omit(item, 'uuid'));
   };
 
+  // 找到透视表，保存管理员列宽的配置
+  savePivotTableColumnWidthConfig = components => {
+    return components.map(item => {
+      if (item.type === enumWidgetType.analysis && item.reportType === reportTypes.PivotTable) {
+        const columnWidthConfig = sessionStorage.getItem(`pivotTableColumnWidthConfig-${item.value}`) || undefined;
+        return {
+          ...item,
+          config: {
+            ...item.config,
+            columnWidthConfig
+          }
+        }
+      } else {
+        return item;
+      }
+    });
+  }
+
   @autobind
   async handleSave() {
-    const { version, pageId, components, updatePageInfo, updateSaveLoading } = this.props;
+    const { version, ids, components, updatePageInfo, updateSaveLoading } = this.props;
+    const pageId = ids.worksheetId;
 
     updateSaveLoading(true);
 
@@ -413,6 +434,7 @@ export default class CustomPage extends Component {
     newComponents = await this.fillBtnData(newComponents);
     newComponents = await this.fillFilterData(newComponents);
     newComponents = await this.fillFilterComponent(newComponents);
+    newComponents = this.savePivotTableColumnWidthConfig(newComponents);
     newComponents = this.dealComponentUUId(newComponents);
 
     customApi
@@ -428,14 +450,13 @@ export default class CustomPage extends Component {
           this.removeFiltersGroup();
           this.$originComponents = components;
           updatePageInfo({ components, pageId, version, modified: false });
-          this.handleBack();
-          alert(_l('保存成功'));
+          alert(_l('保存成功'), 1);
         } else {
-          alert(_l('保存失败'));
+          alert(_l('保存失败'), 2);
         }
       })
       .fail(() => {
-        alert(_l('保存失败'));
+        alert(_l('保存失败'), 2);
       })
       .always(() => updateSaveLoading(false));
   }
@@ -456,13 +477,14 @@ export default class CustomPage extends Component {
   };
 
   render() {
-    const { loading, ...rest } = this.props;
+    const { loading, name, ...rest } = this.props;
     const { displayType } = this.state;
     const Comp = TYPE_TO_COMP[displayType];
     return (
       <CustomPageWrap className="customPageWrap">
         <ConfigHeader
           {...rest}
+          pageName={name}
           displayType={displayType}
           cancelModified={this.cancelModified}
           switchType={this.switchType}

@@ -1,4 +1,4 @@
-import React, { useState, useReducer, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useReducer, useMemo, useEffect, useRef, useCallback } from 'react';
 import PropTypes, { func } from 'prop-types';
 import cx from 'classnames';
 import styled from 'styled-components';
@@ -8,7 +8,8 @@ import update from 'immutability-helper';
 import withClickAway from 'ming-ui/decorators/withClickAway';
 import createDecoratedComponent from 'ming-ui/decorators/createDecoratedComponent';
 import { replaceByIndex, emitter } from 'worksheet/util';
-import { WORKSHEETTABLE_FROM_MODULE } from 'worksheet/constants/enum';
+import { getFilter } from 'src/pages/worksheet/common/WorkSheetFilter/util';
+import { WORKSHEETTABLE_FROM_MODULE, RECORD_INFO_FROM, ROW_HEIGHT } from 'worksheet/constants/enum';
 import { controlState } from 'src/components/newCustomFields/tools/utils';
 import Skeleton from 'src/router/Application/Skeleton';
 import { Input } from 'ming-ui';
@@ -17,7 +18,7 @@ import { SYSTEM_CONTROL } from 'src/pages/widgetConfig/config/widget';
 import RecordInfoWrapper from 'worksheet/common/recordInfo/RecordInfoWrapper';
 import { selectRecord } from 'src/components/recordCardListDialog';
 import Pagination from 'worksheet/components/Pagination';
-import WorksheetTable from 'worksheet/components/WorksheetTable/V2';
+import WorksheetTable from 'worksheet/components/WorksheetTable';
 import ColumnHead from './RelateRecordTableColumnHead';
 import RowHead from './RelateRecordTableRowHead';
 import RelateRecordBtn from './RelateRecordBtn';
@@ -26,6 +27,8 @@ import { getWorksheetInfo, updateRecordControl, updateRelateRecords } from '../c
 import { isOpenPermit } from 'src/pages/FormSet/util.js';
 import { permitList } from 'src/pages/FormSet/config.js';
 import { formatSearchConfigs } from 'src/pages/widgetConfig/util';
+import { openRelateRelateRecordTable } from 'worksheet/components/RelateRecordTableDialog';
+import { addBehaviorLog } from 'src/util';
 import _ from 'lodash';
 
 const ClickAwayable = createDecoratedComponent(withClickAway);
@@ -38,7 +41,11 @@ function tableReducer(state, action) {
     }
   }
   state.lastAction = action.type;
+  state.changed = action.type !== 'RESET_CHANGED';
   switch (action.type) {
+    case 'UPDATE_VERSION':
+      updateVersion();
+      return state;
     case 'UPDATE_RECORDS':
       updateVersion();
       return update(state, { records: { $set: action.records } });
@@ -82,6 +89,11 @@ function tableReducer(state, action) {
 
 function createTableActions(dispatch) {
   return {
+    updateVersion: () => {
+      dispatch({
+        type: 'UPDATE_VERSION',
+      });
+    },
     updateRecords: (records, noUpdate) => {
       dispatch({
         type: 'UPDATE_RECORDS',
@@ -137,6 +149,38 @@ const Con = styled.div(
   ({ padding }) => `
   padding: ${typeof padding === 'string' ? padding : `${padding}px`};
   height: 56px;
+  .searchIcon {
+    position: relative;
+    right: 10px;
+    z-index: 2;
+    .icon-search {
+      position: relative;
+      margin: 5px 0 0;
+    }
+    .searchInput {
+      font-size: 0px;
+      overflow: hidden;
+      background: #eaeaea;
+      height: 28px;
+      border-radius: 28px;
+      input {
+        width: 150px;
+        margin-left: 30px;
+        padding-left: 0px;
+        height: 28px;
+        line-height: 28px;
+        font-size: 12px;
+        border: none;
+        background: transparent;
+      }
+    }
+    .clearKeywords {
+      cursor: pointer;
+      margin: 5px;
+      position: absolute;
+      right: 0px;
+    }
+  }
 `,
 );
 
@@ -150,7 +194,20 @@ const Desc = styled.div`
   font-size: 12px;
 `;
 
-function getCellWidths(control) {
+const IconBtn = styled.span`
+  color: #9e9e9e;
+  display: inline-block;
+  height: 28px;
+  font-size: 20px;
+  line-height: 28px;
+  padding: 0 4px;
+  border-radius: 5px;
+  &:hover {
+    background: #f7f7f7;
+  }
+`;
+
+function getCellWidths(control, tableControls) {
   const result = {};
   let widths = [];
   try {
@@ -158,7 +215,9 @@ function getCellWidths(control) {
   } catch (err) {}
   if (widths.length) {
     control.showControls
-      .map(scid => _.find((control.relationControls || []).concat(SYSTEM_CONTROL), c => c.controlId === scid))
+      .map(scid =>
+        _.find((tableControls || control.relationControls || []).concat(SYSTEM_CONTROL), c => c.controlId === scid),
+      )
       .filter(c => c && controlState(c).visible)
       .forEach((c, i) => {
         result[c.controlId] = widths[i];
@@ -173,32 +232,36 @@ let request;
 
 export default function RelateRecordTable(props) {
   const {
+    mode = 'recordForm',
     isSplit,
     formWidth,
     sideVisible,
     loading,
     formdata,
     recordbase,
-    recordinfo,
+    useHeight = false,
     relateRecordData = {},
     control,
     addRefreshEvents = () => {},
     setRelateNumOfControl = () => {},
     setLoading = () => {},
     onRelateRecordsChange = () => {},
+    updateLoading = () => {},
     from,
   } = props;
   const { worksheetId, recordId, isCharge, allowEdit } = recordbase;
   const allowlink = (control.advancedSetting || {}).allowlink;
-  const columnWidthsOfSetting = getCellWidths(control);
-  const [isHiddenOtherViewRecord, , onlyRelateByScanCode] = control.strDefault.split('').map(b => !!+b);
+  const rowHeight = Number((control.advancedSetting || {}).rowheight || 0);
+  const [isHiddenOtherViewRecord, , onlyRelateByScanCode] = (control.strDefault || '').split('').map(b => !!+b);
   const disabledManualWrite = onlyRelateByScanCode && control.advancedSetting.dismanual === '1';
+  const pageSize = props.pageSize || PAGE_SIZE;
+  const cache = useRef({});
   const searchRef = useRef();
   const conRef = useRef();
   const worksheetTableRef = useRef();
-  const [{ records = [], count, tableVersion, lastAction }, dispatch] = useReducer(tableReducer, {
+  const [{ records = [], count, tableVersion, changed, lastAction }, dispatch] = useReducer(tableReducer, {
     records: [],
-    count: 0,
+    count: _.isNumber(Number(control.value)) ? Number(control.value) : 0,
   });
   const tableActions = createTableActions(dispatch);
   const [layoutChanged, setLayoutChanged] = useState();
@@ -220,6 +283,8 @@ export default function RelateRecordTable(props) {
   const [refreshFlag, setRefreshFlag] = useState();
   const [highlightRows, setHighlightRows] = useState({});
   const [disableMaskDataControls, setDisableMaskDataControls] = useState({});
+  const [defaultScrollLeft, setDefaultScrollLeft] = useState(0);
+  const columnWidthsOfSetting = getCellWidths(control, tableControls);
   const isNewRecord = !recordId;
   const relateNum = useRef();
   relateNum.current = control.value;
@@ -247,20 +312,25 @@ export default function RelateRecordTable(props) {
   }
   async function loadRows({ showHideTip } = {}) {
     try {
-      if (isNewRecord) {
+      if (isNewRecord && control.type !== 51) {
         const worksheetInfo = await getWorksheetInfo({
           worksheetId: control.dataSource,
           getTemplate: true,
           getRules: true,
         });
-        const newTableControls = control.showControls
-          .map(scid => _.find(worksheetInfo.template.controls.concat(SYSTEM_CONTROL), c => c.controlId === scid))
-          .filter(c => c && controlState(c).visible);
+        const newTableControls = worksheetInfo.template.controls.concat(SYSTEM_CONTROL).filter(
+          c =>
+            c &&
+            controlState({
+              ...c,
+              controlPermissions: isHiddenOtherViewRecord
+                ? c.controlPermissions
+                : replaceByIndex(control.controlPermissions || '111', 0, '1'),
+            }).visible,
+        );
         setWorksheetOfControl(worksheetInfo);
         setTableControls(newTableControls);
-        tableActions.updateRecords(
-          relateRecordData[control.controlId] ? relateRecordData[control.controlId].value : [],
-        );
+        tableActions.updateVersion();
         setLoading(false);
         return;
       }
@@ -274,41 +344,66 @@ export default function RelateRecordTable(props) {
         controlId: control.controlId,
         pageIndex,
         keywords: keywordsForSearch,
-        pageSize: PAGE_SIZE,
+        pageSize,
         getWorksheet: pageIndex === 1,
         getRules: pageIndex === 1,
         sortId: (sortControl || {}).controlId,
         isAsc: (sortControl || {}).isAsc,
-        getType: from === 21 ? from : undefined,
+        getType: from === RECORD_INFO_FROM.DRAFT ? from : undefined,
       };
-      const isShare = /\/public\/record/.test(location.pathname) || /\/public\/view/.test(location.pathname);
-      if (isShare) {
-        args.shareId = (location.href.match(/\/public\/(record|view)\/(\w{24})/) || '')[2];
+      // 关联查询组件逻辑 begin ->
+      if (control.type === 51) {
+        let relationControls = [...tableControls];
+        let resWorksheetInfo;
+        if (_.isEmpty(relationControls)) {
+          resWorksheetInfo = await worksheetAjax.getWorksheetInfo({
+            worksheetId: control.dataSource,
+            getTemplate: true,
+          });
+          relationControls = _.get(resWorksheetInfo, 'template.controls') || [];
+        }
+        const filterControls = getFilter({
+          control: { ...control, relationControls, recordId },
+          formData: formdata,
+          filterKey: 'resultfilters',
+        });
+        cache.current.filter = filterControls;
+        args.filterControls = filterControls || [];
+        if (filterControls === false) {
+          setWorksheetOfControl(resWorksheetInfo || {});
+          setTableControls(relationControls);
+          setLoading(false);
+          setTableLoading(false);
+          return;
+        }
+      }
+      // <- end 关联查询组件逻辑
+      if (window.shareState.shareId) {
+        args.shareId = window.shareState.shareId;
       }
       request = worksheetAjax.getRowRelationRows(args);
       const res = await request;
       const newRecords = res.data;
-      const isLastPage = pageIndex === Math.ceil(res.count / PAGE_SIZE) || res.count === 0;
+      const isLastPage = pageIndex === Math.ceil(res.count / pageSize) || res.count === 0;
       let controls = tableControls.slice(0);
       if (res.worksheet) {
-        const newTableControls = control.showControls
-          .map(scid => _.find(res.worksheet.template.controls.concat(SYSTEM_CONTROL), c => c.controlId === scid))
-          .filter(
-            c =>
-              c &&
-              controlState({
-                ...c,
-                controlPermissions: isHiddenOtherViewRecord
-                  ? c.controlPermissions
-                  : replaceByIndex(control.controlPermissions || '111', 0, '1'),
-              }).visible,
-          );
+        const newTableControls = res.worksheet.template.controls.concat(SYSTEM_CONTROL).filter(
+          c =>
+            c &&
+            controlState({
+              ...c,
+              controlPermissions: isHiddenOtherViewRecord
+                ? c.controlPermissions
+                : replaceByIndex(control.controlPermissions || '111', 0, '1'),
+            }).visible,
+        );
         controls = newTableControls;
         setWorksheetOfControl(res.worksheet);
         setTableControls(newTableControls);
       }
       if (
         isHiddenOtherViewRecord &&
+        _.get(control, 'advancedSetting.showcount') !== '1' &&
         showHideTip &&
         !keywordsForSearch &&
         isLastPage &&
@@ -326,14 +421,23 @@ export default function RelateRecordTable(props) {
         });
       }
       tableActions.updateRecords(newRecords);
-      setPageIndexForHead(pageIndex);
       tableActions.updateCount(res.count);
+      setPageIndexForHead(pageIndex);
       setLoading(false);
       setTableLoading(false);
+      updateLoading(false);
     } catch (err) {
       console.log(err);
     }
   }
+  cache.current.loadRows = loadRows;
+  const debounceLoadRows = useCallback(
+    _.debounce(() => {
+      setTableLoading(true);
+      cache.current.loadRows();
+    }, 400),
+    [],
+  );
   async function deleteRelateRow(deleteRecordId, slient) {
     try {
       if (recordId) {
@@ -345,6 +449,8 @@ export default function RelateRecordTable(props) {
           updateType: from,
         });
         loadRows();
+        tableActions.addCount(-1);
+        setRelateNumOfControl(count - 1);
         if (!slient) {
           alert(_l('取消关联成功！'));
         }
@@ -372,13 +478,69 @@ export default function RelateRecordTable(props) {
     }
   }
   useEffect(() => {
-    tableActions.updateRecords(relateRecordData[control.controlId] ? relateRecordData[control.controlId].value : []);
-  }, [relateRecordData[control.controlId]]);
-  useEffect(() => {
-    if (isNewRecord) {
+    setTableControls([]);
+    if ((isNewRecord || from === RECORD_INFO_FROM.DRAFT) && control.type !== 51) {
       loadRows({ showHideTip: true });
     }
-  }, [control.controlId, _.isEmpty(relateRecordData)]);
+    setFixedColumnCount(Number(control.advancedSetting.fixedcolumncount || 0));
+    setDefaultScrollLeft(0);
+  }, [control.controlId]);
+  /**
+   * 关联查询的记录加载逻辑
+   * - 初始化时
+   * - 切换控件
+   * - 切换记录
+   * - 依赖的动态值变更了
+   * - 刷新
+   */
+  useEffect(() => {
+    function updateCurrent() {
+      cache.current.recordId = recordId;
+      cache.current.refreshFlag = refreshFlag;
+      cache.current.controlId = control.controlId;
+      cache.current.pageIndex = pageIndex;
+      cache.current.keywordsForSearch = keywordsForSearch;
+    }
+    if (control.type !== 51) {
+      updateCurrent();
+      return;
+    }
+    const didMount = !cache.current.didMount; // 初始化时
+    const controlIdChanged = cache.current.controlId !== control.controlId; // 切换控件
+    const recordIdChanged = cache.current.recordId !== recordId; // 切换记录
+    const pageIndexChanged = cache.current.pageIndex !== pageIndex;
+    const keywordsChanged = cache.current.keywordsForSearch !== keywordsForSearch;
+    const needRefresh = cache.current.refreshFlag !== refreshFlag; // 刷新
+    if (didMount || controlIdChanged || recordIdChanged || needRefresh || pageIndexChanged || keywordsChanged) {
+      debounceLoadRows();
+      updateCurrent();
+      return;
+    }
+    const newFilter = getFilter({
+      control: { ...control, relationControls: tableControls, recordId },
+      formData: formdata,
+      filterKey: 'resultfilters',
+    });
+    const filterChanged = newFilter && !_.isEqual(cache.current.filter, newFilter);
+    if (filterChanged) {
+      debounceLoadRows();
+      cache.current.filter = newFilter;
+      return;
+    }
+    const filterChangToFalse = !_.isEqual(cache.current.formdata, formdata) && newFilter === false;
+    if (filterChangToFalse) {
+      tableActions.updateRecords([]);
+      tableActions.updateCount(0);
+      cache.current.filter = newFilter;
+      cache.current.formdata = formdata;
+      return;
+    }
+  });
+  useEffect(() => {
+    if (isNewRecord) {
+      tableActions.updateRecords(relateRecordData[control.controlId] ? relateRecordData[control.controlId].value : []);
+    }
+  }, [relateRecordData[control.controlId], control.controlId]);
   useEffect(() => {
     if (!isNewRecord) {
       setTableControls([]);
@@ -387,16 +549,23 @@ export default function RelateRecordTable(props) {
       setKeywords('');
       setKeywordsForSearch('');
       setSortControl();
+      dispatch({ type: 'RESET_CHANGED' });
     }
     loadSheetSwitchPermition();
     loadSheetSearchConfig();
   }, [recordId, control.controlId]);
   useEffect(() => {
-    if (!isNewRecord) {
+    if (!isNewRecord && control.type !== 51) {
       setLoading(true);
       loadRows({ showHideTip: true });
     }
   }, [recordId, control.controlId, pageIndex, sortControl, keywordsForSearch, refreshFlag]);
+  useEffect(() => {
+    if (sortControl && control.type === 51) {
+      setLoading(true);
+      loadRows({ showHideTip: true });
+    }
+  }, [sortControl]);
   useEffect(() => {
     try {
       setTimeout(() => {
@@ -415,33 +584,37 @@ export default function RelateRecordTable(props) {
       }, 100);
     }
   }, [searchVisible]);
+  function reloadTable() {
+    setLoading(true);
+    setRefreshFlag(Math.random());
+    setLayoutChanged(false);
+    setSortControl(undefined);
+    setFixedColumnCount(0);
+    setSheetHiddenColumnIds([]);
+    setSheetColumnWidths({});
+  }
   useEffect(() => {
-    addRefreshEvents('reloadRelateRecordsTable', () => {
-      setLoading(true);
-      setRefreshFlag(Math.random());
-      setLayoutChanged(false);
-      setSortControl(undefined);
-      setFixedColumnCount(0);
-      setSheetHiddenColumnIds([]);
-      setSheetColumnWidths({});
-    });
+    cache.current.didMount = true;
+    addRefreshEvents('reloadRelateRecordsTable', reloadTable);
     emitter.addListener('RELOAD_RECORD_INFO', handleUpdateRow);
     return () => {
       emitter.removeListener('RELOAD_RECORD_INFO', handleUpdateRow);
     };
   }, []);
   useEffect(() => {
-    if (_.includes(['ADD_RECORDS', 'DELETE_RECORDS', 'UPDATE_RECORD', 'UPDATE_COUNT'], lastAction)) {
+    if (_.includes(['ADD_RECORDS', 'DELETE_RECORDS', 'UPDATE_RECORD'], lastAction)) {
       if (isNewRecord) {
         onRelateRecordsChange(records);
       }
     }
   }, [records, lastAction]);
+
   useEffect(() => {
-    if (!isNewRecord) {
-      setRelateNumOfControl(count);
+    if (from === RECORD_INFO_FROM.DRAFT) {
+      onRelateRecordsChange(records);
     }
-  }, [count]);
+  }, [records]);
+
   const columns = tableControls.length
     ? tableControls
         .filter(c => !_.find(sheetHiddenColumnIds, id => c.controlId === id))
@@ -456,6 +629,10 @@ export default function RelateRecordTable(props) {
             : c,
         )
     : [{ controlId: 'tip' }];
+  const overrideColumns = overrideControls(columns);
+  const tableVisibleControls = control.showControls
+    .map(sid => _.find(overrideColumns, { controlId: sid }))
+    .filter(_.identity);
   const controlPermission = controlState(control, recordId ? 3 : 2);
   const addVisible =
     !control.disabled &&
@@ -465,7 +642,9 @@ export default function RelateRecordTable(props) {
     worksheetOfControl.allowAdd &&
     control.enumDefault2 !== 1 &&
     control.enumDefault2 !== 11 &&
-    !disabledManualWrite;
+    !disabledManualWrite &&
+    !(isNewRecord && control.type === 51) &&
+    !_.get(window, 'shareState.isPublicForm');
   const selectVisible =
     !control.disabled &&
     !_.isEmpty(worksheetOfControl) &&
@@ -473,14 +652,25 @@ export default function RelateRecordTable(props) {
     control.enumDefault2 !== 10 &&
     control.enumDefault2 !== 11 &&
     allowEdit &&
-    !disabledManualWrite;
+    !disabledManualWrite &&
+    control.type !== 51;
   const titleControl = formdata.filter(c => c.attribute === 1) || {};
   const defaultRelatedSheetValue = {
     name: titleControl.value,
     sid: recordId,
     type: 8,
     sourcevalue: JSON.stringify({
-      ..._.assign(...formdata.map(c => ({ [c.controlId]: c.value }))),
+      ..._.assign(
+        ...formdata.map(c => ({
+          [c.controlId]:
+            c.type === 29 && _.isObject(c.value) && c.value.records
+              ? JSON.stringify(
+                  // 子表使用双向关联字段作为默认值 RELATERECORD_OBJECT
+                  c.value.records.map(r => ({ sid: r.rowid, sourcevalue: JSON.stringify(r) })),
+                )
+              : c.value,
+        })),
+      ),
       [titleControl.controlId]: titleControl.value,
       rowid: recordId,
     }),
@@ -493,8 +683,11 @@ export default function RelateRecordTable(props) {
       defaultRelatedSheetValue.name = '';
     }
   }
-  const rowCount = records.length > 3 ? records.length : 3;
-  const numberWidth = String(isNewRecord ? records.length * 10 : pageIndex * PAGE_SIZE).length * 8;
+  let rowCount = records.length > 3 ? records.length : 3;
+  if (!isNewRecord && rowCount > pageSize) {
+    rowCount = pageSize;
+  }
+  const numberWidth = String(isNewRecord ? records.length * 10 : pageIndex * pageSize).length * 8;
   let rowHeadWidth = (numberWidth > 24 ? numberWidth : 24) + 32;
   function handleUpdateCell({ cell, cells, updateRecordId }, options = {}) {
     updateRecordControl({
@@ -519,7 +712,8 @@ export default function RelateRecordTable(props) {
         loading={tableLoading}
         fromModule={WORKSHEETTABLE_FROM_MODULE.RELATE_RECORD}
         fixedColumnCount={fixedColumnCount}
-        rowCount={rowCount}
+        rowCount={!useHeight ? rowCount : undefined}
+        defaultScrollLeft={defaultScrollLeft}
         allowlink={allowlink}
         viewId={control.viewId}
         sheetSwitchPermit={sheetSwitchPermit}
@@ -535,10 +729,10 @@ export default function RelateRecordTable(props) {
         worksheetId={worksheetOfControl.worksheetId}
         // rules={worksheetOfControl.rules}
         rowHeadWidth={rowHeadWidth}
-        rowHeight={34}
+        rowHeight={ROW_HEIGHT[rowHeight] || 34}
         controls={tableControls}
-        columns={overrideControls(columns)}
-        data={isNewRecord ? records : records.slice(0, PAGE_SIZE)}
+        data={isNewRecord ? records : records.slice(0, pageSize)}
+        columns={tableVisibleControls}
         sheetColumnWidths={{ ...columnWidthsOfSetting, ...sheetColumnWidths }}
         sheetViewHighlightRows={highlightRows}
         renderRowHead={({ className, style, rowIndex, row }) => (
@@ -562,24 +756,28 @@ export default function RelateRecordTable(props) {
             worksheetId={worksheetOfControl.worksheetId}
             relateRecordControlPermission={controlPermission}
             allowAdd={addVisible}
-            allowEdit={allowEdit}
+            allowEdit={allowEdit && control.type !== 51}
             pageIndex={pageIndexForHead}
-            pageSize={PAGE_SIZE}
+            pageSize={pageSize}
             recordId={recordId}
             projectId={worksheetOfControl.projectId}
             deleteRelateRow={deleteRelateRow}
             removeRecords={rows => {
+              setRelateNumOfControl(count - rows.length);
               tableActions.deleteRecord(rows.map(r => r.rowid));
             }}
             addReocord={(record, afterRecordId) => {
               setHighlightRows({ [record.rowid]: true });
+              setRelateNumOfControl(count + 1);
               tableActions.addRecords(record, afterRecordId);
             }}
             saveSheetLayout={() => {
               const newControl = _.omit(control, ['relationControls']);
               if (!_.isEmpty(sheetColumnWidths)) {
                 const newWidths = JSON.stringify(
-                  columns.map(c => ({ ...columnWidthsOfSetting, ...sheetColumnWidths }[c.controlId] || 160)),
+                  tableVisibleControls.map(
+                    c => ({ ...columnWidthsOfSetting, ...sheetColumnWidths }[c.controlId] || 160),
+                  ),
                 );
                 newControl.advancedSetting.widths = newWidths;
               }
@@ -600,7 +798,7 @@ export default function RelateRecordTable(props) {
                   setLayoutChanged(false);
                 });
             }}
-            resetSehetLayout={() => {
+            resetSheetLayout={() => {
               setLayoutChanged(false);
               setSortControl(undefined);
               setFixedColumnCount(0);
@@ -638,6 +836,14 @@ export default function RelateRecordTable(props) {
                         isAsc: newIsAsc,
                       },
                 );
+                try {
+                  const scrollX = worksheetTableRef.current.con.querySelector(`.sheetViewTable .scroll-x`);
+                  if (scrollX) {
+                    setDefaultScrollLeft(scrollX.scrollLeft);
+                  }
+                } catch (err) {
+                  console.error(err);
+                }
               }}
               hideColumn={controlId => {
                 setLayoutChanged(true);
@@ -658,6 +864,9 @@ export default function RelateRecordTable(props) {
           );
         }}
         onCellClick={(cell, row) => {
+          if (location.pathname.indexOf('public') === -1) {
+            addBehaviorLog('worksheetRecord', control.dataSource, { rowId: row.rowid }); // 埋点
+          }
           setActiveRecord({
             id: row.rowid,
             activeRelateTableControlIdOfRecord: cell.type === 29 ? cell.controlId : undefined,
@@ -666,7 +875,7 @@ export default function RelateRecordTable(props) {
         }}
         updateCell={({ cell, row }, options = {}) => {
           const dataFormat = new DataFormat({
-            data: tableControls
+            data: (_.get(worksheetOfControl, 'template.controls') || tableControls)
               .filter(c => c.advancedSetting)
               .map(c => ({ ...c, value: (row || {})[c.controlId] || c.value })),
             projectId: worksheetOfControl.projectId,
@@ -707,6 +916,8 @@ export default function RelateRecordTable(props) {
       />
     ),
     [
+      count,
+      allowEdit,
       tableVersion,
       tableLoading,
       isCharge,
@@ -715,6 +926,7 @@ export default function RelateRecordTable(props) {
       sheetHiddenColumnIds,
       fixedColumnCount,
       disableMaskDataControls,
+      control.showControls,
     ],
   );
   return (
@@ -722,7 +934,7 @@ export default function RelateRecordTable(props) {
       {control.desc && <Desc>{control.desc}</Desc>}
       <Con
         ref={conRef}
-        className="flexRow"
+        className="tableOperate flexRow"
         padding="10px 0px"
         style={{
           ...(recordId && { padding: '10px 24px' }),
@@ -741,7 +953,7 @@ export default function RelateRecordTable(props) {
                   controlId: control.controlId,
                   worksheetId,
                 },
-                defaultRelatedSheet: {
+                defaultRelatedSheet: control.type !== 51 && {
                   worksheetId,
                   relateSheetControlId: control.controlId,
                   value: defaultRelatedSheetValue,
@@ -750,6 +962,7 @@ export default function RelateRecordTable(props) {
                 showFillNext: true,
                 onAdd: record => {
                   if (record) {
+                    setRelateNumOfControl(count + 1);
                     tableActions.addRecords(record);
                   }
                 },
@@ -770,9 +983,9 @@ export default function RelateRecordTable(props) {
                 filterRowIds: [recordId].concat(recordId ? [] : records.map(r => r.rowid)),
                 onOk: async selectedRecords => {
                   try {
-                    if (!isNewRecord) {
+                    if (!isNewRecord && from !== RECORD_INFO_FROM.DRAFT) {
                       await updateRelateRecords({
-                        ...recordbase,
+                        ..._.omit(recordbase, 'appId'),
                         controlId: control.controlId,
                         isAdd: true,
                         recordIds: selectedRecords.map(c => c.rowid),
@@ -780,6 +993,7 @@ export default function RelateRecordTable(props) {
                       });
                     }
                     tableActions.addRecords(selectedRecords);
+                    setRelateNumOfControl(count + selectedRecords.length);
                     if (recordId) {
                       alert(_l('添加记录成功！'));
                     }
@@ -822,7 +1036,9 @@ export default function RelateRecordTable(props) {
                       onChange={setKeywords}
                       onKeyDown={e => {
                         if (e.keyCode === 13) {
-                          setTableLoading(true);
+                          if (control.type !== 51) {
+                            setTableLoading(true);
+                          }
                           setPageIndex(1);
                           setSortControl({});
                           setKeywordsForSearch(keywords);
@@ -844,10 +1060,33 @@ export default function RelateRecordTable(props) {
                 </div>
               )}
             </Motion>
+            {mode === 'recordForm' && from !== RECORD_INFO_FROM.DRAFT && (
+              <span
+                data-tip={_l('放大')}
+                style={{ height: 28 }}
+                onClick={() =>
+                  openRelateRelateRecordTable({
+                    title: recordbase.recordTitle,
+                    appId: recordbase.appId,
+                    viewId: recordbase.viewId,
+                    worksheetId,
+                    recordId,
+                    control,
+                    allowEdit,
+                    formdata,
+                    reloadTable,
+                  })
+                }
+              >
+                <IconBtn className="Hand ThemeHoverColor3">
+                  <i className="icon icon-worksheet_enlarge" />
+                </IconBtn>
+              </span>
+            )}
             <Pagination
               className="pagination"
               pageIndex={pageIndex}
-              pageSize={PAGE_SIZE}
+              pageSize={pageSize}
               allCount={count}
               allowChangePageSize={false}
               changePageIndex={value => {
@@ -860,16 +1099,14 @@ export default function RelateRecordTable(props) {
               }}
               onNext={() => {
                 setTableLoading(true);
-                setPageIndex(
-                  pageIndex + 1 > Math.ceil(count / PAGE_SIZE) ? Math.ceil(count / PAGE_SIZE) : pageIndex + 1,
-                );
+                setPageIndex(pageIndex + 1 > Math.ceil(count / pageSize) ? Math.ceil(count / pageSize) : pageIndex + 1);
               }}
             />
           </TableBtnCon>
         )}
       </Con>
       <div
-        className={cx({ flex: isSplit })}
+        className={cx('tableCon', { flex: isSplit })}
         style={{
           ...(recordId && { padding: '0 24px' }),
           ...(isSplit && { overflow: 'auto' }),
@@ -899,7 +1136,7 @@ export default function RelateRecordTable(props) {
             from={2}
             visible
             appId={worksheetOfControl.appId}
-            viewId={control.viewId}
+            viewId={_.get(control, 'advancedSetting.openview') || control.viewId}
             recordId={activeRecord && activeRecord.id}
             activeRelateTableControlId={activeRecord && activeRecord.activeRelateTableControlIdOfRecord}
             worksheetId={worksheetOfControl.worksheetId}

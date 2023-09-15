@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import styled from 'styled-components';
 import { Dropdown, Modal } from 'antd';
 import { v4 as uuidv4 } from 'uuid';
-import { Menu, MenuItem, Dialog } from 'ming-ui';
+import { Menu, MenuItem, Dialog, Support } from 'ming-ui';
 import { arrayMove, SortableContainer, SortableElement, SortableHandle } from 'react-sortable-hoc';
 import update from 'immutability-helper';
 import { useSetState } from 'react-use';
@@ -143,6 +143,7 @@ export default function ConfigureControl({ data, globalSheetInfo, controls, onCh
   const { appId } = globalSheetInfo;
   const $ref = useRef(null);
   const [activeWidgetIndex, setWidgetIndex] = useState(-1);
+  const [visible, setValue] = useState(false);
   const [{ selectCascadeDataSourceVisible }, setVisible] = useSetState({ selectCascadeDataSourceVisible: false });
   let dataSource = '';
   let controlName = '';
@@ -174,8 +175,8 @@ export default function ConfigureControl({ data, globalSheetInfo, controls, onCh
                   type,
                   controlId: uuidv4(),
                 };
-                // 子表表单不允许再添加子表、分段、文本识别、嵌入
-                if (_.includes([22, 34, 43, 45, 47, 49], type)) return null;
+                // 子表表单不允许再添加子表、分割线、文本识别、嵌入、查询记录
+                if (_.includes([22, 34, 43, 45, 47, 49, 51], type)) return null;
                 return (
                   <MenuItem
                     key={type}
@@ -193,14 +194,7 @@ export default function ConfigureControl({ data, globalSheetInfo, controls, onCh
                             <Fragment>
                               <div className="intro" style={{ color: '#9e9e9e' }}>
                                 {_l('在表单中显示关联的记录。如：订单关联客户')}
-                                <span
-                                  style={{
-                                    color: '#2196f3',
-                                    marginLeft: '6px',
-                                  }}
-                                >
-                                  {_l('帮助')}
-                                </span>
+                                <Support type={3} text={_l('帮助')} href={'https://help.mingdao.com/sheet11'} />
                               </div>
                               <SelectSheetFromApp
                                 globalSheetInfo={globalSheetInfo}
@@ -214,17 +208,19 @@ export default function ConfigureControl({ data, globalSheetInfo, controls, onCh
                           okText: _l('确定'),
                           onOk: () => {
                             if (dataSource) {
-                              worksheetAjax.getWorksheetInfo({ worksheetId: dataSource, getTemplate: true }).then(res => {
-                                addControl({
-                                  ...data,
-                                  controlName,
-                                  dataSource,
-                                  relationControls: (res.template || {}).controls || [],
+                              worksheetAjax
+                                .getWorksheetInfo({ worksheetId: dataSource, getTemplate: true })
+                                .then(res => {
+                                  addControl({
+                                    ...data,
+                                    controlName,
+                                    dataSource,
+                                    relationControls: (res.template || {}).controls || [],
+                                  });
                                 });
-                              });
                               return;
                             }
-                            alert(_l('没有选择工作表'));
+                            alert(_l('没有选择工作表'), 3);
                           },
                         });
                         return;
@@ -270,11 +266,11 @@ export default function ConfigureControl({ data, globalSheetInfo, controls, onCh
             const defaultData = DEFAULT_DATA.CASCADER;
             setVisible({ selectCascadeDataSourceVisible: false });
             if (!sheetId) {
-              alert(_l('没有选择工作表'));
+              alert(_l('没有选择工作表'), 3);
               return;
             }
             if (!viewId) {
-              alert(_l('没有选择视图'));
+              alert(_l('没有选择视图'), 3);
               return;
             }
             addControl({
@@ -313,7 +309,13 @@ export default function ConfigureControl({ data, globalSheetInfo, controls, onCh
               });
             }}
           />
-          <Dropdown trigger={['click']} overlay={SelectWidgetMenu} getPopupContainer={() => $ref.current}>
+          <Dropdown
+            trigger={['click']}
+            visible={visible}
+            overlay={SelectWidgetMenu}
+            onVisibleChange={value => setValue(value)}
+            getPopupContainer={() => $ref.current}
+          >
             <ControlsWrap>
               <div className="addControl" ref={$ref}>
                 <i className="icon-plus Font16" />

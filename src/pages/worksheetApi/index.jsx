@@ -18,11 +18,15 @@ import {
   appSuccessData,
   AddWorksheetParam,
   ADD_API_CONTROLS,
-  ADD_WORKSHEET_SUCCESS
+  ADD_WORKSHEET_SUCCESS,
+  WORKSHEETINFO_SUCCESS_DATA,
+  LIST_SUCCESS,
+  appRoleSuccessData2,
+  DATA_RELATIONS_SUCCESS_DATA,
+  NUMBER_SUCCESS_DATA,
 } from './config';
 import homeApp from 'src/api/homeApp';
 import { Icon, Dialog, Textarea, LoadDiv, ScrollView } from 'ming-ui';
-import color from 'color';
 import { navigateTo } from 'src/router/navigateTo';
 import Skeleton from 'src/router/Application/Skeleton';
 import noDataImg from './img/lock.png';
@@ -137,7 +141,7 @@ class WorksheetApi extends Component {
 
     Promise.all([
       // 获取应用详细信息
-      homeApp.getAppDetail(
+      homeApp.getApp(
         {
           appId: this.getId(),
         },
@@ -314,7 +318,9 @@ class WorksheetApi extends Component {
                 return (
                   <div
                     key={item.workSheetId + o.id}
-                    className={cx('worksheetApiMenuItem pLeft58 overflow_ellipsis', { active: selectId === item.workSheetId + o.id })}
+                    className={cx('worksheetApiMenuItem pLeft58 overflow_ellipsis', {
+                      active: selectId === item.workSheetId + o.id,
+                    })}
                     onClick={() => this.setSelectId({ selectId: item.workSheetId + o.id })}
                   >
                     {o.title}
@@ -333,7 +339,8 @@ class WorksheetApi extends Component {
   renderWorksheetSide() {
     const { worksheetList = [], selectId } = this.state;
     const isOpen =
-      _.findIndex(worksheetList, i => selectId.indexOf(i.workSheetId) > -1) > -1 || ['worksheetFormInfo', 'worksheetCreateForm'].indexOf(selectId) > -1;
+      _.findIndex(worksheetList, i => selectId.indexOf(i.workSheetId) > -1) > -1 ||
+      ['worksheetFormInfo', 'worksheetCreateForm'].indexOf(selectId) > -1;
     return (
       <div className="worksheetApiMenu">
         <div className="worksheetApiMenuTitle" onClick={() => this.setSelectId({ selectId: 'worksheetCreateForm' })}>
@@ -539,6 +546,8 @@ class WorksheetApi extends Component {
             sign: data[0].sign || 'SIGN',
             worksheetId: data[0].alias || data[0].worksheetId,
           },
+          successData: WORKSHEETINFO_SUCCESS_DATA,
+          errorData: appRoleErrorData,
         })}
       </Fragment>
     );
@@ -548,11 +557,69 @@ class WorksheetApi extends Component {
    * 渲染新建工作表
    */
   renderCreateWorksheet() {
-    const { data = [] } = this.state;
+    const { data = [], appInfo } = this.state;
+    const sectionIds = _.get(appInfo, 'apiResponse.sections').flatMap(l => {
+      let items = l.items.filter(it => it.type === 2);
+      if (items.length === 0) return l;
+
+      let items2 = items.map(m => {
+        return {
+          ...m,
+          keyName: `${l.name}-${m.name}`,
+        };
+      });
+
+      return [l].concat(items2);
+    });
+    const sectionIdsFlat = sectionIds.map(l => {
+      return {
+        [l.keyName || l.name]: l.id || l.sectionId,
+      };
+    });
+
+    let param = [
+      {
+        name: 'appKey',
+        required: _l('是'),
+        type: 'string',
+        desc: 'AppKey',
+      },
+      {
+        name: 'sign',
+        required: _l('是'),
+        type: 'string',
+        desc: _l('签名'),
+      },
+      {
+        name: 'name',
+        required: _l('是'),
+        type: 'string',
+        desc: _l('工作表名称'),
+      },
+      {
+        name: 'alias',
+        required: _l('否'),
+        type: 'string',
+        desc: _l('别名'),
+      },
+      {
+        name: 'sectionId',
+        required: _l('否'),
+        type: 'string',
+        desc: JSON.stringify(sectionIdsFlat),
+      },
+      {
+        name: 'controls',
+        required: _l('是'),
+        type: 'list',
+        desc: _l('控件数据'),
+      },
+    ];
+
     return (
       <Fragment>
         <div className="worksheetApiContent1">
-          <div className='Font22 bold'>{_l('新建工作表 POST')}</div>
+          <div className="Font22 bold">{_l('新建工作表 POST')}</div>
           <input
             className="mTop24 worksheetApiInput"
             value={_l('请求URL：') + data[0].apiUrl + 'worksheet/addWorksheet'}
@@ -563,7 +630,7 @@ class WorksheetApi extends Component {
             <div className="mLeft30 w14">{_l('类型')}</div>
             <div className="mLeft30 w36">{_l('说明')}</div>
           </div>
-          {AddWorksheetParam.map(o => {
+          {param.map(o => {
             return (
               <div key={o.name} className="flexRow worksheetApiLine flexRowHeight">
                 <div className="w32">{o.name}</div>
@@ -580,13 +647,14 @@ class WorksheetApi extends Component {
             sign: data[0].sign || 'SIGN',
             name: data[0].name || 'NAME',
             alias: data[0].alias,
+            sectionId: appInfo.apiResponse.sections[0].sectionId || 'sectionId',
             controls: ADD_API_CONTROLS,
           },
           successData: ADD_WORKSHEET_SUCCESS,
           errorData: appRoleErrorData,
         })}
       </Fragment>
-    )
+    );
   }
 
   /**
@@ -978,11 +1046,11 @@ class WorksheetApi extends Component {
                       showWorksheetAliasDialog: false,
                     });
                   } else if (res === 3) {
-                    alert(_l('工作表别名格式不匹配', 3));
+                    alert(_l('工作表别名格式不匹配'), 3);
                   } else if (res === 2) {
-                    alert(_l('工作表别名已存在，请重新输入', 3));
+                    alert(_l('工作表别名已存在，请重新输入'), 3);
                   } else {
-                    alert(_l('别名修改失败', 3));
+                    alert(_l('别名修改失败'), 3);
                   }
                 });
             }}
@@ -1170,11 +1238,15 @@ class WorksheetApi extends Component {
   /**
    * 渲染请求内容
    */
-  renderPostContent(item, i, otherOptions) {
+  renderPostContent(item, i, otherOptions, rightOptions = {}) {
     return (
       <Fragment>
         {this.renderLeftContent(i)}
-        {this.renderRightContent({ data: this.setCommonPostParameters(item, otherOptions) })}
+        {this.renderRightContent({
+          data: this.setCommonPostParameters(item, otherOptions),
+          errorData: appRoleErrorData,
+          ...rightOptions,
+        })}
       </Fragment>
     );
   }
@@ -1323,82 +1395,141 @@ class WorksheetApi extends Component {
    * 新建行记录
    */
   renderAddRow(item, i) {
-    return this.renderPostContent(item, i, {
-      controls: item.controls.filter(o => o.isSupport && (o.controlId.length>20 || o.controlId==="ownerid")).map(o => this.renderMapItem(o)),
-      triggerWorkflow: true,
-    });
+    return this.renderPostContent(
+      item,
+      i,
+      {
+        controls: item.controls
+          .filter(o => o.isSupport && (o.controlId.length > 20 || o.controlId === 'ownerid'))
+          .map(o => this.renderMapItem(o)),
+        triggerWorkflow: true,
+      },
+      {
+        successData: ADD_WORKSHEET_SUCCESS,
+      },
+    );
   }
 
   /**
    * 批量新建行记录
    */
   renderAddRows(item, i) {
-    return this.renderPostContent(item, i, {
-      rows: [item.controls.filter(o => o.isSupport && (o.controlId.length>20 || o.controlId==="ownerid")).map(o => this.renderMapItem(o))],
-      triggerWorkflow: true,
-    });
+    return this.renderPostContent(
+      item,
+      i,
+      {
+        rows: [
+          item.controls
+            .filter(o => o.isSupport && (o.controlId.length > 20 || o.controlId === 'ownerid'))
+            .map(o => this.renderMapItem(o)),
+        ],
+        triggerWorkflow: true,
+      },
+      {
+        successData: NUMBER_SUCCESS_DATA,
+      },
+    );
   }
 
   /**
    * 获取行记录详情
    */
   renderGetDetail(item, i) {
-    return this.renderPostContent(item, i, { rowId: _l('行记录ID'), getSystemControl: _l('是否获取系统字段，默认false') });
+    return this.renderPostContent(
+      item,
+      i,
+      {
+        rowId: _l('行记录ID'),
+        getSystemControl: _l('是否获取系统字段，默认false'),
+      },
+      { successData: LIST_SUCCESS },
+    );
   }
 
   /**
    * 获取行记录详情 post
    */
   renderGetDetailPost(item, i) {
-    return this.renderPostContent(item, i, { rowId: _l('行记录ID'), getSystemControl: _l('是否获取系统字段，默认false') });
+    return this.renderPostContent(
+      item,
+      i,
+      {
+        rowId: _l('行记录ID'),
+        getSystemControl: _l('是否获取系统字段，默认false'),
+      },
+      { successData: LIST_SUCCESS },
+    );
   }
   /**
    * 获取行记录分享链接
    */
-   renderGetRowShareLink(item, i) {
+  renderGetRowShareLink(item, i) {
     let otherOptions = {
       rowId: _l('行记录ID'),
       visibleFields: [_l('可见字段ID')],
       validTime: _l('有效时间'),
       password: _l('密码'),
     };
-    return this.renderPostContent(item, i, otherOptions);
+    return this.renderPostContent(item, i, otherOptions, {
+      successData: {
+        data: _l('链接地址'),
+        success: true,
+        error_code: 1,
+      },
+    });
   }
 
   /**
    * 更新行记录详情
    */
   renderUpdateDetail(item, i) {
-    return this.renderPostContent(item, i, {
-      rowId: _l('行记录ID'),
-      controls: item.controls.filter(o => o.isSupport && (o.controlId.length>20 || o.controlId==="ownerid")).map(o => this.renderMapItem(o)),
-      triggerWorkflow: true,
-    });
+    return this.renderPostContent(
+      item,
+      i,
+      {
+        rowId: _l('行记录ID'),
+        controls: item.controls
+          .filter(o => o.isSupport && (o.controlId.length > 20 || o.controlId === 'ownerid'))
+          .map(o => this.renderMapItem(o)),
+        triggerWorkflow: true,
+      },
+      { successData: appRoleSuccessData2 },
+    );
   }
 
   /**
    * 批量更新行记录详情
    */
   renderUpdateDetails(item, i) {
-    return this.renderPostContent(item, i, {
-      rowIds: [_l('行记录ID'), _l('行记录ID')],
-      control: item.controls.filter(o => o.isSupport).map(o => this.renderMapItem(o))[0],
-      triggerWorkflow: true,
-    });
+    return this.renderPostContent(
+      item,
+      i,
+      {
+        rowIds: [_l('行记录ID'), _l('行记录ID')],
+        control: item.controls.filter(o => o.isSupport).map(o => this.renderMapItem(o))[0],
+        triggerWorkflow: true,
+      },
+      { successData: appRoleSuccessData2 },
+    );
   }
 
   /**
    * 删除行记录
    */
   renderDel(item, i) {
-    return this.renderPostContent(item, i, {
-      rowId: _l('行记录ID，多个用逗号(,)隔开'),
-      triggerWorkflow: true,
-    });
+    return this.renderPostContent(
+      item,
+      i,
+      {
+        rowId: _l('行记录ID，多个用逗号(,)隔开'),
+        triggerWorkflow: true,
+      },
+      { successData: appRoleSuccessData2 },
+    );
   }
 
   /**
-   * 获取相关记录
+   * 获取关联记录
    */
   renderRelation(item, i) {
     let otherOptions = {};
@@ -1407,7 +1538,7 @@ class WorksheetApi extends Component {
         otherOptions[obj.name] = obj.desc;
       }
     });
-    return this.renderPostContent(item, i, otherOptions);
+    return this.renderPostContent(item, i, otherOptions, { successData: DATA_RELATIONS_SUCCESS_DATA });
   }
 
   /**
@@ -1446,7 +1577,9 @@ class WorksheetApi extends Component {
         },
       ],
     };
-    return this.renderPostContent(item, i, otherOptions);
+    return this.renderPostContent(item, i, otherOptions, {
+      successData: NUMBER_SUCCESS_DATA,
+    });
   }
 
   /**
@@ -1474,7 +1607,7 @@ class WorksheetApi extends Component {
       };
     });
 
-    return this.renderPostContent(item, i, otherOptions);
+    return this.renderPostContent(item, i, otherOptions, { successData: LIST_SUCCESS });
   }
 
   /**
@@ -1573,7 +1706,7 @@ class WorksheetApi extends Component {
               <span
                 className="appIconWrapIcon"
                 style={{
-                  backgroundColor: color(dataApp.iconColor),
+                  backgroundColor: dataApp.iconColor,
                 }}
                 onClick={() => {
                   navigateTo(`/app/${this.getId()}`);

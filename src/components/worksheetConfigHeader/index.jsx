@@ -4,6 +4,7 @@ import { Button, Tabs } from 'ming-ui';
 import { navigateTo } from 'src/router/navigateTo';
 import './index.less';
 import { toEditWidgetPage } from '../../pages/widgetConfig/util';
+import WidgetAiRecommend from 'src/pages/widgetConfig/Header/WidgetAiRecommend';
 
 /**
  * 控件配置地址
@@ -73,7 +74,7 @@ export default class WorksheetConfigHeader extends Component {
   }
 
   render() {
-    const { showSaveButton, saveLoading, worksheetName, statusText, onBack, onSave, onClose } = this.props;
+    const { showSaveButton, saveLoading, worksheetName, onBack, onSave, onClose, showAiBtn } = this.props;
     return (
       <div className="worksheetConfigHeader">
         <div className="customHeadBox flexRow">
@@ -81,9 +82,9 @@ export default class WorksheetConfigHeader extends Component {
             <i className="ming Icon icon icon-knowledge-return" />
           </span>
           <div className="editDetailWrap">
-            <div onClick={onBack}>
+            <div onClick={onBack} className="flexCenter">
               <span className="bold pointer">{_l('正在编辑表单：')}</span>
-              <span className="overflow_ellipsis pointer" style={{ maxWidth: '360px' }}>
+              <span className="overflow_ellipsis pointer InlineBlock" style={{ maxWidth: '360px' }}>
                 {worksheetName}
               </span>
             </div>
@@ -100,6 +101,7 @@ export default class WorksheetConfigHeader extends Component {
               this.handleRedirect(tab.value);
             }}
           />
+          {showAiBtn && <WidgetAiRecommend {...this.props} />}
           <Button className="closeConfigPage" onClick={onClose}>
             {_l('关闭')}
           </Button>

@@ -48,7 +48,7 @@ export default class Start extends Component {
   /**
    * 获取动作详情
    */
-  getNodeDetail = (appId, fields) => {
+  getNodeDetail = ({ appId = undefined, fields = undefined } = {}) => {
     const { processId, selectNodeId, selectNodeType, flowInfo, isIntegration } = this.props;
 
     flowNode
@@ -57,12 +57,20 @@ export default class Start extends Component {
         { isIntegration },
       )
       .then(result => {
-        if (result.appType === APP_TYPE.LOOP && !result.executeTime) {
-          result.executeTime = moment().format('YYYY-MM-DD 08:00');
-        }
-
         if (result.appType === APP_TYPE.PBC && !flowInfo.child && !result.controls.length) {
           result.controls = [{ controlId: uuidv4(), controlName: '', type: 2, alias: '', required: false, desc: '' }];
+        }
+
+        if (result.appType === APP_TYPE.APPROVAL_START && fields) {
+          result = Object.assign(this.state.data, { fields: result.fields, flowNodeMap: result.flowNodeMap });
+        }
+
+        if (
+          result.appType === APP_TYPE.APPROVAL_START &&
+          (!result.processConfig.userTaskNullMaps || result.processConfig.userTaskNullMaps[0])
+        ) {
+          result.processConfig.userTaskNullMaps = { [result.processConfig.userTaskNullPass ? 1 : 3]: [] };
+          result.processConfig.userTaskNullPass = false;
         }
 
         this.setState({ data: result });
@@ -85,8 +93,10 @@ export default class Start extends Component {
     const { data, saveRequest } = this.state;
     // 处理按时间触发时间日期
     const isDateField =
-      _.get(_.find(data.controls, ({ controlId }) => controlId === _.get(data, 'assignFieldId')), 'type') ===
-      START_NODE_EXECUTE_DATE_TYPE;
+      _.get(
+        _.find(data.controls, ({ controlId }) => controlId === _.get(data, 'assignFieldId')),
+        'type',
+      ) === START_NODE_EXECUTE_DATE_TYPE;
     const {
       appId,
       appType,
@@ -110,6 +120,10 @@ export default class Start extends Component {
       returnJson,
       returns = [],
       processConfig,
+      hooksAll,
+      hooksBody,
+      fields,
+      flowNodeMap,
     } = data;
     let { time } = data;
     time = isDateField ? '' : time;
@@ -124,7 +138,7 @@ export default class Start extends Component {
         return;
       }
 
-      if (appType === APP_TYPE.WEBHOOK && !data.controls.length) {
+      if (appType === APP_TYPE.WEBHOOK && !data.controls.length && close) {
         alert(_l('请设置有效的参数'), 2);
         return;
       }
@@ -138,32 +152,64 @@ export default class Start extends Component {
         return;
       }
 
-      if (returnJson && !checkJSON(returnJson)) {
+      if (!hooksAll && returnJson && !checkJSON(returnJson)) {
         alert(_l('自定义数据返回JSON格式错误，请修改'), 2);
         return;
       }
 
       if (_.includes([APP_TYPE.PBC, APP_TYPE.PARAMETER], appType)) {
+        let arrError = 0;
+        let objArrError = 0;
+
         if (controls.filter(item => !item.controlName).length) {
           alert(_l('名称不能为空'), 2);
           return;
         }
 
-        const arr = controls.filter(item => item.type === 10000003);
-        let arrError = 0;
-
-        arr.forEach(item => {
-          if (_.isEmpty(safeParse(item.value)) || !_.isArray(safeParse(item.value))) arrError++;
-        });
+        controls
+          .filter(item => item.type === 10000003)
+          .forEach(item => {
+            if (_.isEmpty(safeParse(item.value)) || !_.isArray(safeParse(item.value))) arrError++;
+          });
 
         if (arrError) {
           alert(_l('数组范例数据有错误'), 2);
+          return;
+        }
+
+        controls
+          .filter(item => item.type === 10000008)
+          .forEach(item => {
+            if (!controls.find(o => o.dataSource === item.controlId)) objArrError++;
+          });
+
+        if (objArrError) {
+          alert(_l('对象数组下至少要有一个参数'), 2);
+          return;
+        }
+
+        if (
+          controls.filter(
+            item =>
+              item.dataSource && !item.alias && controls.find(o => o.controlId === item.dataSource).type === 10000008,
+          ).length
+        ) {
+          alert(_l('对象数组下，子节点的别名为必填'), 2);
           return;
         }
       }
 
       if (appType === APP_TYPE.LOOP && executeEndTime && moment(executeTime) >= moment(executeEndTime)) {
         alert(_l('结束执行时间不能小于开始执行时间'), 2);
+        return;
+      }
+
+      if (
+        appType === APP_TYPE.APPROVAL_START &&
+        ((processConfig.initiatorMaps[5] && !processConfig.initiatorMaps[5].length) ||
+          (processConfig.userTaskNullMaps[5] && !processConfig.userTaskNullMaps[5].length))
+      ) {
+        alert(_l('必须指定代理人'), 2);
         return;
       }
     }
@@ -200,6 +246,9 @@ export default class Start extends Component {
           returnJson,
           returns: returns.filter(o => !!o.name),
           processConfig,
+          hooksBody,
+          fields,
+          flowNodeMap,
         },
         { isIntegration: this.props.isIntegration },
       )
@@ -216,7 +265,7 @@ export default class Start extends Component {
    * 切换工作表
    */
   switchWorksheet = appId => {
-    const refreshSource = () => this.getNodeDetail(appId);
+    const refreshSource = () => this.getNodeDetail({ appId });
 
     if (this.state.data.appId) {
       Dialog.confirm({
@@ -377,7 +426,12 @@ export default class Start extends Component {
                 )}
                 {data.triggerId === TRIGGER_ID.DISCUSS && <DiscussContent data={data} />}
                 {data.appType === APP_TYPE.APPROVAL_START && (
-                  <ApprovalProcess data={data} updateSource={this.updateSource} />
+                  <ApprovalProcess
+                    {...this.props}
+                    data={data}
+                    getNodeDetail={this.getNodeDetail}
+                    updateSource={this.updateSource}
+                  />
                 )}
               </Fragment>
             )}

@@ -11,12 +11,14 @@ import _ from 'lodash';
  * export const selectRole = props => functionWrap(DialogSelectOrgRole, { ...props, visibleName: 'orgRoleDialogVisible', closeFnName: 'onHide'  });
  */
 
-export default function (Comp, props) {
+export default function (Comp, props = {}) {
   const div = document.createElement('div');
   document.body.appendChild(div);
   function destory() {
     ReactDOM.unmountComponentAtNode(div);
-    document.body.removeChild(div);
+    if (div.parentElement) {
+      document.body.removeChild(div);
+    }
   }
   ReactDOM.render(
     <Comp

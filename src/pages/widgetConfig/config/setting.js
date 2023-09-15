@@ -45,6 +45,7 @@ export const UNIT_TYPE = [
   { text: _l('天'), value: '3' },
   { text: _l('时'), value: '2' },
   { text: _l('分'), value: '1' },
+  { text: _l('秒'), value: '6' },
 ];
 
 export const DEFAULT_SETTING_OPTIONS = [
@@ -82,7 +83,7 @@ export const DEFAULT_TEXT = {
     { key: '0', value: _l('关闭') },
   ],
   2: [
-    { key: '1', value: _l('是') },
+    { key: '1', value: _l('是%04015') },
     { key: '0', value: _l('否') },
   ],
 };
@@ -94,11 +95,11 @@ export const SWITCH_TYPES = [
   },
   {
     value: '1',
-    text: _l('开关'),
+    text: _l('开关%02066'),
   },
   {
     value: '2',
-    text: _l('是/否'),
+    text: _l('是/否%02067'),
   },
 ];
 
@@ -142,4 +143,18 @@ export const CUSTOM_DISPLAY = [
     text: _l('自定义规则'),
     value: 'custom',
   },
+];
+
+export const RELATION_SEARCH_DISPLAY = [
+  {
+    key: 'card',
+    text: _l('卡片'),
+    value: '1',
+  },
+  {
+    key: 'list',
+    text: _l('列表'),
+    value: '2',
+  },
+  { key: 'text', text: _l('文本'), value: '3' },
 ];

@@ -10,15 +10,21 @@ import './DialogMapping.less';
 import _ from 'lodash';
 
 export default function DialogMapping(props) {
-  const { data = {}, responseControls = [], allControls = [], onClose, onChange } = props;
+  const { data = {}, responseControls = [], originResponseControls = [], allControls = [], onClose, onChange } = props;
   const { itemsource = '' } = getAdvanceSetting(data);
   const responsemap = getAdvanceSetting(data, 'responsemap') || [];
   const [mappingData, setMappingData] = useState(responsemap);
   const dealData = dealRequestControls(responseControls, true);
-  const isBtn = data.type === 49;
+  const isBtn = data.type === 49 || data.type === 43;
   const noData = !data.dataSource || (data.dataSource && !responseControls.length);
-  const selectOptions = ((_.find(dealData, i => i.controlId === itemsource) || {}).child || []).map(i => i.controlId);
-  const selectData = responseControls
+  const selectOptions =
+    _.get(
+      _.find(originResponseControls, o => o.controlId === itemsource),
+      'type',
+    ) === 10000007
+      ? _.filter(originResponseControls, o => o.dataSource === itemsource).map(i => i.controlId)
+      : ((_.find(dealData, i => i.controlId === itemsource) || {}).child || []).map(i => i.controlId);
+  const selectData = originResponseControls
     .filter(i => _.includes(selectOptions, i.controlId))
     .map(item => ({ ...item, dataSource: '' }));
 
@@ -29,7 +35,7 @@ export default function DialogMapping(props) {
           {showSupport ? _l('将所选的数据写入表单字段') : _l('将其他返回数据写入表单字段')}
         </span>
         {showSupport && (
-          <Support className="Gray_9e" type={2} text={_l('映射规则')} href="https://help.mingdao.com/sheet47.html" />
+          <Support className="Gray_9e" type={2} text={_l('映射规则')} href="https://help.mingdao.com/sheet47" />
         )}
       </div>
     );
@@ -49,7 +55,7 @@ export default function DialogMapping(props) {
               style={{ right: 0 }}
               type={2}
               text={_l('映射规则')}
-              href="https://help.mingdao.com/sheet47.html"
+              href="https://help.mingdao.com/sheet47"
             />
           )}
         </div>
@@ -87,7 +93,7 @@ export default function DialogMapping(props) {
       const parentControl = _.find(filterSelf, i => i.controlId === parentMappingItem.cid) || {};
       filterData = getMapControls(
         item,
-        parentControl.relationControls.filter(i => !_.includes(filterSYS, i.controlId)),
+        (parentControl.relationControls || []).filter(i => !_.includes(filterSYS, i.controlId)),
       ).filter(
         i =>
           !_.includes(
@@ -255,12 +261,7 @@ export default function DialogMapping(props) {
   const renderNoData = () => {
     return (
       <div className="mappingNoDataBox">
-        <Support
-          className="Gray_9e Right"
-          type={2}
-          text={_l('映射规则')}
-          href="https://help.mingdao.com/sheet47.html"
-        />
+        <Support className="Gray_9e Right" type={2} text={_l('映射规则')} href="https://help.mingdao.com/sheet47" />
         <div className="noDataContent">{_l('没有返回参数, 请检查模版配置')}</div>
       </div>
     );

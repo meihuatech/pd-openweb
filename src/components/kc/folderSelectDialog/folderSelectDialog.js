@@ -2,7 +2,7 @@ import './folderSelectStyle.css';
 import '../layerMain.css';
 import { getClassNameByExt } from 'src/util';
 import { expireDialogAsync } from 'src/components/common/function';
-import doT from '@mdfe/dot';
+import doT from 'dot';
 import rootTpl from './tpl/rootTpl.html';
 import nodeTpl from './tpl/nodeTpl.html';
 import ajax from 'src/api/kc';
@@ -423,7 +423,7 @@ $.extend(FolderSelect.prototype, {
                 var visibleId = parseInt($this.attr('visible'));
 
                 if (!nodeData.canChangeSharable) {
-                  alert(_l('您无权限修改该文件的分享权限'));
+                  alert(_l('您无权限修改该文件的分享权限'), 3);
                   return false;
                 }
                 if ($this.hasClass('ThemeColor3')) {
@@ -1173,7 +1173,7 @@ $.extend(FolderSelect.prototype, {
         $this.remove();
       })
       .fail(function () {
-        alert(_l('创建失败'));
+        alert(_l('创建失败'), 2);
         $this.closest('li.addNewFolder').fadeOut();
       });
   }, 1000),

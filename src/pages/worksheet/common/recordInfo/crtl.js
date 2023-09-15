@@ -1,4 +1,6 @@
+import quickSelectUser from 'ming-ui/functions/quickSelectUser';
 import worksheetAjax from 'src/api/worksheet';
+import publicWorksheetApi from 'src/api/publicWorksheet';
 import { getRowDetail } from 'worksheet/api';
 import { getCustomWidgetUri } from 'src/pages/worksheet/constants/common';
 import { formatControlToServer, getTitleTextFromControls } from 'src/components/newCustomFields/tools/utils.js';
@@ -24,19 +26,20 @@ export function loadRecord({
   controls,
 }) {
   return new Promise((resolve, reject) => {
-    const apiargs = {
+    let apiargs = {
       worksheetId,
       rowId: recordId,
       getType,
       appId,
       viewId,
-      checkView: true,
+      checkView: !!viewId,
     };
     if (instanceId && workId) {
       apiargs.getType = 9;
       apiargs.instanceId = instanceId;
       apiargs.workId = workId;
     }
+
     let promise;
     if (!getRules) {
       promise = Promise.all([(promise = getRowDetail(apiargs, controls, { fireImmediately: true }))]);
@@ -52,10 +55,6 @@ export function loadRecord({
     promise
       .then(([row, rules]) => {
         if (row.resultCode === 1) {
-          if (instanceId && workId && !viewId) {
-            // 工作流调用
-            row.formData = row.formData.map(c => Object.assign({}, c, { fieldPermission: '111' }));
-          }
           resolve(rules ? { ...row, rules } : row);
         } else {
           reject(row);
@@ -77,6 +76,7 @@ export function updateRecord(
     workId,
     data,
     updateControlIds,
+    isDraft,
     triggerUniqueError,
     updateSuccess,
   },
@@ -84,8 +84,8 @@ export function updateRecord(
 ) {
   const updatedControls = data
     .filter(control => updateControlIds.indexOf(control.controlId) > -1 && control.type !== 30)
-    .map(formatControlToServer);
-  const apiargs = {
+    .map(control => formatControlToServer(control, { isDraft }));
+  let apiargs = {
     appId,
     viewId,
     getType,
@@ -100,13 +100,25 @@ export function updateRecord(
     apiargs.workId = workId;
   }
 
+  const isPublicForm = _.get(window, 'shareState.isPublicForm') && window.shareState.shareId;
+
+  if (isPublicForm) {
+    apiargs = {
+      rowId: recordId,
+      newOldControl: updatedControls,
+    };
+  }
+
   // 处理工作流的暂存直接点击的情况
   if (!updatedControls.length) {
+    if (!(instanceId && workId)) {
+      alert(_l('没有需要保存的字段'), 2);
+    }
     callback('empty');
     return;
   }
 
-  worksheetAjax
+  (isPublicForm ? publicWorksheetApi : worksheetAjax)
     .updateWorksheetRow(apiargs)
     .then(res => {
       if (res && res.data) {
@@ -292,10 +304,10 @@ export function updateRecordOwner({ worksheetId, recordId, accountId }) {
 }
 
 export function handleChangeOwner({ recordId, ownerAccountId, appId, projectId, target, changeOwner }) {
-  $(target).quickSelectUser({
+  quickSelectUser(target, {
     sourceId: recordId,
     projectId: projectId,
-    showQuickInvite: false,
+
     showMoreInvite: false,
     isTask: false,
     tabType: 3,
@@ -327,7 +339,7 @@ export function handleChangeOwner({ recordId, ownerAccountId, appId, projectId, 
   });
 }
 
-export async function handleShare({ isCharge, appId, worksheetId, viewId, recordId }, callback) {
+export async function handleShare({ isCharge, appId, worksheetId, viewId, recordId, hidePublicShare }, callback) {
   try {
     const row = await getRowDetail({ appId, worksheetId, viewId, rowId: recordId });
     let recordTitle = getTitleTextFromControls(row.formData);
@@ -338,6 +350,7 @@ export async function handleShare({ isCharge, appId, worksheetId, viewId, record
       title: _l('分享记录'),
       isPublic: shareRange === 2,
       isCharge: allowChange,
+      hidePublicShare,
       params: {
         appId,
         worksheetId,
@@ -348,7 +361,7 @@ export async function handleShare({ isCharge, appId, worksheetId, viewId, record
       getCopyContent: (type, url) => `${url} ${row.entityName}：${recordTitle}`,
     });
   } catch (err) {
-    alert(_l('分享失败'));
+    alert(_l('分享失败'), 2);
     console.log(err);
   }
 }
@@ -368,7 +381,7 @@ export async function handleCreateTask({ appId, worksheetId, viewId, recordId })
       ProjectID: row.projectId,
     });
   } catch (err) {
-    alert(_l('创建任务失败'));
+    alert(_l('创建任务失败'), 2);
     console.log(err);
   }
 }

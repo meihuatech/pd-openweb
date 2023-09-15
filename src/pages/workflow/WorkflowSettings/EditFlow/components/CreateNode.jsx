@@ -2,7 +2,6 @@ import React, { Component, Fragment } from 'react';
 import { Menu, MenuItem, Dialog, Radio } from 'ming-ui';
 import _ from 'lodash';
 import { NODE_TYPE } from '../../enum';
-import cx from 'classnames';
 
 export default class CreateNode extends Component {
   constructor(props) {
@@ -31,13 +30,16 @@ export default class CreateNode extends Component {
     }
 
     if (isAddState) {
-      return (
+      return isApproval ? (
+        <div className="workflowAddActionBox Gray_75 Font14" style={{ width: 261 }}>
+          {_l('选择要执行的动作')}
+        </div>
+      ) : (
         <div className="workflowAddActionBox Gray_75 Font14">
           {_l('选择要执行的动作，或')}
           <span className="ThemeColor3 pointer workflowCopyBtn" onClick={() => selectCopy(processId)}>
-            {_l('复制')}
+            {_l('复制已有节点')}
           </span>
-          {_l('已有节点')}
         </div>
       );
     }
@@ -50,7 +52,7 @@ export default class CreateNode extends Component {
             if (isApproval) {
               this.setState({ showOptions: true });
             } else {
-              !isCopy && selectAddNodeId(item.id, item.typeId, item.actionId);
+              !isCopy && selectAddNodeId(item.id);
             }
           }}
         >
@@ -64,19 +66,20 @@ export default class CreateNode extends Component {
    * 渲染更多操作
    */
   renderMoreOptions() {
-    const { processId, addFlowNode, item, selectAddNodeId, selectCopy, removeCopyBtn } = this.props;
+    const { item, removeCopyBtn } = this.props;
     const { showOptions } = this.state;
     const LIST = [
       { type: 4, name: _l('审批'), iconColor: '#7E57C2', iconName: 'icon-workflow_ea' },
-      { type: 3, name: _l('填写'), iconColor: '#00BCD4', iconName: 'icon-workflow_write' },
-      { type: 5, name: _l('抄送'), iconColor: '#2196f3', iconName: 'icon-workflow_notice' },
-      { type: 1, name: _l('数据分支'), iconColor: '#4C7D9E', iconName: 'icon-workflow_branch' },
+      { type: 3, name: _l('填写%03025'), iconColor: '#00BCD4', iconName: 'icon-workflow_write' },
+      { type: 5, name: _l('抄送%03026'), iconColor: '#2196f3', iconName: 'icon-workflow_notice' },
+      { type: 1, name: _l('条件分支'), iconColor: '#4C7D9E', iconName: 'icon-workflow_branch' },
       {
         type: 0,
         name: _l('审批结果分支'),
         iconColor: '#4C7D9E',
         iconName: 'icon-user_Review',
       },
+      { type: 26, name: _l('数据处理'), iconColor: '#ffa340', iconName: 'icon-workflow' },
       { type: -1, name: _l('复制'), iconColor: '#BDBDBD', iconName: 'icon-copy' },
     ];
 
@@ -95,38 +98,7 @@ export default class CreateNode extends Component {
         {LIST.map((o, i) => (
           <Fragment key={i}>
             {o.type === -1 && <div className="mTop5 mBottom5" style={{ background: '#eaeaea', height: 1 }} />}
-            <MenuItem
-              className="flexRow"
-              key={i}
-              onClick={() => {
-                if (_.includes([NODE_TYPE.WRITE, NODE_TYPE.APPROVAL, NODE_TYPE.CC], o.type)) {
-                  addFlowNode(processId, {
-                    name: o.name,
-                    prveId: item.id,
-                    typeId: o.type,
-                  });
-                } else if (o.type === NODE_TYPE.BRANCH) {
-                  // 数据分支
-                  if (!item.nextId || item.nextId === '99' || removeCopyBtn) {
-                    this.createBranchNode({ noMove: true, isResultBranch: false });
-                  } else {
-                    this.setState({ showBranchDialog: true, isOrdinary: true });
-                  }
-                } else if (o.type === 0) {
-                  // 审批结果分支
-                  if (!item.nextId || item.nextId === '99') {
-                    this.createBranchNode({ noMove: true, isResultBranch: true });
-                  } else {
-                    this.setState({ showBranchDialog: true, isOrdinary: false });
-                  }
-                } else {
-                  selectAddNodeId(item.id);
-                  selectCopy(processId);
-                }
-
-                this.setState({ showOptions: false });
-              }}
-            >
+            <MenuItem className="flexRow" key={i} onClick={() => this.moreOptionsAction(o)}>
               <i className={`Font16 ${o.iconName}`} style={{ color: o.iconColor }} />
               <span className="Font14 mLeft10 Gray">{o.name}</span>
             </MenuItem>
@@ -137,12 +109,52 @@ export default class CreateNode extends Component {
   }
 
   /**
+   * 更多操作点击
+   */
+  moreOptionsAction(o) {
+    const { processId, addFlowNode, item, selectAddNodeId, selectCopy, removeCopyBtn } = this.props;
+
+    if (_.includes([NODE_TYPE.WRITE, NODE_TYPE.APPROVAL, NODE_TYPE.CC], o.type)) {
+      addFlowNode(processId, {
+        name: o.name,
+        prveId: item.id,
+        typeId: o.type,
+      });
+    } else if (o.type === NODE_TYPE.BRANCH) {
+      // 数据分支
+      if (!item.nextId || item.nextId === '99' || removeCopyBtn) {
+        this.createBranchNode({ noMove: true, isResultBranch: false });
+      } else {
+        this.setState({ showBranchDialog: true, isOrdinary: true });
+      }
+    } else if (o.type === 0) {
+      // 审批结果分支
+      if (!item.nextId || item.nextId === '99') {
+        this.createBranchNode({ noMove: true, isResultBranch: true });
+      } else {
+        this.setState({ showBranchDialog: true, isOrdinary: false });
+      }
+    } else if (o.type === NODE_TYPE.APPROVAL_PROCESS) {
+      // 数据处理
+      selectAddNodeId(item.id, processId);
+    } else {
+      selectAddNodeId(item.id);
+      selectCopy(processId);
+    }
+
+    this.setState({ showOptions: false });
+  }
+
+  /**
    * 渲染分支
    */
   renderBranch() {
     const { moveType, isOrdinary } = this.state;
     const MOVE_TYPE = isOrdinary
-      ? [{ text: _l('左侧'), value: 1 }, { text: _l('不移动'), value: 0 }]
+      ? [
+          { text: _l('左侧'), value: 1 },
+          { text: _l('不移动'), value: 0 },
+        ]
       : [
           { text: _l('左侧（通过分支）'), value: 1 },
           { text: _l('右侧（否决分支）'), value: 2 },

@@ -539,7 +539,7 @@ export default class JSONParse extends Component {
           <Support
             type={3}
             className="workflowDialogSupport"
-            href="https://help.mingdao.com/flow75.html"
+            href="https://help.mingdao.com/flow75"
             text={_l('了解 JSON Path')}
           />
         </span>
@@ -638,6 +638,7 @@ export default class JSONParse extends Component {
    * 递归渲染列表
    */
   renderJSONList(source) {
+    const { isIntegration } = this.props;
     const { data } = this.state;
 
     return source.map(item => {
@@ -724,11 +725,24 @@ export default class JSONParse extends Component {
               />
               <Icon
                 type="add"
-                className="Font20 pointer Gray_9e ThemeHoverColor3"
+                className="Font16 pointer Gray_9e ThemeHoverColor3"
                 onClick={() => this.addParameters(item)}
               />
             </div>
           </OutputList>
+          {isIntegration && (
+            <div className={cx('mBottom10 flexRow alignItemsCenter', { pLeft20: item.dataSource })}>
+              <input
+                type="text"
+                className="ThemeBorderColor3 actionControlBox pTop0 pBottom0 pLeft10 pRight10 flex"
+                placeholder={_l('说明')}
+                value={item.desc}
+                onChange={evt => this.updateOutputParameters('desc', evt.target.value, item)}
+                onBlur={evt => this.updateOutputParameters('desc', evt.target.value.trim(), item)}
+              />
+            </div>
+          )}
+
           {this.renderJSONList(data.outputs.filter(o => o.dataSource === item.controlId))}
         </Fragment>
       );
@@ -839,7 +853,7 @@ export default class JSONParse extends Component {
           bg="BGBlueAsh"
           updateSource={this.updateSource}
         />
-        <div className="flex mTop20">
+        <div className="flex">
           <ScrollView>
             <div className="workflowDetailBox">{this.renderContent()}</div>
           </ScrollView>

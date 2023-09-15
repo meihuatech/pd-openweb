@@ -5,21 +5,32 @@ import {
   WORKFLOW_SYSTEM_CONTROL,
   WIDGETS_TO_API_TYPE_ENUM,
 } from 'src/pages/widgetConfig/config/widget';
-import { getLRUWorksheetConfig, saveLRUWorksheetConfig, clearLRUWorksheetConfig } from 'worksheet/util';
+import {
+  getLRUWorksheetConfig,
+  saveLRUWorksheetConfig,
+  clearLRUWorksheetConfig,
+  formatQuickFilter,
+} from 'worksheet/util';
 import { getNavGroupCount } from './index';
+
+const DEFAULT_PAGESIZE = 50;
 
 export const fetchRows = ({ isFirst, changeView, noLoading, noClearSelected, updateWorksheetControls } = {}) => {
   return (dispatch, getState) => {
     const { base, filters, sheetview, quickFilter, navGroupFilters } = getState().sheet;
     const { appId, viewId, worksheetId, maxCount, chartId, showAsSheetView } = base;
-    let { pageSize, pageIndex, sortControls } = sheetview.sheetFetchParams;
+    let savedPageSize = parseInt(getLRUWorksheetConfig('WORKSHEET_VIEW_PAGESIZE', viewId), 10);
+    if (_.isNaN(savedPageSize)) {
+      savedPageSize = undefined;
+    }
+    let { pageIndex, sortControls } = sheetview.sheetFetchParams;
     if (changeView) {
       pageIndex = 1;
       dispatch(resetView());
     }
     const args = {
       worksheetId,
-      pageSize,
+      pageSize: savedPageSize || DEFAULT_PAGESIZE,
       pageIndex,
       status: 1,
       appId,
@@ -28,19 +39,7 @@ export const fetchRows = ({ isFirst, changeView, noLoading, noClearSelected, upd
       sortControls,
       notGetTotal: true,
       ...filters,
-      fastFilters: quickFilter.map(f =>
-        _.pick(f, [
-          'controlId',
-          'dataType',
-          'spliceType',
-          'filterType',
-          'dateRange',
-          'value',
-          'values',
-          'minValue',
-          'maxValue',
-        ]),
-      ),
+      fastFilters: formatQuickFilter(quickFilter),
       navGroupFilters,
       isGetWorksheet: updateWorksheetControls,
       ...(showAsSheetView ? { getType: 0 } : {}),
@@ -51,6 +50,9 @@ export const fetchRows = ({ isFirst, changeView, noLoading, noClearSelected, upd
     }
     if (changeView || isFirst) {
       dispatch(setViewLayout(viewId));
+    }
+    if (savedPageSize && savedPageSize !== DEFAULT_PAGESIZE) {
+      dispatch(changePageSize(savedPageSize, args.pageIndex));
     }
     dispatch({
       type: 'WORKSHEET_SHEETVIEW_FETCH_ROWS_START',
@@ -165,8 +167,17 @@ export function updateControlOfRow({ cell = {}, cells = [], recordId }, options 
     const control = _.find(controls, { controlId });
     const newOldControl = cells
       .map(cell => {
-        const { controlId, value, editType } = cell;
+        const { controlId, editType } = cell;
+        let { value } = cell;
         const control = _.find(controls, { controlId });
+        if (control.type === 29) {
+          try {
+            const parsedValue = JSON.parse(value);
+            if (_.isArray(parsedValue) && !_.isEmpty(parsedValue) && parsedValue[0].sourcevalue) {
+              value = JSON.stringify(parsedValue.map(v => _.omit(v, 'sourcevalue')));
+            }
+          } catch (err) {}
+        }
         return (
           control && {
             ..._.pick(control, ['controlId', 'type', 'controlName', 'dot']),
@@ -292,10 +303,11 @@ export const setHighLightOfRows = (rowIds, tableId) => {
       if (_.isUndefined(rowIndex)) {
         return;
       }
-      rowIndex = rowIndex + 1;
-      $(`${tableId ? `.sheetViewTable.id-${tableId}-id` : '.sheetViewTable'} .cell.row-${rowIndex}`).addClass(
-        'highlight',
-      );
+      setTimeout(() => {
+        $(`${tableId ? `.sheetViewTable.id-${tableId}-id` : '.sheetViewTable'} .cell.row-${rowIndex}`).addClass(
+          'highlight',
+        );
+      }, 100);
       window[`sheetTableHighlightRow${tableId}`] = rowIndex;
     });
   };
@@ -376,8 +388,11 @@ export function saveSheetLayout({ closePopup = () => {} }) {
       } else {
         updates.advancedSetting = { ...view.advancedSetting, customdisplay: '1' };
         updates.showControls = controls
+          .filter(
+            c =>
+              /^\w{24}$/.test(c.controlId) || _.includes(safeParse(view.advancedSetting.sysids, 'array'), c.controlId),
+          )
           .sort((a, b) => (a.row * 10 + a.col > b.row * 10 + b.col ? 1 : -1))
-          .concat(SYSTEM_CONTROL)
           .filter(c => !_.find(sheetHiddenColumns, hcid => hcid === c.controlId))
           .map(c => c.controlId);
       }
@@ -406,7 +421,7 @@ export function saveSheetLayout({ closePopup = () => {} }) {
       });
   };
 }
-export function resetSehetLayout() {
+export function resetSheetLayout() {
   return function (dispatch, getState) {
     const { base, views } = getState().sheet;
     const { viewId } = base;
@@ -436,11 +451,11 @@ export const updateDefaultScrollLeft = value => ({
 });
 
 // 更新每页数量
-export function changePageSize(pageSize) {
+export function changePageSize(pageSize, pageIndex) {
   return function (dispatch, getState) {
     const { base } = getState().sheet;
     saveLRUWorksheetConfig('WORKSHEET_VIEW_PAGESIZE', base.viewId, pageSize);
-    dispatch({ type: 'WORKSHEET_SHEETVIEW_CHANGE_PAGESIZE', pageSize });
+    dispatch({ type: 'WORKSHEET_SHEETVIEW_CHANGE_PAGESIZE', pageSize, pageIndex });
   };
 }
 // 分页
@@ -616,7 +631,7 @@ export function addRecord(records, afterRowId) {
       const afterRowIndex = _.findIndex(rows, row => row.rowid === afterRowId);
       const newRows = _.isUndefined(afterRowId)
         ? [...records, ...rows]
-        : [...rows.slice(0, afterRowIndex + 1), ...records, ...rows.slice(afterRowIndex + records.length)];
+        : [...rows.slice(0, afterRowIndex + 1), ...records, ...rows.slice(afterRowIndex + 1)];
       dispatch({
         type: 'WORKSHEET_SHEETVIEW_UPDATE_ROWS',
         rows: newRows,

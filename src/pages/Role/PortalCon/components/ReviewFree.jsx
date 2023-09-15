@@ -120,7 +120,7 @@ const Wrap = styled.div`
 `;
 const list = ['导入Excel数据', '从工作表获取数据'];
 export default function ReviewFree(props) {
-  const { appId, projectId, onCancel, show, data, onChangePortalVersion } = props;
+  const { appId, projectId, onCancel, show, data, onChangePortalVersion, canChooseOtherApp } = props;
   const [cellConfigs, setCellConfigs] = useState([]); //免审名单
   const [controls, setControls] = useState([]);
   const [cells, setCells] = useState([]); //免审文件内容信息
@@ -161,12 +161,14 @@ export default function ReviewFree(props) {
     });
   };
   const getControls = () => {
-    externalPortalAjax.getUserCollect({
-      appId,
-      getSystem: true,
-    }).then(res => {
-      setControls(res);
-    });
+    externalPortalAjax
+      .getUserCollect({
+        appId,
+        getSystem: true,
+      })
+      .then(res => {
+        setControls(res);
+      });
   };
   //当前免审名单相关信息
   const getInfo = () => {
@@ -200,10 +202,10 @@ export default function ReviewFree(props) {
 
   const update = () => {
     if (cellConfigs.length <= 0 && status === 0 && type === 0) {
-      return alert(_l('还未设置免审'));
+      return alert(_l('还未设置免审'), 3);
     }
     if (status === 0 && type === 1 && (_.get(query, ['configs']) || []).length <= 0) {
-      return alert(_l('还未设置免审'));
+      return alert(_l('还未设置免审'), 3);
     }
     let param =
       status === 1
@@ -237,7 +239,7 @@ export default function ReviewFree(props) {
         onCancel();
         props.getInfo();
       } else {
-        alert(_l('配置失败，请稍后再试', 3));
+        alert(_l('配置失败，请稍后再试'), 3);
       }
     });
   };
@@ -291,6 +293,7 @@ export default function ReviewFree(props) {
               <ReviewFreeByWorksheetWrap
                 query={query}
                 appId={appId}
+                canChooseOtherApp={canChooseOtherApp}
                 projectId={projectId}
                 onChange={query => {
                   setQuery(query);

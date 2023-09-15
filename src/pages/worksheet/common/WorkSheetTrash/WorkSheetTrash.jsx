@@ -1,16 +1,17 @@
 import React, { useState, useReducer, useEffect, useRef } from 'react';
 import { arrayOf, bool, func, shape, string } from 'prop-types';
-import { Modal, Dialog, Checkbox } from 'ming-ui';
+import { Modal, Dialog, Checkbox, VerifyPasswordConfirm } from 'ming-ui';
 import styled from 'styled-components';
 import update from 'immutability-helper';
 import worksheetAjax from 'src/api/worksheet';
 import { controlState } from 'src/components/newCustomFields/tools/utils';
-import WorksheetTable from 'worksheet/components/WorksheetTable/V2';
+import WorksheetTable from 'worksheet/components/WorksheetTable';
 import { RowHead } from 'worksheet/components/WorksheetTable/components/';
 import ColumnHead from './TrashColumnHead';
 import TrashBatchOperate from './TrashBatchOperate';
 import Header from './Header';
 import _ from 'lodash';
+import { SHEET_VIEW_HIDDEN_TYPES } from 'worksheet/constants/enum';
 
 const Con = styled.div`
   width: 100%;
@@ -161,7 +162,12 @@ export default function WorkSheetTrash(props) {
   const hasAuthRowIds = hasAuthRows.map(item => item.rowid);
   const actions = createActions(dispatch, state);
   const controlsForShow = controls
-    .filter(column => !_.includes(['utime', 'uaid'], column.controlId) && controlState(column).visible)
+    .filter(
+      column =>
+        !_.includes(SHEET_VIEW_HIDDEN_TYPES, column.type) &&
+        !_.includes(['utime', 'uaid'], column.controlId) &&
+        controlState(column).visible,
+    )
     .map(c =>
       disableMaskDataControls[c.controlId]
         ? {
@@ -204,11 +210,12 @@ export default function WorkSheetTrash(props) {
       <Con>
         <TrashBatchOperate
           isCharge={isCharge}
-          selectedLength={selected.length}
+          isAll={isAll}
+          selectedLength={isAll ? count - selected.length : selected.length}
           totalLength={records.length}
           entityName={worksheetInfo.entityName}
           onRestore={() => {
-            if (hasAuthRowIds.length === 0) {
+            if (!isAll && hasAuthRowIds.length === 0) {
               alert(_l('无权限恢复选择的记录'), 3);
               setSelected([]);
             } else {
@@ -221,7 +228,7 @@ export default function WorkSheetTrash(props) {
                 if (isAll) {
                   delete args.rowIds;
                   args.isAll = true;
-                  args.excludeRowIds = records.filter(r => !_.includes(selected, r.rowid)).map(r => r.rowid);
+                  args.excludeRowIds = hasAuthRowIds;
                 }
                 args.restoreRelation = !!needRestoreRelation.current;
                 worksheetAjax.restoreWorksheetRows(args).then(res => {
@@ -230,7 +237,7 @@ export default function WorkSheetTrash(props) {
                     return;
                   }
                   setIsAll(false);
-                  if (res.successCount === selected.length) {
+                  if (res.successCount === selected.length || isAll) {
                     alert(_l('恢复成功'));
                     setSelected([]);
                     reloadWorksheet();
@@ -239,12 +246,14 @@ export default function WorkSheetTrash(props) {
                     alert(_l('恢复成功，部分数据已被彻底删除无法恢复'));
                     setSelected([]);
                     reloadWorksheet();
-                    loadRows({ pageIndex: 1 });
                     return;
                   }
-                  if (records.length - hasAuthRowIds === 0 && pageIndex > 1) {
-                    loadRows({ pageIndex: 1 });
-                  }
+                  setTimeout(
+                    () => {
+                      loadRows({ pageIndex: 1 });
+                    },
+                    isAll ? 1000 : 0,
+                  );
                 });
               };
               if (controls.find(c => c.type === 29)) {
@@ -267,17 +276,28 @@ export default function WorkSheetTrash(props) {
             }
           }}
           onCancel={() => {
+            setIsAll(false);
             setSelected([]);
             setSelectRows([]);
           }}
           onHardDelete={() => {
-            Dialog.confirm({
-              title: <span style={{ color: '#f44336' }}>{_l('彻底删除%0', worksheetInfo.entityName)}</span>,
-              buttonType: 'danger',
-              description: _l('记录删除后无法恢复，请确认您和工作表成员都不再需要这些记录再行删除。'),
-              okText: _l('删除'),
+            VerifyPasswordConfirm.confirm({
+              title: (
+                <div className="Bold" style={{ color: '#f44336', display: 'flex', alignItems: 'center' }}>
+                  <i className="icon-error error" style={{ fontSize: '28px', marginRight: '8px' }}></i>
+                  {_l('彻底删除%0', worksheetInfo.entityName)}
+                </div>
+              ),
+              description: (
+                <div className="Font14 Gray_75">
+                  {_l('记录删除后无法恢复，请确认您和工作表成员都不再需要这些记录再行删除。')}
+                </div>
+              ),
+              confirmType: 'danger',
+              passwordPlaceHolder: _l('请输入密码确认删除'),
+              allowNoVerify: false,
               onOk: () => {
-                if (hasAuthRowIds.length === 0) {
+                if (!isAll && hasAuthRowIds.length === 0) {
                   alert(_l('无权限删除选择的记录'), 3);
                   setSelected([]);
                 } else {
@@ -289,10 +309,10 @@ export default function WorkSheetTrash(props) {
                   if (isAll) {
                     delete args.rowIds;
                     args.isAll = true;
-                    args.excludeRowIds = records.filter(r => !_.includes(selected, r.rowid)).map(r => r.rowid);
+                    args.excludeRowIds = hasAuthRowIds;
                   }
                   worksheetAjax.removeWorksheetRows(args).then(() => {
-                    if (selectRows.length === selected.length) {
+                    if (selectRows.length === selected.length || isAll) {
                       alert(_l('删除成功'));
                     } else {
                       alert(_l('删除成功，无编辑权限的记录无法删除'));
@@ -300,6 +320,12 @@ export default function WorkSheetTrash(props) {
                     setIsAll(false);
                     setSelected([]);
                     reloadWorksheet();
+                    if (isAll) {
+                      setTimeout(() => {
+                        loadRows({ pageIndex: 1 });
+                      }, 1000);
+                      return;
+                    }
                     actions.deleteRecord(hasAuthRowIds);
                   });
                 }
@@ -330,8 +356,10 @@ export default function WorkSheetTrash(props) {
         />
         <Body>
           <WorksheetTable
+            isTrash
             loading={loading}
             viewId={viewId}
+            projectId={projectId}
             noRenderEmpty={!searchText}
             lineNumberBegin={lineNumberBegin}
             columns={controlsForShow}
@@ -382,26 +410,49 @@ export default function WorkSheetTrash(props) {
             renderRowHead={({ className, style, rowIndex, row }) => (
               <RowHead
                 isTrash
-                // canSelectAll
+                canSelectAll
                 className={className}
                 style={{ ...style, width: String(lineNumberBegin + rowIndex).length * 8 + 64 }}
                 lineNumberBegin={lineNumberBegin}
+                allWorksheetIsSelected={isAll}
                 selectedIds={selected}
                 onSelectAllWorksheet={() => {
-                  setIsAll(true);
-                  setSelected(records.map(row => row.rowid));
-                  setSelectRows(records);
+                  setIsAll(!isAll);
+                  setSelected([]);
+                  setSelectRows([]);
                 }}
                 onSelect={newSelected => {
-                  const selectRows = [];
-                  newSelected.forEach(rowId => {
-                    const row = _.find(records, trashRow => trashRow.rowid === rowId);
-                    if (row && (row.allowedit || row.allowEdit)) {
-                      selectRows.push(row);
-                    }
-                  });
+                  let newSelectRows = [];
+                  if (isAll) {
+                    newSelected.forEach(rowId => {
+                      newSelectRows = records.filter(r => _.find(newSelected, id => r.rowid !== id));
+                      newSelected = newSelectRows.map(r => r.rowid);
+                    });
+                    setIsAll(false);
+                  } else {
+                    newSelected.forEach(rowId => {
+                      const row = _.find(records, trashRow => trashRow.rowid === rowId);
+                      if (row && (row.allowedit || row.allowEdit)) {
+                        newSelectRows.push(row);
+                      }
+                    });
+                    setIsAll(false);
+                  }
                   setSelected(newSelected);
-                  setSelectRows(selectRows);
+                  setSelectRows(newSelectRows);
+                }}
+                onReverseSelect={() => {
+                  if (isAll) {
+                    setIsAll(false);
+                    setSelected([]);
+                    setSelectRows([]);
+                  } else {
+                    const newSelectedRows = records
+                      .filter(r => !_.find(selected, selectedRowId => selectedRowId === r.rowid))
+                      .filter(_.identity);
+                    setSelectRows(newSelectedRows);
+                    setSelected(newSelectedRows.map(r => r.rowid));
+                  }
                 }}
                 rowIndex={rowIndex}
                 data={records}

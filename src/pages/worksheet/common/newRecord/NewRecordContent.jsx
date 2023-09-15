@@ -25,6 +25,7 @@ import { browserIsMobile } from 'src/util';
 import './NewRecord.less';
 import { BUTTON_ACTION_TYPE } from './NewRecord';
 import _ from 'lodash';
+import { canEditData } from 'worksheet/redux/actions/util';
 
 const Con = styled.div`
   height: 100%;
@@ -59,6 +60,7 @@ function NewRecordForm(props) {
     from,
     isCustomButton,
     isCharge,
+    appPkgData,
     notDialog,
     appId,
     viewId,
@@ -75,6 +77,9 @@ function NewRecordForm(props) {
     masterRecord,
     masterRecordRowId,
     shareVisible,
+    customButtonConfirm,
+    customBtn,
+    sheetSwitchPermit,
     advancedSetting = {},
     setShareVisible = () => {},
     onSubmitBegin = () => {},
@@ -84,6 +89,7 @@ function NewRecordForm(props) {
     openRecord,
     loadDraftDataCount = () => {},
     addNewRecord = () => {},
+    hidePublicShare,
   } = props;
   const tempNewRecord = needCache && viewId && localStorage.getItem('tempNewRecord_' + viewId);
   const cache = useRef({});
@@ -190,23 +196,13 @@ function NewRecordForm(props) {
             });
             return;
           }
-          if (_.isFunction(onAdd)) {
-            onAdd([]);
-          }
           onCancel();
         },
         onSubmitEnd: () => {
           onSubmitEnd();
           setRequesting(false);
         },
-        ..._.pick(props, [
-          'notDialog',
-          'addWorksheetRow',
-          'customBtn',
-          'masterRecord',
-          'addType',
-          'updateWorksheetControls',
-        ]),
+        ..._.pick(props, ['notDialog', 'addWorksheetRow', 'masterRecord', 'addType', 'updateWorksheetControls']),
       });
       return;
     }
@@ -214,7 +210,7 @@ function NewRecordForm(props) {
     cache.current.newRecordOptions = options;
     customwidget.current.submitFormData();
   }
-  function onSave(error, { data } = {}) {
+  async function onSave(error, { data } = {}) {
     if (error) {
       onSubmitEnd();
       return;
@@ -234,7 +230,9 @@ function NewRecordForm(props) {
             getSubListError(
               {
                 ...control.value,
-                rules: _.get(cellObjs.current || {}, `${control.controlId}.cell.worksheettable.current.table.rules`),
+                rules:
+                  _.get(cellObjs.current || {}, `${control.controlId}.cell.worksheettable.current.table.rules`) ||
+                  _.get(cellObjs.current || {}, `${control.controlId}.cell.props.rules`),
               },
               _.get(cellObjs.current, `${control.controlId}.cell.state.controls`) || control.relationControls,
               control.showControls,
@@ -276,6 +274,15 @@ function NewRecordForm(props) {
     } else {
       if (requesting) {
         return false;
+      }
+      if (customButtonConfirm) {
+        try {
+          const remark = await customButtonConfirm();
+          customBtn.btnRemark = remark;
+        } catch (err) {
+          onSubmitEnd();
+          return;
+        }
       }
       setRequesting(true);
       const { autoFill, actionType, continueAdd, isContinue } = cache.current.newRecordOptions || {};
@@ -339,21 +346,15 @@ function NewRecordForm(props) {
             removeFromLocal('tempNewRecord_' + viewId);
           }
           if (_.isFunction(onAdd)) {
-            onAdd(rowData);
+            onAdd(rowData, { continueAdd: actionType === BUTTON_ACTION_TYPE.CONTINUE_ADD || continueAdd });
           }
         },
         onSubmitEnd: () => {
           onSubmitEnd();
           setRequesting(false);
         },
-        ..._.pick(props, [
-          'notDialog',
-          'addWorksheetRow',
-          'customBtn',
-          'masterRecord',
-          'addType',
-          'updateWorksheetControls',
-        ]),
+        customBtn,
+        ..._.pick(props, ['notDialog', 'addWorksheetRow', 'masterRecord', 'addType', 'updateWorksheetControls']),
       });
     }
   }
@@ -407,9 +408,11 @@ function NewRecordForm(props) {
           <Share
             title={_l('新建记录链接')}
             from="newRecord"
+            canEditForm={isCharge} //仅 管理员|开发者 可设置公开表单
             isPublic={visibleType === 2}
             publicUrl={publicShareUrl}
-            isCharge={isCharge}
+            hidePublicShare={hidePublicShare}
+            isCharge={isCharge || canEditData(appPkgData.appRoleType)} //运营者具体分享权限
             params={{
               appId,
               viewId,
@@ -425,14 +428,18 @@ function NewRecordForm(props) {
                   resolve(`${url} ${recordTitle}`);
                   return;
                 }
-                const res = await publicWorksheetAjax.getPublicWorksheetInfo({ worksheetId });
-                resolve(`${url} ${res.name}`);
+                let name = '';
+                try {
+                  const res = await publicWorksheetAjax.getPublicWorksheetInfo({ worksheetId }, { silent: true });
+                  name = res.name;
+                } catch (err) {}
+                resolve(`${url} ${name}`);
               })
             }
             onClose={() => setShareVisible(false)}
           />
         )}
-        {showTitle && <div className="newRecordTitle ellipsis Font19 mBottom10">{recordTitle}</div>}
+        {showTitle && <div className="newRecordTitle ellipsis Font19 mBottom10 Bold">{recordTitle}</div>}
         <div className="customFieldsCon" ref={formcon}>
           <RecordForm
             from={2}
@@ -446,6 +453,8 @@ function NewRecordForm(props) {
               isCharge,
               allowEdit: true,
             }}
+            sheetSwitchPermit={sheetSwitchPermit}
+            widgetStyle={worksheetInfo.advancedSetting}
             masterRecordRowId={masterRecordRowId || (masterRecord || {}).rowId}
             registerCell={({ item, cell }) => (cellObjs.current[item.controlId] = { item, cell })}
             mountRef={ref => (customwidget.current = ref.current)}
@@ -494,6 +503,15 @@ function NewRecordForm(props) {
                     } catch (err) {
                       c.value = '0';
                     }
+                  } else if (c.value === 'deleteRowIds: all') {
+                    setRelateRecordData(oldValue => ({
+                      ...oldValue,
+                      [c.controlId]: {
+                        ...c,
+                        value: [],
+                      },
+                    }));
+                    c.value = '0';
                   }
                 });
               }

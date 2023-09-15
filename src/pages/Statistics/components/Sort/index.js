@@ -181,7 +181,7 @@ export default class Sort extends Component {
       if (currentCustomSort === split.controlId) {
         this.handleChangeYSort(sortListKey, { controlId: split.controlId });
       }
-      if (rightY && rightY.split.controlId) {
+      if (rightY && currentCustomSort === rightY.split.controlId) {
         const ySameList = _.filter(yaxisList, item => _.find(rightY.yaxisList, { controlId: item.controlId })).map(
           item => item.controlId,
         );
@@ -210,7 +210,7 @@ export default class Sort extends Component {
     }
   }
   getCustomSort = (controlId, value) => {
-    const { currentReport } = this.props;
+    const { sourceType, currentReport, reportData } = this.props;
 
     this.setState({
       customSortLoading: true,
@@ -222,6 +222,9 @@ export default class Sort extends Component {
       .customSort({
         appId: currentReport.appId,
         controlId,
+        auth: reportData.auth,
+        owner: reportData.owner,
+        sourceType,
         filter: currentReport.filter,
         sort: value
       })
@@ -440,7 +443,7 @@ export default class Sort extends Component {
     const { xaxes = {}, yaxisList = [], split, rightY, pivotTable } = currentReport;
     return (
       <SortContent className="displaySetupPanel">
-        {xaxes.controlId && reportType !== reportTypes.PivotTable && this.renderItem({
+        {xaxes.controlId && ![reportTypes.PivotTable, reportTypes.TopChart].includes(reportType) && this.renderItem({
           ...xaxes,
           originalControlId: xaxes.controlId,
           controlId: xaxes.particleSizeType ? `${xaxes.controlId}-${xaxes.particleSizeType}` : xaxes.controlId,
@@ -488,6 +491,9 @@ export default class Sort extends Component {
           reportTypes.FunnelChart,
           reportTypes.DualAxes,
           reportTypes.PivotTable,
+          reportTypes.NumberChart,
+          reportTypes.BidirectionalBarChart,
+          reportTypes.TopChart
         ].includes(reportType) && (
           <Dropdown
             visible={visible}

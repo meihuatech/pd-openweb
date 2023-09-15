@@ -33,10 +33,6 @@ export const ROUTE_CONFIG = {
     component: () => import('src/pages/task/detail'),
     title: _l('任务详情'),
   },
-  taskCustomTemplate: {
-    path: '/apps/task/customTemplate/:tempId?',
-    component: () => import('src/pages/task/customTemplate'),
-  },
   task: {
     path: '/apps/(task|taskcenter)',
     component: () => import('src/pages/task'),
@@ -160,8 +156,8 @@ export const ROUTE_CONFIG = {
   },
   search: {
     path: '/search',
-    component: () => import('src/pages/SmartSearch'),
-    title: _l('智能搜索'),
+    component: () => import('src/pages/globalSearch'),
+    title: _l('超级搜索'),
   },
   admin: {
     path: '/admin/:routeType/:projectId',
@@ -223,7 +219,7 @@ export const ROUTE_CONFIG = {
     title: _l('正在导出，请稍候...'),
   },
   my: {
-    path: '/app/my/(group)?/:projectId?/:groupType?/:groupId?',
+    path: '/app/my/(group|all)?/:projectId?/:groupType?/:groupId?',
     component: () => import('src/pages/AppHomepage/AppCenter'),
     title: _l('我的应用'),
   },
@@ -242,20 +238,31 @@ export const ROUTE_CONFIG = {
     component: () => import('src/pages/Demos'),
     title: _l('应用'),
   },
+  integrationTask: {
+    path: '/integration/taskCon/:id/:type?',
+    component: () => import('src/pages/integration/dataIntegration/TaskCon'),
+    title: _l('集成中心'),
+  },
   integration: {
     path: '/integration/:type?/:listType?',
     component: () => import('src/pages/integration'),
     title: _l('集成中心'),
   },
   integrationConnect: {
-    path: '/integrationConnect/:projectId?/:id?',
-    component: () => import('src/pages/integration/integrationConnect'),
+    path: '/integrationConnect/:id?',
+    component: () => import('src/pages/integration/apiIntegration/ConnectWrap'),
     title: _l('集成中心'),
   },
   integrationApi: {
-    path: '/integrationApi/:projectId?/:apiId?',
+    path: '/integrationApi/:apiId?',
     component: () => import('src/pages/integration/integrationApi'),
     title: _l('集成中心'),
+  },
+  // 微信支付
+  wechatPay: {
+    path: '/wechatPay/:projectId/:orderId',
+    component: () => import('src/components/pay/wechatPay'),
+    title: _l('微信支付'),
   },
   default: {
     path: '/app',
@@ -269,7 +276,6 @@ const withoutHeaderPathList = [
   'apps/kcupload',
   'apps/kcshare',
   'apps/kc/shareFolder',
-  'apps/task/customTemplate',
   'apps/task/print',
   'apps/kc/shareFolder',
   'worksheet/worksheetshare',
@@ -288,6 +294,7 @@ const withoutHeaderPathList = [
   'gunterExport',
   'integrationConnect',
   'role',
+  'portaluser',
 ];
 const withoutChatPathList = [
   'app',
@@ -296,7 +303,6 @@ const withoutChatPathList = [
   'apps/kcupload',
   'apps/kcshare',
   'apps/kc/shareFolder',
-  'apps/task/customTemplate',
   'apps/task/print',
   'apps/kc/shareFolder',
   'worksheet/form/preview',
@@ -318,6 +324,8 @@ const withoutChatPathList = [
   'land',
   'integrationConnect',
   'integrationApi',
+  'portaluser',
+  'wechatPay',
 ];
 export const withoutHeaderUrl = `/(.*)(${withoutHeaderPathList.join('|')})`;
 export const withoutChatUrl = `/(.*)(${withoutChatPathList.join('|')})`;

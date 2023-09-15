@@ -4,6 +4,7 @@ import _ from 'lodash';
 
 export default function MDCell(props) {
   const {
+    isTrash,
     className,
     style,
     columnIndex,
@@ -25,6 +26,7 @@ export default function MDCell(props) {
     masterData,
     isSubList,
     rowHeight,
+    rowHeightEnum,
     updateCell = () => {},
     onCellClick = () => {},
     onFocusCell = () => {},
@@ -55,6 +57,7 @@ export default function MDCell(props) {
   };
   return (
     <CellControl
+      isTrash={isTrash}
       tableId={tableId}
       tableType={tableType}
       cache={cache}
@@ -104,6 +107,7 @@ export default function MDCell(props) {
       rowFormData={rowFormData}
       masterData={masterData}
       rowHeight={rowHeight}
+      rowHeightEnum={rowHeightEnum}
       from={from === 21 ? from : 1}
       popupContainer={() => getPopupContainer(columnIndex <= fixedColumnCount)}
       projectId={projectId}

@@ -2,7 +2,7 @@ import React, { Component, Fragment } from 'react';
 import { Icon, Tooltip } from 'ming-ui';
 import { Select } from 'antd';
 import TableCom from '../TableCom';
-import 'src/components/dialogSelectUser/dialogSelectUser';
+import dialogSelectUser from 'src/components/dialogSelectUser/dialogSelectUser';
 import appManagementAjax from 'src/api/appManagement';
 import departmentAjax from 'src/api/department';
 import UserHead from 'src/pages/feed/components/userHead';
@@ -63,7 +63,6 @@ export default class ByUser extends Component {
       list: [],
       loading: false,
       pageIndex: 1,
-      isMore: false,
       fullDepartmentInfo: {},
     };
     this.columns = [
@@ -136,6 +135,15 @@ export default class ByUser extends Component {
       {
         dataIndex: 'appAccess',
         title: _l('应用访问次数'),
+        explain: (
+          <span>
+            {_l('应用访问次数计数说明：')}
+            <br />
+            {_l('· 通过应用图标点击进入应用')}
+            <br />
+            {_l('· 通过系统消息打开了应用')}
+          </span>
+        ),
         className: 'width150',
         sorter: true,
         render: item => {
@@ -145,6 +153,13 @@ export default class ByUser extends Component {
       {
         dataIndex: 'addRow',
         title: _l('记录创建次数'),
+        explain: (
+          <span>
+            {_l('记录创建次数计数说明：')}
+            <br />
+            {_l('通过工作表表单页面创建的记录、不包含Excel导入、工作流创建、API调用的方式')}
+          </span>
+        ),
         className: 'width150',
         sorter: true,
         render: item => {
@@ -173,22 +188,24 @@ export default class ByUser extends Component {
     if (_.isEmpty(departmentIds)) {
       return;
     }
-    departmentAjax.getDepartmentFullNameByIds({
-      projectId,
-      departmentIds,
-    }).then(res => {
-      res.forEach(it => {
-        fullDepartmentInfo[it.id] = it.name;
+    departmentAjax
+      .getDepartmentFullNameByIds({
+        projectId,
+        departmentIds,
+      })
+      .then(res => {
+        res.forEach(it => {
+          fullDepartmentInfo[it.id] = it.name;
+        });
+        this.setState({ fullDepartmentInfo: fullDepartmentInfo });
       });
-      this.setState({ fullDepartmentInfo: fullDepartmentInfo });
-    });
   };
 
   updateState = () => {};
   // 筛选登录人
   handleSleelctUser = () => {
     const { projectId } = this.props;
-    $({}).dialogSelectUser({
+    dialogSelectUser({
       fromAdmin: true,
       SelectUserSettings: {
         projectId,
@@ -208,13 +225,8 @@ export default class ByUser extends Component {
   };
   getList = () => {
     const { projectId, appId } = this.props;
-    const { pageIndex, loading, isMore, sorterInfo = {}, keyword, selectedDate, userInfo = [] } = this.state;
+    const { pageIndex, sorterInfo = {}, keyword, selectedDate, userInfo = [] } = this.state;
     const { sortFiled, order } = sorterInfo;
-
-    // 加载更多
-    if (pageIndex > 1 && ((loading && isMore) || !isMore)) {
-      return;
-    }
 
     this.setState({ loading: true });
 
@@ -235,17 +247,14 @@ export default class ByUser extends Component {
     this.ajaxRequst
       .then(({ list, allCount }) => {
         this.setState({
-          list: pageIndex === 1 ? list : this.state.list.concat(list),
-          pageIndex: pageIndex + 1,
+          list,
           total: allCount,
           loading: false,
-          isMore: list.length,
         });
       })
       .fail(err => {
         this.setState({
           loading: false,
-          isMore: false,
         });
       });
   };
@@ -255,12 +264,12 @@ export default class ByUser extends Component {
     });
   };
   render() {
-    let { selectedDate, list = [], loading, pageIndex, userInfo = [] } = this.state;
+    let { selectedDate, list = [], loading, pageIndex, userInfo = [], total } = this.state;
     return (
       <ByUserWrap>
         <div className="searchWrap flexRow">
           <Select
-            className="userSelect"
+            className="userSelect mdAntSelect"
             style={{ width: '200px' }}
             value={userInfo.map(item => item.fullname).join(',') || undefined}
             placeholder={_l('搜索成员')}
@@ -282,7 +291,7 @@ export default class ByUser extends Component {
             }}
           />
           <Select
-            className="mLeft16"
+            className="mLeft16 mdAntSelect"
             style={{ width: '200px' }}
             placeholder={_l('最近30天')}
             suffixIcon={<Icon icon="arrow-down-border" className="Font18" />}
@@ -304,7 +313,7 @@ export default class ByUser extends Component {
           dataSource={list}
           columns={this.columns}
           loadNextPage={this.getList}
-          loading={loading && pageIndex === 1}
+          loading={loading}
           defaultSorter={{ sortFiled: 'appAccess', order: 'desc' }}
           dealSorter={this.dealSorter}
           emptyInfo={
@@ -315,6 +324,9 @@ export default class ByUser extends Component {
                 }
               : {}
           }
+          total={total}
+          pageIndex={pageIndex}
+          changePage={pageIndex => this.setState({ pageIndex }, this.getList)}
         />
       </ByUserWrap>
     );

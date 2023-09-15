@@ -1,4 +1,9 @@
 import appManagementAjax from 'src/api/appManagement.js';
+export const setLoading = data => {
+  return (dispatch, getState) => {
+    dispatch({ type: 'UPDATE_ROLE_LOADING', data });
+  };
+};
 //角色列表
 export const setRoleId = data => {
   return (dispatch, getState) => {
@@ -6,9 +11,10 @@ export const setRoleId = data => {
   };
 };
 
-export const setQuickTag = data => {
+export const setQuickTag = (data = {}) => {
   return (dispatch, getState) => {
     dispatch({ type: 'UPDATE_QUICKTAG', data });
+    dispatch(setRoleId(data.roleId || 'all'));
   };
 };
 //选择列表数据
@@ -65,7 +71,7 @@ export const getOutList = (props, isOut) => {
     }
     ajaxOut = appManagementAjax.getOutsourcingMembers({
       appId,
-      appRolePagingModel,
+      ..._.pick(appRolePagingModel, ['pageIndex', 'pageSize']),
     });
     ajaxOut.then(res => {
       dispatch(setOutsourcingList(res));
@@ -85,9 +91,13 @@ export const getRoleSummary = (appId, cb, loading) => {
       appId,
     });
     ajaxAppRoleSummary.then(res => {
-      dispatch(setAppRoleSummary(res.roleInfos));
+      if (!res.roleInfos) {
+        location.reload();
+        return;
+      }
+      dispatch(setAppRoleSummary(res.roleInfos || []));
       dispatch({ type: 'ROLE_UPDATE_PAGE_LOADING', data: false });
-      cb && cb(res.roleInfos);
+      cb && cb(res.roleInfos || []);
     });
   };
 };
@@ -115,45 +125,43 @@ export const getUserList = (props, isUserList) => {
   // isAllCount 用于左侧nav的计数 全部
   return (dispatch, getState) => {
     const { appRolePagingModel = {}, roleId = 'all', userList = [] } = getState().appRole;
-    const { number = 1 } = appRolePagingModel;
+    const { pageIndex = 1 } = appRolePagingModel;
     const { appId } = props;
     isUserList && dispatch({ type: 'UPDATE_ROLE_LOADING', data: true });
     if (ajax) {
       ajax.abort();
     }
     ajax = ['all', 'apply', 'outsourcing'].includes(roleId)
-      ? appManagementAjax.getTotalMemrber({
+      ? appManagementAjax.getTotalMember({
         appId,
-        appRolePagingModel,
+        ...appRolePagingModel,
       })
       : appManagementAjax.getMembersByRole({
         appId,
         roleId,
-        appRolePagingModel,
+        ...appRolePagingModel,
       });
     ajax.then(res => {
-      (['all', 'apply', 'outsourcing'].includes(roleId)) && dispatch({ type: 'UPDATE_APPUSER_LIST_ALL_TOTAL', data: res.totalCount });
+      ['all', 'apply', 'outsourcing'].includes(roleId) &&
+        dispatch({ type: 'UPDATE_APPUSER_LIST_ALL_TOTAL', data: res.totalCount });
       dispatch(setUser(res));
-      dispatch(setUserList(number > 1 ? userList.concat(res.memberModels) : res.memberModels));
+      dispatch(setUserList(pageIndex > 1 ? userList.concat(res.memberModels || []) : res.memberModels || []));
       isUserList && dispatch({ type: 'UPDATE_ROLE_LOADING', data: false });
     });
   };
 };
 
-let CountAllAjax = null
-export const getUserAllCount = (props) => {
+let CountAllAjax = null;
+export const getUserAllCount = props => {
   // isAllCount 用于左侧nav的计数 全部
   return (dispatch, getState) => {
-    // const { appRolePagingModel = {} } = getState().appRole;
     const { appId } = props;
     if (CountAllAjax) {
       CountAllAjax.abort();
     }
-    CountAllAjax =
-    appManagementAjax.getTotalMemrber({
-        appId,
-        appRolePagingModel: {},
-      });
+    CountAllAjax = appManagementAjax.getTotalMember({
+      appId,
+    });
     CountAllAjax.then(res => {
       dispatch({ type: 'UPDATE_APPUSER_LIST_ALL_TOTAL', data: res.totalCount });
     });
@@ -177,8 +185,8 @@ export const getUserAllCount = (props) => {
 //获取nav
 export const fetchAllNavCount = props => {
   return (dispatch, getState) => {
-    const { isAdmin } = props;
-    if (isAdmin) {
+    const { canEditUser } = props;
+    if (canEditUser) {
       const { roleId = 'all' } = getState().appRole;
       dispatch(getRoleSummary(props.appId));
       dispatch(getApplyList(props, ['apply'].includes(roleId)));
@@ -187,7 +195,7 @@ export const fetchAllNavCount = props => {
     } else {
       dispatch(
         getRoleSummary(props.appId, list => {
-          dispatch(setRoleId(list[0].roleId));
+          dispatch(setRoleId((list[0] || {}).roleId));
         }),
       );
     }

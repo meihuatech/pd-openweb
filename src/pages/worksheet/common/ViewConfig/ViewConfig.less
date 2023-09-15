@@ -1,5 +1,5 @@
 // @containerWidth: 360px;
-@containerWidth: 640px;
+@containerWidth: 720px;
 @transitionTime: 0.25s;
 @blue: #2196f3;
 
@@ -13,7 +13,11 @@
   background-color: #fff;
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.2), 0 3px 6px rgba(0, 0, 0, 0.15);
   z-index: 12;
-
+  .Dropdown {
+    .Menu.List {
+      margin-top: 3px;
+    }
+  }
   .ming.Dropdown,
   .dropdownTrigger {
     &.disabled {
@@ -41,7 +45,7 @@
     border-radius: 4px;
 
     .Dropdown--border {
-      border: 1px solid rgba(33, 150, 243, 0.3);
+      // border: 1px solid rgba(33, 150, 243, 0.3);
     }
 
     .Item-content {
@@ -66,7 +70,7 @@
       > li {
         display: inline-block;
         width: ~'calc(50% - 6px)';
-        height: 86px;
+        height: 106px;
         border-radius: 3px;
         position: relative;
         vertical-align: top;
@@ -100,7 +104,7 @@
         }
 
         &:last-child {
-          height: 70px;
+          height: 88px;
 
           &::before {
             background-image: url('./components/mobileSet/img/line3.png');
@@ -158,14 +162,21 @@
       }
     }
   }
-
-  .icon-close {
-    &:hover {
-      color: @blue !important;
+  .viewTitle {
+    .icon-close {
+      &:hover {
+        color: @blue !important;
+      }
     }
   }
 
   .sortConditions {
+    .icon-drag {
+      color: #9e9e9e;
+      &:hover {
+        color: #2196f3;
+      }
+    }
     .operateBtn {
       cursor: pointer;
       font-size: 20px;
@@ -186,12 +197,14 @@
   .viewSetBox {
     display: flex;
     height: 100%;
+    overflow: hidden;
   }
 
   .viewBtns {
+    height: auto;
+    overflow: auto;
     width: 200px;
     font-size: 13px;
-    // display: flex;
     align-items: center;
     justify-content: center;
     border-bottom: 1px solid #eaeaea;
@@ -240,7 +253,7 @@
       word-break: break-all;
       white-space: nowrap;
       overflow: hidden;
-      text-overflow: ellipsis;
+      // text-overflow: ellipsis;
 
       .icon {
         color: #757575;
@@ -279,14 +292,11 @@
     padding: 32px 0 0;
     .groupSelectStartOrEnd .selectStartOrEndCon {
       .dropCon {
-        width: 133px !important;
+        flex: 1;
+        flex-shrink: 0;
       }
     }
 
-    .cardAppearanceWrap {
-      // padding: 0 20px 20px 20px;
-      // margin-top: -20px;
-    }
 
     .dataSetting {
       .Radio-box {
@@ -311,10 +321,6 @@
   .viewContent {
     .viewContentCon {
       padding: 0 40px 32px;
-      // height: 100%;
-      .sortColumnWrap {
-        // padding-bottom: 40px;
-      }
       .sortColumnWrap .Dropdown--input {
         padding: 0 5px 0 12px;
       }
@@ -377,9 +383,6 @@
 
       &.exist {
         border-radius: 0;
-        // background-color: #fafafa;
-        // border-top: 1px solid #eaeaea;
-        // border-bottom: 1px solid #eaeaea;
       }
     }
   }
@@ -511,4 +514,29 @@
   max-height: 360px;
   overflow: auto;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.13), 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+.sortConditionsViewControl {
+  z-index: 1000;
+  position: fixed !important;
+  .icon-drag {
+    color: #9e9e9e;
+  }
+  .operateBtn {
+    cursor: pointer;
+    font-size: 20px;
+    color: #9e9e9e;
+    margin: 0 4px;
+    line-height: 36px;
+    &:hover {
+      color: #2196f3;
+    }
+    &.disabled {
+      color: #ddd !important;
+    }
+  }
+  .tipsIcon {
+    left: -38px;
+    line-height: 36px;
+  }
 }

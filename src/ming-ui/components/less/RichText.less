@@ -18,6 +18,65 @@
       opacity: 0;
     }
   }
+  .ck-content .image {
+    display: table;
+    clear: both;
+    text-align: center;
+    margin: 0.9em auto;
+    min-width: 50px;
+  }
+}
+
+.ck.ck-splitbutton {
+  display: flex;
+}
+.ck-content {
+  .image img {
+    display: block;
+    margin: 0 auto;
+    max-width: 100%;
+    min-width: 100%;
+  }
+  .image.image_resized {
+    box-sizing: border-box;
+    display: block;
+    max-width: 100%;
+    img {
+      width: 100%;
+    }
+  }
+  .text-huge {
+    font-size: 1.8em;
+  }
+  .text-tiny {
+    font-size: 0.7em;
+  }
+  .text-small {
+    font-size: 0.85em;
+  }
+  .text-big {
+    font-size: 1.4em;
+  }
+  .marker-yellow {
+    background-color: #fdfd77;
+  }
+  .marker-green {
+    background-color: #62f962;
+  }
+  .marker-pink {
+    background-color: #fc7899;
+  }
+  .marker-blue {
+    background-color: #72ccfd;
+  }
+  .pen-red {
+    background-color: transparent;
+    color: #e71313;
+  }
+  .pen-green {
+    background-color: transparent;
+    color: #128a00;
+  }
 }
 
 .ck.ck-editor__editable_inline {
@@ -43,10 +102,9 @@
     margin-inline-start: 0px;
     margin-inline-end: 0px;
     padding-inline-start: 40px;
-    list-style-type: disc !important;
     li {
       display: list-item !important;
-      list-style-type: disc !important;
+      list-style: inherit;
       text-align: -webkit-match-parent !important;
       ::marker {
         unicode-bidi: isolate;
@@ -59,8 +117,30 @@
     }
   }
   ol {
-    li {
-      list-style-type: decimal !important;
+    list-style-type: decimal;
+    ol {
+      list-style-type: lower-latin;
+      ol {
+        list-style-type: lower-roman;
+        ol {
+          list-style-type: upper-latin;
+          ol {
+            list-style-type: upper-roman;
+          }
+        }
+      }
+    }
+  }
+  ul {
+    list-style-type: disc;
+    ul {
+      list-style-type: circle;
+      ul {
+        list-style-type: square;
+        ul {
+          list-style-type: square;
+        }
+      }
     }
   }
   .todo-list {
@@ -79,6 +159,7 @@
       & > input {
         width: 16px !important;
         height: 16px !important;
+        left: -25px;
         cursor: pointer;
         &:hover:before {
           box-shadow: 0 0 0 5px rgba(0, 0, 0, 0.1);
@@ -103,18 +184,25 @@
         border-color: #26ab33 !important;
       }
       & > input:after {
-        top: 30%;
-        display: block;
-        position: absolute;
+        border-color: transparent;
+        border-style: solid;
+        border-width: 0 2px 2px 0;
         box-sizing: content-box;
-        pointer-events: none;
         content: ' ';
-        border-left: 0 solid transparent;
+        display: block;
+        height: 6px;
+        left: 5px;
+        pointer-events: none;
+        position: absolute;
+        top: 3px;
         transform: rotate(45deg);
+        width: 3px;
       }
       & > input[checked]:after {
         background-color: #26ab33 !important;
         border-color: #fff !important;
+        margin-top: 0;
+        opacity: 1;
       }
     }
   }

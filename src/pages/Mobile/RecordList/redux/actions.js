@@ -1,6 +1,6 @@
 import sheetAjax from 'src/api/worksheet';
 import homeAppAjax from 'src/api/homeApp';
-import { isHaveCharge } from 'src/pages/worksheet/redux/actions/util';
+import { canEditApp } from 'src/pages/worksheet/redux/actions/util';
 import { getRequest } from 'src/util';
 import _ from 'lodash';
 
@@ -25,24 +25,8 @@ export const loadWorksheet = () => (dispatch, getState) => {
     localStorage.getItem(`currentNavWorksheetInfo-${currentNavWorksheetId}`) &&
     JSON.parse(localStorage.getItem(`currentNavWorksheetInfo-${currentNavWorksheetId}`));
   if (appNaviStyle === 2 && currentNavWorksheetInfo) {
-    dispatch({
-      type: 'WORKSHEET_INIT',
-      value: {
-        ...currentNavWorksheetInfo,
-        views: currentNavWorksheetInfo.views.filter(
-          v => _.get(v, 'advancedSetting.showhide') !== 'hide' && _.get(v, 'advancedSetting.showhide') !== 'spc&happ',
-        ),
-      },
-    });
-    dispatch({
-      type: 'MOBILE_WORK_SHEET_INFO',
-      data: {
-        ...currentNavWorksheetInfo,
-        views: currentNavWorksheetInfo.views.filter(
-          v => _.get(v, 'advancedSetting.showhide') !== 'hide' && _.get(v, 'advancedSetting.showhide') !== 'spc&happ',
-        ),
-      },
-    });
+    dispatch({ type: 'WORKSHEET_INIT', value: currentNavWorksheetInfo });
+    dispatch({ type: 'MOBILE_WORK_SHEET_INFO', data: currentNavWorksheetInfo });
     dispatch({ type: 'MOBILE_WORK_SHEET_UPDATE_LOADING', loading: false });
   } else {
     dispatch({ type: 'MOBILE_WORK_SHEET_UPDATE_LOADING', loading: true });
@@ -73,24 +57,8 @@ export const loadWorksheet = () => (dispatch, getState) => {
           }
         });
       }
-      dispatch({
-        type: 'WORKSHEET_INIT',
-        value: {
-          ...workSheetInfo,
-          views: workSheetInfo.views.filter(
-            v => _.get(v, 'advancedSetting.showhide') !== 'hide' && _.get(v, 'advancedSetting.showhide') !== 'spc&happ',
-          ),
-        },
-      });
-      dispatch({
-        type: 'MOBILE_WORK_SHEET_INFO',
-        data: {
-          ...workSheetInfo,
-          views: workSheetInfo.views.filter(
-            v => _.get(v, 'advancedSetting.showhide') !== 'hide' && _.get(v, 'advancedSetting.showhide') !== 'spc&happ',
-          ),
-        },
-      });
+      dispatch({ type: 'WORKSHEET_INIT', value: workSheetInfo });
+      dispatch({ type: 'MOBILE_WORK_SHEET_INFO', data: workSheetInfo });
       dispatch({
         type: 'MOBILE_SHEET_PERMISSION_INIT',
         value: workSheetInfo.switches,
@@ -98,7 +66,7 @@ export const loadWorksheet = () => (dispatch, getState) => {
       dispatch({ type: 'MOBILE_WORK_SHEET_UPDATE_LOADING', loading: false });
     });
   homeAppAjax
-    .getAppDetail({
+    .getApp({
       appId: base.appId,
     })
     .then(data => {
@@ -113,7 +81,7 @@ export const loadWorksheet = () => (dispatch, getState) => {
           },
         },
       });
-      const isCharge = isHaveCharge(data.permissionType, data.isLock);
+      const isCharge = canEditApp(data.permissionType, data.isLock);
       dispatch({
         type: 'MOBILE_UPDATE_IS_CHARGE',
         value: isCharge,
@@ -126,9 +94,11 @@ export const loadWorksheet = () => (dispatch, getState) => {
 };
 
 export const fetchSheetRows = params => (dispatch, getState) => {
-  const { base, filters, sheetView, quickFilter, sheetFiltersGroup, mobileNavGroupFilters, sheetRowLoading } =
+  const { base, filters, sheetView, worksheetInfo = {}, quickFilter, sheetFiltersGroup, mobileNavGroupFilters, sheetRowLoading, } =
     getState().mobile;
   const { appId, worksheetId, viewId, maxCount } = base;
+  const { views = [] } = worksheetInfo;
+  const defaultViewId = _.get(views[0], 'viewId');
   const { keyWords } = filters;
   const { chartId } = getRequest();
   let { pageIndex } = sheetView;
@@ -150,7 +120,7 @@ export const fetchSheetRows = params => (dispatch, getState) => {
     pageSize,
     pageIndex,
     status: 1,
-    viewId,
+    viewId: viewId || defaultViewId,
     keyWords,
     filterControls: [],
     sortControls: [],
@@ -198,6 +168,9 @@ export const fetchSheetRows = params => (dispatch, getState) => {
     });
     dispatch({ type: 'MOBILE_FETCH_SHEETROW_SUCCESS' });
   });
+};
+export const changeMobileSheetRows = data => (dispatch, getState) => {
+  dispatch({ type: 'MOBILE_CHANGE_SHEET_ROWS', data });
 };
 
 export const unshiftSheetRow = data => (dispatch, getState) => {
@@ -267,7 +240,7 @@ export const resetSheetView = () => (dispatch, getState) => {
 };
 
 export const emptySheetRows = () => (dispatch, getState) => {
-  dispatch({ type: 'MOBILE_CHANGE_SHEET_ROWS', data: [] });
+  changeMobileSheetRows([]);
   dispatch({ type: 'MOBILE_WORK_SHEET_INFO', data: {} });
 };
 

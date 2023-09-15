@@ -71,10 +71,11 @@ export default function InvoiceSetting(props) {
             'taxRegContactPhone',
           ])
         : _.pick(data, ['companyName', 'price', 'address', 'recipientName', 'taxNumber', 'contactPhone']);
-    orderAjax.applyInvoice({ projectId, orderId, ...para, invoiceType: data.invoiceType || 1 })
+    orderAjax
+      .applyInvoice({ projectId, orderId, ...para, invoiceType: data.invoiceType || 1 })
       .then(res => {
         if (!res) {
-          alert(_l('申请失败'));
+          alert(_l('申请失败'), 2);
           return;
         }
         alert(_l('申请成功'));
@@ -96,7 +97,8 @@ export default function InvoiceSetting(props) {
             {_l('保存')}
           </Button>
         </SaveInvoice>
-      }>
+      }
+    >
       <InvoiceContentWrap>
         <ApplyInvoiceWrap>
           {applyInvoiceConfig.map(item => {
@@ -112,7 +114,7 @@ export default function InvoiceSetting(props) {
                     const value = e.target.value;
                     if (verify && value && !verify.test(value)) {
                       setData({ [key]: '' });
-                      alert(_l('%0填写格式有误', text));
+                      alert(_l('%0填写格式有误', text), 2);
                     }
                   }}
                 />
@@ -143,7 +145,7 @@ export default function InvoiceSetting(props) {
                   onBlur={e => {
                     const value = e.target.value;
                     if (verify && value && !verify.test(value)) {
-                      alert(_l('%0填写格式有误', text));
+                      alert(_l('%0填写格式有误', text), 2);
                       setData({ [key]: '' });
                     }
                   }}

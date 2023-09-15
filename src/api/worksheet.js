@@ -1,5 +1,124 @@
 export default {
   /**
+  * 生成控件默认别名
+  * @param {Object} args 请求参数
+  * @param {string} args.appId 应用id
+  * @param {string} args.worksheetId 工作表id
+  * @param {integer} args.version 版本号
+  * @param {Object} options 配置参数
+  * @param {Boolean} options.silent 是否禁止错误弹层
+  * @returns {Promise<Boolean, ErrorModel>}
+  **/
+   editGenerateControlsDefaultAlias: function (args, options = {}) {
+     
+     return $.api('Worksheet', 'EditGenerateControlsDefaultAlias', args, options);
+   },
+  /**
+  * 保存表控件
+  * @param {Object} args 请求参数
+  * @param {string} args.sourceId 兼容老数据
+  * @param {string} args.worksheetId WorksheetId
+  * @param {integer} args.version 版本号
+  * @param {array} args.controls 控件集合
+  * @param {string} args.appId 应用ID
+  * @param {string} args.controlId 控件ID
+  * @param {array} args.controlIds 控件IDs
+  * @param {integer} args.status 状态 1:恢复 999：彻底删除
+  * @param {Object} options 配置参数
+  * @param {Boolean} options.silent 是否禁止错误弹层
+  * @returns {Promise<Boolean, ErrorModel>}
+  **/
+   editWorksheetControls: function (args, options = {}) {
+     
+     return $.api('Worksheet', 'EditWorksheetControls', args, options);
+   },
+  /**
+  * 获取表格控件数量
+  * @param {Object} args 请求参数
+  * @param {string} args.worksheetId 工作表id
+  * @param {string} args.relationWorksheetId 关联表的id
+  * @param {boolean} args.getTemplate 是否获取Template
+  * @param {boolean} args.getViews 是否获取Views
+  * @param {string} args.appId 应用Id
+  * @param {boolean} args.handleDefault 处理默认值
+  * @param {} args.getControlType 0:显示控件 1：不显示控件（被动关联） 2：全部 3:全部关联控件 9:回收站的控件 11:获取表信息不处理隐藏controlSource
+  * @param {array} args.worksheetIds 批量工作表id
+  * @param {boolean} args.handControlSource 是否处理关联的原始类型
+  * @param {boolean} args.getRules 是否需要验证规则
+  * @param {boolean} args.getSwitchPermit 是否获取功能开关
+  * @param {boolean} args.getRelationSearch 获取查下记录控件
+  * @param {integer} args.resultType 获取类型 0或者1：常规 2：简易模式
+  * @param {Object} options 配置参数
+  * @param {Boolean} options.silent 是否禁止错误弹层
+  * @returns {Promise<Boolean, ErrorModel>}
+  **/
+   getWorksheetControlsQuantity: function (args, options = {}) {
+     
+     return $.api('Worksheet', 'GetWorksheetControlsQuantity', args, options);
+   },
+  /**
+  * 重置自动编号
+  * @param {Object} args 请求参数
+  * @param {string} args.sourceId 兼容老数据
+  * @param {string} args.worksheetId WorksheetId
+  * @param {integer} args.version 版本号
+  * @param {array} args.controls 控件集合
+  * @param {string} args.appId 应用ID
+  * @param {string} args.controlId 控件ID
+  * @param {array} args.controlIds 控件IDs
+  * @param {integer} args.status 状态 1:恢复 999：彻底删除
+  * @param {Object} options 配置参数
+  * @param {Boolean} options.silent 是否禁止错误弹层
+  * @returns {Promise<Boolean, ErrorModel>}
+  **/
+   resetControlIncrease: function (args, options = {}) {
+     
+     return $.api('Worksheet', 'ResetControlIncrease', args, options);
+   },
+  /**
+  * 删除autoid
+  * @param {Object} args 请求参数
+  * @param {string} args.worksheetId 工作表id
+  * @param {string} args.relationWorksheetId 关联表的id
+  * @param {boolean} args.getTemplate 是否获取Template
+  * @param {boolean} args.getViews 是否获取Views
+  * @param {string} args.appId 应用Id
+  * @param {boolean} args.handleDefault 处理默认值
+  * @param {} args.getControlType 0:显示控件 1：不显示控件（被动关联） 2：全部 3:全部关联控件 9:回收站的控件 11:获取表信息不处理隐藏controlSource
+  * @param {array} args.worksheetIds 批量工作表id
+  * @param {boolean} args.handControlSource 是否处理关联的原始类型
+  * @param {boolean} args.getRules 是否需要验证规则
+  * @param {boolean} args.getSwitchPermit 是否获取功能开关
+  * @param {boolean} args.getRelationSearch 获取查下记录控件
+  * @param {integer} args.resultType 获取类型 0或者1：常规 2：简易模式
+  * @param {Object} options 配置参数
+  * @param {Boolean} options.silent 是否禁止错误弹层
+  * @returns {Promise<Boolean, ErrorModel>}
+  **/
+   deleteWorksheetAutoID: function (args, options = {}) {
+     
+     return $.api('Worksheet', 'DeleteWorksheetAutoID', args, options);
+   },
+  /**
+  * 编辑控件状态
+  * @param {Object} args 请求参数
+  * @param {string} args.sourceId 兼容老数据
+  * @param {string} args.worksheetId WorksheetId
+  * @param {integer} args.version 版本号
+  * @param {array} args.controls 控件集合
+  * @param {string} args.appId 应用ID
+  * @param {string} args.controlId 控件ID
+  * @param {array} args.controlIds 控件IDs
+  * @param {integer} args.status 状态 1:恢复 999：彻底删除
+  * @param {Object} options 配置参数
+  * @param {Boolean} options.silent 是否禁止错误弹层
+  * @returns {Promise<Boolean, ErrorModel>}
+  **/
+   editControlsStatus: function (args, options = {}) {
+     
+     return $.api('Worksheet', 'EditControlsStatus', args, options);
+   },
+  /**
   * 获取系统打印列表
   * @param {Object} args 请求参数
   * @param {string} args.worksheetId
@@ -41,6 +160,8 @@ export default {
   * @param {string} args.appId 应用Id
   * @param {string} args.instanceId 通过工作流审批打印时必传
   * @param {string} args.workId 通过工作流审批打印时必传
+  * @param {array} args.filterControls
+  * @param {array} args.fastFilters 快递筛选
   * @param {Object} options 配置参数
   * @param {Boolean} options.silent 是否禁止错误弹层
   * @returns {Promise<Boolean, ErrorModel>}
@@ -66,6 +187,8 @@ export default {
   * @param {string} args.appId 应用Id
   * @param {string} args.instanceId 通过工作流审批打印时必传
   * @param {string} args.workId 通过工作流审批打印时必传
+  * @param {array} args.filterControls
+  * @param {array} args.fastFilters 快递筛选
   * @param {Object} options 配置参数
   * @param {Boolean} options.silent 是否禁止错误弹层
   * @returns {Promise<Boolean, ErrorModel>}
@@ -75,7 +198,7 @@ export default {
      return $.api('Worksheet', 'GetCodePrint', args, options);
    },
   /**
-  * 新建生成打印模板e
+  * 新建生成打印模板
   * @param {Object} args 请求参数
   * @param {string} args.id
   * @param {string} args.projectId
@@ -91,6 +214,8 @@ export default {
   * @param {string} args.appId 应用Id
   * @param {string} args.instanceId 通过工作流审批打印时必传
   * @param {string} args.workId 通过工作流审批打印时必传
+  * @param {array} args.filterControls
+  * @param {array} args.fastFilters 快递筛选
   * @param {Object} options 配置参数
   * @param {Boolean} options.silent 是否禁止错误弹层
   * @returns {Promise<Boolean, ErrorModel>}
@@ -334,9 +459,9 @@ export default {
   * @param {Boolean} options.silent 是否禁止错误弹层
   * @returns {Promise<Boolean, ErrorModel>}
   **/
-   updateFormSubmissionSettings: function (args, options = {}) {
+   editWorksheetSetting: function (args, options = {}) {
      
-     return $.api('Worksheet', 'UpdateFormSubmissionSettings', args, options);
+     return $.api('Worksheet', 'EditWorksheetSetting', args, options);
    },
   /**
   * 获取功能系统开关配置
@@ -718,6 +843,78 @@ export default {
      return $.api('Worksheet', 'GetApiControlDetail', args, options);
    },
   /**
+  * 更新附件排序
+  * @param {Object} args 请求参数
+  * @param {string} args.worksheetId 表id
+  * @param {string} args.rowId
+  * @param {string} args.controlId 附件控件id
+  * @param {string} args.viewId
+  * @param {array} args.fileIds 附件ids（排好序的）
+  * @param {Object} options 配置参数
+  * @param {Boolean} options.silent 是否禁止错误弹层
+  * @returns {Promise<Boolean, ErrorModel>}
+  **/
+   sortAttachment: function (args, options = {}) {
+     
+     return $.api('Worksheet', 'SortAttachment', args, options);
+   },
+  /**
+  * 更新记录附件名
+  * @param {Object} args 请求参数
+  * @param {string} args.fileId
+  * @param {string} args.fileName
+  * @param {string} args.controlId 附件的控件id
+  * @param {string} args.worksheetId 工作表id
+  * @param {string} args.rowId 行id
+  * @param {} args.getType
+  * @param {string} args.viewId 视图Id
+  * @param {string} args.appId 应用Id
+  * @param {string} args.instanceId 流程实例id
+  * @param {string} args.workId 运行节点id
+  * @param {boolean} args.getTemplate 是否获取模板
+  * @param {string} args.shareId 分享页获取关联记录iD
+  * @param {boolean} args.checkView 是否验证视图
+  * @param {Object} options 配置参数
+  * @param {Boolean} options.silent 是否禁止错误弹层
+  * @returns {Promise<Boolean, ErrorModel>}
+  **/
+   editAttachmentName: function (args, options = {}) {
+     
+     return $.api('Worksheet', 'EditAttachmentName', args, options);
+   },
+  /**
+  * 获取导出excel配置
+  * @param {Object} args 请求参数
+  * @param {string} args.worksheetId
+  * @param {string} args.viewId
+  * @param {Object} options 配置参数
+  * @param {Boolean} options.silent 是否禁止错误弹层
+  * @returns {Promise<Boolean, ErrorModel>}
+  **/
+   getExportConfig: function (args, options = {}) {
+     
+     return $.api('Worksheet', 'GetExportConfig', args, options);
+   },
+  /**
+  * 保存导出配置
+  * @param {Object} args 请求参数
+  * @param {array} args.exportExtIds 导出特殊列配置
+  * @param {array} args.controlIds 需要导出的控件ids
+  * @param {} args.type 导出类型，0 = excel,1= csv
+  * @param {} args.exportFieldType 导出字段类型，0=全部字段，1 =  导出当前表格显示列
+  * @param {boolean} args.getColumnRpt 是否导出列统计
+  * @param {boolean} args.edited 是否允许修改
+  * @param {string} args.worksheetId
+  * @param {string} args.viewId
+  * @param {Object} options 配置参数
+  * @param {Boolean} options.silent 是否禁止错误弹层
+  * @returns {Promise<Boolean, ErrorModel>}
+  **/
+   saveExportConfig: function (args, options = {}) {
+     
+     return $.api('Worksheet', 'SaveExportConfig', args, options);
+   },
+  /**
   * 获取视图字段查看编辑权限
   * @param {Object} args 请求参数
   * @param {string} args.worksheetId 工作表id
@@ -744,6 +941,58 @@ export default {
    getViewPermission: function (args, options = {}) {
      
      return $.api('Worksheet', 'GetViewPermission', args, options);
+   },
+  /**
+  * 获取应用角色用户扩展属性
+  * @param {Object} args 请求参数
+  * @param {string} args.appId AppId
+  * @param {Object} options 配置参数
+  * @param {Boolean} options.silent 是否禁止错误弹层
+  * @returns {Promise<Boolean, ErrorModel>}
+  **/
+   getAppExtendAttr: function (args, options = {}) {
+     
+     return $.api('Worksheet', 'GetAppExtendAttr', args, options);
+   },
+  /**
+  * 获取工作表扩展属性可选项控件集合
+  * @param {Object} args 请求参数
+  * @param {string} args.worksheetId 工作表Id
+  * @param {Object} options 配置参数
+  * @param {Boolean} options.silent 是否禁止错误弹层
+  * @returns {Promise<Boolean, ErrorModel>}
+  **/
+   getExtendAttrOptionalControls: function (args, options = {}) {
+     
+     return $.api('Worksheet', 'GetExtendAttrOptionalControls', args, options);
+   },
+  /**
+  * 获取工作表的扩展属性选项控件信息
+  * @param {Object} args 请求参数
+  * @param {string} args.worksheetId 工作表Id
+  * @param {Object} options 配置参数
+  * @param {Boolean} options.silent 是否禁止错误弹层
+  * @returns {Promise<Boolean, ErrorModel>}
+  **/
+   getExtendAttrOptionalControl: function (args, options = {}) {
+     
+     return $.api('Worksheet', 'GetExtendAttrOptionalControl', args, options);
+   },
+  /**
+  * 保存应用角色用户扩展属性
+  * @param {Object} args 请求参数
+  * @param {string} args.appId 应用
+  * @param {string} args.worksheetId 工作表Id
+  * @param {string} args.userControlId 用户控件
+  * @param {array} args.extendAttrs 扩展字段属性
+  * @param {integer} args.status 状态【9：关闭 1：正常】
+  * @param {Object} options 配置参数
+  * @param {Boolean} options.silent 是否禁止错误弹层
+  * @returns {Promise<Boolean, ErrorModel>}
+  **/
+   saveAppExtendAttr: function (args, options = {}) {
+     
+     return $.api('Worksheet', 'SaveAppExtendAttr', args, options);
    },
   /**
   * 复制表格
@@ -880,14 +1129,18 @@ export default {
   * 工作表详情
   * @param {Object} args 请求参数
   * @param {string} args.worksheetId 工作表id
+  * @param {string} args.relationWorksheetId 关联表的id
   * @param {boolean} args.getTemplate 是否获取Template
   * @param {boolean} args.getViews 是否获取Views
   * @param {string} args.appId 应用Id
   * @param {boolean} args.handleDefault 处理默认值
-  * @param {integer} args.getControlType 0:显示控件 1：不显示控件（被动关联） 2：全部 9:回收站的控件
+  * @param {} args.getControlType 0:显示控件 1：不显示控件（被动关联） 2：全部 3:全部关联控件 9:回收站的控件 11:获取表信息不处理隐藏controlSource
   * @param {array} args.worksheetIds 批量工作表id
   * @param {boolean} args.handControlSource 是否处理关联的原始类型
   * @param {boolean} args.getRules 是否需要验证规则
+  * @param {boolean} args.getSwitchPermit 是否获取功能开关
+  * @param {boolean} args.getRelationSearch 获取查下记录控件
+  * @param {integer} args.resultType 获取类型 0或者1：常规 2：简易模式
   * @param {Object} options 配置参数
   * @param {Boolean} options.silent 是否禁止错误弹层
   * @returns {Promise<Boolean, ErrorModel>}
@@ -897,20 +1150,25 @@ export default {
      return $.api('Worksheet', 'GetWorksheetInfo', args, options);
    },
   /**
-  * 审批获取子表信息及控件权限
+  * 审批、填写获取子表信息及控件权限
   * @param {Object} args 请求参数
   * @param {string} args.controlId 子表的控件id
   * @param {string} args.instanceId 流程实例id
   * @param {string} args.workId 运行节点id
+  * @param {string} args.linkId 工作流填写链接id
   * @param {string} args.worksheetId 工作表id
+  * @param {string} args.relationWorksheetId 关联表的id
   * @param {boolean} args.getTemplate 是否获取Template
   * @param {boolean} args.getViews 是否获取Views
   * @param {string} args.appId 应用Id
   * @param {boolean} args.handleDefault 处理默认值
-  * @param {integer} args.getControlType 0:显示控件 1：不显示控件（被动关联） 2：全部 9:回收站的控件
+  * @param {} args.getControlType 0:显示控件 1：不显示控件（被动关联） 2：全部 3:全部关联控件 9:回收站的控件 11:获取表信息不处理隐藏controlSource
   * @param {array} args.worksheetIds 批量工作表id
   * @param {boolean} args.handControlSource 是否处理关联的原始类型
   * @param {boolean} args.getRules 是否需要验证规则
+  * @param {boolean} args.getSwitchPermit 是否获取功能开关
+  * @param {boolean} args.getRelationSearch 获取查下记录控件
+  * @param {integer} args.resultType 获取类型 0或者1：常规 2：简易模式
   * @param {Object} options 配置参数
   * @param {Boolean} options.silent 是否禁止错误弹层
   * @returns {Promise<Boolean, ErrorModel>}
@@ -923,14 +1181,18 @@ export default {
   * 工作表详情
   * @param {Object} args 请求参数
   * @param {string} args.worksheetId 工作表id
+  * @param {string} args.relationWorksheetId 关联表的id
   * @param {boolean} args.getTemplate 是否获取Template
   * @param {boolean} args.getViews 是否获取Views
   * @param {string} args.appId 应用Id
   * @param {boolean} args.handleDefault 处理默认值
-  * @param {integer} args.getControlType 0:显示控件 1：不显示控件（被动关联） 2：全部 9:回收站的控件
+  * @param {} args.getControlType 0:显示控件 1：不显示控件（被动关联） 2：全部 3:全部关联控件 9:回收站的控件 11:获取表信息不处理隐藏controlSource
   * @param {array} args.worksheetIds 批量工作表id
   * @param {boolean} args.handControlSource 是否处理关联的原始类型
   * @param {boolean} args.getRules 是否需要验证规则
+  * @param {boolean} args.getSwitchPermit 是否获取功能开关
+  * @param {boolean} args.getRelationSearch 获取查下记录控件
+  * @param {integer} args.resultType 获取类型 0或者1：常规 2：简易模式
   * @param {Object} options 配置参数
   * @param {Boolean} options.silent 是否禁止错误弹层
   * @returns {Promise<Boolean, ErrorModel>}
@@ -961,8 +1223,11 @@ export default {
   /**
   * 根据shareid得到worksheetid
   * @param {Object} args 请求参数
-  * @param {string} args.shareId shareId
+  * @param {string} args.shareId 对外分享标识
   * @param {string} args.password 密码
+  * @param {string} args.clientId 客户端标识
+记录输入密码之后，页面刷新不用重复输入密码操作
+滑动过期
   * @param {string} args.ticket 验证码返票据
   * @param {string} args.randStr 票据随机字符串
   * @param {} args.captchaType 验证码类型（默认腾讯云）
@@ -1016,6 +1281,7 @@ export default {
   * 获取 附件详情
   * @param {Object} args 请求参数
   * @param {string} args.attachmentShareId 附件分享Id
+  * @param {} args.getType
   * @param {Object} options 配置参数
   * @param {Boolean} options.silent 是否禁止错误弹层
   * @returns {Promise<Boolean, ErrorModel>}
@@ -1076,17 +1342,6 @@ export default {
      return $.api('Worksheet', 'GetWorkItem', args, options);
    },
   /**
-  * 获取流程信息
-  * @param {Object} args 请求参数
-  * @param {Object} options 配置参数
-  * @param {Boolean} options.silent 是否禁止错误弹层
-  * @returns {Promise<Boolean, ErrorModel>}
-  **/
-   getWorkItemDebug: function (args, options = {}) {
-     options.ajaxOptions = Object.assign({}, options.ajaxOptions, { type: 'GET' }); 
-     return $.api('Worksheet', 'GetWorkItemDebug', args, options);
-   },
-  /**
   * 行列表
   * @param {Object} args 请求参数
   * @param {string} args.worksheetId 工作表id
@@ -1116,9 +1371,10 @@ export default {
   * @param {string} args.keywords 关键词
   * @param {string} args.linkId 链接分享id
   * @param {string} args.viewId
-  * @param {array} args.filters
+  * @param {array} args.filterControls
   * @param {boolean} args.getRules
   * @param {} args.getType
+  * @param {array} args.fastFilters 快递筛选
   * @param {Object} options 配置参数
   * @param {Boolean} options.silent 是否禁止错误弹层
   * @returns {Promise<Boolean, ErrorModel>}
@@ -1146,20 +1402,21 @@ export default {
   /**
   * 添加行
   * @param {Object} args 请求参数
-  * @param {string} args.shareId 分享id
   * @param {string} args.worksheetId 工作表id
   * @param {array} args.receiveControls 该行所有的cell
   * @param {array} args.receiveRows 批量新增所有rows
   * @param {string} args.viewId 视图Id
   * @param {string} args.appId 应用Id
   * @param {string} args.btnId 自定义按钮ID
+  * @param {string} args.btnRemark 按钮备注
   * @param {string} args.btnWorksheetId 点击按钮对应的工作表ID
   * @param {string} args.btnRowId 点击按钮对应的行记录ID
   * @param {} args.masterRecord 主记录信息
   * @param {string} args.pushUniqueId 推送ID
   * @param {string} args.verifyCode 验证码【根据配置来校验是否必填】
-  * @param {integer} args.rowStatus 1：正常 11：草稿箱
+  * @param {integer} args.rowStatus 1：正常 21：草稿箱
   * @param {string} args.draftRowId 草稿ID
+  * @param {string} args.clientId 未登录用户临时登录凭据
   * @param {string} args.ticket 验证码返票据
   * @param {string} args.randStr 票据随机字符串
   * @param {} args.captchaType 验证码类型（默认腾讯云）
@@ -1174,20 +1431,21 @@ export default {
   /**
   * 批量添加行
   * @param {Object} args 请求参数
-  * @param {string} args.shareId 分享id
   * @param {string} args.worksheetId 工作表id
   * @param {array} args.receiveControls 该行所有的cell
   * @param {array} args.receiveRows 批量新增所有rows
   * @param {string} args.viewId 视图Id
   * @param {string} args.appId 应用Id
   * @param {string} args.btnId 自定义按钮ID
+  * @param {string} args.btnRemark 按钮备注
   * @param {string} args.btnWorksheetId 点击按钮对应的工作表ID
   * @param {string} args.btnRowId 点击按钮对应的行记录ID
   * @param {} args.masterRecord 主记录信息
   * @param {string} args.pushUniqueId 推送ID
   * @param {string} args.verifyCode 验证码【根据配置来校验是否必填】
-  * @param {integer} args.rowStatus 1：正常 11：草稿箱
+  * @param {integer} args.rowStatus 1：正常 21：草稿箱
   * @param {string} args.draftRowId 草稿ID
+  * @param {string} args.clientId 未登录用户临时登录凭据
   * @param {string} args.ticket 验证码返票据
   * @param {string} args.randStr 票据随机字符串
   * @param {} args.captchaType 验证码类型（默认腾讯云）
@@ -1209,6 +1467,7 @@ export default {
   * @param {string} args.instanceId 流程实例id
   * @param {string} args.workId 运行节点id
   * @param {string} args.btnId 自定义按钮ID
+  * @param {string} args.btnRemark 按钮备注
   * @param {string} args.btnWorksheetId 点击按钮对应的工作表ID
   * @param {string} args.btnRowId 点击按钮对应的行记录ID
   * @param {string} args.pushUniqueId 推送ID
@@ -1250,7 +1509,9 @@ export default {
   * @param {string} args.keyWords 搜索关键字
   * @param {array} args.fastFilters 快递筛选
   * @param {array} args.navGroupFilters 导航分组筛选
+  * @param {array} args.filtersGroup
   * @param {string} args.btnId 自定义按钮ID
+  * @param {string} args.btnRemark 按钮备注
   * @param {string} args.btnWorksheetId 点击按钮对应的工作表ID
   * @param {string} args.btnRowId 点击按钮对应的行记录ID
   * @param {string} args.pushUniqueId 推送ID
@@ -1336,7 +1597,9 @@ export default {
   * @param {string} args.keyWords 搜索关键字
   * @param {array} args.fastFilters 快递筛选
   * @param {array} args.navGroupFilters 导航分组筛选
+  * @param {array} args.filtersGroup
   * @param {string} args.btnId 自定义按钮ID
+  * @param {string} args.btnRemark 按钮备注
   * @param {string} args.btnWorksheetId 点击按钮对应的工作表ID
   * @param {string} args.btnRowId 点击按钮对应的行记录ID
   * @param {string} args.pushUniqueId 推送ID
@@ -1362,6 +1625,7 @@ export default {
   * @param {string} args.keyWords 搜索关键字
   * @param {array} args.fastFilters 快速筛选
   * @param {array} args.navGroupFilters 导航分组筛选
+  * @param {array} args.filtersGroup
   * @param {boolean} args.thoroughDelete 彻底删除
   * @param {} args.deleteType
   * @param {Object} options 配置参数
@@ -1381,6 +1645,11 @@ export default {
   * @param {string} args.appId 应用Id
   * @param {boolean} args.restoreRelation 恢复关联
   * @param {string} args.copyRelationControlId
+  * @param {boolean} args.isAll 是否全选
+  * @param {array} args.excludeRowIds 需要排除的rowIds
+  * @param {array} args.filterControls 筛选条件
+  * @param {string} args.keyWords 搜索关键字
+  * @param {array} args.fastFilters 快速筛选
   * @param {Object} options 配置参数
   * @param {Boolean} options.silent 是否禁止错误弹层
   * @returns {Promise<Boolean, ErrorModel>}
@@ -1395,6 +1664,11 @@ export default {
   * @param {string} args.worksheetId 工作表id
   * @param {array} args.rowIds 行ids
   * @param {string} args.appId 应用Id
+  * @param {boolean} args.isAll 是否全选
+  * @param {array} args.excludeRowIds 需要排除的rowIds
+  * @param {array} args.filterControls 筛选条件
+  * @param {string} args.keyWords 搜索关键字
+  * @param {array} args.fastFilters 快速筛选
   * @param {Object} options 配置参数
   * @param {Boolean} options.silent 是否禁止错误弹层
   * @returns {Promise<Boolean, ErrorModel>}
@@ -1435,6 +1709,9 @@ export default {
   * @param {string} args.linkId 填写链接id
   * @param {string} args.reportId 统计图ID
   * @param {boolean} args.notGetTotal 不获取总记录数
+  * @param {string} args.clientId 客户端标识
+记录输入密码之后，页面刷新不用重复输入密码操作
+滑动过期
   * @param {string} args.ticket 验证码返票据
   * @param {string} args.randStr 票据随机字符串
   * @param {} args.captchaType 验证码类型（默认腾讯云）
@@ -1450,6 +1727,7 @@ export default {
   * 工作表查询默认值获取
   * @param {Object} args 请求参数
   * @param {string} args.id 工作表查询id
+  * @param {boolean} args.getAllControls 是否返回所有控件返回值
   * @param {string} args.worksheetId 工作表id
   * @param {} args.getType
   * @param {array} args.filterControls 查询列
@@ -1479,6 +1757,9 @@ export default {
   * @param {string} args.linkId 填写链接id
   * @param {string} args.reportId 统计图ID
   * @param {boolean} args.notGetTotal 不获取总记录数
+  * @param {string} args.clientId 客户端标识
+记录输入密码之后，页面刷新不用重复输入密码操作
+滑动过期
   * @param {string} args.ticket 验证码返票据
   * @param {string} args.randStr 票据随机字符串
   * @param {} args.captchaType 验证码类型（默认腾讯云）
@@ -1522,6 +1803,9 @@ export default {
   * @param {string} args.linkId 填写链接id
   * @param {string} args.reportId 统计图ID
   * @param {boolean} args.notGetTotal 不获取总记录数
+  * @param {string} args.clientId 客户端标识
+记录输入密码之后，页面刷新不用重复输入密码操作
+滑动过期
   * @param {string} args.ticket 验证码返票据
   * @param {string} args.randStr 票据随机字符串
   * @param {} args.captchaType 验证码类型（默认腾讯云）
@@ -1584,13 +1868,14 @@ export default {
   * @param {string} args.startDate 开始时间
   * @param {string} args.endDate
   * @param {string} args.lastMark 最后标记时间
+  * @param {boolean} args.isGlobaLog 是否为全局日志获取记录日志
   * @param {Object} options 配置参数
   * @param {Boolean} options.silent 是否禁止错误弹层
   * @returns {Promise<Boolean, ErrorModel>}
   **/
-   getWorksheetOpeationLogs: function (args, options = {}) {
+   getWorksheetOperationLogs: function (args, options = {}) {
      
-     return $.api('Worksheet', 'GetWorksheetOpeationLogs', args, options);
+     return $.api('Worksheet', 'GetWorksheetOperationLogs', args, options);
    },
   /**
   * 获取子表日志详情
@@ -1625,13 +1910,14 @@ export default {
   * @param {string} args.startDate 开始时间
   * @param {string} args.endDate
   * @param {string} args.lastMark 最后标记时间
+  * @param {boolean} args.isGlobaLog 是否为全局日志获取记录日志
   * @param {Object} options 配置参数
   * @param {Boolean} options.silent 是否禁止错误弹层
   * @returns {Promise<Boolean, ErrorModel>}
   **/
-   batchGetWorksheetOpeationLogs: function (args, options = {}) {
+   batchGetWorksheetOperationLogs: function (args, options = {}) {
      
-     return $.api('Worksheet', 'BatchGetWorksheetOpeationLogs', args, options);
+     return $.api('Worksheet', 'BatchGetWorksheetOperationLogs', args, options);
    },
   /**
   * 批量修改行负责人
@@ -1724,6 +2010,11 @@ export default {
   * @param {string} args.appId 应用Id
   * @param {boolean} args.restoreRelation 恢复关联
   * @param {string} args.copyRelationControlId
+  * @param {boolean} args.isAll 是否全选
+  * @param {array} args.excludeRowIds 需要排除的rowIds
+  * @param {array} args.filterControls 筛选条件
+  * @param {string} args.keyWords 搜索关键字
+  * @param {array} args.fastFilters 快速筛选
   * @param {Object} options 配置参数
   * @param {Boolean} options.silent 是否禁止错误弹层
   * @returns {Promise<Boolean, ErrorModel>}
@@ -1967,6 +2258,7 @@ export default {
   * @param {string} args.rowId 行记录ID
   * @param {string} args.worksheetId 工作表ID
   * @param {string} args.btnId
+  * @param {integer} args.status 状态 1：正常 9：回收站
   * @param {Object} options 配置参数
   * @param {Boolean} options.silent 是否禁止错误弹层
   * @returns {Promise<Boolean, ErrorModel>}
@@ -1983,6 +2275,7 @@ export default {
   * @param {string} args.rowId 行记录ID
   * @param {string} args.worksheetId 工作表ID
   * @param {string} args.btnId
+  * @param {integer} args.status 状态 1：正常 9：回收站
   * @param {Object} options 配置参数
   * @param {Boolean} options.silent 是否禁止错误弹层
   * @returns {Promise<Boolean, ErrorModel>}
@@ -1998,7 +2291,7 @@ export default {
   * @param {string} args.viewId 视图ID
   * @param {string} args.btnId 按钮ID
   * @param {string} args.worksheetId 工作表ID
-  * @param {integer} args.optionType 操作类型 1：视图添加按钮 2：视图删除按钮 9：删除按钮
+  * @param {integer} args.optionType 操作类型 1：视图添加按钮 2：视图删除按钮 9：删除按钮, 11:恢复按钮 999：彻底删除
   * @param {Object} options 配置参数
   * @param {Boolean} options.silent 是否禁止错误弹层
   * @returns {Promise<Boolean, ErrorModel>}
@@ -2033,6 +2326,9 @@ export default {
   * @param {string} args.desc 描述
   * @param {integer} args.isAllView
   * @param {array} args.editAttrs 编辑属性
+  * @param {boolean} args.verifyPwd
+  * @param {boolean} args.enableConfirm
+  * @param {object} args.advancedSetting
   * @param {Object} options 配置参数
   * @param {Boolean} options.silent 是否禁止错误弹层
   * @returns {Promise<Boolean, ErrorModel>}
@@ -2040,6 +2336,22 @@ export default {
    saveWorksheetBtn: function (args, options = {}) {
      
      return $.api('Worksheet', 'SaveWorksheetBtn', args, options);
+   },
+  /**
+  * 复制按钮
+  * @param {Object} args 请求参数
+  * @param {string} args.appId 应用iD
+  * @param {string} args.viewId 视图ID
+  * @param {string} args.btnId 按钮ID
+  * @param {string} args.worksheetId 工作表ID
+  * @param {integer} args.optionType 操作类型 1：视图添加按钮 2：视图删除按钮 9：删除按钮, 11:恢复按钮 999：彻底删除
+  * @param {Object} options 配置参数
+  * @param {Boolean} options.silent 是否禁止错误弹层
+  * @returns {Promise<Boolean, ErrorModel>}
+  **/
+   copyWorksheetBtn: function (args, options = {}) {
+     
+     return $.api('Worksheet', 'CopyWorksheetBtn', args, options);
    },
   /**
   * 获取规则列表
@@ -2134,14 +2446,18 @@ export default {
   * 获取表控件
   * @param {Object} args 请求参数
   * @param {string} args.worksheetId 工作表id
+  * @param {string} args.relationWorksheetId 关联表的id
   * @param {boolean} args.getTemplate 是否获取Template
   * @param {boolean} args.getViews 是否获取Views
   * @param {string} args.appId 应用Id
   * @param {boolean} args.handleDefault 处理默认值
-  * @param {integer} args.getControlType 0:显示控件 1：不显示控件（被动关联） 2：全部 9:回收站的控件
+  * @param {} args.getControlType 0:显示控件 1：不显示控件（被动关联） 2：全部 3:全部关联控件 9:回收站的控件 11:获取表信息不处理隐藏controlSource
   * @param {array} args.worksheetIds 批量工作表id
   * @param {boolean} args.handControlSource 是否处理关联的原始类型
   * @param {boolean} args.getRules 是否需要验证规则
+  * @param {boolean} args.getSwitchPermit 是否获取功能开关
+  * @param {boolean} args.getRelationSearch 获取查下记录控件
+  * @param {integer} args.resultType 获取类型 0或者1：常规 2：简易模式
   * @param {Object} options 配置参数
   * @param {Boolean} options.silent 是否禁止错误弹层
   * @returns {Promise<Boolean, ErrorModel>}
@@ -2151,17 +2467,34 @@ export default {
      return $.api('Worksheet', 'GetWorksheetControls', args, options);
    },
   /**
+  * 获取工作表字段智能建议
+  * @param {Object} args 请求参数
+  * @param {string} args.prompt 提示词
+  * @param {} args.lang 语言
+  * @param {Object} options 配置参数
+  * @param {Boolean} options.silent 是否禁止错误弹层
+  * @returns {Promise<Boolean, ErrorModel>}
+  **/
+   getAiFieldRecommendation: function (args, options = {}) {
+     
+     return $.api('Worksheet', 'GetAiFieldRecommendation', args, options);
+   },
+  /**
   * 批量获取表控件
   * @param {Object} args 请求参数
   * @param {string} args.worksheetId 工作表id
+  * @param {string} args.relationWorksheetId 关联表的id
   * @param {boolean} args.getTemplate 是否获取Template
   * @param {boolean} args.getViews 是否获取Views
   * @param {string} args.appId 应用Id
   * @param {boolean} args.handleDefault 处理默认值
-  * @param {integer} args.getControlType 0:显示控件 1：不显示控件（被动关联） 2：全部 9:回收站的控件
+  * @param {} args.getControlType 0:显示控件 1：不显示控件（被动关联） 2：全部 3:全部关联控件 9:回收站的控件 11:获取表信息不处理隐藏controlSource
   * @param {array} args.worksheetIds 批量工作表id
   * @param {boolean} args.handControlSource 是否处理关联的原始类型
   * @param {boolean} args.getRules 是否需要验证规则
+  * @param {boolean} args.getSwitchPermit 是否获取功能开关
+  * @param {boolean} args.getRelationSearch 获取查下记录控件
+  * @param {integer} args.resultType 获取类型 0或者1：常规 2：简易模式
   * @param {Object} options 配置参数
   * @param {Boolean} options.silent 是否禁止错误弹层
   * @returns {Promise<Boolean, ErrorModel>}
@@ -2188,116 +2521,5 @@ export default {
    editControlsAlias: function (args, options = {}) {
      
      return $.api('Worksheet', 'EditControlsAlias', args, options);
-   },
-  /**
-  * 生成控件默认别名
-  * @param {Object} args 请求参数
-  * @param {string} args.appId 应用id
-  * @param {string} args.worksheetId 工作表id
-  * @param {integer} args.version 版本号
-  * @param {Object} options 配置参数
-  * @param {Boolean} options.silent 是否禁止错误弹层
-  * @returns {Promise<Boolean, ErrorModel>}
-  **/
-   editGenerateControlsDefaultAlias: function (args, options = {}) {
-     
-     return $.api('Worksheet', 'EditGenerateControlsDefaultAlias', args, options);
-   },
-  /**
-  * 保存表控件
-  * @param {Object} args 请求参数
-  * @param {string} args.sourceId 兼容老数据
-  * @param {string} args.worksheetId WorksheetId
-  * @param {integer} args.version 版本号
-  * @param {array} args.controls 控件集合
-  * @param {string} args.appId 应用ID
-  * @param {string} args.controlId 控件ID
-  * @param {array} args.controlIds 控件IDs
-  * @param {integer} args.status 状态 1:恢复 999：彻底删除
-  * @param {Object} options 配置参数
-  * @param {Boolean} options.silent 是否禁止错误弹层
-  * @returns {Promise<Boolean, ErrorModel>}
-  **/
-   editWorksheetControls: function (args, options = {}) {
-     
-     return $.api('Worksheet', 'EditWorksheetControls', args, options);
-   },
-  /**
-  * 获取表格控件数量
-  * @param {Object} args 请求参数
-  * @param {string} args.worksheetId 工作表id
-  * @param {boolean} args.getTemplate 是否获取Template
-  * @param {boolean} args.getViews 是否获取Views
-  * @param {string} args.appId 应用Id
-  * @param {boolean} args.handleDefault 处理默认值
-  * @param {integer} args.getControlType 0:显示控件 1：不显示控件（被动关联） 2：全部 9:回收站的控件
-  * @param {array} args.worksheetIds 批量工作表id
-  * @param {boolean} args.handControlSource 是否处理关联的原始类型
-  * @param {boolean} args.getRules 是否需要验证规则
-  * @param {Object} options 配置参数
-  * @param {Boolean} options.silent 是否禁止错误弹层
-  * @returns {Promise<Boolean, ErrorModel>}
-  **/
-   getWorksheetControlsQuantity: function (args, options = {}) {
-     
-     return $.api('Worksheet', 'GetWorksheetControlsQuantity', args, options);
-   },
-  /**
-  * 重置自动编号
-  * @param {Object} args 请求参数
-  * @param {string} args.sourceId 兼容老数据
-  * @param {string} args.worksheetId WorksheetId
-  * @param {integer} args.version 版本号
-  * @param {array} args.controls 控件集合
-  * @param {string} args.appId 应用ID
-  * @param {string} args.controlId 控件ID
-  * @param {array} args.controlIds 控件IDs
-  * @param {integer} args.status 状态 1:恢复 999：彻底删除
-  * @param {Object} options 配置参数
-  * @param {Boolean} options.silent 是否禁止错误弹层
-  * @returns {Promise<Boolean, ErrorModel>}
-  **/
-   resetControlIncrease: function (args, options = {}) {
-     
-     return $.api('Worksheet', 'ResetControlIncrease', args, options);
-   },
-  /**
-  * 删除autoid
-  * @param {Object} args 请求参数
-  * @param {string} args.worksheetId 工作表id
-  * @param {boolean} args.getTemplate 是否获取Template
-  * @param {boolean} args.getViews 是否获取Views
-  * @param {string} args.appId 应用Id
-  * @param {boolean} args.handleDefault 处理默认值
-  * @param {integer} args.getControlType 0:显示控件 1：不显示控件（被动关联） 2：全部 9:回收站的控件
-  * @param {array} args.worksheetIds 批量工作表id
-  * @param {boolean} args.handControlSource 是否处理关联的原始类型
-  * @param {boolean} args.getRules 是否需要验证规则
-  * @param {Object} options 配置参数
-  * @param {Boolean} options.silent 是否禁止错误弹层
-  * @returns {Promise<Boolean, ErrorModel>}
-  **/
-   deleteWorksheetAutoID: function (args, options = {}) {
-     
-     return $.api('Worksheet', 'DeleteWorksheetAutoID', args, options);
-   },
-  /**
-  * 编辑控件状态
-  * @param {Object} args 请求参数
-  * @param {string} args.sourceId 兼容老数据
-  * @param {string} args.worksheetId WorksheetId
-  * @param {integer} args.version 版本号
-  * @param {array} args.controls 控件集合
-  * @param {string} args.appId 应用ID
-  * @param {string} args.controlId 控件ID
-  * @param {array} args.controlIds 控件IDs
-  * @param {integer} args.status 状态 1:恢复 999：彻底删除
-  * @param {Object} options 配置参数
-  * @param {Boolean} options.silent 是否禁止错误弹层
-  * @returns {Promise<Boolean, ErrorModel>}
-  **/
-   editControlsStatus: function (args, options = {}) {
-     
-     return $.api('Worksheet', 'EditControlsStatus', args, options);
    },
 };

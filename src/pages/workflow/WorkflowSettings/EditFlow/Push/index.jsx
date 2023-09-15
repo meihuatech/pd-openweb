@@ -18,6 +18,15 @@ export default class Push extends Component {
       return <div className="pLeft8 pRight8 blue">{_l('设置此节点')}</div>;
     }
 
+    if (item.pushType && item.isException) {
+      return (
+        <div className="pLeft8 pRight8 red">
+          <i className="icon-workflow_info Font18 mRight5" />
+          {_l('节点配置有误')}
+        </div>
+      );
+    }
+
     return (
       <Fragment>
         <div className="pLeft8 pRight8 ellipsis">{PUSH_LIST.find(o => o.value === item.pushType).text}</div>
@@ -26,7 +35,7 @@ export default class Push extends Component {
   }
 
   render() {
-    const { processId, item, disabled, selectNodeId, openDetail } = this.props;
+    const { processId, item, disabled, selectNodeId, openDetail, isSimple } = this.props;
 
     return (
       <div className="flexColumn">
@@ -36,7 +45,7 @@ export default class Push extends Component {
               'workflowItem',
               { workflowItemDisabled: disabled },
               { active: selectNodeId === item.id },
-              { errorShadow: item.selectNodeId && item.isException },
+              { errorShadow: item.pushType && item.isException },
             )}
             onMouseDown={() => !disabled && openDetail(processId, item.id, item.typeId)}
           >
@@ -44,7 +53,9 @@ export default class Push extends Component {
               <i className={cx('workflowAvatar icon-interface_push', item.pushType ? 'BGBlue' : 'BGGray')} />
             </div>
             <NodeOperate nodeClassName="BGBlue" {...this.props} />
-            <div className="workflowContent Font13">{this.renderContent()}</div>
+            <div className="workflowContent Font13">
+              {isSimple ? <span className="pLeft8 pRight8 Gray_9e">{_l('加载中...')}</span> : this.renderContent()}
+            </div>
           </div>
           <CreateNode {...this.props} />
         </section>

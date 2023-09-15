@@ -137,7 +137,7 @@ class ChatPanelHeader extends Component {
       isPushNotice,
     }).then((result) => {
       this.props.dispatch(actions.updateGroupPushNotice(session.id, isPushNotice));
-      isPushNotice ? alert(_l('已关闭消息免打扰')) : alert(_l('已开启消息免打扰'));
+      // isPushNotice ? alert(_l('已关闭消息免打扰')) : alert(_l('已开启消息免打扰'));
     });
     this.handleTriggerChange(false);
   }
@@ -189,9 +189,9 @@ class ChatPanelHeader extends Component {
   renderIcon() {
     const { session } = this.props;
     if (session.isPushNotice) {
-      return <i className="icon-task-point-more" />;
+      return <i className="icon-notifications_off" />;
     } else {
-      return <i className="icon-chat-bell-nopush" />;
+      return <i className="icon-notifications" />;
     }
   }
   renderMenu() {
@@ -213,7 +213,7 @@ class ChatPanelHeader extends Component {
           <div className="menuItem ThemeBGColor3" onClick={this.handleUpdateGroupPushNotice.bind(this)}>
             {session.isGroup ? this.renderIcon() : undefined}
             <div className="menuItem-text">
-              {session.isPushNotice ? _l('开启消息免打扰') : _l('关闭消息免打扰')}
+              {session.isPushNotice ? _l('消息免打扰') : _l('允许提醒')}
             </div>
           </div> : undefined
         }

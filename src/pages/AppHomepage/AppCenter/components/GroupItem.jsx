@@ -10,6 +10,7 @@ import { VerticalMiddle, FlexSpacer } from 'worksheet/components/Basics';
 import _ from 'lodash';
 
 const GroupItemLink = styled(MdLink)`
+  display: block;
   &.draggingItem > div {
     background: #f1f1f1;
   }
@@ -169,14 +170,18 @@ export default function GroupItem(props) {
         {fontIcon ? (
           <i className={`fontIcon icon icon-${fontIcon} Font16 Gray_75 mRight8`} />
         ) : (
-          <GroupItemIcon size={18} url={iconUrl || `https://fp1.mingdaoyun.cn/customIcon/${icon}.svg`} fill="#757575" />
+          <GroupItemIcon
+            size={18}
+            url={iconUrl || `${md.global.FileStoreConfig.pubHost.replace(/\/$/, '')}/customIcon/${icon}.svg`}
+            fill="#757575"
+          />
         )}
         <span className="name ellipsis">{name}</span>
         {!_.includes(['static'], itemType) && (
           <React.Fragment>
             <FlexSpacer />
             <VerticalMiddle
-              className="operate"
+              className="operate stopPropagation"
               onClick={e => {
                 e.stopPropagation();
                 e.preventDefault();
@@ -216,7 +221,7 @@ export default function GroupItem(props) {
                   }
                 >
                   <MoreBtnCon>
-                    <i className="icon icon-more_horiz Font18 Gray_9e Hand"></i>
+                    <i className="icon icon-more_horiz Font18 Gray_9e Hand" />
                   </MoreBtnCon>
                 </Trigger>
               )}
@@ -227,15 +232,18 @@ export default function GroupItem(props) {
                 text={<span>{isMarked ? _l('取消标星') : _l('标星，显示在首页')}</span>}
               >
                 <i
-                  className={cx(`star icon icon-${isMarked ? 'task-star' : 'star_outline'} Font18 Gray_9e mLeft5`, {
-                    isMarked,
-                  })}
+                  className={cx(
+                    `star icon icon-${isMarked ? 'task-star' : 'star_outline'} Font18 Gray_9e mLeft5 stopPropagation`,
+                    {
+                      isMarked,
+                    },
+                  )}
                   onClick={() => onMark(id)}
-                ></i>
+                />
               </Tooltip>
             </VerticalMiddle>
             {itemType !== 'star' && count !== 0 && <span className="num Gray_9e">{count}</span>}
-            {itemType !== 'star' && isMarked && <i className={cx('visibleStar icon-task-star Font18  mLeft8')}></i>}
+            {itemType !== 'star' && isMarked && <i className={cx('visibleStar icon-task-star Font18  mLeft8')} />}
           </React.Fragment>
         )}
       </VerticalMiddle>

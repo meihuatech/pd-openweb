@@ -3,13 +3,13 @@ import React from 'react';
 import ReactDom from 'react-dom';
 import './css/createCalendar.less';
 import 'src/components/mdBusinessCard/mdBusinessCard';
-import 'src/components/quickSelectUser/quickSelectUser';
+import quickSelectUser from 'ming-ui/functions/quickSelectUser';
 import ajaxRequest from 'src/api/calendar';
 import timezone from './timezone';
 import SelectTimezone from './component/SelectTimezone';
 import RegExp from 'src/util/expression';
 import { htmlEncodeReg, htmlDecodeReg } from 'src/util';
-import doT from '@mdfe/dot';
+import doT from 'dot';
 import taskHtml from './tpl/createCalendar.html';
 import 'src/components/mdDialog/dialog';
 import 'src/components/mdDatePicker/mdDatePicker';
@@ -808,7 +808,7 @@ $.extend(CreateCalendar.prototype, {
           }
         });
 
-        _this.quickSelectUser({
+        quickSelectUser(_this[0], {
           sourceId: '',
           projectId: '',
           offset: {
@@ -818,6 +818,7 @@ $.extend(CreateCalendar.prototype, {
           fromType: 5,
           zIndex: 1111,
           filterAccountIds: existsIds,
+          isDynamic: true,
           SelectUserSettings: {
             filterAccountIds: existsIds,
             projectId: settings.ProjectID,
@@ -1675,7 +1676,7 @@ CreateCalendar.methods = {
  */
 export default function (opts) {
   return new CreateCalendar(opts);
-};
+}
 
 // 加载时 执行 绑定 jquery
 (function ($) {

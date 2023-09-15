@@ -322,7 +322,7 @@ export const getConditionList = (type, enumDefault) => {
       if (enumDefault === 0) {
         list = { ids: ['9', '10', '1', '2', '35', '36', '48', '49', '8', '7'], defaultConditionId: '9' };
       } else {
-        list = { ids: ['9', '10', '3', '4', '35', '36', '48', '49', '43', '8', '7'], defaultConditionId: '9' };
+        list = { ids: ['9', '10', '100', '101', '35', '36', '48', '49', '43', '8', '7'], defaultConditionId: '9' };
       }
       break;
     case 29:
@@ -381,6 +381,8 @@ export const getConditionNumber = id => {
     case '45':
     case '48':
     case '49':
+    case '100':
+    case '101':
       count = 1;
       break;
     case '7':
@@ -463,4 +465,25 @@ export const getFilterText = (item, conditionId) => {
   }
 
   return CONDITION_TYPE[conditionId];
+};
+
+/**
+ * 切换筛选条件到条件组
+ */
+export const switchFilterConditions = conditions => {
+  if (conditions.length > 1) {
+    return conditions.map(item => {
+      return {
+        conditions: [item],
+        spliceType: 2,
+      };
+    });
+  }
+
+  return [
+    {
+      conditions,
+      spliceType: 2,
+    },
+  ];
 };

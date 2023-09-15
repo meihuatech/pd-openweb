@@ -50,7 +50,7 @@ export default class Accumulate extends Component {
   handleSaveShowOptionIds = () => {
     const { showOptionIds } = this.state;
     if (_.isEmpty(showOptionIds)) {
-      alert(_l('请选择显示项'));
+      alert(_l('请选择显示项'), 2);
       return;
     }
     this.handleChangeDisplaySetup({
@@ -80,14 +80,15 @@ export default class Accumulate extends Component {
     );
   }
   render() {
+    const { allControls, reportData, currentReport } = this.props;
     const { showControlVisible, showOptionIds } = this.state;
-    const { valueMap = {} } = this.props.reportData;
-    const { xaxes, displaySetup } = this.props.currentReport;
-    const xAxesValueMap = valueMap[xaxes.controlId] || {};
-    const optionList = Object.keys(xAxesValueMap).map(id => {
+    const { xaxes, displaySetup } = currentReport;
+    const control = _.find(allControls, { controlId: xaxes.controlId }) || {};
+    const { options = [] } = control;
+    const optionList = options.filter(item => !item.isDeleted).map(item => {
       return {
-        controlId: id,
-        controlName: xAxesValueMap[id],
+        controlId: item.key,
+        controlName: item.value,
         type: xaxes.controlType
       }
     });

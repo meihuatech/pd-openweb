@@ -105,6 +105,9 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
+    .icon:hover {
+      color: #2196F3 !important;
+    }
   }
   .count {
     font-weight: 500;
@@ -226,6 +229,9 @@
       justify-content: center;
       margin: 0;
     }
+    .ant-tabs-nav-operations {
+      display: none;
+    }
     .ant-tabs-nav .ant-tabs-ink-bar-animated {
       height: 3px;
     }
@@ -250,6 +256,40 @@
       background-color: #fff;
     }
   }
+  .chartTypeImageSelect {
+    .styleItem {
+      font-size: 13px;
+      margin-right: 10px;
+      .iconWrap {
+        border-radius: 6px;
+      }
+      &:hover {
+        .iconWrap {
+          background: #ededed;
+          border-color: #ededed;
+        }
+      }
+      &:last-child {
+        margin-right: 0;
+      }
+    }
+    .active {
+      font-weight: bold;
+      color: #2196F3 !important;
+      .iconWrap {
+        border-color: #2196F3 !important;
+        background: #fff !important;
+      }
+    }
+    .iconWrap {
+      padding: 5px 0;
+      margin-bottom: 5px;
+      border: 1px solid transparent;
+      img {
+        width: 30px;
+      }
+    }
+  }
   .dataSourceCollapse .icon-arrow-down-border {
     display: flex;
     align-content: center;
@@ -261,8 +301,29 @@
       background-color: #f6f6f6;
     }
   }
+  .entranceWrap {
+    border: 1px solid #d9d9d9;
+    border-radius: 4px;
+    height: 30px;
+    background-color: #fff;
+    &.hover:hover {
+      background-color: #f5f5f5;
+      .highlightIcon {
+        color: #2196F3 !important;
+      }
+    }
+    &.ruleIcon {
+      width: 30px;
+      margin-left: 10px;
+      justify-content: center;
+      &:hover {
+        background-color: #f5f5f5;
+      }
+    }
+  }
   .chartSelect();
   .chartInput();
+  .colorWrap();
 }
 
 .sortableDimensionalityCard {
@@ -287,6 +348,9 @@
   }
   .ant-modal-close-x {
     line-height: 66px;
+    .icon-close:hover {
+      color: #2196f3 !important;
+    }
   }
   .ant-modal-header {
     padding: 24px;
@@ -301,6 +365,7 @@
   }
   .chartSelect();
   .chartInput();
+  .colorWrap();
   .ant-select-selector, .ant-select-selection-item, .ant-input, .ant-picker {
     height: 36px !important;
     line-height: 34px !important;
@@ -308,7 +373,7 @@
   .ant-modal-close {
     cursor: inherit;
   }
-  .icon-close, .hoverHighlight {
+  .ant-modal-header .icon-close, .hoverHighlight {
     &:hover {
       color: #2196F3 !important;
     }
@@ -324,9 +389,18 @@
     padding: 0 32px;
     background: #3196f3;
     border-color: #3196f3;
+    &:hover {
+      background: #1d8cf2;
+      border-color: #1d8cf2;
+    }
   }
   .ant-checkbox-input {
     position: absolute;
+  }
+  .hoverThemeColor {
+    &:hover {
+      color: #0a88ec !important;
+    }
   }
 }
 
@@ -408,9 +482,42 @@
       border-color: #d9d9d9 !important;
     }
   }
+  .columnCountInput {
+    .disabled {
+      color: #ddd;
+    }
+    .ant-input-suffix {
+      width: 38px !important;
+    }
+  }
+}
+
+.colorWrap () {
+  .colorWrap {
+    width: 32px;
+    height: 32px;
+    border-radius: 3px;
+    padding: 4px;
+    border: 1px solid #DDDDDD;
+    background-color: #fff;
+    .colorBlock {
+      width: 100%;
+      height: 100%;
+    }
+    .colorInput {
+      width: 100%;
+      height: 100%;
+      opacity: 0;
+    }
+  }
 }
 
 .ant-tooltip-inner {
   min-height: auto;
   line-height: initial;
+}
+
+.sortableScopeRuleWrap {
+  .chartInput();
+  .chartSelect();
 }

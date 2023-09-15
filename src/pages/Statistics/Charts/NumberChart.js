@@ -4,8 +4,8 @@ import styled from 'styled-components';
 import Icon from 'ming-ui/components/Icon';
 import { Tooltip, Row, Col } from 'antd';
 import { formatContrastTypes, isFormatNumber } from '../common';
-import { defaultNumberChartStyle } from 'statistics/components/ChartStyle/components/NumberStyle';
-import { formatrChartValue } from './common';
+import { defaultNumberChartStyle, sizeTypes } from 'statistics/components/ChartStyle/components/NumberStyle';
+import { formatrChartValue, getStyleColor } from './common';
 import SvgIcon from 'src/components/SvgIcon';
 import { toFixed, browserIsMobile } from 'src/util';
 import _ from 'lodash';
@@ -28,6 +28,10 @@ const Wrap = styled.div`
     overflow: hidden;
     border-radius: 12px;
     transition: background-color 0.2s;
+    &.oneNumber {
+      padding-left: 0;
+      padding-right: 0;
+    }
     &.hover:hover {
       cursor: pointer;
       background-color: #f5f5f5;
@@ -40,7 +44,7 @@ const Wrap = styled.div`
     align-items: center;
     justify-content: center;
     .svgIconWrap {
-      margin-bottom: 8px;
+      margin-bottom: 12px;
     }
   }
   .wrap-left {
@@ -51,7 +55,7 @@ const Wrap = styled.div`
     justify-content: flex-start;
     .svgIconWrap {
       margin-right: 16px;
-      margin-top: 5px;
+      margin-top: 10px;
     }
   }
   .svgIconWrap {
@@ -130,6 +134,7 @@ const NumberChartContent = styled.div`
     min-width: 0;
   }
   &.numberChartAlign-center {
+    max-width: 100%;
     .name {
       text-align: center;
     }
@@ -153,7 +158,7 @@ const NumberChartContent = styled.div`
   }
   .count {
     font-size: ${props => props.fontSize}px !important;
-    line-height: ${props => props.fontSize}px;
+    line-height: ${props => props.fontSize}px !important;
     width: 100%;
     color: #333;
     font-weight: 500;
@@ -171,12 +176,13 @@ const getMap = (map, contrast, contrastMap) => {
 const formatData = (map, contrast, contrastMap, displaySetup, yaxisList) => {
   const result = [];
   const data = fillMap(map, contrast, contrastMap);
+  const isHide = yaxisList.length === 1 && yaxisList[0].emptyShowType === 0;
   data.forEach((item, index) => {
     if (index) {
       item.value.forEach((n, i) => {
         const minorList = result[i].minorList || [];
         const control = _.find(yaxisList, { controlId: item.c_id }) || {};
-        result[i].minorList = minorList.concat({ name: control.rename || control.controlName, value: n.v, controlId: item.c_id });
+        result[i].minorList = minorList.concat({ name: control.rename || control.controlName, value: n.v || 0, controlId: item.c_id });
       });
     } else {
       const contrastList = _.get(contrast[index], 'value') || [];
@@ -192,7 +198,13 @@ const formatData = (map, contrast, contrastMap, displaySetup, yaxisList) => {
       });
     }
   });
-  return result;
+  return result.filter(data => {
+    if (isHide && !data.value && !data.contrastValue && !data.lastContrastValue) {
+      return false;
+    } else {
+      return true;
+    }
+  });
 }
 
 const fillMap = (map, contrast, contrastMap) => {
@@ -212,23 +224,42 @@ const fillMap = (map, contrast, contrastMap) => {
   }
 }
 
+const getControlMinAndMax = map => {
+  const result = {};
+  map.forEach(item => {
+    const values = item.value.map(n => n.v);
+    const min = _.min(values) || 0;
+    const max = _.max(values) || 0;
+    result[item.c_id] = {
+      min,
+      max,
+      center: (max + min) / 2
+    }
+  });
+  return result;
+}
+
 
 export default class extends Component {
   constructor(props) {
     super(props);
   }
   componentDidMount() {
-    console.log('number chart')
-    const { reportId, xaxes, yaxisList, style } = this.props.reportData;
-    const { numberChartStyle = {} } = style;
-    if (yaxisList.length === 1 && !xaxes.controlId) {
-      const el = document.querySelector(`.statisticsCard-${reportId}`);
-      const parentElement = _.get(el, 'parentElement.parentElement');
+    const { sourceType, isThumbnail } = this.props;
+    const { reportId, xaxes, yaxisList, style, displaySetup } = this.props.reportData;
+    const el = document.querySelector(`.statisticsCard-${reportId}`);
+    const parentElement = _.get(el, 'parentElement.parentElement');
+    if (yaxisList.length === 1 && !xaxes.controlId && sourceType && isThumbnail) {
       if (parentElement) {
+        el.classList.add('hideNumberChartName');
+        el.classList.add('hideChartHeader');
         parentElement.classList.add('numberChartCardHover');
-        if (numberChartStyle.iconVisible) {
-          parentElement.classList.add('hideNumberChartName');
-        }
+      }
+    } else {
+      if (parentElement && displaySetup.showTitle) {
+        el.classList.remove('hideNumberChartName');
+        el.classList.remove('hideChartHeader');
+        parentElement.classList.remove('numberChartCardHover');
       }
     }
   }
@@ -241,10 +272,10 @@ export default class extends Component {
     const { reportData, isViewOriginalData, isThumbnail } = this.props;
     const { xaxes, displaySetup } = reportData;
     if (displaySetup.showRowList && isViewOriginalData) {
-      const isNumber = isFormatNumber(xaxes.controlType);
       const param = {};
       if (xaxes.cid) {
-        param[xaxes.cid] = isNumber ? Number(originalId) : originalId;
+        const isNumber = isFormatNumber(xaxes.controlType);
+        param[xaxes.cid] = isNumber && originalId ? Number(originalId) : originalId;
       }
       const data = {
         isPersonal: false,
@@ -277,14 +308,14 @@ export default class extends Component {
         <div className="mRight5 Gray_75">{name}</div>
         {
           contrastValue && percentage ? (
-            <Tooltip title={tipsText} overlayInnerStyle={{ textAlign: 'center' }}>
+            //<Tooltip title={tipsText} overlayInnerStyle={{ textAlign: 'center' }}>
               <div className={`tip-top ${positiveNumber ? (contrastColor ? 'Red' : 'DepGreen') : (contrastColor ? 'DepGreen' : 'Red')}`}>
                 <div className="valignWrapper">
                   {isEquality ? null : <Icon className="mRight3" icon={`${positiveNumber ? 'worksheet_rise' : 'worksheet_fall'}`} />}
                   <span className={cx('bold', { Gray_75: isEquality })}>{contrastValueShowType ? contrastValue : `${Math.abs(toFixed(percentage, contrastValueDot))}%`}</span>
                 </div>
               </div>
-            </Tooltip>
+            //</Tooltip>
           ) : (
             <span className="Gray range">- -</span>
           )
@@ -292,18 +323,33 @@ export default class extends Component {
       </div>
     );
   }
-  renderMapItem(data, span) {
+  renderMapItem(data, controlMinAndMax, span) {
     const { isViewOriginalData, reportData } = this.props;
-    const { xaxes, yaxisList, style, filter, displaySetup } = reportData;
-    const { controlId, name, value, lastContrastValue, contrastValue, minorList = [] } = data;
-    const formatrValue = formatrChartValue(value, false, yaxisList, controlId, false);
+    const { xaxes, yaxisList, style, filter, displaySetup, desc } = reportData;
+    const { controlId, name, value, lastContrastValue, contrastValue, minorList = [], descVisible } = data;
+    const newYaxisList = yaxisList.map(data => {
+      return {
+        ...data,
+        emptyShowType: data.emptyShowType === 0 ? 1 : data.emptyShowType
+      }
+    });
+    const hideVisible = xaxes.controlId && yaxisList.length === 1;
+    const formatrValue = formatrChartValue(value, false, hideVisible ? yaxisList : newYaxisList, controlId);
     const { numberChartStyle = defaultNumberChartStyle } = style;
     const { iconVisible, textAlign, icon, iconColor, shape, fontSize, fontColor, lastContrastText, contrastText } = numberChartStyle;
+    const titleFontSize = _.get(_.find(sizeTypes, { value: fontSize }), 'titleValue') || 15;
     const contrastTypes = formatContrastTypes(filter);
     const oneNumber = !xaxes.controlId && yaxisList.length === 1;
+    const rule = _.get(displaySetup.colorRules[0], 'dataBarRule') || {};
+    const color = !_.isEmpty(rule) && xaxes.controlId ? getStyleColor({
+      value,
+      controlMinAndMax,
+      rule,
+      controlId: yaxisList[0].controlId
+    }) : fontColor;
     return (
       <Col span={span} onClick={() => !oneNumber ? this.handleOpenSheet(data) : _.noop()}>
-        <div className={cx(`wrap-${textAlign}`, { hover: !oneNumber && displaySetup.showRowList && isViewOriginalData })}>
+        <div className={cx(`wrap-${textAlign}`, { oneNumber, hover: !oneNumber && displaySetup.showRowList && isViewOriginalData })}>
           {iconVisible && oneNumber && (
             <div className={cx('svgIconWrap valignWrapper justifyContentCenter', shape, `svgIconSize${fontSize}`)} style={{ backgroundColor: iconColor }}>
               <SvgIcon url={`${md.global.FileStoreConfig.pubHost}/customIcon/${icon}.svg`} fill="#fff" size={32} />
@@ -315,11 +361,23 @@ export default class extends Component {
           >
             <Tooltip title={value.toLocaleString() == formatrValue ? null : value.toLocaleString()} overlayInnerStyle={{ textAlign: 'center' }}>
               <div className="contentWrapper textWrap flexColumn tip-top">
-                {name && <div className="Font16 mBottom10 w100 ellipsis name">{name}</div>}
+                {name && (
+                  <div className="flexRow valignWrapper w100 mBottom2">
+                    <div className="flex ellipsis name" style={{ fontSize: titleFontSize }}>{name}</div>
+                    {descVisible && desc && (
+                      <Tooltip title={desc} placement="bottom">
+                        <Icon
+                          icon="info"
+                          className="Font18 pointer Gray_9e mLeft7 mRight7 InlineBlock mTop2"
+                        /> 
+                      </Tooltip>
+                    )}
+                  </div>
+                )}
                 <div className="flexRow">
                   <div
                     className="ellipsis count"
-                    style={{ color: fontColor }}
+                    style={{ color }}
                   >
                     {formatrValue}
                   </div>
@@ -332,7 +390,7 @@ export default class extends Component {
               {minorList.map(data => (
                 <div className="w100 flexRow textWrap minorWrap Font14">
                   <div className="mRight5 Gray_75">{data.name}</div>
-                  <div>{formatrChartValue(data.value, false, yaxisList, data.controlId, false)}</div>
+                  <div>{formatrChartValue(data.value, false, newYaxisList, data.controlId)}</div>
                 </div>
               ))}
             </div>
@@ -342,15 +400,18 @@ export default class extends Component {
     );
   }
   render() {
-    const { name, xaxes, map, contrast = [], contrastMap = [], displaySetup = {}, summary, yaxisList, style } = this.props.reportData;
+    const { mobileCount = 1, layoutType, reportData, sourceType, isThumbnail } = this.props;
+    const { name, xaxes, map, contrast = [], contrastMap = [], displaySetup = {}, summary, yaxisList, style } = reportData;
     const { numberChartStyle = {} } = style;
     const list = xaxes.controlId ? formatData(map, contrast, contrastMap, displaySetup, yaxisList) : fillMap(map, contrast, contrastMap);
+    const totalIsHide = yaxisList.length === 1 && yaxisList[0].emptyShowType === 0 && !summary.sum;
     const oneNumber = !xaxes.controlId && yaxisList.length === 1;
     const defaultColumnCount = oneNumber ? 1 : (numberChartStyle.columnCount || 4);
-    const columnCount = (isMobile && defaultColumnCount > 2) ? 2 : defaultColumnCount;
-    const showTotal = displaySetup.showTotal && !oneNumber;
+    const columnCount = (isMobile || layoutType === 'mobile') ? mobileCount : defaultColumnCount;
+    const showTotal = displaySetup.showTotal && xaxes.controlId;
     const count = list.length + (showTotal ? 1 : 0);
     const span = Math.ceil(24 / columnCount);
+    const controlMinAndMax = getControlMinAndMax(map);
     return (
       <Wrap
         className={cx('flexRow h100', `verticalAlign-${numberChartStyle.allowScroll ? 'top' : 'center'}`)}
@@ -358,29 +419,35 @@ export default class extends Component {
         onClick={() => oneNumber ? this.handleOpenSheet({}) : _.noop()}
       >
         <Row gutter={[8, 0]}>
-          {showTotal && (
+          {showTotal && !!list.length && !totalIsHide && (
             this.renderMapItem({
               value: summary.sum,
               name: summary.name,
               lastContrastValue: displaySetup.contrast ? summary.contrastSum || 0 : null,
               contrastValue: displaySetup.contrastType ? summary.contrastMapSum || 0 : null
-            }, span)
+            }, controlMinAndMax, span)
           )}
           {xaxes.controlId ? (
             list.map(data => (
-              this.renderMapItem(data, span)
+              this.renderMapItem(data, controlMinAndMax, span)
             ))
           ) : (
             list.map((data, index) => (
               this.renderMapItem({
                 controlId: data.c_id,
                 value: _.get(data, 'value[0].v') || 0,
-                name: list.length === 1 ? (numberChartStyle.iconVisible ? name : undefined) : this.getControlName(data.c_id),
+                name: isMobile ? (list.length === 1 ? null : this.getControlName(data.c_id)) : (sourceType && list.length === 1) ? name : this.getControlName(data.c_id),
+                descVisible: !isMobile && sourceType && list.length === 1,
                 lastContrastValue: _.get(contrast[index], 'value[0].v') || (displaySetup.contrast ? 0 : null),
                 contrastValue: _.get(contrastMap[index], 'value[0].v') || (displaySetup.contrastType ? 0 : null)
-              }, span)
+              }, controlMinAndMax, span)
             ))
           )}
+          {!list.length && this.renderMapItem({
+            value: 0,
+            name: isMobile ? null : name,
+            descVisible: sourceType,
+          }, controlMinAndMax, 24)}
         </Row>
       </Wrap>
     );

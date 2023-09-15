@@ -108,10 +108,12 @@ export default function Number(props) {
               newOptions.numinterval = '1';
               newOptions.min = '0';
               newOptions.max = '100';
-              newOptions.itemcolor = JSON.stringify(defaultItemColor);
+              newOptions.itemcolor = JSON.stringify(_.isEmpty(itemcolor) ? defaultItemColor : itemcolor);
               newOptions.showinput = '1';
               newOptions.datamask = '';
               setNumValue(newOptions.numinterval);
+              onChange({ ...handleAdvancedSettingChange(data, newOptions), dot: 0 });
+              return;
             }
             onChange(handleAdvancedSettingChange(data, newOptions));
           }}
@@ -160,7 +162,11 @@ export default function Number(props) {
                   tempValue = numinterval;
                 }
                 setNumValue(tempValue);
-                onChange(handleAdvancedSettingChange(data, { numinterval: tempValue }));
+                const pointIndex = String(tempValue).indexOf('.') + 1;
+                onChange({
+                  ...handleAdvancedSettingChange(data, { numinterval: tempValue }),
+                  dot: pointIndex > 0 ? String(tempValue).length - pointIndex : 0,
+                });
               }}
             />
             <div className="labelWrap mTop12">
@@ -190,13 +196,9 @@ export default function Number(props) {
       {fromExcel ? null : (
         <Fragment>
           <DynamicDefaultValue {...props} />
+          <WidgetVerify {...props} />
 
-          {isNumber && (
-            <Fragment>
-              <WidgetVerify {...props} />
-              <NumberConfig {...props} />
-            </Fragment>
-          )}
+          {isNumber && <NumberConfig {...props} />}
 
           {numshow !== '1' && isNumber && (
             <SettingItem>

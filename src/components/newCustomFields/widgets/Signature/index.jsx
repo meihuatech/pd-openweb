@@ -13,6 +13,7 @@ import createDecoratedComponent from 'ming-ui/decorators/createDecoratedComponen
 import { browserIsMobile, getToken } from 'src/util';
 import accountSettingAjax from 'src/api/accountSetting';
 import { Base64 } from 'js-base64';
+import { CardButton } from 'src/pages/worksheet/components/Basics.jsx';
 
 const ClickAwayable = createDecoratedComponent(withClickAway);
 
@@ -79,13 +80,9 @@ const SignatureWrap = styled.div`
   }
   .remove {
     position: absolute;
-    right: -8px;
-    top: -8px;
+    right: -12px;
+    top: -12px;
     visibility: hidden;
-    i {
-      font-size: 18px;
-      color: #757575;
-    }
   }
 `;
 const Footer = styled.div`
@@ -196,8 +193,13 @@ export default class Signature extends Component {
     }
 
     const data = this.signaturePad.toDataURL('image/png');
+    const { projectId, appId, worksheetId } = this.props;
     this.setState({ popupVisible: false, signature: data });
-    getToken([{ bucket: 4, ext: '.png' }]).then(res => {
+    getToken([{ bucket: 4, ext: '.png' }], 10, {
+      projectId,
+      appId,
+      worksheetId,
+    }).then(res => {
       if (res.error) {
         alert(res.error);
       } else {
@@ -231,7 +233,7 @@ export default class Signature extends Component {
 
   useLastSignature = () => {
     accountSettingAjax.getSign().then(res => {
-      if (!res.url) return alert(_l('暂无签名记录'));
+      if (!res.url) return alert(_l('暂无签名记录'), 3);
       this.setState({ isEdit: true, lastInfo: res });
     });
   };
@@ -269,8 +271,17 @@ export default class Signature extends Component {
   preview = e => {
     e.nativeEvent.stopImmediatePropagation();
     const { value } = this.props;
+
     previewAttachments({
-      attachments: [{ previewType: 1, ext: 'png', name: 'signature.png', previewAttachmentType: 'QINIU', path: value }],
+      attachments: [
+        {
+          previewType: 1,
+          ext: 'png',
+          name: 'signature.png',
+          previewAttachmentType: 'QINIU',
+          path: value.indexOf('bucket') > -1 ? md.global.FileStoreConfig.pictureHost + safeParse(value).key : value,
+        },
+      ],
       index: 0,
       callFrom: 'player',
       hideFunctions: ['editFileName'],
@@ -380,9 +391,25 @@ export default class Signature extends Component {
     );
   };
 
+  getValue() {
+    const { value } = this.props;
+    if (value && value.startsWith('{')) {
+      try {
+        const parsed = JSON.parse(value);
+        if (parsed.bucket && parsed.key) {
+          return md.global.FileStoreConfig[parsed.bucket === 4 ? 'pictureHost' : 'pubHost'] + parsed.key;
+        }
+      } catch (err) {
+        console.error(err);
+        return '';
+      }
+    }
+    return /(\.jpeg|\.png|\.jpg)$/.test((value || '').replace(/\?.*/g, '')) ? value : '';
+  }
+
   render() {
     const { disabled, onlySignature } = this.props;
-    const value = /(\.jpeg|\.png|\.jpg)$/.test((this.props.value || '').replace(/\?.*/g, '')) ? this.props.value : '';
+    const value = this.getValue();
     const { signature } = this.state;
 
     // 只读
@@ -409,7 +436,9 @@ export default class Signature extends Component {
             style={{ backgroundImage: `url(${signature || value})` }}
           >
             <div className="remove" onClick={this.removeSignature}>
-              <i className="icon-minus-square" />
+              <CardButton>
+                <i className="icon icon-close" />
+              </CardButton>
             </div>
           </SignatureWrap>
         ) : (

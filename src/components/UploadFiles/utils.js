@@ -240,7 +240,7 @@ export const findIndex = (res, id) => {
 };
 
 export const checkAccountUploadLimit = (size, params = {}) => {
-  return kcCtrl.getUsage(params).then(function(usage) {
+  return kcCtrl.getUsage(params).then(function (usage) {
     return usage.used + size < usage.total;
   });
 };
@@ -320,24 +320,25 @@ export const formatTime = (seconds = 0) => {
 // 文件类型验证
 export const checkFileExt = (filetype = '', fileExt = '') => {
   const { type = '', values = [] } = JSON.parse(filetype || '{}');
+  fileExt = fileExt.replace('.', '');
   let verifyExt = true;
 
   const FileExts = {
     0: values,
-    1: ['JPG', 'JPEG', 'PNG', 'Gif', 'WebP', 'Tiff', 'bmp'],
-    3: ['WAV', 'FLAC', 'APE', 'ALAC', 'WavPack', 'MP3', 'AAC', 'Ogg Vorbis', 'Opus', 'Au', 'MMF', 'AIF'],
+    1: ['JPG', 'JPEG', 'PNG', 'Gif', 'WebP', 'Tiff', 'bmp', 'HEIC'],
+    3: ['WAV', 'FLAC', 'APE', 'ALAC', 'WavPack', 'MP3', 'M4a', 'AAC', 'Ogg Vorbis', 'Opus', 'Au', 'MMF', 'AIF'],
     4: ['MP4', 'AVI', 'MOV', 'WMV', 'MKV', 'FLV', 'F4V', 'SWF', 'RMVB', 'MPG'],
   };
 
   if (_.includes(['0', '1', '3', '4'], type)) {
-    verifyExt = FileExts[type].some(i => fileExt.toLowerCase().indexOf(i.toLowerCase()) > -1);
+    verifyExt = FileExts[type].some(i => fileExt.toLowerCase() === i.toLowerCase());
   } else if (_.includes(['2'], type)) {
     const tempFileExts = Object.keys(FileExts).reduce((total, cur) => {
       if (_.includes(['0', '2'], type)) {
         return (total = total.concat(FileExts[cur]));
       }
     }, []);
-    verifyExt = tempFileExts.every(i => !(fileExt.toLowerCase().indexOf(i.toLowerCase()) > -1));
+    verifyExt = tempFileExts.every(i => !(fileExt.toLowerCase() === i.toLowerCase()));
   }
 
   const errorText =
@@ -354,7 +355,7 @@ export const checkFileAvailable = (fileSettingInfo = {}, files = [], tempCount =
 
   // 附件数量
   if (maxcount && count > Number(maxcount)) {
-    alert(_l('最多上传%0个文件', maxcount));
+    alert(_l('最多上传%0个文件', maxcount), 2);
     isAvailable = false;
   }
 
@@ -367,12 +368,12 @@ export const checkFileAvailable = (fileSettingInfo = {}, files = [], tempCount =
           itemField.name ? File.GetExt(itemField.name) : itemField.fileExt,
         );
         if (!verifyExt) {
-          alert(errorText);
+          alert(errorText, 2);
           return false;
         }
       }
       if (max && (itemField.size || itemField.fileSize) > parseFloat(max) * 1024 * 1024) {
-        alert(_l('上传失败，无法上传大于%0MB的文件', max));
+        alert(_l('上传失败，无法上传大于%0MB的文件', max), 2);
         return false;
       }
       return true;

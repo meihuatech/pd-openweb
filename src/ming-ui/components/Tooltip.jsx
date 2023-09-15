@@ -68,6 +68,10 @@ class Tooltip extends Component {
      */
     tooltipClass: PropTypes.string,
     /**
+     * 自定义样式
+     */
+    tooltipStyle: PropTypes.string,
+    /**
      * 偏移的值，[x, y]
      */
     offset: PropTypes.array,
@@ -89,9 +93,10 @@ class Tooltip extends Component {
     text: <span />,
     popupPlacement: 'top',
     themeColor: 'black',
-    offset: [1, 1],
+    offset: [1, 3],
     overflow: [1, 1],
     disable: false,
+    tooltipStyle: {},
   };
   constructor(props) {
     super(props);
@@ -101,7 +106,7 @@ class Tooltip extends Component {
     };
   }
   renderPopup() {
-    const { text, tooltipClass } = this.props;
+    const { text, tooltipClass, tooltipStyle } = this.props;
     const { loading, value } = this.state;
     let content = text;
     if (this.contentIsFunction) {
@@ -110,7 +115,7 @@ class Tooltip extends Component {
       content = <span>{text}</span>;
     }
     return (
-      <div className={cx('Tooltip-wrapper', tooltipClass)}>
+      <div className={cx('Tooltip-wrapper', tooltipClass)} style={tooltipStyle}>
         <div className="Tooltip-arrow" />
         <div
           className="Tooltip-content"

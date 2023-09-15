@@ -6,6 +6,7 @@ import SheetTable, { changeSheetModel } from './SheetTable';
 import { PERMISSION_WAYS, TEXTS, roleDetailPropType, actionList } from 'src/pages/Role/config.js';
 import styled from 'styled-components';
 import _ from 'lodash';
+import { WrapFooter } from 'src/pages/Role/style.jsx';
 
 const WrapCon = styled.div`
   .optionTxt {
@@ -13,7 +14,7 @@ const WrapCon = styled.div`
     color: #919191;
   }
   .toUser {
-    color: #757575;
+    color: #5a5a5a;
     &:hover {
       color: #2196f3;
     }
@@ -29,52 +30,7 @@ const WrapCon = styled.div`
 const Wrap = styled.div`
   width: 52%;
 `;
-const WrapFooter = styled.div`
-  .saveBtn {
-    height: 36px;
-    padding: 0 30px;
-    color: #fff;
-    line-height: 36px;
-    border-radius: 4px 4px 4px 4px;
-    font-size: 14px;
-    font-weight: 400;
-    transition: color ease-in 0.2s, border-color ease-in 0.2s, background-color ease-in 0;
-    background: #1e88e5;
-    &:hover {
-      background: #1565c0;
-    }
-    &.disabled {
-      color: #fff;
-      background: #b2dbff;
-      cursor: not-allowed;
-      &:hover {
-        background: #b2dbff;
-      }
-    }
-  }
-  .delBtn {
-    height: 36px;
-    padding: 0 30px;
-    line-height: 36px;
-    border-radius: 4px 4px 4px 4px;
-    font-size: 14px;
-    opacity: 1;
-    border: 1px solid #eaeaea;
-    margin-left: 23px;
-    font-weight: 400;
-    transition: color ease-in 0.2s, border-color ease-in 0.2s, background-color ease-in 0;
-    &:hover {
-      border: 1px solid #ccc;
-    }
-    &.disabled {
-      color: #eaeaea;
-      cursor: not-allowed;
-      &:hover {
-        border: 1px solid #eaeaea;
-      }
-    }
-  }
-`;
+
 const PERMISSION_WAYS_WITH_CHECKBOX = [
   PERMISSION_WAYS.OnlyManageSelfRecord,
   PERMISSION_WAYS.OnlyManageSelfAndSubRecord,
@@ -125,7 +81,7 @@ export default class extends PureComponent {
     });
   };
 
-  changePermissionWay = permissionWay => {
+  changePermissionWay = (permissionWay, clearExtendAttrs = false) => {
     const { onChange, roleDetail: { description, permissionWay: oldPermissionWay } = {} } = this.props;
     if (oldPermissionWay !== permissionWay) {
       let payload = {
@@ -157,12 +113,22 @@ export default class extends PureComponent {
           ...payload,
         };
       }
+
+      if (clearExtendAttrs) {
+        payload.extendAttrs = [];
+      }
+
       onChange(payload);
     }
   };
 
   renderAuth() {
-    const { roleDetail: { permissionWay } = {}, isForPortal, onChange, roleDetail } = this.props;
+    const {
+      roleDetail: { permissionWay, optionalControls, extendAttrs } = {},
+      isForPortal,
+      onChange,
+      roleDetail,
+    } = this.props;
 
     const list = [
       PERMISSION_WAYS.ManageAllRecord,
@@ -196,7 +162,7 @@ export default class extends PureComponent {
             className="mLeft40"
             checked={isCustom}
             value={PERMISSION_WAYS.CUSTOM}
-            onClick={this.changePermissionWay}
+            onClick={value => this.changePermissionWay(value, true)}
           />
         </div>
         {!isCustom ? (
@@ -212,7 +178,7 @@ export default class extends PureComponent {
                   return TEXTS[permissionWay];
                 }}
                 menuStyle={{ width: '100%' }}
-                onChange={this.changePermissionWay}
+                onChange={value => this.changePermissionWay(value, true)}
               />
             </div>
             {showCheckbox && !isForPortal ? (
@@ -236,6 +202,66 @@ export default class extends PureComponent {
                 <Tooltip text={<span>{_l('汇报关系中，下属拥有的记录')} </span>} popupPlacement="top">
                   <i className="icon-info_outline Font16 Gray_9e mLeft3 TxtMiddle" />
                 </Tooltip>
+              </div>
+            ) : null}
+            {showCheckbox && optionalControls.length > 0 && !isForPortal ? (
+              <div className="mTop15 flexRow">
+                <div className="left">
+                  <span className="flexRow alignItemsCenter">
+                    <Checkbox
+                      className={'subCheckbox InlineBlock'}
+                      checked={optionalControls.filter(l => extendAttrs.includes(l.id)).length > 0}
+                      clearselected={
+                        optionalControls.filter(l => extendAttrs.includes(l.id)).length > 0 &&
+                        optionalControls.filter(l => !extendAttrs.includes(l.id)).length !== 0
+                      }
+                      size="small"
+                      onClick={checked => {
+                        if (checked) {
+                          onChange({ extendAttrs: [] });
+                        } else {
+                          onChange({ extendAttrs: optionalControls.map(l => l.id) });
+                        }
+                      }}
+                    >
+                      {_l('匹配用户权限标签的记录')}
+                    </Checkbox>
+                    <Tooltip
+                      text={
+                        <span>
+                          {_l(
+                            '可启用的权限标签字段来自于[用户扩展信息]的标签字段。勾选后，可根据[用户扩展信息-人员表]中配置的字段值，查看工作表被关联的字段所属记录。',
+                          )}{' '}
+                        </span>
+                      }
+                      popupPlacement="top"
+                    >
+                      <Icon icon="workflow_error" className="Font16 Gray_9e mLeft3 TxtMiddle" />
+                    </Tooltip>
+                  </span>
+                </div>
+                <div className="right mLeft40" style={{ display: 'flex', gap: '10px 46px', flexWrap: 'wrap' }}>
+                  {optionalControls.map(item => (
+                    <span className="flexRow alignItemsCenter">
+                      <Checkbox
+                        className="InlineBlock"
+                        checked={extendAttrs.indexOf(item.id) > -1}
+                        text={item.name}
+                        onClick={value => {
+                          if (value) {
+                            onChange({
+                              extendAttrs: extendAttrs.filter(l => l !== item.id),
+                            });
+                          } else {
+                            onChange({
+                              extendAttrs: extendAttrs.concat(item.id),
+                            });
+                          }
+                        }}
+                      />
+                    </span>
+                  ))}
+                </div>
               </div>
             ) : null}
             {!isCustom && (
@@ -264,7 +290,11 @@ export default class extends PureComponent {
                         <Checkbox
                           className={'subCheckbox InlineBlock TxtMiddle'}
                           disabled={o.key === 'generalAdd' && PERMISSION_WAYS.OnlyViewAllRecord === permissionWay} //对所有记录只有查看权限 同时 操作权限 不可新增
-                          checked={roleDetail[o.key].enable}
+                          checked={
+                            o.key === 'generalAdd' && PERMISSION_WAYS.OnlyViewAllRecord === permissionWay
+                              ? false
+                              : roleDetail[o.key].enable
+                          }
                           size="small"
                           onClick={checked => {
                             onChange({
@@ -442,17 +472,19 @@ export default class extends PureComponent {
   };
 
   render() {
-    const {
-      roleDetail: { name, description, roleId } = {},
+    let {
+      roleDetail: { name, description, roleId, hideAppForMembers } = {},
       loading,
       onChange,
       onSave,
-      setQuickTag,
       onDel,
       saveLoading,
       roleDetailCache,
+      isForPortal,
+      setQuickTag,
+      canEditUser,
     } = this.props;
-
+    roleId = roleId === 'new' ? '' : roleId;
     if (loading) return <LoadDiv className="mTop10" />;
 
     return (
@@ -465,22 +497,11 @@ export default class extends PureComponent {
                 this.container = el;
               }}
             >
-              <div className="flexRow alignItemsCenter">
+              <div className="roleTitle Bold Font17">{!roleId ? _l('创建角色') : _l('编辑角色')}</div>
+              <div className="flexRow alignItemsCenter mTop30">
                 <div className="Font14 bold flex">{_l('角色名称')}</div>
-                {!!roleId && (
-                  <span
-                    className="Font14 toUser Hand flexRow alignItemsCenter"
-                    onClick={() => {
-                      this.props.handleChangePage(() => {
-                        setQuickTag({ roleId, tab: 'user' });
-                      });
-                    }}
-                  >
-                    <Icon type={'supervisor_account'} className="mRight6 Font16" /> {_l('查看用户')}
-                  </span>
-                )}
               </div>
-              <div className="mTop8">
+              <div className="mTop8 flexRow">
                 <Input
                   type="text"
                   value={name}
@@ -495,6 +516,33 @@ export default class extends PureComponent {
                     });
                   }}
                 />
+                {!!roleId && !isForPortal && (
+                  <span className="Font14 toUser Hand flexRow alignItemsCenter mLeft30">
+                    <Checkbox
+                      className="Gray"
+                      size="small"
+                      checked={hideAppForMembers}
+                      onClick={() => {
+                        onChange({
+                          hideAppForMembers: !hideAppForMembers,
+                        });
+                      }}
+                      text={_l('隐藏应用')}
+                    />
+                    <Tooltip
+                      text={
+                        <span>
+                          {_l(
+                            '对当前角色下的用户仅授予权限，但不显示应用入口。通常用于跨应用关联数据或引用视图时，只需要用户从另一个应用中进行操作的场景。',
+                          )}
+                        </span>
+                      }
+                      popupPlacement="top"
+                    >
+                      <i className="icon-info_outline Font16 Gray_bd mLeft7" />
+                    </Tooltip>
+                  </span>
+                )}
               </div>
               <div className="Font14 mTop25 bold">{_l('描述')}</div>
               <div className="mTop8">
@@ -514,7 +562,7 @@ export default class extends PureComponent {
             </div>
           </ScrollView>
         </WrapCon>
-        <WrapFooter className={'footer flexRow'}>
+        <WrapFooter className={'footer flexRow alignItemsCenter'}>
           <div
             className={cx('saveBtn Hand flexRow alignItemsCenter', {
               disabled: saveLoading || (_.isEqual(this.props.roleDetail, roleDetailCache) && !!roleId),
@@ -536,10 +584,27 @@ export default class extends PureComponent {
                 onDel();
               }
             }}
-            className={cx('delBtn Hand', { disabled: _.isEqual(this.props.roleDetail, roleDetailCache) && !!roleId })}
+            className={cx('delBtn Hand', {
+              disabled: _.isEqual(this.props.roleDetail, roleDetailCache) && !!roleId,
+            })}
           >
             {!roleId ? _l('删除') : _l('取消')}
           </div>
+          {!!roleId && canEditUser && (
+            <React.Fragment>
+              <div className="line"></div>
+              <div
+                className="toUser Hand Bold"
+                onClick={() => {
+                  this.props.handleChangePage(() => {
+                    setQuickTag({ roleId: roleId, tab: 'user' });
+                  });
+                }}
+              >
+                {_l('管理用户')}
+              </div>
+            </React.Fragment>
+          )}
         </WrapFooter>
       </React.Fragment>
     );

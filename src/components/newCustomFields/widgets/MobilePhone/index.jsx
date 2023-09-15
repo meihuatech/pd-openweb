@@ -22,7 +22,10 @@ const PhoneWrap = styled.div`
   .cellMobileInput {
     line-height: 30px;
   }
-  ${props => (props.showCountry && !props.isEditing && props.itiWidth ? `width: ${props.itiWidth};` : '')};
+  ${props =>
+    props.showCountry && !props.isEditing && props.itiWidth
+      ? `width: ${props.isMobile ? 'unset' : props.itiWidth};`
+      : ''};
   input {
     padding-right: ${props => (props.showCountry && !props.isEditing && props.itiWidth ? '0px !important' : '12px')};
   }
@@ -171,7 +174,7 @@ export default class Widgets extends Component {
             { controlDisabled: disabled },
             { Hidden: isCell },
           )}
-          style={{ paddingLeft: hiddenCountry ? '12px' : `${itiWidth}` || '12px' }}
+          style={{ paddingLeft: hiddenCountry ? '12px' : `${itiWidth}` || '12px', height: '36px' }}
           onClick={() => {
             if (!disabled && !isEditing) {
               this.setState({ isEditing: true }, () => this.input && this.input.focus());
@@ -189,7 +192,13 @@ export default class Widgets extends Component {
           </span>
         </MobilePhoneBox>
 
-        <PhoneWrap isEditing={isEditing} showCountry={!hiddenCountry} itiWidth={itiWidth} isCell={isCell}>
+        <PhoneWrap
+          isEditing={isEditing}
+          showCountry={!hiddenCountry}
+          itiWidth={itiWidth}
+          isCell={isCell}
+          isMobile={browserIsMobile()}
+        >
           <ClickAwayable onClickAway={() => this.setState({ isEditing: false })}>
             <input
               type="tel"
@@ -208,11 +217,14 @@ export default class Widgets extends Component {
           </ClickAwayable>
         </PhoneWrap>
 
-        {(_.includes([FROM.H5_ADD, FROM.H5_EDIT], from) || (browserIsMobile() && disabled)) && !!value && (
-          <a href={`tel:${value}`} className="Absolute customFormControlTelBtn" style={{ right: 0, top: 10 }}>
-            <Icon icon="phone22" className="Font16 ThemeColor3" />
-          </a>
-        )}
+        {maskPermissions &&
+          value &&
+          (_.includes([FROM.H5_ADD, FROM.H5_EDIT], from) || (browserIsMobile() && disabled)) &&
+          !!value && (
+            <a href={`tel:${value}`} className="Absolute customFormControlTelBtn" style={{ right: 0, top: 10 }}>
+              <Icon icon="phone22" className="Font16 ThemeColor3" />
+            </a>
+          )}
       </div>
     );
   }

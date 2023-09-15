@@ -28,7 +28,7 @@ class WidgetsDesc extends React.Component {
       return null;
     }
 
-    if (_.includes([FROM.NEWRECORD, FROM.PUBLIC, FROM.H5_ADD], from)) {
+    if (_.includes([FROM.NEWRECORD, FROM.PUBLIC_ADD, FROM.H5_ADD, FROM.DRAFT], from) && !item.isSubList) {
       return (
         <Linkify properties={{ target: '_blank' }}>
           <p className="descBox pAll0 mAll0 mBottom0 mTop6 Font12 Gray_9e w100 WordBreak">
@@ -58,27 +58,29 @@ class WidgetsDesc extends React.Component {
     }
 
     return (
-      <Tooltip
-        text={
-          <span
-            className="Block"
-            style={{
-              maxWidth: 230,
-              maxHeight: 200,
-              overflowY: 'auto',
-              color: '#fff',
-              whiteSpace: 'pre-wrap',
-            }}
-          >
-            {item.desc}
-          </span>
-        }
-        action={[isMobile ? 'click' : 'hover']}
-        popupPlacement={'topLeft'}
-        offset={[-12, 0]}
-      >
-        <i className="icon-workflow_error descBoxInfo pointer Font16 Gray_9e mLeft3" />
-      </Tooltip>
+      <span className="descBoxInfo">
+        <Tooltip
+          text={
+            <span
+              className="Block"
+              style={{
+                maxWidth: 230,
+                maxHeight: 200,
+                overflowY: 'auto',
+                color: '#fff',
+                whiteSpace: 'pre-wrap',
+              }}
+            >
+              {item.desc}
+            </span>
+          }
+          action={[isMobile ? 'click' : 'hover']}
+          popupPlacement={'topLeft'}
+          offset={[-12, 0]}
+        >
+          <i className="icon-workflow_error pointer Font16 Gray_9e mLeft3 InlineBlock" />
+        </Tooltip>
+      </span>
     );
   }
 }

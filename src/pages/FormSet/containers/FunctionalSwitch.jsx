@@ -9,12 +9,21 @@ import Range from '../components/functional/Range';
 import DeleDialog from '../components/DeleAutoIdDialog';
 import cx from 'classnames';
 const confirm = Dialog.confirm;
-import { listConfigStr, listPermit, batch } from '../config';
+import {
+  listConfigStr,
+  listPermit,
+  batch,
+  statistics,
+  statisticsConst,
+  noRangeList,
+  helfList,
+  hasRangeList,
+} from '../config';
 import _ from 'lodash';
 
 const tipStr = {
   10: _l('在工作表右上方显示的创建记录按钮。关闭后，则无法直接在工作表中创建记录，只能通过关联记录等其他位置创建'),
-  22: _l('表格视图可以单元格直接编辑，看板、层级、画廊视图可以在卡片上直接修改文本类标题和检查框'),
+  22: _l('表格视图可以单元格直接编辑；看板、层级、甘特图在标题字段为文本类型时可以只填写标题字段快速创建记录；可以在看板、层级和画廊视图的卡片上直接修改文本类标题和检查框'),
   23: _l('仅控制系统默认的条形码/二维码打印功能。不包含配置的打印模板'),
   32: _l('仅控制系统默认提供的打印方式，不包含打印模版'),
   33: _l('可以控制附件的下载、分享、保存到知识（不包含用户自行上传的附件）'),
@@ -30,6 +39,7 @@ function FunctionalSwitch(props) {
   const { views = [], projectId, appId } = worksheetInfo;
   const [show, setShow] = useState(false);
   const [hideBatch, sethideBatch] = useState(false);
+  const [hideStatistics, sethideStatistics] = useState(false);
   const [closeAutoID, setCloseAutoID] = useState(!!worksheetInfo.closeAutoID);
   const [info, setInfo] = useState({
     loading: true,
@@ -45,17 +55,41 @@ function FunctionalSwitch(props) {
   }, [info.worksheetId]);
 
   useEffect(() => {
-    sethideBatch(localStorage.getItem('batchIsOpen') === '1');
-  }, []);
+    const { formSet } = props;
+    const { worksheetInfo } = formSet;
+    setCloseAutoID(!!worksheetInfo.closeAutoID);
+  }, [props]);
 
+  useEffect(() => {
+    sethideBatch(localStorage.getItem('batchIsOpen') === '1');
+    sethideStatistics(localStorage.getItem('statisticsIsOpen') === '1');
+  }, []);
+  const setFormatData = data => {
+    const listC = data.filter(o => statistics.includes(o.type)) || [];
+    let list = _.groupBy(
+      //统计=>包含个人|公共
+      data.filter(o => ![...statistics, statisticsConst].includes(o.type)),
+      item => Math.floor(item.type / 10),
+    );
+    list[1] = [
+      ...list[1],
+      {
+        view: [],
+        state: listC.filter(o => o.state).length > 0,
+        type: statisticsConst, //统计
+        roleType: 0,
+        viewIds: [],
+      },
+      ...listC,
+    ];
+    return list;
+  };
   const getSwitchData = () => {
     sheetAjax.getSwitch({ worksheetId: info.worksheetId }).then(res => {
       let data = res;
       // //测试
       // data.push(
-      //   ...[//25, 26, 27, 28,
-      //      29
-      //   ].map(o => {
+      //   ...[14].map(o => {
       //     return {
       //       view: [],
       //       state: true,
@@ -65,12 +99,11 @@ function FunctionalSwitch(props) {
       //     };
       //   }),
       // );
-      // console.log(data);
       setInfo({
         ...info,
         loading: false,
         data,
-        list: _.groupBy(data, item => Math.floor(item.type / 10)),
+        list: setFormatData(data),
       });
     });
   };
@@ -106,10 +139,36 @@ function FunctionalSwitch(props) {
         }
       }
     }
+    if ([statisticsConst, ...statistics].includes(type)) {
+      if (type === statisticsConst) {
+        switchList.push(
+          ...info.data
+            .filter(o => statistics.includes(o.type))
+            .map(o => {
+              return { ..._.pick(o, ['roleType', 'type', 'state', 'viewIds']), state: state };
+            }),
+        );
+      } else {
+        let batchOther = info.data.filter(o => statistics.includes(o.type) && type !== o.type);
+        switchList.push(...batchOther);
+        let batchNum = switchList.filter(item => item.state).length;
+        let noBatch = batchNum <= 0;
+        if (noBatch) {
+          //下面批量操作全部关闭，批量操作按钮也关闭
+          switchList.push(
+            ...info.data
+              .filter(o => o.type === statisticsConst)
+              .map(o => {
+                return { ..._.pick(o, ['roleType', 'type', 'state', 'viewIds']), state: false };
+              }),
+          );
+        }
+      }
+    }
     sheetAjax
       .batchEditSwitch({
         worksheetId: info.worksheetId,
-        switchList,
+        switchList: switchList.filter(o => o.type !== statisticsConst),
       })
       .then(data => {
         if (data) {
@@ -119,7 +178,7 @@ function FunctionalSwitch(props) {
           setInfo({
             ...info,
             data: da,
-            list: _.groupBy(da, m => Math.floor(m.type / 10)),
+            list: setFormatData(da),
             showData: props,
           });
         } else {
@@ -226,25 +285,31 @@ function FunctionalSwitch(props) {
                 });
                 let batchNum = info.data.filter(item => batch.includes(item.type) && item.state).length;
                 let noBatch = batchNum <= 0;
+                let statisticsNum = info.data.filter(item => statistics.includes(item.type) && item.state).length;
+                let noStatistics = statisticsNum <= 0;
                 return (
                   <React.Fragment>
                     <h6 className="Font13 mTop24 Gray Bold">{strFn(key)}</h6>
                     <ul className="mTop12">
                       {item.map(o => {
-                        if (o.type === 31 || (batch.includes(o.type) && (noBatch || hideBatch))) {
+                        if (
+                          o.type === 31 ||
+                          (batch.includes(o.type) && (noBatch || hideBatch)) ||
+                          (statistics.includes(o.type) && (noStatistics || hideStatistics))
+                        ) {
                           //排除复制,暂未上线
                           return '';
                         }
                         return (
                           <li className={cx({ current: (info.showData.type || '') === o.type, isOpen: o.state })}>
-                            {/* 12, 13, 34不能关闭  batch内的操作左侧没有开关*/}
-                            {![12, 13, 34].concat(batch).includes(o.type) ? (
+                            {/* batch,statistics内的操作左侧没有开关*/}
+                            {![...batch, ...statistics].includes(o.type) ? (
                               renderSwitch(o)
                             ) : (
                               <div className="InlineBlock mRight18 nullBox"></div>
                             )}
-                            {/* batch内的操作 开关缩进 */}
-                            {batch.includes(o.type) && renderSwitch(o)}
+                            {/* batch,statistics内的操作 开关缩进 */}
+                            {[...batch, ...statistics].includes(o.type) && renderSwitch(o)}
                             <span
                               className="con flexRow"
                               onClick={e => {
@@ -283,13 +348,21 @@ function FunctionalSwitch(props) {
                                   {batchNum}/{batch.length}
                                 </span>
                               )}
-                              {[10, 22, 23, 33, 32, 40].includes(o.type) && (
+                              {[statisticsConst].includes(o.type) && !noStatistics && (
+                                <span className="mLeft5 Gray_9e">
+                                  {statisticsNum}/{statistics.length}
+                                </span>
+                              )}
+                              {helfList.includes(o.type) && (
                                 <Tooltip popupPlacement="bottom" text={<span>{tipStr[o.type]}</span>}>
                                   <Icon icon="help" className="Font14 Gray_9e mLeft4" />
                                 </Tooltip>
                               )}
                               {o.roleType === 100 && o.state && (
-                                <Tooltip popupPlacement="bottom" text={<span>{_l('仅管理员可见')}</span>}>
+                                <Tooltip
+                                  popupPlacement="bottom"
+                                  text={<span>{_l('仅系统角色可见（包含管理员、运营者、开发者）')}</span>}
+                                >
                                   <Icon icon="visibility_off" className="" />
                                 </Tooltip>
                               )}
@@ -305,26 +378,29 @@ function FunctionalSwitch(props) {
                                   {hideBatch ? _l('展开') : _l('收起')}
                                 </span>
                               )}
+                              {[statisticsConst].includes(o.type) && !noStatistics && (
+                                <span
+                                  className="batchIsOpen Right Hand ThemeHoverColor3"
+                                  onClick={() => {
+                                    safeLocalStorageSetItem('statisticsIsOpen', hideStatistics ? null : '1');
+                                    sethideStatistics(!hideStatistics);
+                                  }}
+                                >
+                                  {hideStatistics ? _l('展开') : _l('收起')}
+                                </span>
+                              )}
                               {/* 作用范围 */}
-                              {[...batch, 12, 13, 20, 21, 22, 30, 31, 32, 33, 34, 35, 36, 41].includes(o.type) &&
-                                o.state && <Icon icon="navigate_next" className="Gray_c Right Hand Font20" />}
-                              {/* 10, 11, 25没有范围的操作 */}
-                              {o.state && ![10, 11, 25, 40].includes(o.type) && (
+                              {hasRangeList.includes(o.type) && o.state && (
+                                <Icon icon="navigate_next" className="Gray_c Right Hand Font20" />
+                              )}
+                              {/* 25没有范围的操作 */}
+                              {o.state && !noRangeList.includes(o.type) && (
                                 <span className="Gray_bd Right text">
                                   {key === '1'
                                     ? o.roleType === 100
-                                      ? _l('仅管理员')
+                                      ? _l('仅系统角色')
                                       : _l('所有用户')
                                     : strRight(key, o)}
-                                </span>
-                              )}
-                              {[40].includes(o.type) && (
-                                <span
-                                  className="Gray_bd Right text overflow_ellipsis WordBreak TxtMiddle"
-                                  style={{ cursor: 'default', maxWidth: 420 }}
-                                  title={_l('Beta版可用于表格显示，筛选、统计等正在开发中...')}
-                                >
-                                  {_l('Beta版可用于表格显示，筛选、统计等正在开发中...')}
                                 </span>
                               )}
                             </span>
@@ -337,10 +413,10 @@ function FunctionalSwitch(props) {
               })}
             </div>
             {/* 10, 11, 25, 40 没有范围选择 */}
-            {info.showDialog && ![10, 11, 25, 40].includes(info.showData.type || '') && (
+            {info.showDialog && !noRangeList.includes(info.showData.type || '') && (
               <Range
                 showDialog={info.showDialog}
-                hasViewRange={![12, 13].includes(info.showData.type || '')} //是否可选视图范围
+                hasViewRange={![...statistics, 10, 11, 12, 13, 14].includes(info.showData.type || '')} //是否可选视图范围
                 text={{
                   allview: info.showData.type / 10 >= 4 ? _l('所有记录') : '',
                   assignview: info.showData.type / 10 >= 4 ? _l('应用于指定的视图下的记录') : '',

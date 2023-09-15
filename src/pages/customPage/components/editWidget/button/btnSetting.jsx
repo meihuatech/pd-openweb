@@ -171,7 +171,6 @@ const BtnSettingWrap = styled.div`
     }
   }
   .customPageBtnSelectIcon {
-    width: 312px;
     .inputWrap {
       display: none;
     }
@@ -209,7 +208,7 @@ const CLICK_ACTION = [
     svgIcon: 'qr_code_19'
   },
   {
-    text: _l('调用业务流程'),
+    text: _l('调用封装业务流程'),
     value: 6,
     svgIcon: 'custom_actions'
   }
@@ -239,7 +238,7 @@ const ProcessDefaultConfig = {
 let sheetRequest = null;
 
 function BtnSetting(props) {
-  const { activeIndex, appPkg = {}, ids = {}, btnSetting, btnConfig, explain, setBtnSetting, setSetting, onDel } = props;
+  const { activeIndex, appPkg = {}, ids = {}, btnSetting, btnConfig, explain, setBtnSetting, setSetting, onDel, onCopy } = props;
   const { appId, pageId } = ids;
   const [displayType, setDisplayType] = useState('setting');
   const [paras, setParas] = useState(btnSetting.param || []);
@@ -596,7 +595,7 @@ function BtnSetting(props) {
                   value: 1,
                 },
                 {
-                  text: _l('调用业务流程'),
+                  text: _l('调用封装业务流程'),
                   value: 2,
                 },
                 {
@@ -635,6 +634,7 @@ function BtnSetting(props) {
                   onChange={(__, itemId) => {
                     setBtnSetting({
                       ...btnSetting,
+                      filterId: null,
                       value: itemId,
                       config: {
                         ...config,
@@ -713,7 +713,7 @@ function BtnSetting(props) {
         </Fragment>
       );
     }
-    // 调用业务流程
+    // 调用封装业务流程
     if (action === 6) {
       return (
         <Fragment>
@@ -782,6 +782,9 @@ function BtnSetting(props) {
       </ul>
       {displayType === 'setting' && (
         <div className="delBtn">
+          <div className="iconWrap mRight8" data-tip={_l('复制')} onClick={onCopy}>
+            <i className="icon-copy_custom Font20"></i>
+          </div>
           <div className="iconWrap" data-tip={_l('删除')} onClick={onDel}>
             <i className="icon-delete_12 Font18"></i>
           </div>

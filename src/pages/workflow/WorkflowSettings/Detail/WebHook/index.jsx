@@ -249,7 +249,7 @@ export default class WebHook extends Component {
           <Fragment>
             <div className="Font13 bold mTop20">{_l('可信 IP 地址')}</div>
             <div className="mTop10 Gray_9e">
-              {_l('某些第三方平台需要设置可信 IP 才能调用API，以下是系统可能使用的 IP 地址')}
+              {_l('某些第三方平台需要设置白名单 IP 才能调用API，以下是系统使用的 IP 地址')}
             </div>
             <div className="mTop10">{data.realIp}</div>
           </Fragment>
@@ -546,7 +546,7 @@ export default class WebHook extends Component {
           });
         } else {
           this.updateSource({ testMap });
-          alert(result.msg, 2);
+          alert(result.msg || _l('请求异常'), 2);
         }
 
         this.setState({ sendRequest: false });
@@ -597,20 +597,26 @@ export default class WebHook extends Component {
                   processId={this.props.processId}
                   selectNodeId={this.props.selectNodeId}
                   updateSource={({ fieldValue }) =>
-                    this.updateSource({ settings: Object.assign({}, data.settings, { timeout: parseInt(fieldValue) }) })
+                    this.updateSource({
+                      settings: Object.assign({}, data.settings, {
+                        timeout: parseInt(fieldValue),
+                        maxRetries: fieldValue > 30 ? 0 : data.settings.maxRetries,
+                      }),
+                    })
                   }
                   type="number"
                   min={5}
-                  max={30}
+                  max={120}
                   hasOtherField={false}
                   data={{ fieldValue: data.settings.timeout }}
                 />
               </div>
-              <div className="mLeft10">{_l('秒')}（5 ~ 30）</div>
+              <div className="mLeft10">{_l('秒')}（5 ~ 120）</div>
 
               <Checkbox
                 style={{ marginLeft: 80 }}
                 text={_l('超时自动重试（最多重试2次）')}
+                disabled={data.settings.timeout > 30}
                 checked={data.settings.maxRetries > 0}
                 onClick={checked =>
                   this.updateSource({ settings: Object.assign({}, data.settings, { maxRetries: checked ? 0 : 2 }) })
@@ -721,7 +727,7 @@ export default class WebHook extends Component {
           bg="BGBlueAsh"
           updateSource={this.updateSource}
         />
-        <div className="flex mTop20">
+        <div className="flex">
           <ScrollView>
             <div className="workflowDetailBox">
               {_.includes([APP_TYPE.SHEET, APP_TYPE.CUSTOM_ACTION], data.appType) && this.renderDefaultSource()}

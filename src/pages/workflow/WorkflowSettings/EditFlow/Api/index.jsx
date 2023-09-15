@@ -39,14 +39,14 @@ export default class Api extends Component {
   }
 
   openApi = evt => {
-    const { item, companyId } = this.props;
+    const { item } = this.props;
 
     evt.stopPropagation();
-    window.open(`/integrationApi/${companyId}/${item.appId}`);
+    window.open(`/integrationApi/${item.appId}`);
   };
 
   render() {
-    const { processId, item, disabled, selectNodeId, openDetail } = this.props;
+    const { processId, item, disabled, selectNodeId, openDetail, isSimple } = this.props;
 
     return (
       <div className="flexColumn">
@@ -64,7 +64,9 @@ export default class Api extends Component {
               <i className={cx('workflowAvatar icon-api', item.appId ? 'BGBlueAsh' : 'BGGray')} />
             </div>
             <NodeOperate nodeClassName="BGBlueAsh" {...this.props} />
-            <div className="workflowContent Font13">{this.renderContent()}</div>
+            <div className="workflowContent Font13">
+              {isSimple ? <span className="pLeft8 pRight8 Gray_9e">{_l('加载中...')}</span> : this.renderContent()}
+            </div>
           </div>
           <CreateNode {...this.props} />
         </section>

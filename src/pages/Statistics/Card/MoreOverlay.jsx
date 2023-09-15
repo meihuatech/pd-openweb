@@ -22,7 +22,7 @@ export default class MoreOverlay extends Component {
     };
   }
   handleExportExcel = exportType => {
-    const { report, worksheetId, exportData } = this.props;
+    const { report, worksheetId, exportData, filter } = this.props;
     const {
       filters = [],
       filtersGroup = [],
@@ -42,6 +42,7 @@ export default class MoreOverlay extends Component {
         filterRangeId,
         rangeType,
         rangeValue,
+        dynamicFilter: rangeType ? filter.dynamicFilter : undefined,
         sorts,
         filters: [filters, filtersGroup, filterControls].filter(n => !_.isEmpty(n)),
       })
@@ -125,6 +126,7 @@ export default class MoreOverlay extends Component {
       reportStatus,
       isMove,
       isCharge,
+      permissionType,
       onOpenFilter,
       onOpenSetting,
       onRemove,
@@ -178,35 +180,40 @@ export default class MoreOverlay extends Component {
             </div>
           </Menu.Item>
         )}
-        <Menu.SubMenu
-          popupClassName="chartMenu"
-          title={_l('导出Excel')}
-          icon={<Icon className="Gray_9e Font18 mRight5" icon="file_download" />}
-          popupOffset={[0, 0]}
-        >
-          <Menu.Item
-            style={{ width: 180 }}
-            className="pLeft20"
-            onClick={() => {
-              this.handleExportExcel(0);
-            }}
+        {!window.isPublicApp && (
+          <Menu.SubMenu
+            popupClassName="chartMenu"
+            title={_l('导出Excel%06002')}
+            icon={<Icon className="Gray_9e Font18 mRight5" icon="file_download" />}
+            popupOffset={[0, 0]}
           >
-            <div className="flexRow valignWrapper">{_l('按照原值导出')}</div>
-          </Menu.Item>
-          <Menu.Item
-            style={{ width: 180 }}
-            className="pLeft20"
-            onClick={() => {
-              this.handleExportExcel(1);
-            }}
-          >
-            <div className="flexRow valignWrapper">{_l('按显示单位导出')}</div>
-          </Menu.Item>
-        </Menu.SubMenu>
-        {[reportTypes.PivotTable].includes(reportType) && (
+            <Menu.Item
+              style={{ width: 180 }}
+              className="pLeft20"
+              onClick={() => {
+                this.handleExportExcel(0);
+              }}
+            >
+              <div className="flexRow valignWrapper">{_l('按照原值导出%06000')}</div>
+            </Menu.Item>
+            <Menu.Item
+              style={{ width: 180 }}
+              className="pLeft20"
+              onClick={() => {
+                this.handleExportExcel(1);
+              }}
+            >
+              <div className="flexRow valignWrapper">{_l('按显示单位导出%06001')}</div>
+            </Menu.Item>
+          </Menu.SubMenu>
+        )}
+        {[reportTypes.PivotTable].includes(reportType) && !md.global.Account.isPortal && (
           <Menu.Item
             className="pLeft10"
             onClick={() => {
+              const { filters = [], filtersGroup = [] } = this.props.exportData;
+              const printFilter = [filters, filtersGroup].filter(n => !_.isEmpty(n));
+              sessionStorage.setItem(`printFilter-${report.id}`, JSON.stringify(printFilter));
               window.open(`/printPivotTable/${report.id}`);
             }}
           >
@@ -238,16 +245,18 @@ export default class MoreOverlay extends Component {
               >
                 <div className="flexRow valignWrapper">{_l('当前统计')}</div>
               </Menu.Item>
-              <Menu.Item
-                style={{ width: 180 }}
-                className="pLeft20"
-                onClick={() => {
-                  this.setState({ showPageMove: true });
-                  this.handleUpdateDropdownVisible(false);
-                }}
-              >
-                <div className="flexRow valignWrapper">{_l('自定义页面')}</div>
-              </Menu.Item>
+              {permissionType !== 2 && (
+                <Menu.Item
+                  style={{ width: 180 }}
+                  className="pLeft20"
+                  onClick={() => {
+                    this.setState({ showPageMove: true });
+                    this.handleUpdateDropdownVisible(false);
+                  }}
+                >
+                  <div className="flexRow valignWrapper">{_l('自定义页面')}</div>
+                </Menu.Item>
+              )}
             </Menu.SubMenu>
           </Fragment>
         )}
@@ -267,7 +276,7 @@ export default class MoreOverlay extends Component {
   }
   render() {
     const { shareVisible, showPageMove, dropdownVisible } = this.state;
-    const { appId, worksheetId, report, className, permissions, isCharge, sheetVisible } = this.props;
+    const { appId, worksheetId, report, className, permissions, isCharge, isLock, sheetVisible, permissionType } = this.props;
     return (
       <Fragment>
         <Dropdown
@@ -283,7 +292,7 @@ export default class MoreOverlay extends Component {
           <Share
             title={_l('分享统计图: %0', report.name)}
             from="report"
-            isCharge={permissions || isCharge}
+            isCharge={permissions || (isLock ? [100, 200, 1, 2, 3].includes(permissionType) : isCharge || [2].includes(permissionType))}
             params={{
               appId,
               sourceId: report.id,

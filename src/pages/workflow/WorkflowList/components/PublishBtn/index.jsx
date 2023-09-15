@@ -11,7 +11,7 @@ const publishStatus2Text = {
   0: _l('创建'),
   1: _l('更新未发布'),
   2: _l('发布'),
-  3: _l('关闭'),
+  3: _l('关闭%03055'),
 };
 
 export default class PublishBtn extends Component {
@@ -55,10 +55,16 @@ export default class PublishBtn extends Component {
    */
   switchEnabled = () => {
     const { item } = this.props;
+    if (item.isLock) {
+      return alert(_l('应用锁定，权限不足', 3));
+    }
     const list = _.cloneDeep(this.props.list);
 
     if (this.state.publishing) {
       return;
+    }
+    if (item.isLock) {
+      return alert(_l('应用锁定，权限不足', 3));
     }
 
     this.setState({ publishing: true });
@@ -106,7 +112,7 @@ export default class PublishBtn extends Component {
         <Switch
           disabled={disabled}
           checked={item.enabled}
-          text={item.enabled ? _l('开启') : _l('关闭')}
+          text={item.enabled ? _l('开启') : _l('关闭%03055')}
           onClick={this.switchEnabled}
         />
         {!!showTime && (

@@ -4,7 +4,12 @@ import update from 'immutability-helper';
 import { VIEW_DISPLAY_TYPE } from 'worksheet/constants/enum';
 import { formatValuesOfCondition } from 'worksheet/common/WorkSheetFilter/util';
 import addRecord from 'worksheet/common/newRecord/addRecord';
-import { refresh as sheetViewRefresh, addRecord as sheetViewAddRecord, setViewLayout } from './sheetview';
+import {
+  refresh as sheetViewRefresh,
+  addRecord as sheetViewAddRecord,
+  setViewLayout,
+  setHighLightOfRows,
+} from './sheetview';
 import { refresh as galleryViewRefresh } from './galleryview';
 import { refresh as calendarViewRefresh } from './calendarview';
 import { resetLoadGunterView, addNewRecord as addGunterNewRecord } from './gunterview';
@@ -38,6 +43,15 @@ export const clearChartId = base => {
   };
 };
 
+// 更新个别字段
+export const updateWorksheetSomeControls = controls => ({
+  type: 'WORKSHEET_UPDATE_SOME_CONTROLS',
+  controls,
+});
+
+export const updateIsCharge = isCharge => ({ type: 'WORKSHEET_UPDATE_IS_CHARGE', isCharge });
+export const updateAppPkgData = appPkgData => ({ type: 'WORKSHEET_UPDATE_APPPKGDATA', appPkgData });
+
 export const updateWorksheetLoading = loading => ({ type: 'WORKSHEET_UPDATE_LOADING', loading });
 
 let worksheetRequest = null;
@@ -60,14 +74,17 @@ export function loadWorksheet(worksheetId) {
       type: 'WORKSHEET_FETCH_START',
     });
 
-    worksheetRequest = worksheetAjax.getWorksheetInfo({
+    const args = {
       worksheetId,
       reportId: chartId || undefined,
       getViews: true,
       getTemplate: true,
       getRules: true,
       getSwitchPermit: true,
-    });
+      resultType: 2,
+    };
+
+    worksheetRequest = worksheetAjax.getWorksheetInfo(args);
 
     worksheetRequest
       .then(async res => {
@@ -78,11 +95,26 @@ export function loadWorksheet(worksheetId) {
         if (res.isWorksheetQuery) {
           queryRes = await worksheetAjax.getQueryBySheetId({ worksheetId }, { silent: true });
         }
-
+        if (res.resultCode !== 1) {
+          dispatch({
+            type: 'WORKSHEET_INIT_FAIL',
+          });
+          return;
+        }
         if (!res.isWorksheetQuery || queryRes) {
           dispatch({
             type: 'WORKSHEET_INIT',
-            value: !chartId ? res : { ...res, views: res.views.map(v => ({ ...v, viewType: 0 })) },
+            value: Object.assign(
+              !chartId
+                ? res
+                : {
+                    ...res,
+                    views: res.views.map(v => ({ ...v, viewType: 0 })),
+                  },
+              {
+                isRequestingRelationControls: res.requestAgain,
+              },
+            ),
           });
           dispatch(setViewLayout(viewId));
           dispatch({
@@ -94,6 +126,20 @@ export function loadWorksheet(worksheetId) {
           dispatch({
             type: 'WORKSHEET_PERMISSION_INIT',
             value: res.switches,
+          });
+        }
+        if (res.requestAgain) {
+          worksheetRequest = worksheetAjax.getWorksheetInfo({ ...args, resultType: undefined });
+          worksheetRequest.then(infoRes => {
+            const newControls = _.get(infoRes, 'template.controls');
+            if (_.isEmpty(newControls)) {
+              return;
+            }
+            dispatch(updateWorksheetSomeControls(newControls));
+            dispatch({
+              type: 'WORKSHEET_UPDATE_IS_REQUESTING_RELATION_CONTROLS',
+              value: false,
+            });
           });
         }
       })
@@ -190,7 +236,7 @@ export function saveView(viewId, newConfig, cb) {
     }
     // 筛选需要在保存成功后再触发界面更新
     const updateAfterSave =
-      _.some(['filters', 'moreSort', 'viewControl'].map(k => editAttrs.includes(k))) ||
+      _.some(['filters', 'moreSort', 'viewControl', 'fastFilters'].map(k => editAttrs.includes(k))) ||
       (editAttrs.includes('advancedSetting') && !!_.get(saveParams, ['advancedSetting', 'navfilters']));
     if (!updateAfterSave) {
       dispatch({
@@ -281,7 +327,7 @@ export function addNewRecord(data, view) {
 // 打开创建记录弹层
 export function openNewRecord() {
   return (dispatch, getState) => {
-    const { base, views, worksheetInfo, navGroupFilters, sheetSwitchPermit, isCharge, draftDataCount } =
+    const { base, views, worksheetInfo, navGroupFilters, sheetSwitchPermit, isCharge, draftDataCount, appPkgData } =
       getState().sheet;
     const { appId, viewId, worksheetId } = base;
     const view = _.find(views, { viewId }) || (!viewId && views[0]) || {};
@@ -303,12 +349,18 @@ export function openNewRecord() {
         projectId: worksheetInfo.projectId,
         needCache: true,
         addType: 1,
-        showShare: isOpenPermit(permitList.recordShareSwitch, sheetSwitchPermit, viewId),
+        showShare: true,
+        sheetSwitchPermit,
+        hidePublicShare: !(
+          isOpenPermit(permitList.recordShareSwitch, sheetSwitchPermit, viewId) && !md.global.Account.isPortal
+        ),
         isCharge: isCharge,
+        appPkgData: appPkgData,
         entityName: worksheetInfo.entityName,
         onAdd: data => {
           if (!_.isEmpty(data)) {
             dispatch(addNewRecord(data, view));
+            dispatch(setHighLightOfRows([data.rowid]));
             return;
           }
           dispatch({ type: 'UPDATE_DRAFT_DATA_COUNT', data: draftDataCount + 1 });
@@ -368,12 +420,6 @@ export function openNewRecord() {
 // 更新字段
 export const updateWorksheetControls = controls => ({
   type: 'WORKSHEET_UPDATE_CONTROLS',
-  controls,
-});
-
-// 更新个别字段
-export const updateWorksheetSomeControls = controls => ({
-  type: 'WORKSHEET_UPDATE_SOME_CONTROLS',
   controls,
 });
 
@@ -440,13 +486,10 @@ export function updateGroupFilter(navGroupFilters = [], view) {
 // 获取分组筛选的count
 export function getNavGroupCount() {
   return (dispatch, getState) => {
-    if (_.get(window, 'shareState.isPublicView')) {
-      return;
-    }
     const sheet = getState().sheet;
     const { filters = {}, base = {}, quickFilter = {} } = sheet;
     const { worksheetId, viewId } = base;
-    const { filterControls, keyWords, searchType } = filters;
+    const { filterControls, filtersGroup, keyWords, searchType } = filters;
     if (!worksheetId && !viewId) {
       return;
     }
@@ -455,6 +498,7 @@ export function getNavGroupCount() {
         worksheetId,
         viewId,
         filterControls,
+        filtersGroup,
         searchType,
         fastFilters: (_.isArray(quickFilter) ? quickFilter : []).map(f =>
           _.pick(f, [

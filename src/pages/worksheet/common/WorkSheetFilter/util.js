@@ -3,6 +3,8 @@ import moment from 'moment';
 import renderCellText from 'src/pages/worksheet/components/CellControls/renderText';
 import { getFormData, getSelectedOptions } from 'src/pages/worksheet/util';
 import { getIconByType } from 'src/pages/widgetConfig/util';
+import { WIDGETS_TO_API_TYPE_ENUM } from 'src/pages/widgetConfig/config/widget';
+import { getDatePickerConfigs } from 'src/pages/widgetConfig/util/setting.js';
 import {
   CONTROL_FILTER_WHITELIST,
   FILTER_CONDITION_TYPE,
@@ -31,7 +33,9 @@ export function formatConditionForSave(condition, relationType, options = {}) {
     dynamicSource: condition.dynamicSource || [],
     value: condition.value,
     values:
-      returnFullValues && _.includes([26, 27, 29, 19, 23, 24, 35, 48], controlType) ? condition.fullValues : values,
+      returnFullValues && _.includes([26, 27, 29, 19, 23, 24, 35, 48], controlType) && !_.isEmpty(values)
+        ? condition.fullValues
+        : values,
   };
 }
 
@@ -253,7 +257,7 @@ export function checkConditionAvailable(condition) {
 }
 
 export function getConditionOverrideValue(type, condition) {
-  const { conditionGroupType, value, values, dateRange, dateRangeType } = condition;
+  const { conditionGroupType, value, values, dateRange, dateRangeType, fullValues } = condition;
   const base = {
     type,
     values: [],
@@ -264,6 +268,8 @@ export function getConditionOverrideValue(type, condition) {
     dateRangeType: 1,
     dynamicSource: [],
     isDynamicsource: false,
+    // 兼容values清空，fullValues值还存在的问题
+    ...(_.isUndefined(fullValues) ? {} : { fullValues: _.isEmpty(values) ? [] : fullValues }),
   };
   if (type === FILTER_CONDITION_TYPE.ISNULL || type === FILTER_CONDITION_TYPE.HASVALUE) {
     return base;
@@ -316,7 +322,7 @@ export function compareControlType(widget, type) {
 
 export function getFilterTypes(control = {}, conditionType, from) {
   let typeEnums = [];
-  const { type } = control;
+  const { type, advancedSetting = {} } = control;
   const typeKey = getTypeKey(type);
   switch (type) {
     // 文本类型
@@ -436,7 +442,9 @@ export function getFilterTypes(control = {}, conditionType, from) {
         FILTER_CONDITION_TYPE.ISNULL,
         FILTER_CONDITION_TYPE.HASVALUE,
       ].concat(
-        _.includes(['caid', 'ownerid'], control.controlId)
+        _.includes(['caid', 'ownerid'], control.controlId) &&
+          from !== 'rule' &&
+          !_.get(window, 'md.global.Account.isPortal')
           ? [FILTER_CONDITION_TYPE.NORMALUSER, FILTER_CONDITION_TYPE.PORTALUSER]
           : [],
       );
@@ -467,8 +475,10 @@ export function getFilterTypes(control = {}, conditionType, from) {
       break;
     case 29: // 关联
       typeEnums =
-        conditionType &&
-        (conditionType === FILTER_CONDITION_TYPE.LIKE || conditionType === FILTER_CONDITION_TYPE.NCONTAIN) // 兼容老数据
+        advancedSetting.showtype === '2' && from === 'rule'
+          ? [FILTER_CONDITION_TYPE.ISNULL, FILTER_CONDITION_TYPE.HASVALUE]
+          : conditionType &&
+            (conditionType === FILTER_CONDITION_TYPE.LIKE || conditionType === FILTER_CONDITION_TYPE.NCONTAIN) // 兼容老数据
           ? [
               FILTER_CONDITION_TYPE.ARREQ,
               FILTER_CONDITION_TYPE.ARRNE,
@@ -513,6 +523,14 @@ export function getFilterTypes(control = {}, conditionType, from) {
   if (from === 'subTotal') {
     typeEnums = typeEnums.filter(type => type !== FILTER_CONDITION_TYPE.ALLCONTAIN);
   }
+  if (control.encryId) {
+    typeEnums = [
+      FILTER_CONDITION_TYPE.EQ,
+      FILTER_CONDITION_TYPE.NE,
+      FILTER_CONDITION_TYPE.ISNULL,
+      FILTER_CONDITION_TYPE.HASVALUE,
+    ];
+  }
   return typeEnums.map(filterType => ({
     value: filterType,
     text: getFilterTypeLabel(typeKey, filterType, control),
@@ -522,7 +540,7 @@ export function getFilterTypes(control = {}, conditionType, from) {
 function getDefaultFilterType(control) {
   // 文本类
   if (_.includes([2, 3, 4, 5, 7, 32, 33], control.type)) {
-    return FILTER_CONDITION_TYPE.LIKE;
+    return FILTER_CONDITION_TYPE.EQ;
   }
   // 数值类
   if (_.includes([6, 8, 25, 31, 37], control.type)) {
@@ -537,8 +555,9 @@ function getDefaultFilterType(control) {
   if (_.includes([15, 46], control.type)) {
     return FILTER_CONDITION_TYPE.DATEENUM;
   }
-  if (_.includes([29, 35], control.type)) {
-    return FILTER_CONDITION_TYPE.RCEQ;
+  // 29 关联、35 级联、9 10 11 选项、26 人员、27 部门、48 角色
+  if (_.includes([29, 35, 9, 10, 11, 26, 27, 48], control.type)) {
+    return FILTER_CONDITION_TYPE.ARREQ;
   }
 }
 
@@ -576,10 +595,17 @@ export function redefineComplexControl(contorl) {
     return { ...contorl, ...{ type: contorl.enumDefault2 || 6, originType: contorl.type } };
   }
   if (contorl.type === 30) {
+    let controlType = contorl.sourceControlType;
+    if (controlType === 37) {
+      controlType = contorl.enumDefault2;
+    }
+    if (controlType === 38) {
+      controlType = 6;
+    }
     return {
       ...contorl,
       ...{
-        type: contorl.sourceControltype === 37 ? contorl.enumDefault2 : contorl.sourceControlType,
+        type: controlType,
         originType: contorl.type,
       },
     };
@@ -614,7 +640,7 @@ export function redefineComplexControl(contorl) {
 //   AREA_INPUT_19: 19, // 地区 19'省23'省-市'24'省-市-县'
 //   AREA_INPUT_23: 23, // 地区 19'省23'省-市'24'省-市-县'
 //   RELATION: 21, // 自由连接
-//   SPLIT_LINE: 22, // 分段
+//   SPLIT_LINE: 22, // 分割线
 //   MONEY_CN: 25, // 大写金额
 //   USER_PICKER: 26, // 成员
 //   GROUP_PICKER: 27, // 部门
@@ -661,7 +687,7 @@ export function relateDy(conditionType, contorls, control, defaultValue) {
     case API_ENUM_TO_TYPE.CONCATENATE:
     case API_ENUM_TO_TYPE.AUTOID:
       // 除了检查框、自由连接、等级、他表字段以外所有能取到文本值的字段类型
-      // 除分段、备注、富文本、单选项、多选项、地区、人员、部门、检查框、附件、自由连接、签名、表关联、他表字段、汇总、子表外
+      // 除分割线、备注、富文本、单选项、多选项、地区、人员、部门、检查框、附件、自由连接、签名、表关联、他表字段、汇总、子表外
       typeList = [
         API_ENUM_TO_TYPE.SWITCH,
         API_ENUM_TO_TYPE.RELATION,
@@ -686,6 +712,7 @@ export function relateDy(conditionType, contorls, control, defaultValue) {
         API_ENUM_TO_TYPE.EMBED,
         API_ENUM_TO_TYPE.BARCODE,
         API_ENUM_TO_TYPE.CASCADER,
+        API_ENUM_TO_TYPE.RELATESEARCH,
       ];
       return _.filter(contorls, items => !_.includes(typeList, items.type));
     // 电话、证件、邮件
@@ -780,13 +807,7 @@ export function relateDy(conditionType, contorls, control, defaultValue) {
     case API_ENUM_TO_TYPE.OPTIONS_11:
       // 单选项、多选项(相同选项集的其他字段)
       typeList = [API_ENUM_TO_TYPE.OPTIONS_9, API_ENUM_TO_TYPE.OPTIONS_10, API_ENUM_TO_TYPE.OPTIONS_11];
-      return _.filter(
-        contorls,
-        items =>
-          _.includes(typeList, items.type) &&
-          items.dataSource === control.dataSource &&
-          (control.containSelf || items.controlId !== control.controlId),
-      );
+      return _.filter(contorls, items => _.includes(typeList, items.type) && items.dataSource === control.dataSource);
     // 关联单条、级联选择
     case API_ENUM_TO_TYPE.RELATESHEET:
     case API_ENUM_TO_TYPE.CASCADER:
@@ -820,18 +841,18 @@ export function relateDy(conditionType, contorls, control, defaultValue) {
   }
 }
 
-export function getFilter({ control, formData = [] }) {
+export function getFilter({ control, formData = [], filterKey = 'filters' }) {
   if (
     !control ||
     _.isEmpty(control.advancedSetting) ||
-    _.isEmpty(control.advancedSetting.filters) ||
-    control.advancedSetting.filters === '[]'
+    _.isEmpty(control.advancedSetting[filterKey]) ||
+    control.advancedSetting[filterKey] === '[]'
   ) {
     return [];
   }
   let conditions;
   try {
-    conditions = JSON.parse(control.advancedSetting.filters);
+    conditions = JSON.parse(control.advancedSetting[filterKey]);
   } catch (err) {
     return [];
   }
@@ -841,8 +862,17 @@ export function getFilter({ control, formData = [] }) {
         values: formatValues(condition.dataType, condition.filterType, condition.values),
       });
     } else {
-      condition.dateRange = 0;
-      return fillConditionValue({ condition, formData, relateControl: control });
+      if (_.includes([WIDGETS_TO_API_TYPE_ENUM.DATE, WIDGETS_TO_API_TYPE_ENUM.DATE_TIME], condition.dataType)) {
+        condition.dateRange = 18;
+      } else {
+        condition.dateRange = 0;
+      }
+      return fillConditionValue({
+        condition,
+        formData,
+        relateControl: control,
+        ignoreFilterControl: control.ignoreFilterControl,
+      });
     }
   }
   conditions = conditions.map(condition => {
@@ -881,7 +911,7 @@ export function getFilter({ control, formData = [] }) {
   }
 }
 
-export function fillConditionValue({ condition, formData, relateControl }) {
+export function fillConditionValue({ condition, formData, relateControl, ignoreFilterControl = false }) {
   const { dataType, controlId } = condition;
   const dynamicSource = condition.dynamicSource[0];
   const systemControls = [
@@ -892,7 +922,7 @@ export function fillConditionValue({ condition, formData, relateControl }) {
     },
     {
       controlId: 'caid',
-      controlName: _l('创建者'),
+      controlName: _l('创建人'),
       type: 26,
     },
     {
@@ -910,12 +940,19 @@ export function fillConditionValue({ condition, formData, relateControl }) {
     (relateControl.relationControls || []).concat(systemControls),
     item => item.controlId === controlId,
   );
-  if (!dynamicSource || !filterControl) {
+  if (!dynamicSource || (!filterControl && !ignoreFilterControl)) {
     return;
   }
   const { cid } = dynamicSource;
   if (!cid) {
     return;
+  }
+  if (cid === 'current-rowid') {
+    if (!relateControl.recordId) {
+      return;
+    }
+    condition.values = [relateControl.recordId];
+    return condition;
   }
   let dynamicControl;
   dynamicControl = _.find(formData, c => c && c.controlId === cid);
@@ -932,10 +969,13 @@ export function fillConditionValue({ condition, formData, relateControl }) {
   }
   if (dataType === 2 || dataType === 32 || dataType === 3 || dataType === 7 || dataType === 5) {
     condition.values = [
-      renderCellText({
-        ...dynamicControl,
-        value,
-      }),
+      renderCellText(
+        {
+          ...dynamicControl,
+          value,
+        },
+        { noMask: true },
+      ),
     ];
   } else if (
     dataType === 6 ||
@@ -950,7 +990,17 @@ export function fillConditionValue({ condition, formData, relateControl }) {
     // || dataType === 38 // 公式日期
     // TODO 汇总日期类
   ) {
-    condition.value = value;
+    try {
+      condition.value = moment(value).format(
+        getDatePickerConfigs({
+          ...dynamicControl,
+          value,
+        }).formatMode,
+      );
+    } catch (err) {
+      condition.value = value;
+      console.error(err);
+    }
   } else if (dataType === 9 || dataType === 11 || dataType === 10) {
     if (type === 9 || type === 11) {
       // 单选
@@ -958,7 +1008,9 @@ export function fillConditionValue({ condition, formData, relateControl }) {
       if (!selectedOption) {
         condition.values = [];
       } else {
-        const matchedOptions = filterControl.options.filter(option => option.value === selectedOption.value);
+        const matchedOptions = (_.get(filterControl, 'options') || []).filter(
+          option => option.key === selectedOption.key,
+        );
         if (matchedOptions.length) {
           condition.values = matchedOptions.map(option => option.key);
         } else {
@@ -971,7 +1023,7 @@ export function fillConditionValue({ condition, formData, relateControl }) {
       if (!selectedOptions.length) {
         condition.values = [];
       } else {
-        const matchedOptions = filterControl.options.filter(option =>
+        const matchedOptions = (_.get(filterControl, 'options') || []).filter(option =>
           _.find(
             selectedOptions.map(o => o.value),
             ov => ov === option.value,
@@ -985,14 +1037,14 @@ export function fillConditionValue({ condition, formData, relateControl }) {
       }
     } else {
       // 文字
-      condition.values = filterControl.options
+      condition.values = (_.get(filterControl, 'options') || [])
         .filter(option => option.value.indexOf(value) > -1)
         .map(option => option.key);
     }
   } else if (dataType === 29 || dataType === 35) {
     try {
-      condition.values = JSON.parse(value)
-        .map(r => r.sid)
+      condition.values = (_.isObject(value) ? value.records : JSON.parse(value))
+        .map(r => r.sid || r.rowid)
         .filter(_.identity);
     } catch (err) {
       condition.values = [];

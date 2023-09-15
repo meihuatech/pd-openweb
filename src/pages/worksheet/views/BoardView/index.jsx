@@ -1,4 +1,4 @@
-﻿import React, { useRef, useEffect, Fragment } from 'react';
+﻿import React, { useRef, useEffect, Fragment, useCallback } from 'react';
 import styled from 'styled-components';
 import { LoadDiv, Icon } from 'ming-ui';
 import { every, isEmpty } from 'lodash';
@@ -6,6 +6,7 @@ import { connect } from 'react-redux';
 import { bindActionCreators } from 'redux';
 import { DndProvider, useDrop } from 'react-dnd-latest';
 import { HTML5Backend } from 'react-dnd-html5-backend-latest';
+import { emitter } from 'worksheet/util';
 import { getIconByType } from 'src/pages/widgetConfig/util';
 import worksheetAjax from 'src/api/worksheet';
 import * as boardActions from 'src/pages/worksheet/redux/actions/boardView';
@@ -19,6 +20,7 @@ import { ITEM_TYPE } from './config';
 import { dealBoardViewData } from './util';
 import cx from 'classnames';
 import './index.less';
+import { setSysWorkflowTimeControlFormat } from 'src/pages/worksheet/views/CalendarView/util.js';
 
 export const RecordBoardWrap = styled.div`
   height: 100%;
@@ -64,6 +66,7 @@ function BoardView(props) {
     filters,
     addRecord,
     updateMultiSelectBoard,
+    refreshSheet,
     ...rest
   } = props;
 
@@ -122,6 +125,11 @@ function BoardView(props) {
       $listWrap.scrollLeft = e.deltaY * 10 + $listWrap.scrollLeft;
     }
   };
+  const refresh = useCallback(({ worksheetId }) => {
+    if (worksheetId === props.worksheetId && !document.querySelector('.workSheetRecordInfo')) {
+      refreshSheet(view);
+    }
+  });
   const bindEvent = () => {
     const scrollEvent = _.throttle(scrollHorizontal);
     const scrollLoadEvent = _.throttle(scrollLoad);
@@ -131,8 +139,10 @@ function BoardView(props) {
     if ($listWrap) {
       $listWrap.addEventListener('scroll', scrollLoadEvent);
     }
+    emitter.addListener('RELOAD_RECORD_INFO', refresh);
     return () => {
       document.body.removeEventListener('mousewheel', scrollEvent);
+      emitter.removeListener('RELOAD_RECORD_INFO', refresh);
       window.removeEventListener('resize', scrollEvent);
       if ($listWrap) {
         $listWrap.removeEventListener('scroll', scrollLoadEvent);
@@ -154,6 +164,7 @@ function BoardView(props) {
     view.advancedSetting.navfilters,
     view.advancedSetting.freezenav,
     view.advancedSetting.navempty,
+    view.moreSort,
   ]);
 
   const handleSelectField = obj => {
@@ -192,7 +203,7 @@ function BoardView(props) {
             currentValue: value,
           });
         } else {
-          alert(_l('拖拽更新失败!'));
+          alert(_l('拖拽更新失败!'), 2);
         }
       });
       return;
@@ -205,14 +216,18 @@ function BoardView(props) {
 
   const renderContent = () => {
     const { boardViewLoading, boardData } = boardView;
+    const { sheetSwitchPermit } = props;
     const { viewControl } = view;
     const viewData = dealBoardViewData({ view, controls, data: boardData });
     const { navshow, freezenav } = getAdvanceSetting(view);
     // 选择了控件作为看板且控件没有被删除
-    const isHaveSelectControl = viewControl && _.find(controls, item => item.controlId === viewControl);
+    const isHaveSelectControl =
+      viewControl &&
+      _.find(setSysWorkflowTimeControlFormat(controls, sheetSwitchPermit), item => item.controlId === viewControl);
     if (!isHaveSelectControl) {
       return (
         <SelectField
+          sheetSwitchPermit={sheetSwitchPermit}
           isCharge={isCharge}
           fields={filterAndFormatterControls({
             controls: controls,
@@ -293,7 +308,15 @@ function BoardView(props) {
 
 const ConnectedBoardView = connect(
   state =>
-    _.pick(state.sheet, ['boardView', 'worksheetInfo', 'filters', 'controls', 'sheetSwitchPermit', 'sheetButtons']),
+    _.pick(state.sheet, [
+      'boardView',
+      'worksheetInfo',
+      'filters',
+      'controls',
+      'sheetSwitchPermit',
+      'sheetButtons',
+      'navGroupFilters',
+    ]),
   dispatch => bindActionCreators({ ...boardActions, ...baseAction }, dispatch),
 )(BoardView);
 

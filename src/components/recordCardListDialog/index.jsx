@@ -10,7 +10,8 @@ import ScrollView from 'ming-ui/components/ScrollView';
 import LoadDiv from 'ming-ui/components/LoadDiv';
 import NewRecord from 'src/pages/worksheet/common/newRecord/NewRecord';
 import RecordCard from 'src/components/recordCard';
-import { fieldCanSort } from 'src/pages/worksheet/util';
+import { checkIsTextControl, fieldCanSort } from 'src/pages/worksheet/util';
+import functionWrap from 'ming-ui/components/FunctionWrap';
 import { getFilter } from 'src/pages/worksheet/common/WorkSheetFilter/util';
 import { WIDGETS_TO_API_TYPE_ENUM } from 'src/pages/widgetConfig/config/widget';
 import Header from './Header';
@@ -63,6 +64,7 @@ export default class RecordCardListDialog extends Component {
     onOk: PropTypes.func, // 确定回掉
     onText: PropTypes.string,
     formData: PropTypes.arrayOf(PropTypes.shape({})),
+    pageSize: PropTypes.number,
   };
   static defaultProps = {
     allowNewRecord: true,
@@ -73,7 +75,10 @@ export default class RecordCardListDialog extends Component {
     onOk: () => {},
     formData: [],
     singleConfirm: false,
+    pageSize: 50,
   };
+  conRef = React.createRef();
+  listRef = React.createRef();
   constructor(props) {
     super(props);
     this.state = {
@@ -88,14 +93,22 @@ export default class RecordCardListDialog extends Component {
       loadouted: false,
       showNewRecord: false,
       selectAll: false,
+      focusIndex: -1,
     };
     this.handleSearch = _.debounce(this.handleSearch, 500);
   }
   componentDidMount() {
-    const { control } = this.props;
+    const { control, parentWorksheetId } = this.props;
     if (control) {
-      (window.isPublicWorksheet ? publicWorksheetAjax : sheetAjax)
-        .getWorksheetInfo({ worksheetId: control.dataSource, getTemplate: true })
+      (window.isPublicWorksheet && !_.get(window, 'shareState.isPublicWorkflowRecord')
+        ? publicWorksheetAjax
+        : sheetAjax
+      )
+        .getWorksheetInfo({
+          worksheetId: control.dataSource,
+          getTemplate: true,
+          relationWorksheetId: parentWorksheetId,
+        })
         .then(data => {
           window.worksheetControlsCache = {};
           data.template.controls.forEach(c => {
@@ -115,6 +128,64 @@ export default class RecordCardListDialog extends Component {
       this.loadRecord();
     }
   }
+  @autobind
+  handleInputKeyDown(e) {
+    const { singleConfirm, multiple, onOk, onClose } = this.props;
+    const { focusIndex, list, selectedRecords } = this.state;
+    e.stopPropagation();
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+      onOk(selectedRecords);
+      onClose();
+      return;
+    }
+    if (e.key === 'ArrowUp') {
+      this.updateFocusIndex(false);
+      e.preventDefault();
+    } else if (e.key === 'ArrowDown') {
+      this.updateFocusIndex(true);
+      e.preventDefault();
+    } else if (e.key === 'Enter') {
+      if (list[focusIndex]) {
+        if (multiple || singleConfirm) {
+          const selected = _.find(selectedRecords, r => r.rowid === list[focusIndex].rowid);
+          this.setState({
+            selectedRecords: selected
+              ? selectedRecords.filter(r => r.rowid !== selected.rowid)
+              : selectedRecords.concat(list[focusIndex]),
+          });
+        } else {
+          onOk([list[focusIndex]]);
+          onClose();
+        }
+      }
+    }
+  }
+  updateFocusIndex(isNext) {
+    const { focusIndex = 0, list } = this.state;
+    if (!list.length) {
+      return;
+    }
+    let newIndex = focusIndex + (isNext ? 1 : -1);
+    if (newIndex < 0) {
+      newIndex = 0;
+    }
+    if (newIndex > list.length - 1) {
+      newIndex = list.length - 1;
+    }
+    this.setState({ focusIndex: newIndex }, () => {
+      let $list = this.listRef.current.nanoScroller;
+      if (!$list) {
+        return;
+      }
+      $list = $list.querySelector('.nano-content');
+      const $currentItem = $list.querySelector(`.worksheetRecordCard:nth-child(${newIndex + 1})`);
+      if (isNext && $currentItem.offsetTop + $currentItem.offsetHeight > $list.scrollTop + $list.clientHeight) {
+        $list.scrollTop = $list.scrollTop + $currentItem.offsetHeight + 12;
+      } else if ($currentItem.offsetTop < $list.scrollTop) {
+        $list.scrollTop = $list.scrollTop - $currentItem.offsetHeight - 12;
+      }
+    });
+  }
   loadRecord() {
     const {
       from,
@@ -126,7 +197,7 @@ export default class RecordCardListDialog extends Component {
       controlId,
       control,
       formData,
-      multiple,
+      pageSize,
     } = this.props;
     const {
       pageIndex,
@@ -137,8 +208,9 @@ export default class RecordCardListDialog extends Component {
       filterForControlSearch,
       worksheetInfo,
     } = this.state;
+    const searchConfig = control ? getSearchConfig(control) : {};
+    const { searchControl } = searchConfig;
     let getFilterRowsPromise, args;
-    const pageSize = 50;
     let filterControls;
     if (control && control.advancedSetting.filters) {
       if (worksheetInfo) {
@@ -190,9 +262,9 @@ export default class RecordCardListDialog extends Component {
       if (window.recordShareLinkId) {
         args.linkId = window.recordShareLinkId;
       }
-      args.formId = window.publicWorksheetShareId;
+      args.shareId = window.publicWorksheetShareId;
     }
-    if (parentWorksheetId && controlId) {
+    if (parentWorksheetId && controlId && _.get(parentWorksheetId, 'length') === 24) {
       args.relationWorksheetId = parentWorksheetId;
       args.rowId = recordId;
       args.controlId = controlId;
@@ -200,12 +272,18 @@ export default class RecordCardListDialog extends Component {
     this.searchAjax = getFilterRowsPromise(args);
     this.searchAjax.then(res => {
       if (res.resultCode === 1) {
-        const filteredList = _.uniqBy(
+        let filteredList = _.uniqBy(
           list.concat(res.data.filter(record => !_.find(filterRowIds, fid => record.rowid === fid))),
           'rowid',
         );
+        const needSort =
+          (keyWords && pageIndex === 1, _.get(control, 'advancedSetting.searchcontrol') && searchControl);
+        if (needSort && _.get(control, 'advancedSetting.searchtype') !== '1') {
+          filteredList = filteredList.sort((a, b) => (b[searchControl.controlId] === keyWords ? 1 : -1));
+        }
         this.setState(
           {
+            focusIndex: needSort && filteredList[0] && filteredList[0][searchControl.controlId] === keyWords ? 0 : -1,
             list: filteredList,
             loading: false,
             loadouted: res.data.length < pageSize,
@@ -332,7 +410,7 @@ export default class RecordCardListDialog extends Component {
     const titleControl = _.find(controls, c => c.attribute === 1);
     const allControls = [
       { controlId: 'ownerid', controlName: _l('拥有者'), type: 26 },
-      { controlId: 'caid', controlName: _l('创建者'), type: 26 },
+      { controlId: 'caid', controlName: _l('创建人'), type: 26 },
       { controlId: 'ctime', controlName: _l('创建时间'), type: 16 },
       { controlId: 'utime', controlName: _l('最近修改时间'), type: 16 },
     ].concat(controls);
@@ -381,6 +459,7 @@ export default class RecordCardListDialog extends Component {
       showNewRecord,
       allowAdd,
       quickFilters = [],
+      focusIndex,
       filterForControlSearch,
     } = this.state;
     const { cardControls } = this;
@@ -401,6 +480,12 @@ export default class RecordCardListDialog extends Component {
         <div
           className="recordCardListCon flexColumn"
           style={{ height: window.innerHeight > 1000 ? 1000 - 138 : window.innerHeight - 138 }}
+          ref={this.conRef}
+          onClick={() => {
+            if (this.conRef.current && this.conRef.current.querySelector('.recordListKeyword')) {
+              this.conRef.current.querySelector('.recordListKeyword').focus();
+            }
+          }}
         >
           {!error && (
             <Header
@@ -412,6 +497,7 @@ export default class RecordCardListDialog extends Component {
               quickFilters={quickFilters}
               onSearch={this.handleSearch}
               onFilter={this.handleFilter}
+              onKeyDown={this.handleInputKeyDown}
             />
           )}
           {showList ? (
@@ -447,6 +533,7 @@ export default class RecordCardListDialog extends Component {
               </div>
               <ScrollView
                 className="recordCardList flex"
+                ref={this.listRef}
                 onScrollEnd={() => {
                   if (!loading && !loadouted) {
                     this.loadNext();
@@ -456,17 +543,25 @@ export default class RecordCardListDialog extends Component {
                 {list.length
                   ? list.map((record, i) => {
                       const selected = !!_.find(selectedRecords, r => r.rowid === record.rowid);
+                      const focused = focusIndex === i;
                       return (
                         <RecordCard
                           key={i}
                           from={2}
                           coverCid={coverCid}
                           isCharge={isCharge}
+                          projectId={worksheet.projectId}
                           showControls={cardControls.map(c => c.controlId)}
                           controls={controls}
                           data={record}
                           selected={selected}
-                          onClick={() => this.handleSelect(record, !selected)}
+                          focused={focused}
+                          onClick={() => {
+                            this.setState({
+                              focusIndex: i,
+                            });
+                            this.handleSelect(record, !selected);
+                          }}
                         />
                       );
                     })
@@ -513,7 +608,7 @@ export default class RecordCardListDialog extends Component {
               )}
               {showNewRecord && (
                 <NewRecord
-                  className="worksheetRelateNewRecord"
+                  className="worksheetRelateNewRecord worksheetRelateNewRecordFromSelectRelateRecord"
                   viewId={viewId}
                   worksheetId={relateSheetId}
                   projectId={worksheet.projectId}
@@ -522,6 +617,14 @@ export default class RecordCardListDialog extends Component {
                   entityName={worksheet.entityName}
                   filterRelateSheetIds={[relateSheetId]}
                   filterRelatesheetControlIds={filterRelatesheetControlIds}
+                  defaultFormDataEditable
+                  defaultFormData={
+                    searchControl && checkIsTextControl(searchControl.type) && keyWords
+                      ? {
+                          [searchControl.controlId]: keyWords,
+                        }
+                      : {}
+                  }
                   defaultRelatedSheet={defaultRelatedSheet}
                   visible={showNewRecord}
                   hideNewRecord={() => {
@@ -590,11 +693,5 @@ export default class RecordCardListDialog extends Component {
 }
 
 export function selectRecord(props) {
-  const div = document.createElement('div');
-  document.body.appendChild(div);
-  function destory() {
-    ReactDOM.unmountComponentAtNode(div);
-    document.body.removeChild(div);
-  }
-  ReactDOM.render(<RecordCardListDialog visible {...props} onClose={destory} />, div);
+  functionWrap(RecordCardListDialog, props);
 }

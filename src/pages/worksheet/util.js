@@ -2,15 +2,18 @@ import EventEmitter from 'events';
 import moment from 'moment';
 import filterXss from 'xss';
 import copy from 'copy-to-clipboard';
+import axios from 'axios';
+import { toFixed } from 'src/util';
+import appManagementAjax from 'src/api/appManagement';
 import { FROM } from 'src/components/newCustomFields/tools/config';
 import DataFormat from 'src/components/newCustomFields/tools/DataFormat';
 import { FORM_ERROR_TYPE_TEXT } from 'src/components/newCustomFields/tools/config';
 import { controlState } from 'src/components/newCustomFields/tools/utils';
 import { updateRulesData } from 'src/components/newCustomFields/tools/filterFn';
-import { RELATE_RECORD_SHOW_TYPE } from 'worksheet/constants/enum';
+import { RELATE_RECORD_SHOW_TYPE, RELATION_SEARCH_SHOW_TYPE } from 'worksheet/constants/enum';
 import { WIDGETS_TO_API_TYPE_ENUM } from 'src/pages/widgetConfig/config/widget';
 import renderCellText from 'worksheet/components/CellControls/renderText';
-import { SYSTEM_CONTROLS } from 'worksheet/constants/enum';
+import { SYSTEM_CONTROLS, RECORD_INFO_FROM } from 'worksheet/constants/enum';
 import _, { head } from 'lodash';
 
 export { calcDate, formatControlValue, getSelectedOptions } from './util-purejs';
@@ -160,11 +163,11 @@ export function getSortData(type, control = {}) {
   } else if (type === 15 || type === 16 || type === 17 || type === 18) {
     return [
       {
-        text: _l('最新的在前'),
+        text: _l('最新的在前%05029'),
         value: descendingValue,
       },
       {
-        text: _l('最旧的在前'),
+        text: _l('最旧的在前%05030'),
         value: ascendingValue,
       },
     ];
@@ -191,11 +194,11 @@ export function getSortData(type, control = {}) {
   } else {
     return [
       {
-        text: _l('升序'),
+        text: _l('升序%05031'),
         value: ascendingValue,
       },
       {
-        text: _l('降序'),
+        text: _l('降序%05032'),
         value: descendingValue,
       },
     ];
@@ -228,11 +231,11 @@ export function filterRelatesheetMutipleControls(controls) {
 export function formatFormulaDate({ value, unit, hideUnitStr, dot = 0 }) {
   let content = '';
   const isNegative = value < 0; // 处理负数
-  value = (Math.floor(value * Math.pow(10, dot)) / Math.pow(10, dot)).toFixed(dot);
+  value = toFixed(Math.floor(value * Math.pow(10, dot)) / Math.pow(10, dot), dot);
   if (isNegative) {
     value = -1 * value;
   }
-  const units = [_l('分钟'), _l('小时'), _l('天'), _l('月'), _l('年')];
+  const units = [_l('分钟'), _l('小时'), _l('天'), _l('月'), _l('年'), _l('秒')];
   let unitStr = units[parseInt(unit, 10) - 1] || '';
   if (hideUnitStr) {
     unitStr = '';
@@ -246,7 +249,9 @@ export function formatFormulaDate({ value, unit, hideUnitStr, dot = 0 }) {
         content = value + unitStr;
       } else if (+value < dayMinute) {
         content =
-          Math.floor(value / hourMinute) + units[1] + (value % hourMinute >= 0 ? (value % hourMinute) + unitStr : '');
+          Math.floor(value / hourMinute) +
+          units[1] +
+          (value % hourMinute >= 0 ? toFixed(value % hourMinute, dot) + unitStr : '');
       } else {
         content =
           Math.floor(value / dayMinute) +
@@ -254,7 +259,7 @@ export function formatFormulaDate({ value, unit, hideUnitStr, dot = 0 }) {
           (Math.floor((value % dayMinute) / hourMinute) >= 0
             ? Math.floor((value % dayMinute) / hourMinute) + units[1]
             : '') +
-          (value % hourMinute >= 0 ? (value % hourMinute).toFixed(dot) + unitStr : '');
+          (value % hourMinute >= 0 ? toFixed(value % hourMinute, dot) + unitStr : '');
       }
       break;
     case '2':
@@ -264,7 +269,14 @@ export function formatFormulaDate({ value, unit, hideUnitStr, dot = 0 }) {
         content =
           Math.floor(value / dayHour) +
           units[2] +
-          (value % dayHour >= 0 ? (value % dayHour).toFixed(dot) + unitStr : '');
+          (value % dayHour >= 0 ? toFixed(value % dayHour, dot) + unitStr : '');
+      }
+      break;
+    case '4':
+      if (+value < 12) {
+        content = value + unitStr;
+      } else {
+        content = Math.floor(value / 12) + units[4] + (value % 12 >= 0 ? toFixed(value % 12, dot) + unitStr : '');
       }
       break;
     default:
@@ -285,10 +297,13 @@ export function regexFilterHtmlScript(str) {
  * regexFilter dom 转换方式过滤 html标签
  * 缺点：慢
  */
-export function domFilterHtmlScript(str) {
-  var div = document.createElement('div');
-  div.innerHTML = filterXss(str);
-  return div.innerText;
+export function domFilterHtmlScript(html) {
+  try {
+    let doc = new DOMParser().parseFromString(html, 'text/html');
+    return doc.body.textContent || '';
+  } catch (err) {
+    return html;
+  }
 }
 
 /**
@@ -445,7 +460,7 @@ export function getControlValueSortType(control) {
  * @param  {} records
  */
 
-export function formatRecordToRelateRecord(controls, records = []) {
+export function formatRecordToRelateRecord(controls, records = [], { addedIds = [], deletedIds = [], count = 0 } = {}) {
   if (!_.isArray(records)) {
     records = [];
   }
@@ -470,6 +485,9 @@ export function formatRecordToRelateRecord(controls, records = []) {
       type: 8,
       sourcevalue: JSON.stringify(record),
       row: record,
+      isNew: _.includes(addedIds, record.rowid),
+      deletedIds,
+      count,
     };
   });
   return value;
@@ -496,9 +514,8 @@ export function getSubListError({ rows, rules }, controls = [], showControls = [
         c => _.find(showControls, id => id === c.controlId) && controlState(c).visible && controlState(c).editable,
       );
       const formdata = new DataFormat({
-        data: controldata,
+        data: controldata.map(c => ({ ...c, isSubList: true })),
         from: FROM.NEWRECORD,
-        ignoreRequired: true,
       });
       let errorItems = formdata.getErrorControls();
       rulesErrors.forEach(errorItem => {
@@ -556,7 +573,10 @@ export function controlIsNumber({ type, sourceControlType, enumDefault, enumDefa
  * 是否是按关联表格呈现的控件
  */
 export function isRelateRecordTableControl({ type, enumDefault, advancedSetting = {} }) {
-  return type === 29 && enumDefault === 2 && parseInt(advancedSetting.showtype, 10) === RELATE_RECORD_SHOW_TYPE.LIST;
+  return (
+    (type === 29 && enumDefault === 2 && parseInt(advancedSetting.showtype, 10) === RELATE_RECORD_SHOW_TYPE.LIST) ||
+    (type === 51 && advancedSetting.showtype === String(RELATION_SEARCH_SHOW_TYPE.LIST))
+  );
 }
 
 export function replaceByIndex(str = '111', index = 0, replacestr = '') {
@@ -580,13 +600,28 @@ export function getBoardItemKey(data) {
 }
 
 export function updateOptionsOfControl(control, value, realValue) {
-  const newOption = {
-    index: control.options.length + 1,
-    isDeleted: false,
-    key: _.last(JSON.parse(realValue)),
-    color: '#2196f3',
-    value: value && (value.match(/"add_(.*)"]/) || '')[1],
-  };
+  let parsedValue = safeParse(value);
+  let newOption;
+  if (parsedValue.length > 1) {
+    const parsedRealValue = safeParse(realValue);
+    newOption = parsedValue
+      .map((v, i) => ({
+        index: control.options.length + i + 1,
+        isDeleted: false,
+        key: parsedRealValue[i],
+        color: '#2196f3',
+        value: v && (v.match(/add_(.*)/) || '')[1],
+      }))
+      .filter(v => v.value);
+  } else {
+    newOption = {
+      index: control.options.length + 1,
+      isDeleted: false,
+      key: _.last(JSON.parse(realValue)),
+      color: '#2196f3',
+      value: value && (value.match(/"add_(.*)"]/) || '')[1],
+    };
+  }
   return {
     ...control,
     options: control.options.concat(newOption),
@@ -637,9 +672,15 @@ export function copySublistControlValue(control, value) {
     case WIDGETS_TO_API_TYPE_ENUM.AREA_CITY: // 地区
     case WIDGETS_TO_API_TYPE_ENUM.AREA_COUNTY: // 地区
     case WIDGETS_TO_API_TYPE_ENUM.SHEET_FIELD: // 他表字段
+    case WIDGETS_TO_API_TYPE_ENUM.ORG_ROLE: // 组织角色
+    case WIDGETS_TO_API_TYPE_ENUM.TIME: // 时间
       return value;
     case WIDGETS_TO_API_TYPE_ENUM.SIGNATURE: // 签名
-      return;
+      try {
+        return value.startsWith('http') ? JSON.stringify({ bucket: 4, key: new URL(value).pathname.slice(1) }) : value;
+      } catch (err) {
+        return;
+      }
     default:
       return;
   }
@@ -949,13 +990,15 @@ export function validateFnExpression(expression, type = 'mdfunction') {
 /**
  * 对字段的 advancedSettings 进行解析处理
  */
-export function parseAdvancedSetting(setting) {
+export function parseAdvancedSetting(setting = {}) {
   return {
     allowadd: setting.allowadd === '1', // 子表允许新增
     allowcancel: setting.allowcancel === '1', // 子表允许删除
     allowedit: setting.allowedit === '1', // 子表允许编辑
     allowsingle: setting.allowsingle === '1', // 子表允许单条添加
     batchcids: safeParseArray(setting.batchcids), // 子表从指定字段添加记录
+    hidenumber: setting.hidenumber === '1', // 隐藏序号
+    rowheight: Number(setting.rowheight || 0), // 行高
   };
 }
 
@@ -998,7 +1041,7 @@ export function isKeyBoardInputChar(value) {
   );
 }
 
-export function handleCopyControlText(control) {
+export function getCopyControlText(control) {
   let content;
   try {
     if (_.includes([WIDGETS_TO_API_TYPE_ENUM.SIGNATURE, WIDGETS_TO_API_TYPE_ENUM.SUB_LIST], control.type)) {
@@ -1024,12 +1067,70 @@ export function handleCopyControlText(control) {
             }]${c.name}(${c.link})`,
         )
         .join(',');
+    } else if (_.includes([WIDGETS_TO_API_TYPE_ENUM.SCORE], control.type)) {
+      content = control.value;
     } else {
       content = renderCellText(control);
     }
   } catch (err) {}
-  window.tempCopyForSheetView = content;
+  return content;
+}
+
+export function handleCopyControlText(control, tableId) {
+  const content = getCopyControlText(control);
+  window.tempCopyForSheetView = JSON.stringify({ type: 'text', value: content, controlType: control.type, tableId });
   copy(content);
+}
+
+export function isSameTypeForPaste(type1, type2) {
+  if (_.includes([15, 16], type1) && _.includes([15, 16], type2)) {
+    return true;
+  } else {
+    return type1 === type2;
+  }
+}
+
+export function handlePasteUpdateCell(cell, pasteData, update = () => {}) {
+  // WIDGETS_TO_API_TYPE_ENUM
+  if (
+    _.includes(
+      [
+        WIDGETS_TO_API_TYPE_ENUM.MOBILE_PHONE,
+        WIDGETS_TO_API_TYPE_ENUM.NUMBER,
+        WIDGETS_TO_API_TYPE_ENUM.FLAT_MENU,
+        WIDGETS_TO_API_TYPE_ENUM.MULTI_SELECT,
+        WIDGETS_TO_API_TYPE_ENUM.DROP_DOWN,
+        WIDGETS_TO_API_TYPE_ENUM.DATE,
+        WIDGETS_TO_API_TYPE_ENUM.DATE_TIME,
+        WIDGETS_TO_API_TYPE_ENUM.USER_PICKER,
+        WIDGETS_TO_API_TYPE_ENUM.DEPARTMENT,
+        WIDGETS_TO_API_TYPE_ENUM.SCORE,
+        WIDGETS_TO_API_TYPE_ENUM.RELATE_SHEET,
+        WIDGETS_TO_API_TYPE_ENUM.CASCADER,
+        WIDGETS_TO_API_TYPE_ENUM.SWITCH,
+        WIDGETS_TO_API_TYPE_ENUM.RICH_TEXT,
+        WIDGETS_TO_API_TYPE_ENUM.TIME,
+        WIDGETS_TO_API_TYPE_ENUM.ORG_ROLE,
+        WIDGETS_TO_API_TYPE_ENUM.LOCATION,
+      ],
+      cell.type,
+    )
+  ) {
+    update(pasteData.value);
+  } else if (
+    _.includes(
+      [
+        WIDGETS_TO_API_TYPE_ENUM.AREA_PROVINCE,
+        WIDGETS_TO_API_TYPE_ENUM.AREA_CITY,
+        WIDGETS_TO_API_TYPE_ENUM.AREA_COUNTY,
+      ],
+      cell.type,
+    )
+  ) {
+    update(safeParse(pasteData.value).code);
+  }
+  // ATTACHMENT: 14,
+  // SIGNATURE
 }
 
 export function getScrollBarWidth() {
@@ -1042,3 +1143,144 @@ export function getScrollBarWidth() {
   document.body.removeChild(scroll);
   return width || 10;
 }
+
+export function getRowGetType(from) {
+  if (from == 21) {
+    return 21;
+  } else if (
+    from === RECORD_INFO_FROM.CHAT ||
+    (from === RECORD_INFO_FROM.WORKSHEET_ROW_LAND && location.search && location.search.indexOf('share') > -1) ||
+    _.get(window, 'shareState.isPublicView') ||
+    _.get(window, 'shareState.isPublicRecord')
+  ) {
+    return 3;
+  } else {
+    return 1;
+  }
+}
+
+export function findSheet(id, sheetList = []) {
+  let result = null;
+  for (let i = 0; i < sheetList.length; i++) {
+    const current = sheetList[i];
+    if (current.workSheetId == id) {
+      result = current;
+      break;
+    }
+    if (current.type === 2) {
+      result = findSheet(id, current.items);
+      if (result) {
+        break;
+      }
+    }
+  }
+  return result;
+}
+
+export function getSheetListFirstId(sheetList = [], isCharge = true) {
+  let result = null;
+  for (let i = 0; i < sheetList.length; i++) {
+    const current = sheetList[i];
+    if (current.type === 2) {
+      result = getSheetListFirstId(current.items, isCharge);
+      if (result) {
+        break;
+      }
+    } else if (isCharge ? true : current.status === 1 && !current.navigateHide) {
+      result = current.workSheetId;
+      break;
+    }
+  }
+  return result;
+}
+
+export function formatQuickFilter(items = []) {
+  return items.map(item =>
+    _.pick(item, [
+      'controlId',
+      'dataType',
+      'spliceType',
+      'filterType',
+      'dateRange',
+      'value',
+      'values',
+      'minValue',
+      'maxValue',
+    ]),
+  );
+}
+
+export function getRelateRecordCountFromValue(value) {
+  let count;
+  try {
+    const parsedValue = safeParse(value, 'array');
+    const savedCount = parsedValue[0].count || _.get(parsedValue, 'length');
+    if (!_.isUndefined(savedCount) && !_.isNaN(Number(savedCount))) {
+      count = Number(savedCount);
+    }
+  } catch (err) {
+    // console.log(err);
+  }
+  if (String(value).startsWith('deleteRowIds')) {
+    return 0;
+  }
+  return count;
+}
+
+export async function postWithToken(url, tokenArgs = {}, body = {}, axiosConfig = {}) {
+  const token = await appManagementAjax.getToken(tokenArgs);
+  if (!token) {
+    return Promise.reject('获取token失败');
+  }
+  return axios.post(
+    url,
+    Object.assign({}, body, {
+      token,
+      accountId: md.global.Account.accountId,
+    }),
+    axiosConfig,
+  );
+}
+
+export async function getWithToken(url, tokenArgs = {}, body = {}, axiosConfig = {}) {
+  const token = await appManagementAjax.getToken(tokenArgs);
+  if (!token) {
+    return Promise.reject('获取token失败');
+  }
+  return axios.get(url, {
+    ...axiosConfig,
+    params: {
+      ...body,
+      token,
+      accountId: md.global.Account.accountId,
+    },
+  });
+}
+
+export function download(blob = '', name) {
+  name = name || blob.name || 'file';
+  function down(href) {
+    const downButton = document.createElement('a');
+    downButton.href = href;
+    downButton.download = name;
+    downButton.click();
+  }
+  if (typeof blob === 'string') {
+    down(blob);
+  } else {
+    down(URL.createObjectURL(blob));
+  }
+}
+
+export const moveSheetCache = (appId, groupId) => {
+  const storage = JSON.parse(localStorage.getItem(`mdAppCache_${md.global.Account.accountId}_${appId}`)) || {};
+  const worksheets = storage.worksheets.map(data => {
+    if (data.groupId === groupId) {
+      data.worksheetId = '';
+    }
+    return data;
+  });
+  storage.worksheets = worksheets;
+  storage.lastWorksheetId = '';
+  safeLocalStorageSetItem(`mdAppCache_${md.global.Account.accountId}_${appId}`, JSON.stringify(storage));
+};

@@ -1,6 +1,7 @@
-import React, { Component, memo } from 'react';
+import React, { Component, Fragment, memo } from 'react';
 import { string } from 'prop-types';
 import { LoadDiv, Icon, Modal } from 'ming-ui';
+import { Modal as MobileModal } from 'antd-mobile';
 import styled from 'styled-components';
 import flowNode from '../../api/flowNode';
 import { getSameLevelIds } from '../../WorkflowSettings/utils';
@@ -9,7 +10,8 @@ import { NODE_TYPE } from '../../WorkflowSettings/enum';
 import cx from 'classnames';
 import _ from 'lodash';
 import './index.less';
-import '../../WorkflowSettings/EditFlow/index.less'
+import '../../WorkflowSettings/EditFlow/index.less';
+import { browserIsMobile } from 'src/util';
 
 const Start = styled.div`
   padding: 0 0 32px 0 !important;
@@ -58,20 +60,20 @@ const End = styled.div`
 `;
 
 const Legend = styled.div`
-  position: absolute;
-  left: 32px;
+  margin-left: 12px;
   font-size: 12px;
   .legendLine {
-    width: 30px;
+    width: 12px;
     height: 3px;
-    margin-right: 16px;
+    margin-right: 8px;
   }
 `;
 
-class FlowChart extends Component {
+export class FlowChart extends Component {
   static propTypes = {
     processId: string.isRequired,
     instanceId: string.isRequired,
+    selectNodeId: string,
   };
 
   state = {
@@ -137,6 +139,7 @@ class FlowChart extends Component {
    * 渲染线
    */
   renderLine(ids, isPending = false) {
+    const { selectNodeId } = this.props;
     const { flowNodeMap, execIds, execPendingIds } = this.state;
 
     ids.forEach((id, index) => {
@@ -144,15 +147,21 @@ class FlowChart extends Component {
 
       if (isPending) {
         $(`.flowChartModal .workflowBox[data-id=${id}],.workflowBranch[data-id=${id}]`).addClass('workflowBoxPending');
+      } else {
+        $el.parent().addClass('executed');
       }
 
-      // 已执行的高亮 或者 未执行的第一个高亮
-      if (!isPending || (isPending && index === 0)) {
+      // 已执行的高亮
+      if (!isPending || id === selectNodeId) {
         $el.find('> .workflowItem').removeClass('workflowItemDisabled');
       }
 
       if (flowNodeMap[id].typeId === NODE_TYPE.BRANCH) {
-        const $branchEl = $(`.flowChartModal .workflowBranch[data-id=${id}]`);
+        const { flowIds, gatewayType } = flowNodeMap[id];
+        const $branchEl = $(`.flowChartModal .workflowBranch[data-id=${id}]`).toggleClass(
+          'workflowInclusionBranch',
+          gatewayType === 1,
+        );
         const branchLeft = $branchEl.offset().left;
         const branchWidth = $branchEl.innerWidth();
 
@@ -165,14 +174,38 @@ class FlowChart extends Component {
           return;
         }
 
+        // 包含分支最后一个经过节点id
+        let lastId;
+        if (gatewayType === 1) {
+          flowIds.forEach((o, i) => {
+            if (_.includes(ids, o)) {
+              lastId = o;
+            }
+          });
+        }
+
         const $nextEl = $(`.flowChartModal .workflowBox[data-id=${ids[index + 1]}]`);
         const nextLeft = $nextEl.offset().left;
         const nextWidth = $nextEl.innerWidth();
-
         const diffWidth = branchWidth / 2 + branchLeft - (nextWidth / 2 + nextLeft);
-        const isLeft = diffWidth > 0;
-        const lineStyle = `width: ${Math.abs(diffWidth) + 2}px;margin-left:${
-          isLeft ? `${Math.ceil(branchWidth / 2 - diffWidth) - 1}px;` : `${Math.floor(branchWidth / 2) - 1}px;`
+        let moreBranchWidth = 0;
+
+        // 经过分支多个补充宽度
+        if (lastId && lastId !== ids[index + 1]) {
+          const $lastEl = $(`.flowChartModal .workflowBox[data-id=${lastId}]`);
+          const lastLeft = $lastEl.offset().left;
+          const lastWidth = $lastEl.innerWidth();
+          const lastDiffWidth = branchWidth / 2 + branchLeft - (lastWidth / 2 + lastLeft);
+
+          if (diffWidth > 0 && lastDiffWidth < 0) {
+            moreBranchWidth = Math.abs(lastDiffWidth);
+          } else if (diffWidth < 0 && lastDiffWidth < 0) {
+            moreBranchWidth = Math.abs(lastDiffWidth) - Math.abs(diffWidth);
+          }
+        }
+
+        const lineStyle = `width: ${Math.abs(diffWidth) + 2 + moreBranchWidth}px;margin-left:${
+          diffWidth > 0 ? `${Math.ceil(branchWidth / 2 - diffWidth) - 1}px;` : `${Math.floor(branchWidth / 2) - 1}px;`
         }`;
 
         $branchEl.prepend(`<div class="workflowExecTopLine" style="${lineStyle}" />`);
@@ -190,14 +223,25 @@ class FlowChart extends Component {
             if (
               flowNodeMap[key].typeId === NODE_TYPE.BRANCH &&
               (_.includes(['', '99'], flowNodeMap[key].nextId) ||
-                (!isPending && _.includes(execPendingIds, flowNodeMap[key].nextId)) ||
+                (!isPending && (!execPendingIds.length || _.includes(execPendingIds, flowNodeMap[key].nextId))) ||
                 isPending)
             ) {
               const $branchEl = $(`.flowChartModal .workflowBranch[data-id=${key}]`);
               const $btn = $branchEl.siblings('.workflowLineBtn');
+              let nextIsPadding = false;
+
+              if (
+                (flowNodeMap[key].nextId === '99' && !!execPendingIds.length) ||
+                _.includes(execPendingIds, flowNodeMap[key].nextId)
+              ) {
+                nextIsPadding = true;
+              }
 
               if (!$branchEl.find('> .workflowExecBottomLine').length) {
-                $branchEl.toggleClass('workflowBoxBranchPending', isPending);
+                $branchEl.toggleClass(
+                  'workflowBoxBranchPending',
+                  _.includes(execIds, flowNodeMap[key].nextId) ? false : isPending || nextIsPadding,
+                );
                 $branchEl.append(
                   `<div class="workflowExecBottomLine" style="${$branchEl
                     .find('> .workflowExecTopLine')
@@ -206,14 +250,15 @@ class FlowChart extends Component {
               }
 
               if (!$btn.find('> .workflowExecLine').length) {
-                $btn.toggleClass('workflowBoxPending', isPending).append('<div class="workflowExecLine" />');
+                $btn
+                  .toggleClass(
+                    'workflowBoxPending',
+                    _.includes(execIds, flowNodeMap[key].nextId) ? false : isPending || nextIsPadding,
+                  )
+                  .append('<div class="workflowExecLine" />');
               }
 
-              $branchEl
-                .find('.workflowExecLine')
-                .eq(0)
-                .closest('.flexColumn')
-                .addClass('workflowExecBeforeLine');
+              $branchEl.find('.workflowExecLine').eq(0).closest('.flexColumn').addClass('workflowExecBeforeLine');
             }
           });
       }
@@ -261,6 +306,7 @@ class FlowChart extends Component {
   render() {
     const { processId } = this.props;
     const { scale, startEventId, flowNodeMap } = this.state;
+    const isMobile = browserIsMobile();
 
     return (
       <div className="workflowEdit flexRow workflowEditRelease flex">
@@ -292,40 +338,48 @@ class FlowChart extends Component {
           </div>
         )}
 
-        <div className="workflowEditBtns">
-          <span data-tip={_l('放大')}>
+        <div className={cx('workflowEditBtn', { mobile: isMobile })}>
+          <span data-tip={isMobile ? '' : _l('缩小')}>
             <i
-              className={cx('icon-add ThemeHoverColor3', { disabled: scale === 100 })}
-              onClick={() => scale < 100 && this.setState({ scale: scale + 10 })}
-            />
-          </span>
-          <span data-tip={_l('缩小')}>
-            <i
-              className={cx('icon-maximizing_a2 ThemeHoverColor3', { disabled: scale === 50 })}
+              className={cx('icon-minus', { ThemeHoverColor3: !isMobile }, { disabled: scale === 50 })}
               onClick={() => scale > 50 && this.setState({ scale: scale - 10 })}
             />
           </span>
-          <span className="Font14 mLeft10">{scale}%</span>
-          <span className="mLeft15 Gray_75 ThemeHoverColor3 pointer" onClick={this.fullDisplay}>
-            {_l('完整显示')}
+          <span className="Font14 mRight8 TxtCenter" style={{ width: 40 }}>
+            {scale}%
           </span>
+          <span data-tip={isMobile ? '' : _l('放大')}>
+            <i
+              className={cx('icon-add', { ThemeHoverColor3: !isMobile }, { disabled: scale === 100 })}
+              onClick={() => scale < 100 && this.setState({ scale: scale + 10 })}
+            />
+          </span>
+
+          <span data-tip={isMobile ? '' : _l('适应高度')}>
+            <i className={cx('icon-settings_overscan', { ThemeHoverColor3: !isMobile })} onClick={this.fullDisplay} />
+          </span>
+
+          {!isMobile && (
+            <Fragment>
+              <span className="workflowEditBtnLine" />
+
+              <Legend className="flexRow alignItemsCenter">
+                <div className="legendLine" style={{ background: '#2196f3' }} />
+                <div>{_l('已执行')}</div>
+              </Legend>
+              <Legend className="flexRow alignItemsCenter mLeft20">
+                <div className="legendLine" style={{ background: '#ccc' }} />
+                <div>{_l('待执行')}</div>
+              </Legend>
+            </Fragment>
+          )}
         </div>
-
-        <Legend className="flexRow alignItemsCenter" style={{ top: 130 }}>
-          <div className="legendLine" style={{ background: '#2196f3' }} />
-          <div>{_l('已执行')}</div>
-        </Legend>
-
-        <Legend className="flexRow alignItemsCenter" style={{ top: 160 }}>
-          <div className="legendLine" style={{ background: '#ccc' }} />
-          <div>{_l('待执行')}</div>
-        </Legend>
       </div>
     );
   }
 }
 
-export default memo(({ processId, instanceId, onClose = () => {} }) => {
+export default memo(({ processId, instanceId, selectNodeId, onClose = () => {} }) => {
   return (
     <Modal
       visible
@@ -341,7 +395,16 @@ export default memo(({ processId, instanceId, onClose = () => {} }) => {
       width={window.outerWidth - 60}
       onCancel={onClose}
     >
-      <FlowChart processId={processId} instanceId={instanceId} />
+      <FlowChart processId={processId} instanceId={instanceId} selectNodeId={selectNodeId} />
     </Modal>
+  );
+});
+
+export const MobileFlowChart = memo(({ processId, instanceId, selectNodeId, onClose = () => {} }) => {
+  return (
+    <MobileModal popup animationType="slide-up" className="flowChartModal h100" onClose={onClose} visible={true}>
+      <Icon className="Gray_9e Font22 pointer mobileClose" icon="closeelement-bg-circle" onClick={onClose} />
+      <FlowChart processId={processId} instanceId={instanceId} selectNodeId={selectNodeId} />
+    </MobileModal>
   );
 });

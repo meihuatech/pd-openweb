@@ -26,6 +26,7 @@ import {
 import InvoiceSetting from './invoiceSetting';
 import ApplyInvoice from './applyInvoice';
 import DatePickerFilter from 'src/pages/Admin/common/datePickerFilter';
+import PaginationWrap from '../../components/PaginationWrap';
 import Common from '../common';
 import img from 'staticfiles/images/billinfo_system.png';
 import _ from 'lodash';
@@ -33,7 +34,7 @@ import _ from 'lodash';
 export default function BillInfo({ match }) {
   const { 0: projectId } = _.get(match, 'params');
   const [data, setData] = useSetState({});
-  const [paras, setPara] = useSetState({ pageIndex: 1, pageSize: 20, status: 0, recordTypes: PAID_RECORD_TYPE });
+  const [paras, setPara] = useSetState({ pageIndex: 1, pageSize: 50, status: 0, recordTypes: PAID_RECORD_TYPE });
   const [{ applyInvoiceVisible, applyOrderId, invoiceVisible, operateMenuVisible, datePickerVisible }, setVisible] =
     useSetState({
       applyInvoiceVisible: false,
@@ -43,11 +44,11 @@ export default function BillInfo({ match }) {
       applyOrderId: '',
     });
   const [loading, setLoading] = useState(false);
-  const [hasMoreDataFlag, setFlag] = useState(true);
   const [displayRecordType, setType] = useState('paid');
   const { balance, list = [], allCount, invoiceType } = data;
   const { pageIndex, status, pageSize, startDate, endDate } = paras;
-  const isPaid = data.licenseType === 1;
+  const isPaid =
+    _.get(_.find(md.global.Account.projects, project => project.projectId === projectId) || {}, 'licenseType') === 1;
   const isRechargeType = displayRecordType === 'recharge';
   const { companyName } = getCurrentProject(projectId);
   const refreshData = () => {
@@ -56,9 +57,6 @@ export default function BillInfo({ match }) {
       .getTransactionRecordByPage({ projectId, ...paras, status: displayRecordType === 'recharge' ? 0 : paras.status })
       .then(({ list }) => {
         setData({ list });
-        if (list.length < pageSize) {
-          setFlag(false);
-        }
       })
       .always(() => {
         setLoading(false);
@@ -102,9 +100,6 @@ export default function BillInfo({ match }) {
   };
   useEffect(() => {
     document.title = _l('组织管理 - 账务 - %0', companyName);
-    return () => {
-      document.title = _l('');
-    };
   }, []);
 
   useEffect(() => {
@@ -120,9 +115,6 @@ export default function BillInfo({ match }) {
       .getTransactionRecordByPage({ projectId, ...paras, status: displayRecordType === 'recharge' ? 0 : paras.status })
       .then(({ list, allCount }) => {
         setData({ list, allCount });
-        if (list.length < pageSize) {
-          setFlag(false);
-        }
       })
       .always(() => {
         setLoading(false);
@@ -167,6 +159,7 @@ export default function BillInfo({ match }) {
     const start = list.length ? pageSize * (pageIndex - 1) : 0;
     return _l('第 %0 - %1 条,共 %2 条', start + 1, start + list.length, allCount || 0);
   };
+
   const renderRecordList = () => {
     if (loading) return <LoadDiv />;
     if (!list.length) return <div className="emptyList">{_l('无相应订单数据')}</div>;
@@ -187,12 +180,15 @@ export default function BillInfo({ match }) {
                 invoiceStatus,
                 createAccountInfo,
                 payAccountInfo,
+                recordTypeTitle,
               },
               index,
             ) => (
               <li key={orderId || recordId} className="recordItem">
                 <div className="time overflow_ellipsis item Font14 Gray_75">{createTime}</div>
-                <div className="type overflow_ellipsis item">{orderTypeText[orderRecordType[recordType]]}</div>
+                <div className={cx('type overflow_ellipsis item', { rechargeType: displayRecordType === 'recharge' })}>
+                  {orderTypeText[orderRecordType[recordType]] + (recordTypeTitle ? '（' + recordTypeTitle + '）' : '')}
+                </div>
                 <div className={cx('amount item', { isPositive: price > 0 })}>{price}</div>
                 {isRechargeType ? (
                   <Fragment>
@@ -295,7 +291,7 @@ export default function BillInfo({ match }) {
   return (
     <BillInfoWrap>
       <div className="billInfoHeader">
-        <div className="title">账务</div>
+        <div className="title">{_l('账务%15000')}</div>
         <div
           className="invoiceSetting pointer adminHoverColor"
           onClick={() => {
@@ -312,9 +308,11 @@ export default function BillInfo({ match }) {
             <span>{_l('账户余额')}</span>
             <span className="moneySymbol Gray_75">(￥)</span>
             <span className="balance Font24">{getValue((balance || 0).toLocaleString())}</span>
-            {/* <span className="recharge pointer adminHoverColor" onClick={() => handleClick('recharge')}>
-              {_l('充值')}
-            </span> */}
+            {/* isPaid && (
+              <span className="recharge pointer adminHoverColor" onClick={() => handleClick('recharge')}>
+                {_l('充值')}
+              </span>
+            )*/}
           </div>
         </div>
         <div className="listHeader">
@@ -323,7 +321,6 @@ export default function BillInfo({ match }) {
               className={cx({ active: displayRecordType === 'paid' })}
               onClick={() => {
                 setType('paid');
-                setFlag(true);
                 setPara({ recordTypes: PAID_RECORD_TYPE, pageIndex: 1 });
               }}
             >
@@ -333,7 +330,6 @@ export default function BillInfo({ match }) {
               className={cx({ active: displayRecordType === 'recharge' })}
               onClick={() => {
                 setType('recharge');
-                setFlag(true);
                 setPara({ recordTypes: RECHARGE_RECORD_TYPE, pageIndex: 1 });
               }}
             >
@@ -350,7 +346,6 @@ export default function BillInfo({ match }) {
                 <DatePickerFilter
                   updateData={data => {
                     setPara({ ...data });
-                    setFlag(true);
                     setVisible({ datePickerVisible: false });
                   }}
                 />
@@ -366,30 +361,11 @@ export default function BillInfo({ match }) {
                 <i className="icon-close" onClick={() => setPara({ startDate: '', endDate: '' })} />
               </div>
             ) : null}
-            <div className="rows">{renderRows()}</div>
-            <div className="switchPage">
-              <div className={cx('prevPage mRight24', { disable: pageIndex === 1 })} data-tip={_l('上一页')}>
-                <i
-                  className="icon-arrow-left-border"
-                  onClick={() => pageIndex !== 1 && setPara({ pageIndex: Math.max(1, pageIndex - 1) })}
-                />
-              </div>
-              <div className={cx('nextPage', { disable: !hasMoreDataFlag })} data-tip={_l('下一页')}>
-                <i
-                  className="icon-arrow-right-border"
-                  onClick={() => {
-                    if (hasMoreDataFlag) {
-                      setPara({ pageIndex: pageIndex + 1 });
-                    }
-                  }}
-                />
-              </div>
-            </div>
           </div>
         </div>
         <div className="listTitle">
           <div className="time item">{_l('时间')}</div>
-          <div className="type item">{_l('类型')}</div>
+          <div className={cx('type item', { rechargeType: isRechargeType })}>{_l('类型')}</div>
           <div className="amount item Gray_75">{_l('金额')}</div>
           {isRechargeType ? (
             <Fragment>
@@ -404,7 +380,6 @@ export default function BillInfo({ match }) {
                   value={status}
                   onChange={value => {
                     setPara({ status: value });
-                    setFlag(true);
                   }}
                 />
               </div>
@@ -415,7 +390,13 @@ export default function BillInfo({ match }) {
             </Fragment>
           )}
         </div>
-        {renderRecordList()}
+        <div className="flex">{renderRecordList()}</div>
+        <PaginationWrap
+          total={allCount}
+          pageIndex={pageIndex}
+          pageSize={pageSize}
+          onChange={page => setPara({ pageIndex: page })}
+        />
       </div>
       {invoiceVisible && <InvoiceSetting projectId={projectId} onClose={() => setVisible({ invoiceVisible: false })} />}
       {applyInvoiceVisible && (

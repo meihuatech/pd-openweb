@@ -1,5 +1,5 @@
 import React, { Component } from 'react';
-import { getLegendType, formatrChartValue, formatYaxisList, getChartColors } from './common';
+import { getLegendType, formatrChartValue, formatYaxisList, getChartColors, getStyleColor } from './common';
 import { formatSummaryName, isFormatNumber } from 'statistics/common';
 import { Dropdown, Menu } from 'antd';
 import { toFixed } from 'src/util';
@@ -83,7 +83,7 @@ const fillMapValue = map => {
   return [data[0]];
 }
 
-const formatChartData = (data, { isAccumulate, showOptionIds = [] }, { controlId, xaxisEmpty }) => {
+const formatChartData = (data, { isAccumulate, showOptionIds = [] }, { controlId, xaxisEmpty }, yaxisList) => {
   const result = [];
   const cloneData = formatEmptyDataPosition(controlId ? data : fillMapValue(data), isAccumulate, xaxisEmpty);
   const { value } = cloneData[0] || { value: [] };
@@ -104,12 +104,13 @@ const formatChartData = (data, { isAccumulate, showOptionIds = [] }, { controlId
     cloneData.forEach(element => {
       const target = element.value.filter(n => n.x === name);
       if (target.length && target[0].v) {
+        const { rename } = _.find(yaxisList, { controlId: target[0].originalX }) || {};
         result.push({
           id: target[0].originalX,
           groupName: element.key,
           index: value.length - index,
           value: target[0].v,
-          name: name || _l('空'),
+          name: rename || name || _l('空'),
         });
       }
     });
@@ -121,6 +122,30 @@ const formatChartData = (data, { isAccumulate, showOptionIds = [] }, { controlId
 
   return result;
 };
+
+const getControlMinAndMax = (yaxisList, data) => {
+  const result = {};
+
+  const get = (id) => {
+    let values = [];
+    for (let i = 0; i < data.length; i++) {
+      values.push(data[i].value);
+    }
+    const min = _.min(values) || 0;
+    const max = _.max(values);
+    return {
+      min,
+      max,
+      center: (max + min) / 2
+    }
+  }
+
+  yaxisList.forEach(item => {
+    result[item.controlId] = get(item.controlId);
+  });
+
+  return result;
+}
 
 export default class extends Component {
   constructor(props) {
@@ -154,6 +179,7 @@ export default class extends Component {
       displaySetup.legendType !== oldDisplaySetup.legendType ||
       displaySetup.showNumber !== oldDisplaySetup.showNumber ||
       displaySetup.magnitudeUpdateFlag !== oldDisplaySetup.magnitudeUpdateFlag ||
+      !_.isEqual(displaySetup.colorRules, oldDisplaySetup.colorRules) ||
       style.funnelShape !== oldStyle.funnelShape ||
       style.funnelCurvature !== oldStyle.funnelCurvature
     ) {
@@ -185,10 +211,11 @@ export default class extends Component {
     const { xaxes, split, displaySetup } = this.props.reportData;
     const { contrastType } = displaySetup;
     const currentData = data.data;
-    const isNumber = isFormatNumber(xaxes.controlType);
     const param = {}
     if (xaxes.cid) {
-      param[xaxes.cid] = isNumber ? Number(currentData.id) : currentData.id;
+      const isNumber = isFormatNumber(xaxes.controlType);
+      const value = currentData.id;
+      param[xaxes.cid] = isNumber && value ? Number(value) : value;
     }
     this.setState({
       dropdownVisible: true,
@@ -217,10 +244,23 @@ export default class extends Component {
   }
   getComponentConfig(props) {
     const { map, contrastMap, displaySetup, yaxisList, xaxes, style } = props.reportData;
-    const data = formatChartData(map, displaySetup, xaxes);
+    const data = formatChartData(map, displaySetup, xaxes, yaxisList);
     const { position } = getLegendType(displaySetup.legendType);
     const newYaxisList = formatYaxisList(data, yaxisList);
     const colors = getChartColors(style);
+    const rule = _.get(displaySetup.colorRules[0], 'dataBarRule') || {};
+    const isRuleColor = !_.isEmpty(rule);
+    const controlMinAndMax = isRuleColor ? getControlMinAndMax(yaxisList, data) : {};
+    const getRuleColor = ({ name }) => {
+      const { value } = _.find(data, { name }) || {};
+      const color = getStyleColor({
+        value,
+        controlMinAndMax,
+        rule,
+        controlId: yaxisList[0].controlId
+      });
+      return color || colors[0];
+    }
 
     this.setCount(newYaxisList);
 
@@ -250,7 +290,7 @@ export default class extends Component {
       },
       isTransposed: displaySetup.showChartType === 2,
       shape: style.funnelShape,
-      color: colors,
+      color: isRuleColor ? getRuleColor : colors,
       legend: displaySetup.showLegend
         ? {
             position: position == 'top-left' ? 'top' : position,
@@ -283,7 +323,7 @@ export default class extends Component {
       this.contrastData = null;
       baseConfig.data = data;
     } else {
-      const contrastData = formatChartData(contrastMap, displaySetup, xaxes);
+      const contrastData = formatChartData(contrastMap, displaySetup, xaxes, yaxisList);
       const newData = mergeDataTime(data, contrastData);
       this.contrastData = newData;
       baseConfig.compareField = 'groupName';

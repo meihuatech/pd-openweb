@@ -56,6 +56,7 @@ export function handleLifeEffect(
     cache = {},
     onCellEnter = () => {},
     onCellLeave = () => {},
+    addNewRow = () => {},
     setScroll,
     focusCell,
     handleTableKeyDown,
@@ -154,6 +155,12 @@ export function handleLifeEffect(
       return;
     }
     if (newIndex > cache.rowCount * cache.columnCount - 1) {
+      if (e.action === 'text_enter_to_next' && isSubList) {
+        addNewRow({ noFocus: true });
+        setTimeout(() => {
+          focusCell(newIndex);
+        }, 100);
+      }
       return;
     }
     const nextFocusElement = tableElement.querySelector('.cell-' + newIndex);
@@ -187,7 +194,7 @@ export function handleLifeEffect(
   }
   function handleKeyDown(e) {
     // console.log({ ..._.pick(e, ['key', 'keyCode']), tagName: e.target.tagName });
-    if (tableType !== 'classic' || (!isSubList && window.recordInfoIsOpen)) {
+    if (tableType !== 'classic' || (!isSubList && !!document.querySelector('.workSheetRecordInfo'))) {
       return;
     }
     removeReadOnlyTip();
@@ -211,19 +218,23 @@ export function handleLifeEffect(
     ) {
       handleSwitchCell(e);
     } else {
-      handleTableKeyDown(cache.focusIndex, event);
+      handleTableKeyDown(cache.focusIndex, e);
     }
   }
   function handleOuterClick(e) {
+    removeReadOnlyTip();
     if (
       e.target.closest('.cellNeedFocus,.mdDialog,.mui-dialog-container,.UploadFilesTriggerWrap,.rc-trigger-popup') ||
       (!isSubList && e.target.closest('.recordInfoCon'))
     ) {
       return;
     }
-    if (!e.target.closest(`.cell`)) {
-      window.tempCopyForSheetView = undefined;
-      removeReadOnlyTip();
+    if (!e.target.closest(`.sheetViewTable.id-${tableId}-id`)) {
+      try {
+        if (_.get(safeParse(window.tempCopyForSheetView), 'tableId') === tableId) {
+          window.tempCopyForSheetView = undefined;
+        }
+      } catch (err) {}
       focusCell(-10000);
     }
   }
@@ -231,6 +242,7 @@ export function handleLifeEffect(
   $tableElement.on('mouseenter', '.cell:not(.row-head)', handleCellEnter);
   $tableElement.on('mouseleave', '.cell:not(.row-head)', handleCellLeave);
 
+  emitter.addListener('TRIGGER_TABLE_KEYDOWN_' + tableId, handleKeyDown);
   window.addEventListener('keydown', handleKeyDown);
   document.body.addEventListener('click', handleOuterClick);
   return () => {
@@ -238,6 +250,7 @@ export function handleLifeEffect(
     $tableElement.off('mouseenter', '.cell:not(.row-head)', handleCellEnter);
     $tableElement.off('mouseleave', '.cell:not(.row-head)', handleCellLeave);
     window.removeEventListener('keydown', handleKeyDown);
+    emitter.removeListener('TRIGGER_TABLE_KEYDOWN_' + tableId, handleKeyDown);
     document.body.removeEventListener('click', handleOuterClick);
   };
 }
@@ -258,7 +271,7 @@ export function columnWidthFactory({
     averageWidth = (width - _.sum(widths)) / (visibleColumns.length - widths.length);
   }
   return (index, noAverage) => {
-    const control = visibleColumns[index];
+    const control = visibleColumns[index] || {};
     return control.width || sheetColumnWidths[control.controlId] || (!noAverage && averageWidth) || 200;
   };
 }

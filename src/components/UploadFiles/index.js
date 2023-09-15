@@ -230,7 +230,7 @@ export default class UploadFiles extends Component {
     let { maxTotalSize } = this.state;
     const { nativeFile } = this;
     let { noTotal, dropPasteElement, from, projectId, advancedSetting } = this.props;
-    const isPublic = from === FROM.PUBLIC || from === FROM.WORKFLOW || window.isPublicWorksheet;
+    const isPublic = from === FROM.PUBLIC_ADD || from === FROM.WORKFLOW || window.isPublicWorksheet;
 
     const { licenseType } = _.find(md.global.Account.projects, item => item.projectId === projectId) || {};
 
@@ -311,6 +311,7 @@ export default class UploadFiles extends Component {
           if (isValid(files)) {
             alert(_l('含有不支持格式的文件'), 3);
             _this.onRemoveAll(uploader);
+            _this.props.onUploadComplete(true);
             return false;
           }
 
@@ -330,7 +331,6 @@ export default class UploadFiles extends Component {
             files.splice(files.length - num, num).map(file => {
               uploader.removeFile({ id: file.id });
             });
-
           }
 
           const tokenFiles = [];
@@ -359,7 +359,12 @@ export default class UploadFiles extends Component {
             tokenFiles.push({ bucket: isPic ? 4 : 3, ext: fileExt });
           });
 
-          getToken(tokenFiles).then(res => {
+          const { projectId, appId, worksheetId } = _this.props;
+          getToken(tokenFiles, 0, {
+            projectId,
+            appId,
+            worksheetId,
+          }).then(res => {
             files.forEach((item, i) => {
               item.token = res[i].uptoken;
               item.key = res[i].key;
@@ -609,6 +614,11 @@ export default class UploadFiles extends Component {
     );
   }
   resetFileName(id, newName) {
+    newName = newName.trim();
+    if (_.isEmpty(newName)) {
+      alert(_l('名称不能为空'), 2);
+      return;
+    }
     const newTemporaryData = this.state.temporaryData.map(item => {
       if (item.fileID === id) {
         item.originalFileName = newName;
@@ -715,7 +725,7 @@ export default class UploadFiles extends Component {
         },
       );
     } else if (quIndex >= 0) {
-      let hideFunctions = ['editFileName'];
+      let hideFunctions = ['editFileName', 'share', 'saveToKnowlege'];
       previewAttachments(
         {
           attachments: quData.map(item => {
@@ -754,7 +764,7 @@ export default class UploadFiles extends Component {
         attachments: res.map(item => item.node),
         index: findIndex(res, id),
         callFrom: 'kc',
-        hideFunctions: ['editFileName'],
+        hideFunctions: ['editFileName', 'share', 'saveToKnowlege'],
       },
       {
         openControlAttachmentInNewTab: this.props.controlId && this.handleOpenControlAttachmentInNewTab.bind(this),
@@ -839,12 +849,17 @@ export default class UploadFiles extends Component {
                 <i className="icon icon-knowledge-upload Gray_9e Font19" />
                 <span>{_l('本地')}</span>
               </div>
-              {!md.global.Account.isPortal && from !== FROM.DRAFT && !md.global.SysSettings.forbidSuites.includes('4') && (
-                <div className="flexRow valignWrapper" onClick={this.onOpenFolderSelectDialog.bind(this)}>
-                  <i className="icon icon-folder Gray_9e Font18" />
-                  <span>{_l('知识')}</span>
-                </div>
-              )}
+              {md.global.Account.accountId &&
+                md.global.Account.accountId.length === 36 &&
+                from !== FROM.DRAFT &&
+                !md.global.SysSettings.forbidSuites.includes('4') &&
+                !_.get(window, 'shareState.isPublicForm') &&
+                !_.get(window, 'shareState.isPublicFormPreview') && (
+                  <div className="flexRow valignWrapper" onClick={this.onOpenFolderSelectDialog.bind(this)}>
+                    <i className="icon icon-folder Gray_9e Font18" />
+                    <span>{_l('知识')}</span>
+                  </div>
+                )}
               {canAddLink && (
                 <div className="flexRow valignWrapper" onClick={this.openLinkDialog.bind(this)}>
                   <i className="icon icon-link2 Gray_9e Font19" />

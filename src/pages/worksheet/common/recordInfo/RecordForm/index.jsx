@@ -12,6 +12,7 @@ import DragMask from 'worksheet/common/DragMask';
 import { controlState } from 'src/components/newCustomFields/tools/utils';
 import { updateRulesData } from 'src/components/newCustomFields/tools/filterFn';
 import FormHeader from './FormHeader';
+import FormCover from './FormCover';
 import Abnormal from './Abnormal';
 import RelateRecordTableNav from './RelateRecordTableNav';
 import RelateRecordBlock from './RelateRecordBlock';
@@ -122,6 +123,7 @@ export default function RecordForm(props) {
     onError,
     masterRecordRowId,
     onWidgetChange = () => {},
+    widgetStyle = {},
   } = props;
   let { formdata = [] } = props;
   formdata.forEach(item => {
@@ -171,12 +173,19 @@ export default function RecordForm(props) {
   }
   const relateRecordTableControls = _.sortBy(
     updateRulesData({
-      from: recordId ? 3 : 2,
+      from: recordId && from !== 21 ? 3 : 2,
       rules: recordinfo.rules,
       data: formdata,
     })
-      .filter(control => isRelateRecordTableControl(control) && controlState(control, recordId ? 3 : 2).visible)
-      .map(c => (isLock ? { ...c, disabled: true } : c)),
+      .filter(
+        control =>
+          isRelateRecordTableControl(control) && controlState(control, recordId && from !== 21 ? 3 : 2).visible,
+      )
+      .map(c =>
+        Object.assign(!ignoreLock && isLock ? { ...c, disabled: true } : c, {
+          isDraft: from === RECORD_INFO_FROM.DRAFT,
+        }),
+      ),
     'row',
   ).filter(c => !c.hidden);
   const scrollRef = useRef();
@@ -247,10 +256,12 @@ export default function RecordForm(props) {
       formElement.clientHeight + formElement.offsetTop + 58 + 26 + 1;
     nav.current.style.zIndex = visible ? 1 : -1;
   }
-  function setStickyBarVisible() {
-    const scrollContentElement = recordForm.current.querySelector('.recordInfoFormScroll > .nano-content');
-    const stickyBar = recordForm.current.querySelector('.recordInfoFormScroll .stickyBar');
-    const recordTitle = recordForm.current.querySelector('.recordInfoFormScroll .recordTitle');
+  function setStickyBarVisible({ isSplit } = {}) {
+    const scrollContentElement = recordForm.current.querySelector(
+      isSplit ? '.topCon' : '.recordInfoFormScroll > .nano-content',
+    );
+    const stickyBar = recordForm.current.querySelector('.topCon .stickyBar');
+    const recordTitle = recordForm.current.querySelector('.topCon .recordTitle');
     const visible = scrollContentElement.scrollTop > recordTitle.offsetTop + recordTitle.offsetHeight;
     stickyBar.id = visible ? 'stickyBarActive' : '';
   }
@@ -295,7 +306,20 @@ export default function RecordForm(props) {
                 }
               : {})}
           >
-            <div className="topCon" style={isSplit ? { height: topHeight || 300 } : {}}>
+            <div
+              className="topCon"
+              style={isSplit ? { height: topHeight || 300 } : {}}
+              onScroll={
+                isSplit
+                  ? () => {
+                      setStickyBarVisible({ isSplit: true });
+                    }
+                  : () => {}
+              }
+            >
+              {type === 'edit' && !isSubList && (
+                <FormCover flag={formFlag} formData={formdata} widgetStyle={widgetStyle} />
+              )}
               {type === 'edit' && (
                 <StickyBar
                   className="stickyBar"
@@ -330,12 +354,13 @@ export default function RecordForm(props) {
                   ref={customwidget}
                   from={from === 21 ? from : recordId ? 3 : isMobile ? 5 : 2}
                   flag={formFlag}
+                  widgetStyle={widgetStyle}
                   controlProps={controlProps}
                   data={formdata.filter(c => !_.includes(HIDDEN_CONTROL_IDS, c.controlId))}
                   systemControlData={systemControlData}
                   rules={recordinfo.rules}
                   isWorksheetQuery={recordinfo.isWorksheetQuery}
-                  disabled={!allowEdit && from !== 21}
+                  disabled={!allowEdit}
                   projectId={recordinfo.projectId || props.projectId}
                   groupId={recordinfo.groupId}
                   masterRecordRowId={masterRecordRowId}
@@ -374,7 +399,7 @@ export default function RecordForm(props) {
                   relateNumOfControl={relateNumOfControl}
                   navScrollLeft={navScrollLeft}
                   activeId={activeRelateRecordControlId || relateRecordTableControls[0].controlId}
-                  recordbase={recordbase}
+                  recordbase={{ ...recordbase, allowEdit: isLock ? false : recordbase.allowEdit }}
                   recordinfo={recordinfo}
                   controls={relateRecordTableControls}
                   relateRecordData={relateRecordData}

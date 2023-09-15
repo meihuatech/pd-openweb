@@ -1,5 +1,4 @@
 import React from 'react';
-import { Switch } from 'antd';
 import { LoadDiv, Tooltip, Checkbox } from 'ming-ui';
 import accountSetting from 'src/api/accountSetting';
 import cx from 'classnames';
@@ -20,7 +19,6 @@ const configs = [
   },
 ];
 
-const languagueList = [{ key: 'zh-Hans', value: '简体中文' }].concat(langConfig);
 export default class AccountChart extends React.Component {
   constructor(props) {
     super(props);
@@ -77,15 +75,27 @@ export default class AccountChart extends React.Component {
   languague = () => {
     return (
       <div className="languagueSetting">
-        {languagueList.map(item => {
+        {langConfig.map(item => {
           return (
             <div
               className={cx('languagueItem', {
                 active: (getCookie('i18n_langtag') || getNavigatorLang()) === item.key,
               })}
               onClick={() => {
-                setCookie('i18n_langtag', item.key);
-                window.location.reload();
+                if (!md.global.Account.isPortal) {
+                  const settingValue = { 'zh-Hans': '0', en: '1', ja: '2', 'zh-Hant': '3' };
+                  accountSetting
+                    .editAccountSetting({ settingType: '6', settingValue: settingValue[item.key] })
+                    .then(res => {
+                      if (res) {
+                        setCookie('i18n_langtag', item.key);
+                        window.location.reload();
+                      }
+                    });
+                } else {
+                  setCookie('i18n_langtag', item.key);
+                  window.location.reload();
+                }
               }}
             >
               {item.value}
@@ -98,7 +108,7 @@ export default class AccountChart extends React.Component {
 
   render() {
     if (this.state.loading) {
-      return <LoadDiv />;
+      return <LoadDiv className="mTop40" />;
     }
     return (
       <div className="systemSettingsContainer">

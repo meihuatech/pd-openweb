@@ -4,8 +4,15 @@ import SortConditions from 'src/pages/worksheet/common/ViewConfig/components/Sor
 import { getAdvanceSetting } from '../../../util';
 import { handleAdvancedSettingChange } from '../../../util/setting';
 
+const defaultSort = [
+  {
+    controlId: 'ctime',
+    isAsc: true,
+  },
+];
+
 export default function SubListSort(props) {
-  const { data, controls, onChange, onClose } = props;
+  const { data, controls, fromRelate, onChange, onClose } = props;
   const [sorts, setSorts] = useState(getAdvanceSetting(data, 'sorts'));
   return (
     <Dialog
@@ -15,16 +22,21 @@ export default function SubListSort(props) {
       onCancel={onClose}
       className="subListSortDialog"
       onOk={() => {
-        console.log(sorts);
-        onChange(handleAdvancedSettingChange(data, { sorts: JSON.stringify(sorts) }));
+        onChange(
+          handleAdvancedSettingChange(data, {
+            sorts: fromRelate && _.isEmpty(sorts) ? JSON.stringify(defaultSort) : JSON.stringify(sorts),
+          }),
+        );
         onClose();
       }}
     >
       <SortConditions
         className="subListSortCondition"
-        columns={controls.filter(o => ![43].includes(o.type))}
+        columns={controls.filter(o => ![43, 49, 51].includes(o.type))}
         sortConditions={sorts}
+        showSystemControls
         onChange={setSorts}
+        isSubList={true}
       />
     </Dialog>
   );

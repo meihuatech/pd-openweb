@@ -173,6 +173,7 @@ export default function ConditionsGroup(props) {
     filterResigned = true,
     filterAddConditionControls = () => {},
     filterError = [],
+    isRules,
   } = props;
   return (
     <Con className={cx({ isSingleFilter })}>
@@ -191,9 +192,9 @@ export default function ConditionsGroup(props) {
                   disabled={!canEdit}
                   defaultValue={conditionSpliceType}
                   isAppendToBody
-                  menuStyle={{ width: 46 }}
+                  menuStyle={{ width: 'auto' }}
                   data={[
-                    { text: _l('且'), value: FILTER_RELATION_TYPE.AND },
+                    { text: _l('且%25000'), value: FILTER_RELATION_TYPE.AND },
                     { text: _l('或'), value: FILTER_RELATION_TYPE.OR },
                   ]}
                   onChange={value => {
@@ -205,7 +206,7 @@ export default function ConditionsGroup(props) {
                 <span className="text">
                   {
                     {
-                      [FILTER_RELATION_TYPE.AND]: _l('且'),
+                      [FILTER_RELATION_TYPE.AND]: _l('且%25000'),
                       [FILTER_RELATION_TYPE.OR]: _l('或'),
                     }[conditionSpliceType]
                   }
@@ -227,6 +228,7 @@ export default function ConditionsGroup(props) {
               onChange={value => onChange(value, i)}
               conditionError={filterError[i] || ''}
               filterResigned={filterResigned}
+              isRules={isRules}
               {...conditionProps}
             />
           </ConditionCon>

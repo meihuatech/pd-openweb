@@ -10,34 +10,23 @@ import { getPssId } from 'src/util/pssId';
 import qs from 'query-string';
 import qiniuAjax from 'src/api/qiniu';
 import projectAjax from 'src/api/project';
+import captcha from 'src/components/captcha';
+import accountAjax from 'src/api/account';
+import actionLogAjax from 'src/api/actionLog';
+import { purchaseMethodFunc } from 'src/components/upgrade/choose/PurchaseMethodModal';
 
 export const emitter = new EventEmitter();
-
-export function getProject(projectId) {
-  if (projectId === 'external' && browserIsMobile()) {
-    return { projectId, companyName: _l('外部协作') };
-  }
-  const projects = md.global.Account.projects;
-  if (projectId) {
-    const project = _.find(projects, { projectId });
-    if (project) {
-      return project;
-    }
-  }
-  return projects[0];
-}
 
 // 判断选项颜色是否为浅色系
 export const isLightColor = (color = '') => _.includes(LIGHT_COLOR, color.toUpperCase());
 
 export const getCurrentProject = id => {
+  if (id === 'external' && browserIsMobile()) {
+    return { projectId: id, companyName: _l('外部协作') };
+  }
+
   const projects = _.get(md, ['global', 'Account', 'projects']) || [];
   return _.find(projects, item => item.projectId === id) || {};
-};
-
-export const enumObj = obj => {
-  _.keys(obj).forEach(key => (obj[obj[key]] = key));
-  return obj;
 };
 
 export const encrypt = text => {
@@ -98,7 +87,7 @@ export const getItem = key => {
   }
 };
 
-export const formatNumberFromInput = value => {
+export const formatNumberFromInput = (value, pointReturnEmpty = true) => {
   value = value
     .replace(/[^-\d.]/g, '')
     .replace(/^\./g, '')
@@ -110,7 +99,7 @@ export const formatNumberFromInput = value => {
     .replace(/\./g, '')
     .replace('$#$', '.');
 
-  if (value === '.') {
+  if (pointReturnEmpty && value === '.') {
     value = '';
   }
   return value;
@@ -209,36 +198,6 @@ export const cutStringWithHtml = (self, len, rows) => {
 };
 
 /**
- * 翻译中替换{0} {1} 方法
- * @param  {string} str 要替换的字符串
- * @param  {object} args 如果只有第二个参数，并且是对象，根据对象的 key 替换 str 中相应的{key}
- * @return {string}
- */
-export const langFormat = (str, ...args) => {
-  let result = str;
-  let reg;
-  if (!result || !args.length) {
-    return result;
-  }
-  if (args.length === 1 && typeof args[0] === 'object') {
-    for (let key in args[0]) {
-      if ({}.hasOwnProperty.call(args[0], key) && args[0][key] !== undefined) {
-        reg = new RegExp('({)' + key + '(})', 'g');
-        result = result.replace(reg, args[0][key]);
-      }
-    }
-  } else {
-    for (let i = 0; i < args.length; i++) {
-      if (args[i] !== undefined) {
-        reg = new RegExp('({)' + i + '(})', 'g');
-        result = result.replace(reg, args[i]);
-      }
-    }
-  }
-  return result;
-};
-
-/**
  * 将文件大小转换成可读的格式，即 123.4 MB 这种类型
  * @param  {Number} size  文件以 byte 为单位的大小
  * @param  {Array}  accuracy 小数点后保留的位数
@@ -255,20 +214,6 @@ export const formatFileSize = (size, accuracy, space, units) => {
   }
   let i = Math.floor(Math.log(size) / Math.log(1024));
   return (size / Math.pow(1024, i)).toFixed(accuracy) * 1 + space + units[i];
-};
-
-/**
- * 判断是否是视频格式
- * @param {string} fileExt
- * @returns {boolean}
- */
-export const isVideo = fileExt => {
-  let fileExts = ['.mov', '.mp4', '.avi', '.mkv', '.3gp', '.3g2', '.m4v', '.rm', '.rmvb', '.webm'];
-  if (fileExt) {
-    fileExt = fileExt.toLowerCase();
-    return fileExts.indexOf(fileExt) >= 0;
-  }
-  return false;
 };
 
 /**
@@ -289,12 +234,6 @@ export const getRandomString = (length, customStr) => {
     str += chars[Math.floor(Math.random() * chars.length)];
   }
   return str;
-};
-
-export const isUrlRequest = url => {
-  if (/^data:|^chrome-extension:|^(https?:)?\/\/|^[\{\}\[\]#*;,'§\$%&\(=?`´\^°<>]/.test(url)) return true;
-  if (/^\//.test(url)) return true;
-  return false;
 };
 
 export const downloadFile = url => {
@@ -337,7 +276,8 @@ export const browserIsMobile = () => {
   const bIsCE = sUserAgent.match(/windows ce/i) == 'windows ce';
   const bIsWM = sUserAgent.match(/windows mobile/i) == 'windows mobile';
   const bIsApp = sUserAgent.match(/mingdao application/i) == 'mingdao application';
-  const value = bIsIphoneOs || bIsMidp || bIsUc7 || bIsUc || bIsAndroid || bIsCE || bIsWM || bIsApp;
+  const bIsMiniProgram = sUserAgent.match(/miniprogram/i) == 'miniprogram';
+  const value = bIsIphoneOs || bIsMidp || bIsUc7 || bIsUc || bIsAndroid || bIsCE || bIsWM || bIsApp || bIsMiniProgram;
 
   if (sUserAgent.includes('dingtalk')) {
     // 钉钉设备针对侧边栏打开判断为 mobile 环境
@@ -396,15 +336,35 @@ export const getIconNameByExt = ext => {
       break;
     case 'mov':
     case 'mp4':
+    case 'mpg':
     case 'flv':
+    case 'f4v':
     case 'rm':
     case 'rmvb':
     case 'avi':
     case 'mkv':
+    case 'wmv':
     case '3gp':
     case '3g2':
+    case 'swf':
     case 'm4v':
       extType = 'mp4';
+      break;
+    case 'mp3':
+    case 'wav':
+    case 'flac':
+    case 'ape':
+    case 'alac':
+    case 'wavpack':
+    case 'm4a':
+    case 'aac':
+    case 'ogg':
+    case 'vorbis':
+    case 'opus':
+    case 'au':
+    case 'mmf':
+    case 'aif':
+      extType = 'mp3';
       break;
     case 'mmap':
     case 'xmind':
@@ -431,7 +391,6 @@ export const getIconNameByExt = ext => {
     case 'key':
     case 'ma':
     case 'max':
-    case 'mp3':
     case 'numbers':
     case 'obj':
     case 'pages':
@@ -577,27 +536,13 @@ export function createElementFromHtml(html) {
 /**
  * 获取上传token
  */
-export const getToken = (files, type = 0) => {
+export const getToken = (files, type = 0, args = {}) => {
   if (!md.global.Account.accountId) {
-    return qiniuAjax.getFileUploadToken({ files });
+    return qiniuAjax.getFileUploadToken({ files, type, ...args });
   } else {
-    return qiniuAjax.getUploadToken({ files, type });
+    return qiniuAjax.getUploadToken({ files, type, ...args });
   }
 };
-
-/**
- * jQuery Promise 转为标准 Promise
- */
-export function jP2Promise(jPFunction) {
-  return (...args) => {
-    return new Promise((resolve, reject) => {
-      jPFunction(...args)
-        .then(resolve)
-        .fail(reject)
-        .always(Promise.finally);
-    });
-  };
-}
 
 /**
  * 路由添加子路径
@@ -728,19 +673,6 @@ export function getColorCountByBg(backgroundColor) {
   return RgbValueArry[0] * 0.299 + RgbValueArry[1] * 0.587 + RgbValueArry[2] * 0.114;
 }
 
-export function replaceNotNumber(value) {
-  return value
-    .replace(/[^-\d.]/g, '')
-    .replace(/^\./g, '')
-    .replace(/^-/, '$#$')
-    .replace(/-/g, '')
-    .replace('$#$', '-')
-    .replace(/^-\./, '-')
-    .replace('.', '$#$')
-    .replace(/\./g, '')
-    .replace('$#$', '.');
-}
-
 /**
  * 调用 app 内的方式
  */
@@ -765,32 +697,21 @@ export function mdAppResponse(param) {
 }
 
 /**
- * 获取路由参数
- */
-export const parseSearchParams = searchParamsString => {
-  return searchParamsString.split('?').reduce((searchParams, curKV) => {
-    const [k, v] = curKV.split('=').map(decodeURIComponent);
-    searchParams[k] = v;
-
-    return searchParams;
-  }, {});
-};
-
-/**
  * 升级版本dialog
  */
 export const upgradeVersionDialog = options => {
   const hint = options.hint || _l('当前版本无法使用此功能');
-  const explainText = options.explainText || _l('请升级至专业版或旗舰版解锁开启');
+  const explainText = options.explainText;
   const versionType = options.versionType ? options.versionType : undefined;
+  const isExternal = _.isEmpty(getCurrentProject(options.projectId)); // 是否为外协人员
 
   if (options.dialogType === 'content') {
     return (
-      <div>
+      <div className="upgradeWrap">
         <div className="netStateWrap">
           <div className="imgWrap" />
           <div className="hint">{hint}</div>
-          {(!md.global.Config.IsLocal || !md.global.Account.isPortal || options.explainText) && (
+          {!md.global.Config.IsLocal && !md.global.Account.isPortal && !isExternal && options.explainText && (
             <div className="explain">{explainText}</div>
           )}
         </div>
@@ -804,7 +725,7 @@ export const upgradeVersionDialog = options => {
       <div className="netStateWrap">
         <div className="imgWrap" />
         <div className="hint">{hint}</div>
-        {(!md.global.Config.IsLocal || !md.global.Account.isPortal || options.explainText) && (
+        {!md.global.Config.IsLocal && !md.global.Account.isPortal && !isExternal && options.explainText && (
           <div className="explain">{explainText}</div>
         )}
       </div>
@@ -846,9 +767,10 @@ export function getFeatureStatus(projectId, featureId) {
 /**
  * 功能埋点授权显示升级版本内容dialogType： dialog弹层（默认） content 页面
  */
-export function buriedUpgradeVersionDialog(projectId, featureId, dialogType) {
+export function buriedUpgradeVersionDialog(projectId, featureId, dialogType, extra) {
   const { Versions = [] } = md.global || {};
   const { licenseType } = getSyncLicenseInfo(projectId);
+  const { explainText = '' } = extra || {};
   let upgradeName, versionType;
 
   if (!md.global.Config.IsLocal) {
@@ -873,6 +795,8 @@ export function buriedUpgradeVersionDialog(projectId, featureId, dialogType) {
       explainText:
         md.global.Config.IsLocal || md.global.Account.isPortal
           ? _l('请升级版本')
+          : !!explainText
+          ? explainText
           : _l('请升级至%0解锁开启', upgradeName),
       dialogType,
       versionType,
@@ -884,6 +808,8 @@ export function buriedUpgradeVersionDialog(projectId, featureId, dialogType) {
       explainText:
         md.global.Config.IsLocal || md.global.Account.isPortal
           ? _l('请升级版本')
+          : !!explainText
+          ? explainText
           : _l('请升级至%0解锁开启', upgradeName),
       versionType,
     });
@@ -920,3 +846,148 @@ export function toFixed(num, dot = 0) {
     return (isNegative ? '-' : '') + Math.floor(data / Math.pow(10, dot)) + '.' + data.slice(-1 * dot);
   }
 }
+
+/**
+ * 验证登录密码
+ */
+export function verifyPassword({
+  password = '',
+  closeImageValidation = false, // 是否前3次关闭图像验证
+  isNoneVerification = false, // 是否一小时内免验证
+  checkNeedAuth = false, // 检测是否免验证
+  success = () => {},
+  fail = () => {},
+}) {
+  if (!password.trim() && !checkNeedAuth) {
+    alert(_l('请输入密码'), 3);
+    fail();
+    return;
+  }
+  const cb = function (res) {
+    if (res.ret !== 0) {
+      return;
+    }
+
+    accountAjax[checkNeedAuth || closeImageValidation ? 'checkAccountIdentity' : 'checkAccount'](
+      checkNeedAuth
+        ? {}
+        : {
+            isNoneVerification,
+            ticket: res.ticket,
+            randStr: res.randstr,
+            captchaType: md.staticglobal.getCaptchaType(),
+            password: encrypt(password),
+          },
+    ).then(statusCode => {
+      if (statusCode === 1) {
+        success();
+      } else if (statusCode === 10) {
+        captchaFuc();
+      } else if (checkNeedAuth && statusCode === 6) {
+        fail('password');
+      } else {
+        alert(
+          {
+            6: _l('密码不正确'),
+            8: _l('验证码错误'),
+          }[statusCode] || _l('操作失败'),
+          2,
+        );
+        fail();
+      }
+    });
+  };
+  const captchaFuc = () => {
+    if (md.staticglobal.getCaptchaType() === 1) {
+      new captcha(cb);
+    } else {
+      new TencentCaptcha(md.global.Config.CaptchaAppId.toString(), cb).show();
+    }
+  };
+
+  // 前3次关闭图像验证
+  if (closeImageValidation || checkNeedAuth) {
+    cb({ ret: 0 });
+  } else {
+    captchaFuc();
+  }
+}
+
+// 去除无效0
+export function formatStrZero(str = '') {
+  const numStr = (String(str).match(/[,\.\d]+/) || [])[0];
+  if (!numStr) {
+    return str;
+  }
+  const num = numStr.replace(/(?:\.0*|(\.\d+?)0+)$/, '$1');
+  return String(str).replace(numStr, num);
+}
+
+// 根据索引获取不重复名称
+export const getUnUniqName = (data, name = '', key = 'name') => {
+  if (data.filter(item => item[key] === name).length) {
+    const maxNumber = _.max(
+      data
+        .filter(item => item[key].indexOf(String(name).replace(/\d*$/, '')) > -1)
+        .map(item => parseInt(item[key].match(/\d*$/)[0])),
+    );
+
+    name = String(name).replace(/\d*$/, maxNumber + 1);
+  }
+
+  return name;
+};
+
+/**
+ * 添加行为日志
+ */
+export const addBehaviorLog = (type, entityId, params = {}) => {
+  const typeObj = {
+    app: 1, // 应用
+    worksheet: 2, // 工作表
+    customPage: 3, // 自定义页面
+    worksheetRecord: 4, // 工作表记录
+    printRecord: 5, // 打印了记录
+    printWord: 6, // 使用了word模板打印
+    pintTemplate: 7, // 使用了模板打印了记录
+    printQRCode: 8, // 打印了二维码
+    printBarCode: 9, // 打印了条形码
+    batchPrintWord: 10, // 批量word打印
+  };
+  actionLogAjax.addLog({
+    type: typeObj[type],
+    entityId,
+    params,
+  });
+};
+
+/**
+ * 判断是否是uuid
+ */
+export function isUUID(id = '') {
+  return /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(id);
+}
+
+/**
+ * 随机密码
+ */
+export const randomPassword = length => {
+  let passwordArray = ['ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz', '1234567890'];
+  var password = [];
+  let n = 0;
+  for (let i = 0; i < length; i++) {
+    if (password.length < length - 3) {
+      let arrayRandom = Math.floor(Math.random() * 3);
+      let passwordItem = passwordArray[arrayRandom];
+      let item = passwordItem[Math.floor(Math.random() * passwordItem.length)];
+      password.push(item);
+    } else {
+      let newItem = passwordArray[n];
+      let lastItem = newItem[Math.floor(Math.random() * newItem.length)];
+      let spliceIndex = Math.floor(Math.random() * password.length);
+      password.splice(spliceIndex, 0, lastItem);
+      n++;
+    }
+  }
+  return password.join('');
+};

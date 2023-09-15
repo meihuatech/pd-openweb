@@ -239,8 +239,8 @@ export default class CommonInfo extends Component {
     } = this.state;
     const showInfo = [1, 2, 3].indexOf(visibleType) > -1;
     return (
-      <div className="system-set-box">
-        <div className="system-set-header">
+      <div className="orgManagementWrap">
+        <div className="orgManagementHeader">
           <span className="Font17">{_l('组织信息')}</span>
         </div>
         <div className="system-set-content">
@@ -291,7 +291,7 @@ export default class CommonInfo extends Component {
               </div>
               <div className="common-info-row mTop24">
                 <div className="common-info-row-label">{_l('组织名称')}</div>
-                {companyDisplayName && <span className="mRight16">{_l(`${companyDisplayName}`)}</span>}
+                {companyDisplayName && <span className="mRight16">{companyDisplayName}</span>}
                 <button
                   type="button"
                   className="ming Button Button--link ThemeColor3 adminHoverColor"

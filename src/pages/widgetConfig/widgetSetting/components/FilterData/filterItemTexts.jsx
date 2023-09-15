@@ -11,7 +11,7 @@ const FilterTextWrap = styled.div`
   width: 100%;
   border: 1px solid #dddddd;
   border-radius: 3px;
-  padding: 0 12px 6px 12px;
+  padding: 2px 12px 8px;
   box-sizing: border-box;
   color: #333;
   margin: 10px 0;
@@ -30,6 +30,7 @@ const FilterTextWrap = styled.div`
     font-size: 13px;
     color: #333;
     line-height: 20px;
+    padding-left: 20px;
 
     p {
       line-height: 22px;
@@ -58,7 +59,6 @@ const FilterTextWrap = styled.div`
 
   .filterGroup {
     position: relative;
-    margin-left: 22px;
     .spliceText {
       position: absolute;
       left: -20px;
@@ -80,11 +80,13 @@ const FilterTextWrap = styled.div`
 `;
 
 export default class FilterItemTexts extends React.Component {
-  renderFilterItem({ item, index, spliceText }) {
+  renderFilterItem({ item, index, key, spliceText }) {
     return (
-      <div key={item.id} className="pRight10 mTop6 flexBox renderFilterItem">
+      <div key={`${item.id}--${key || index}`} className="pRight10 mTop6 flexBox renderFilterItem">
         {index ? <span className="mRight10 Gray_75 Font13">{spliceText}</span> : null}
-        <span className="mRight10">{item.name}</span>
+        <span className="mRight10" style={{ flexShrink: 0 }}>
+          {item.name}
+        </span>
         {item.type ? <span className="Bold LineHeight19 mRight10 Gray Font13">{item.type.text}</span> : null}
         {item.value && item.value.type === 'dynamicSource' ? (
           item.value.data.map(it => {
@@ -99,13 +101,13 @@ export default class FilterItemTexts extends React.Component {
             );
           })
         ) : (
-          <span className="WordBreak flexItem">{item.value}</span>
+          <span className="breakAll">{item.value}</span>
         )}
       </div>
     );
   }
   render() {
-    let { data, allControls, controls, editFn, loading = true, globalSheetControls = [] } = this.props;
+    let { data, allControls, controls, editFn, loading = true, globalSheetControls = [], className } = this.props;
     const filters = this.props.filters || getAdvanceSetting(data, 'filters');
     let filterItemTexts;
     if (this.props.filterItemTexts) {
@@ -120,8 +122,11 @@ export default class FilterItemTexts extends React.Component {
         data.sourceControlId,
       );
     }
+
+    filterItemTexts = filterItemTexts.filter(o => (o.isGroup ? (o.groupFilters || []).length > 0 : true));
     return (
       <FilterTextWrap
+        className={className}
         onClick={() => {
           editFn();
         }}
@@ -138,6 +143,7 @@ export default class FilterItemTexts extends React.Component {
                       this.renderFilterItem({
                         item: childItem,
                         index: childIndex,
+                        key: `${index}--${childIndex}`,
                         spliceText:
                           item.groupFilters[childIndex - 1] && item.groupFilters[childIndex - 1].spliceType == 1
                             ? _l('且')

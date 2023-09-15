@@ -2,7 +2,7 @@ import React from 'react';
 import classNames from 'classnames';
 import { Route } from 'react-router-dom';
 import { Button, Icon, Checkbox } from 'ming-ui';
-import Link from 'src/router/Link.jsx';
+import { Link } from 'react-router-dom';
 import RoleAuthCommon from './common/common';
 import RoleList from './roleList';
 import RoleDetail from './roleDetail';
@@ -122,22 +122,24 @@ export default class RoleAuth extends React.Component {
           render={({ match }) => {
             if (!this.state.isSuperAdmin) return null;
             return (
-              <div className="roleListAction flexRow">
+              <div className="roleListAction flexRow alignItemsCenter">
                 <Checkbox
-                  className="mRight40 lineHeight36 "
+                  className="lineHeight36"
                   checked={allowApplyManage}
                   onClick={val => {
                     this.setState({ allowApplyManage: !val }, () => {
-                      projectSettingAjax.setAllowApplyManageRole({
-                        projectId,
-                        allowApplyManageRole: !val,
-                      }).then(res => {
-                        if (res) {
-                          alert(_l('设置成功'));
-                        } else {
-                          alert(_l('设置失败'), 2);
-                        }
-                      });
+                      projectSettingAjax
+                        .setAllowApplyManageRole({
+                          projectId,
+                          allowApplyManageRole: !val,
+                        })
+                        .then(res => {
+                          if (res) {
+                            alert(_l('设置成功'));
+                          } else {
+                            alert(_l('设置失败'), 2);
+                          }
+                        });
                     });
                   }}
                 >

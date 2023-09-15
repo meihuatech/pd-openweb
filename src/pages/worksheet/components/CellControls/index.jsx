@@ -6,9 +6,15 @@ import { RELATE_RECORD_SHOW_TYPE, ROW_HEIGHT } from 'worksheet/constants/enum';
 import { controlState } from 'src/components/newCustomFields/tools/utils';
 import { Validator, getRangeErrorType } from 'src/components/newCustomFields/tools/utils';
 import { FORM_ERROR_TYPE, FORM_ERROR_TYPE_TEXT } from 'src/components/newCustomFields/tools/config';
-import { onValidator } from 'src/components/newCustomFields/tools/DataFormat';
+import DataFormat, { onValidator } from 'src/components/newCustomFields/tools/DataFormat';
 import { WORKSHEETTABLE_FROM_MODULE } from 'worksheet/constants/enum';
-import { checkIsTextControl, handleCopyControlText } from '../../util';
+import {
+  checkIsTextControl,
+  handleCopyControlText,
+  isSameTypeForPaste,
+  handlePasteUpdateCell,
+  getCopyControlText,
+} from '../../util';
 import { accDiv } from 'src/util';
 
 import renderText from './renderText';
@@ -34,10 +40,20 @@ import BarCode from './BarCode';
 import Time from './Time';
 import OrgRole from './OrgRole';
 import Search from './Search';
+import RelationSearch from './RelationSearch';
 
 import './CellControls.less';
 import _ from 'lodash';
 
+function mergeControlAdvancedSetting(control = {}, advancedSetting = {}) {
+  return {
+    ...control,
+    advancedSetting: {
+      ...(control.advancedSetting || {}),
+      ...advancedSetting,
+    },
+  };
+}
 export default class CellControl extends React.Component {
   static propTypes = {
     isSubList: PropTypes.bool,
@@ -156,7 +172,7 @@ export default class CellControl extends React.Component {
 
   validate(cell, row) {
     const { tableFromModule, cellUniqueValidate, clearCellError, rowFormData } = this.props;
-    let { errorType } = onValidator({ item: cell, data: rowFormData(), ignoreRequired: true });
+    let { errorType } = onValidator({ item: cell, data: rowFormData() });
     if (!errorType && cell.unique && tableFromModule === WORKSHEETTABLE_FROM_MODULE.SUBLIST) {
       errorType = cellUniqueValidate(cell.controlId, cell.value, row.rowid) ? '' : 'UNIQUE';
     }
@@ -176,23 +192,41 @@ export default class CellControl extends React.Component {
 
   @autobind
   onValidate(value, returnObject = false) {
-    const { cell, row, checkRulesErrorOfControl, rowFormData, clearCellError } = this.props;
+    const { projectId, cell, row, checkRulesErrorOfControl, rowFormData, clearCellError } = this.props;
     // 百分比值处理
     if (_.includes([6], cell.type) && cell.advancedSetting && cell.advancedSetting.numshow === '1' && value) {
       value = accDiv(value, 100);
     }
-    const errorType = this.validate({ ...cell, value }, row);
+    const errorType = this.validate(
+      { ...(cell.type === 10 ? mergeControlAdvancedSetting(cell, { otherrequired: '0' }) : { ...cell }), value },
+      row,
+    );
     let errorText;
-    if (_.includes([15, 16], cell.type) && errorType && errorType !== 'REQUIRED') {
-      errorText = onValidator(cell, _.isFunction(rowFormData) ? rowFormData() : rowFormData, undefined, true).errorText;
+    if (_.includes([15, 16, 46], cell.type) && errorType && errorType !== 'REQUIRED') {
+      errorText = onValidator({
+        item: { ...cell, value },
+        data: _.isFunction(rowFormData) ? rowFormData() : rowFormData,
+        ignoreRequired: true,
+      }).errorText;
     } else {
       errorText = errorType && this.getErrorText(errorType, { ...cell, value });
     }
-    if (_.includes([15, 16], cell.type) && !errorText) {
+    if (_.includes([15, 16, 46], cell.type) && !errorText) {
       clearCellError(`${(row || {}).rowid}-${cell.controlId}`);
       $('.mdTableErrorTip').remove();
     }
-    const error = checkRulesErrorOfControl(cell, { ...row, [cell.controlId]: value });
+    let rowForCheckRule = { ...row, [cell.controlId]: value };
+    try {
+      const tempRow = new DataFormat({
+        projectId,
+        data: _.isFunction(rowFormData) ? rowFormData() : rowFormData,
+      });
+      tempRow.updateDataSource({ controlId: cell.controlId, value });
+      rowForCheckRule = [{}, ...tempRow.data].reduce((a = {}, b = {}) => Object.assign(a, { [b.controlId]: b.value }));
+    } catch (err) {
+      console.log(err);
+    }
+    const error = checkRulesErrorOfControl(cell, rowForCheckRule);
     if (error) {
       this.setState({ error: error.errorMessage });
       return !error;
@@ -208,13 +242,64 @@ export default class CellControl extends React.Component {
     }
     return !errorType;
   }
-
+  @autobind
+  handleCopy(cell) {
+    const { tableId } = this.props;
+    handleCopyControlText(cell, tableId);
+    if (!_.includes([2, 3, 4, 7, 5, 6, 8], cell.type)) {
+      window.tempCopyForSheetView = JSON.stringify({
+        type: 'origin',
+        value: cell.value,
+        textValue: getCopyControlText(cell),
+        controlId: cell.controlId,
+        controlType: cell.type,
+        tableId,
+      });
+    }
+  }
+  @autobind
+  handlePaste(cell) {
+    if (!window.tempCopyForSheetView || !this.editable) {
+      return;
+    }
+    const pasteData = safeParse(window.tempCopyForSheetView);
+    if (_.includes([9, 10, 11, 29, 35], cell.type)) {
+      if (
+        cell.type === 29 &&
+        cell.enumDefault === 2 &&
+        parseInt(cell.advancedSetting.showtype, 10) === RELATE_RECORD_SHOW_TYPE.LIST
+      ) {
+        return;
+      }
+      if (cell.controlId === pasteData.controlId) {
+        handlePasteUpdateCell(cell, pasteData, value => {
+          this.handleUpdateCell({ value: value });
+        });
+      }
+    } else {
+      if (isSameTypeForPaste(cell.type, pasteData.controlType)) {
+        handlePasteUpdateCell(cell, pasteData, value => {
+          this.handleUpdateCell({ value: value });
+        });
+      }
+    }
+  }
   @autobind
   handleTableKeyDown(e, cache) {
     const { tableType, cell, onClick } = this.props;
     const { isediting } = this.state;
+    const haveEditingStatus = this.haveEditingStatus(cell);
     if (e.key === 'c' && (e.metaKey || e.ctrlKey)) {
-      handleCopyControlText(cell);
+      this.handleCopy(cell);
+      return;
+    }
+    if (
+      e.key === 'v' &&
+      (e.metaKey || e.ctrlKey) &&
+      (!_.includes([2, 4, 7, 5, 6, 8], cell.type) ||
+        (cell.type === 6 && cell.advancedSetting && cell.advancedSetting.showtype === '2'))
+    ) {
+      this.handlePaste(cell);
       return;
     }
     if ((e.metaKey || e.ctrlKey) && !(e.key === 'v' && checkIsTextControl(cell.type))) {
@@ -222,25 +307,26 @@ export default class CellControl extends React.Component {
     }
     switch (e.key) {
       case 'Backspace':
-        if (this.editable && !isediting && !cell.required) {
+        if (this.editable && haveEditingStatus && !isediting && !cell.required) {
           this.handleUpdateCell({ value: '' });
         }
         break;
       case ' ':
-        if (e.target.tagName.toLowerCase() === 'body') {
+        if (e.target.tagName.toLowerCase() === 'body' || e.target.classList.contains('body')) {
           onClick();
         }
         break;
       case 'Enter':
-        if (this.editable && this.haveEditingStatus(cell) && !isediting) {
+        if (this.editable && haveEditingStatus && !isediting) {
           this.handleUpdateEditing(true);
+          e.preventDefault();
           if (tableType === 'classic') {
             cache.hasEditingCell = true;
             window.hasEditingCell = true;
           }
         }
         if (
-          _.includes([26, 27, 36, 42], cell.type) ||
+          _.includes([26, 27, 29, 36, 42], cell.type) ||
           (cell.type === 6 && cell.advancedSetting && cell.advancedSetting.showtype === '2')
         ) {
           if (_.isFunction(_.get(this, 'cell.current.handleTableKeyDown'))) {
@@ -390,7 +476,9 @@ export default class CellControl extends React.Component {
       tableId,
       tableType,
       worksheetId,
+      isMobileTable,
       isSubList,
+      isTrash,
       cache,
       style,
       tableFromModule,
@@ -404,6 +492,7 @@ export default class CellControl extends React.Component {
       from,
       mode,
       rowHeight,
+      rowHeightEnum,
       popupContainer,
       projectId,
       canedit,
@@ -486,7 +575,9 @@ export default class CellControl extends React.Component {
       tableId,
       tableType,
       cache,
+      isMobileTable,
       isSubList,
+      isTrash,
       worksheetId,
       className,
       style,
@@ -496,6 +587,8 @@ export default class CellControl extends React.Component {
       editable,
       recordId: row && row.rowid,
       rowHeight,
+      rowHeightEnum,
+      count: row && row[`rq${cell.controlId}`],
       singleLine,
       tableScrollTop,
       gridHeight,
@@ -524,7 +617,7 @@ export default class CellControl extends React.Component {
       onFocusCell,
     };
     if (isTextControl) {
-      if (cell.type === 41 || cell.type === 32 || cell.type === 10010) {
+      if (cell.type === 41 || cell.type === 32 || cell.type === 10010 || (cell.type === 2 && cell.enumDefault === 1)) {
         needLineLimit = true;
       }
       if (cell.type === 41) {
@@ -606,6 +699,9 @@ export default class CellControl extends React.Component {
     }
     if (cell.type === 49 || cell.type === 50) {
       return <Search {...props} />;
+    }
+    if (cell.type === 51) {
+      return <RelationSearch {...props} />;
     }
     return <div className={className} onClick={this.props.onClick} style={style} />;
   }

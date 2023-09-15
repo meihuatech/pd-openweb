@@ -1,8 +1,7 @@
 import React, { Component, Fragment } from 'react';
-import { ScrollView, LoadDiv, Dropdown } from 'ming-ui';
+import { ScrollView, LoadDiv, Dropdown, Checkbox } from 'ming-ui';
 import cx from 'classnames';
 import { DateTime } from 'ming-ui/components/NewDateTimePicker';
-import Number from 'src/components/customWidget/src/component/common/number';
 import { Tooltip } from 'antd';
 import flowNode from '../../../api/flowNode';
 import {
@@ -14,12 +13,22 @@ import {
   CustomTextarea,
   SelectNodeObject,
   FindMode,
+  SpecificFieldsValue,
 } from '../components';
 import { ACTION_ID } from '../../enum';
 import CodeEdit from 'src/pages/widgetConfig/widgetSetting/components/FunctionEditorDialog/Func/common/CodeEdit';
 import FunctionEditorDialog from 'src/pages/widgetConfig/widgetSetting/components/FunctionEditorDialog';
 import _ from 'lodash';
 import moment from 'moment';
+import styled from 'styled-components';
+
+const DotBox = styled.div`
+  input {
+    width: 28px;
+    min-width: 28px !important;
+    text-align: center;
+  }
+`;
 
 export default class Formula extends Component {
   constructor(props) {
@@ -92,8 +101,10 @@ export default class Formula extends Component {
       startTime,
       endTime,
       outUnit,
+      nullZero,
       selectNodeId,
       execute,
+      unit,
     } = data;
 
     // 日期/时间
@@ -149,8 +160,10 @@ export default class Formula extends Component {
         startTime,
         endTime,
         outUnit,
+        nullZero,
         selectNodeId,
         execute,
+        unit,
       })
       .then(result => {
         this.props.updateNodeData(result);
@@ -247,8 +260,26 @@ export default class Formula extends Component {
 
         <div className="mTop15 flexRow flowDetailNumber">
           <div className="mRight12">{_l('结果小数点后保留')}</div>
-          <Number number={data.number} toggleNumber={number => this.updateSource({ number })} />
+          <DotBox>
+            <SpecificFieldsValue
+              updateSource={({ fieldValue }) => this.updateSource({ number: fieldValue })}
+              type="number"
+              min={0}
+              max={9}
+              hasOtherField={false}
+              data={{ fieldValue: data.number }}
+            />
+          </DotBox>
           <div className="mLeft12">{_l('位')}</div>
+        </div>
+
+        <div className="mTop20 flexRow">
+          <Checkbox
+            className="InlineFlex"
+            text={_l('参与计算的字段值为空时，视为0')}
+            checked={data.nullZero}
+            onClick={checked => this.updateSource({ nullZero: !checked })}
+          />
         </div>
       </Fragment>
     );
@@ -390,7 +421,7 @@ export default class Formula extends Component {
           onChange={number => this.updateSource({ number })}
         />
 
-        <div className="mTop30 bold">{_l('运算')}</div>
+        <div className="mTop20 bold">{_l('运算')}</div>
         <div className="mTop10 Gray_9e">
           {_l('输入你想要 添加/减去 的时间。如：+8h+1m，+1M-12d, -1d+8h。当使用数值字段运算时，请不要忘记输入单位。')}
           <Tooltip
@@ -411,6 +442,20 @@ export default class Formula extends Component {
         </div>
 
         {this.renderFormulaAndOtherValue()}
+
+        <div className="mTop20 bold">{_l('输出格式')}</div>
+        <Dropdown
+          className="flowDropdown mTop10"
+          data={[
+            { text: _l('日期+时间'), value: 1 },
+            { text: _l('日期'), value: 3 },
+            { text: _l('时分'), value: 8 },
+            { text: _l('时分秒'), value: 9 },
+          ]}
+          value={data.unit}
+          border
+          onChange={unit => this.updateSource({ unit })}
+        />
       </Fragment>
     );
   }
@@ -424,36 +469,33 @@ export default class Formula extends Component {
     return (
       <Fragment>
         <div className="Font14 Gray_75 workflowDetailDesc">
-          {_l('计算两个日期间的时长，并精确到年、月、天、小时、分')}
+          {_l('计算两个日期/时间之间的时长，并精确到年、月、天、时、分、秒')}
         </div>
-        <div className="mTop20 bold">{_l('开始日期')}</div>
+        <div className="mTop20 bold">{_l('开始')}</div>
         {this.renderDateControl(
           data.startTime,
           obj => this.updateSource({ startTime: Object.assign({}, data.startTime, obj) }),
           'startTimeFieldsVisible',
         )}
 
-        <div className="mTop20 bold">{_l('结束日期')}</div>
+        <div className="mTop20 bold">{_l('结束')}</div>
         {this.renderDateControl(
           data.endTime,
           obj => this.updateSource({ endTime: Object.assign({}, data.endTime, obj) }),
           'endTimeFieldsVisible',
         )}
 
-        <div className="mTop30 bold">{_l('格式化')}</div>
+        <div className="mTop20 bold">{_l('格式化')}</div>
         <div className="mTop10 Gray_9e">{_l('参与计算的日期未设置时间时，格式化方式为：')}</div>
         <Dropdown
           className="flowDropdown mTop10"
-          data={[
-            { text: _l('开始日期 00:00，结束日期24:00'), value: 1 },
-            { text: _l('开始日期 00:00，结束日期00:00'), value: 2 },
-          ]}
+          data={[{ text: _l('开始 00:00，结束24:00'), value: 1 }, { text: _l('开始 00:00，结束00:00'), value: 2 }]}
           value={data.number}
           border
           onChange={number => this.updateSource({ number })}
         />
 
-        <div className="mTop30 bold">{_l('输出单位')}</div>
+        <div className="mTop20 bold">{_l('输出单位')}</div>
         <Dropdown
           className="flowDropdown mTop10"
           data={[
@@ -462,6 +504,7 @@ export default class Formula extends Component {
             { text: _l('天'), value: 3 },
             { text: _l('时'), value: 4 },
             { text: _l('分'), value: 5 },
+            { text: _l('秒'), value: 6 },
           ]}
           value={data.outUnit}
           border
@@ -624,7 +667,7 @@ export default class Formula extends Component {
           bg="BGBlueAsh"
           updateSource={this.updateSource}
         />
-        <div className="flex mTop20">
+        <div className="flex">
           <ScrollView>
             <div className="workflowDetailBox">
               {data.actionId === ACTION_ID.NUMBER_FORMULA && this.renderNumberContent()}

@@ -1,19 +1,15 @@
-import React, { useState, useReducer, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Modal, Icon, Menu, MenuItem, Button, Tooltip } from 'ming-ui';
 import functionWrap from 'ming-ui/components/FunctionWrap';
 import WorksheetDraftOperate from './WorksheetDraftOperate';
-import WorksheetTable from 'worksheet/components/WorksheetTable/V2';
+import WorksheetTable from 'worksheet/components/WorksheetTable';
 import BaseColumnHead from 'worksheet/components/BaseColumnHead';
 import { RowHead } from 'worksheet/components/WorksheetTable/components/';
 import RecordInfo from 'worksheet/common/recordInfo/RecordInfoWrapper';
 import worksheetAjax from 'src/api/worksheet';
 import { controlState } from 'src/components/newCustomFields/tools/utils';
-import { emitter, fieldCanSort, getSortData } from 'worksheet/util';
-import { CONTROL_FILTER_WHITELIST } from 'worksheet/common/WorkSheetFilter/enum';
 import { SHEET_VIEW_HIDDEN_TYPES } from 'worksheet/constants/enum';
-import { isOtherShowFeild } from 'src/pages/widgetConfig/util';
 import styled from 'styled-components';
-import cx from 'classnames';
 
 const Con = styled.div`
   width: 100%;
@@ -67,14 +63,16 @@ function DraftModal(props) {
   const {
     onCancel = () => {},
     appId,
-    viewId,
+    view = {},
     worksheetInfo = {},
     sheetSwitchPermit,
     isCharge,
+    allowAdd,
     sheetViewData = {},
     updateDraftDataCount = () => {},
+    setHighLightOfRows = () => {},
   } = props;
-  const { worksheetId, projectId, allowAdd, rules = [], isWorksheetQuery, advancedSetting = {} } = worksheetInfo;
+  const { worksheetId, projectId, rules = [], isWorksheetQuery, advancedSetting = {} } = worksheetInfo;
   const { rows } = sheetViewData;
   const [selected, setSelected] = useState([]);
   const [recordInfoVisible, setRecordInfoVisible] = useState(false);
@@ -135,6 +133,8 @@ function DraftModal(props) {
         appId,
         worksheetId,
         getType: 21,
+        pageIndex: 1,
+        pageSize: 10,
       })
       .then(res => {
         updateDraftDataCount(res.data.length);
@@ -175,7 +175,7 @@ function DraftModal(props) {
                 }}
               >
                 <i className="icon icon-eye_off"></i>
-                {_l('解密')}
+                {_l('解码')}
               </MenuItem>
             )}
           </Menu>
@@ -254,7 +254,6 @@ function DraftModal(props) {
         <Body>
           <WorksheetTable
             loading={loading}
-            viewId={viewId || _.get(worksheetInfo, 'views[0].viewId')}
             worksheetId={worksheetId}
             appId={appId}
             lineNumberBegin={0}
@@ -268,6 +267,7 @@ function DraftModal(props) {
             controls={controls}
             from={21}
             renderColumnHead={renderColumnHead}
+            sheetSwitchPermit={sheetSwitchPermit}
             renderRowHead={({ className, style, rowIndex }) => (
               <RowHead
                 isDraft
@@ -308,10 +308,10 @@ function DraftModal(props) {
       {recordInfoVisible && (
         <RecordInfo
           ref={recordInfoRef}
-          controls={controls.filter(item => !item.hidden && controlState(item, 2).visible)}
+          controls={controls}
           draftFormControls={controls.filter(
             item =>
-              !_.includes(SHEET_VIEW_HIDDEN_TYPES, item.type) &&
+              !_.includes([...SHEET_VIEW_HIDDEN_TYPES, 33], item.type) &&
               !_.includes(
                 [
                   'wfname',
@@ -338,8 +338,9 @@ function DraftModal(props) {
           rules={rules}
           isWorksheetQuery={isWorksheetQuery}
           isCharge={isCharge}
-          allowAdd={allowAdd}
+          allowAdd={allowAdd || advancedSetting.closedrafts !== '1'}
           appId={appId}
+          view={view}
           from={21}
           visible={recordInfoVisible}
           hideRecordInfo={closeId => {
@@ -381,7 +382,7 @@ function DraftModal(props) {
           loadDraftList={loadRows}
           currentSheetRows={records}
           addNewRecord={props.addNewRecord}
-          view={_.get(worksheetInfo, 'views[0]')}
+          setHighLightOfRows={setHighLightOfRows}
         />
       )}
     </Modal>
@@ -390,8 +391,16 @@ function DraftModal(props) {
 export const openWorkSheetDraft = props => functionWrap(DraftModal, { ...props, closeFnName: 'onCancel' });
 
 function WorksheetDraft(props) {
-  const { appId, viewId, worksheetInfo = {}, sheetSwitchPermit, isCharge, sheetViewData = {}, view } = props;
-  const { worksheetId } = worksheetInfo;
+  const {
+    appId,
+    view = {},
+    worksheetInfo = {},
+    sheetSwitchPermit,
+    isCharge,
+    sheetViewData = {},
+    allowAdd,
+    setHighLightOfRows,
+  } = props;
   const [draftDataCount, setDraftDataCount] = useState(props.draftDataCount);
 
   useEffect(() => {
@@ -404,18 +413,18 @@ function WorksheetDraft(props) {
         className="mRight16 mTop4 Relative"
         onClick={() => {
           openWorkSheetDraft({
+            view,
             appId,
-            viewId,
             worksheetInfo,
             sheetSwitchPermit,
             isCharge,
             sheetViewData,
-            view,
-            sheetViewData,
+            allowAdd,
             addNewRecord: props.addNewRecord,
             updateDraftDataCount: draftDataCount => {
               setDraftDataCount(draftDataCount);
             },
+            setHighLightOfRows,
           });
         }}
       >

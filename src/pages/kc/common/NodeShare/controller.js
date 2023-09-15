@@ -7,7 +7,7 @@ import qs from 'query-string';
 import _ from 'lodash';
 
 function login() {
-  window._alert(_l('请先登录'));
+  window.nativeAlert(_l('请先登录'));
   location.href =
     md.global.Config.WebUrl +
     'login?ReturnUrl=' +
@@ -86,7 +86,7 @@ export function getAttachment() {
         })
         .fail(err => {
           console.log(err);
-          alert(_l('获取附件详情失败'));
+          alert(_l('获取附件详情失败'), 2);
         });
     default:
       return;

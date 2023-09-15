@@ -7,10 +7,10 @@ import './index.less';
 export default class FixedContent extends Component {
   render() {
     const { appPkg, showLeftSkeleton = true, isNoPublish } = this.props;
-    const { fixRemark, fixAccount = {} } = appPkg;
+    const { fixRemark, fixAccount = {}, currentPcNaviStyle } = appPkg;
     return (
       <div className="unusualContentWrap">
-        {showLeftSkeleton && (
+        {showLeftSkeleton && currentPcNaviStyle !== 1 && (
           <div className="unusualSkeletonWrap">
             <Skeleton active={false} />
           </div>
@@ -21,7 +21,7 @@ export default class FixedContent extends Component {
               <div className="imgWrap mBottom18">
                 <Icon className="Font56 Gray_75" icon="send" />
               </div>
-              <div className="Font20 mBottom18">{_l('应用暂未发布')}</div>
+              <div className="Font20 mBottom18">{_l('该应用暂未在此平台发布')}</div>
             </React.Fragment>
           ) : (
             <React.Fragment>

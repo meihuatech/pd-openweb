@@ -104,7 +104,7 @@ const getFilterObject = (components, reports) => {
 }
 
 export default function FilterObject(props) {
-  const { ids, components, filter, setFilter } = props;
+  const { pageId, components, filter, setFilter } = props;
   const { changeGlobal, changeAllFilterObjectControls } = props;
   const { objectControls = [] } = filter;
   const [addTagVisible, setAddTagVisible] = useState(false);
@@ -114,7 +114,7 @@ export default function FilterObject(props) {
 
   useEffect(() => {
     setLoading(true);
-    reportApi.listByPageId({ appId: ids.pageId }).then(data => {
+    reportApi.listByPageId({ appId: pageId }).then(data => {
       setFilterObject(getFilterObject(components, data));
     }).always(() => setLoading(false));
   }, []);
@@ -170,7 +170,7 @@ export default function FilterObject(props) {
           >
             <span className="Font13">{_l('全选')}</span>
           </Checkbox>
-          {filterObject.filter(n => n.name.includes(search)).map(c => (
+          {filterObject.filter(n => (n.name || '').includes(search)).map(c => (
             <Checkbox
               key={c.objectId}
               checked={_.find(objectControls, { objectId: c.objectId }) ? true : false}

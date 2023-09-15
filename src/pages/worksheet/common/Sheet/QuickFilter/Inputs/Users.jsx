@@ -3,7 +3,8 @@ import styled from 'styled-components';
 import { arrayOf, func, number, string } from 'prop-types';
 import UserHead from 'src/pages/feed/components/userHead';
 import { getTabTypeBySelectUser } from 'src/pages/worksheet/common/WorkSheetFilter/util';
-import 'src/components/dialogSelectUser/dialogSelectUser';
+import quickSelectUser from 'ming-ui/functions/quickSelectUser';
+import dialogSelectUser from 'src/components/dialogSelectUser/dialogSelectUser';
 import _ from 'lodash';
 
 const Con = styled.div`
@@ -74,10 +75,21 @@ const Empty = styled.span`
   color: #bdbdbd;
 `;
 export default function Users(props) {
-  const { values = [], projectId, isMultiple, onChange = () => {}, appId, from } = props;
+  const { values = [], projectId, isMultiple, advancedSetting = {}, onChange = () => {}, appId, from } = props;
+  const { shownullitem, nullitemname, navshow, navfilters } = advancedSetting;
   const [active, setActive] = useState();
   const conRef = useRef();
   const tabType = getTabTypeBySelectUser(props.control);
+  let staticAccounts = [];
+  if (navshow === '2') {
+    staticAccounts = safeParse(navfilters)
+      .map(safeParse)
+      .map(u => ({
+        accountId: u.id,
+        fullname: u.name,
+        avatar: u.avatar,
+      }));
+  }
   return (
     <Con
       className={props.className}
@@ -86,7 +98,7 @@ export default function Users(props) {
       onClick={() => {
         setActive(true);
         if (from === 'NavShow') {
-          $(conRef.current).dialogSelectUser({
+          dialogSelectUser({
             title: '添加成员',
             sourceId: 0,
             fromType: 0,
@@ -105,8 +117,7 @@ export default function Users(props) {
             },
           });
         } else {
-          $(conRef.current).quickSelectUser({
-            showQuickInvite: false,
+          quickSelectUser(conRef.current, {
             showMoreInvite: false,
             isTask: false,
             tabType,
@@ -114,11 +125,23 @@ export default function Users(props) {
             includeUndefinedAndMySelf: true,
             includeSystemField: true,
             offset: {
-              top: 0,
-              left: 1,
+              top: 4,
+              left: -1,
             },
             zIndex: 10001,
             filterAccountIds: [md.global.Account.accountId],
+            staticAccounts: (shownullitem === '1'
+              ? [
+                  {
+                    avatar:
+                      md.global.FileStoreConfig.pictureHost.replace(/\/$/, '') +
+                      '/UserAvatar/undefined.gif?imageView2/1/w/100/h/100/q/90',
+                    fullname: nullitemname || _l('为空'),
+                    accountId: 'isEmpty',
+                  },
+                ]
+              : []
+            ).concat(staticAccounts),
             SelectUserSettings: {
               projectId,
               unique: !isMultiple,

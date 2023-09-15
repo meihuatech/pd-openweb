@@ -51,11 +51,14 @@ function generate() {
       if (isProduction && entry.type !== 'index') {
         publicPath = publicPath.replace('/dist/pack/', `/dist/${entry.type}/pack/`);
       }
+
       // if (!isProduction) {
       //   apiMap.workflow = '/workflow_api';
       //   apiMap.report = '/report_api';
       //   apiMap.integration = '/integration_api';
+      //   apiMap.datapipeline = '/data_pipeline_api';
       // }
+
       html = ejs.compile(html)({
         apiServer: JSON.stringify(apiMap),
         releaseDate: moment().format('YYYY/MM/DD HH:mm:SS'),

@@ -9,7 +9,7 @@ import cx from 'classnames';
 import SelectField from '../components/SelectField';
 import { connect } from 'react-redux';
 import { bindActionCreators } from 'redux';
-import { getAdvanceSetting, browserIsMobile } from 'src/util';
+import { getAdvanceSetting, browserIsMobile, addBehaviorLog } from 'src/util';
 import RecordInfoWrapper from 'src/pages/worksheet/common/recordInfo/RecordInfoWrapper';
 import addRecord from 'worksheet/common/newRecord/addRecord';
 import moment from 'moment';
@@ -30,12 +30,12 @@ import {
 import { isLightColor } from 'src/util';
 import { isOpenPermit } from 'src/pages/FormSet/util';
 import { permitList } from 'src/pages/FormSet/config';
+import { SYS_CONTROLS_WORKFLOW } from 'src/pages/widgetConfig/config/widget.js';
 import CurrentDateInfo from 'mobile/RecordList/View/CalendarView/components/CurrentDateInfo';
 import Trigger from 'rc-trigger';
 import autoSize from 'ming-ui/decorators/autoSize';
 import styled from 'styled-components';
 import { controlState } from 'src/components/newCustomFields/tools/utils';
-
 const Wrap = styled.div`
   width: 100%;
   height: 100%;
@@ -123,30 +123,46 @@ class RecordCalendar extends Component {
     };
   }
   componentDidMount() {
+    const { allowAdd } = this.props.worksheetInfo;
+    this.setState({
+      canNew: isOpenPermit(permitList.createButtonSwitch, this.props.sheetSwitchPermit) && allowAdd,
+    });
     this.getFormatData(this.props);
     this.props.getCalendarData();
     this.props.fetchExternal();
     this.getEventsFn();
-    window.addEventListener('resize', () => {
-      this.setState({
-        height: this.props.height,
-      });
-    });
   }
 
   componentWillReceiveProps(nextProps) {
-    const { sheetListVisible, chatVisible, base, calendarview = {}, height } = nextProps;
+    const { base, calendarview = {}, height, sheetSwitchPermit } = nextProps;
+    if (
+      !_.isEqual(sheetSwitchPermit, this.props.sheetSwitchPermit) ||
+      _.get(nextProps, 'worksheetInfo.allowAdd') !== _.get(this.props, 'worksheetInfo.allowAdd')
+    ) {
+      this.setState({
+        canNew:
+          isOpenPermit(permitList.createButtonSwitch, nextProps.sheetSwitchPermit) &&
+          _.get(nextProps, 'worksheetInfo.allowAdd'),
+      });
+    }
     const { calendarData = {}, calendarFormatData } = calendarview;
     const { viewId } = base;
     const currentView = this.getCurrentView(nextProps);
     const preView = this.getCurrentView(this.props);
     const { initialView } = calendarData;
+    if (nextProps.height !== this.props.height) {
+      $('.boxCalendar,.calendarCon,.fc-daygrid-body,.fc-scrollgrid-sync-table,.fc-col-header ').width('100%');
+      this.setState({
+        height: height,
+      });
+    }
     if (!_.isEqual(calendarFormatData, (this.props.calendarview || {}).calendarFormatData)) {
       this.getFormatData(nextProps);
     }
     if (viewId !== this.props.base.viewId || !_.isEqual(currentView, preView)) {
       nextProps.getCalendarData();
-      this.calendarComponentRef.current && this.calendarComponentRef.current.getApi().changeView(initialView); // 更改视图类型
+      this.calendarComponentRef.current &&
+        this.calendarComponentRef.current.getApi().changeView(browserIsMobile() ? 'dayGridMonth' : initialView); // 更改视图类型
       nextProps.fetchExternal();
       this.getEventsFn();
     }
@@ -164,21 +180,11 @@ class RecordCalendar extends Component {
       });
     }
     if (
+      !browserIsMobile() &&
       !_.isEqual(initialView, this.props.calendarview.calendarData.initialView) &&
       this.calendarComponentRef.current
     ) {
       this.calendarComponentRef.current.getApi().changeView(initialView); // 更改视图类型
-    }
-    if (
-      (chatVisible !== this.props.chatVisible || sheetListVisible !== this.props.sheetListVisible) &&
-      this.calendarComponentRef.current
-    ) {
-      setTimeout(() => {
-        $('.boxCalendar,.calendarCon,.fc-daygrid-body,.fc-scrollgrid-sync-table,.fc-col-header ').width('100%');
-        this.setState({
-          height: height,
-        });
-      }, 500);
     }
   }
 
@@ -533,6 +539,9 @@ class RecordCalendar extends Component {
             [o.begin]: startT,
           };
       this.addRecordInfo(data);
+      this.setState({
+        selectTimeInfo: {},
+      });
     }
   };
 
@@ -574,6 +583,7 @@ class RecordCalendar extends Component {
         popup={this.renderPopup(item)}
         getPopupContainer={() => document.body}
         onPopupVisibleChange={visible => {
+          if (browserIsMobile()) return;
           if (visible) {
             if (calendarInfo.length <= 1) {
               this.useViewInfoUpdate(calendarInfo[0], item);
@@ -605,7 +615,10 @@ class RecordCalendar extends Component {
   };
 
   showChooseTrigger = (data, type) => {
-    const { random } = this.state;
+    const { random, canNew } = this.state;
+    if (!canNew) {
+      return;
+    }
     let date = moment(data).format('YYYY-MM-DD');
     $(`span[data-date=${date}-${random}]`)[0].click();
   };
@@ -620,6 +633,7 @@ class RecordCalendar extends Component {
       base,
       calendarview = {},
       mobileCalendarSetting = {},
+      setViewConfigVisible,
     } = this.props;
     const { calendarData = {}, editable, calenderEventList = {} } = calendarview;
     const { eventScheduled = [] } = calenderEventList;
@@ -648,23 +662,17 @@ class RecordCalendar extends Component {
     const eventData = calenderEventList[`${typeEvent}Dt`] || [];
     const { startFormat, endFormat, calendarInfo = [], unweekday = '', btnList, initialView } = calendarData;
     const { height, calendarFormatData } = this.state;
-    const isDelete =
+    let isDelete =
       calendarcids[0].begin &&
       calendarInfo.length > 0 &&
       (!calendarInfo[0].startData || !calendarInfo[0].startData.controlId);
+    if (
+      !isOpenPermit(permitList.sysControlSwitch, sheetSwitchPermit) &&
+      SYS_CONTROLS_WORKFLOW.includes(_.get(calendarInfo[0], 'startData.controlId'))
+    ) {
+      isDelete = true;
+    }
     let isHaveSelectControl = !calendarcids[0].begin || isDelete; // 是否选中了开始时间 //开始时间字段已删除
-    let mobileInitialView =
-      calendarType === '0'
-        ? 'dayGridMonth'
-        : calendarType === '1'
-        ? !_.isEmpty(calendarInfo) && isTimeStyle(calendarInfo[0].startData)
-          ? 'timeGridWeek'
-          : 'dayGridWeek'
-        : calendarType === '2'
-        ? !_.isEmpty(calendarInfo) && isTimeStyle(calendarInfo[0].startData)
-          ? 'timeGridDay'
-          : 'dayGridDay'
-        : '';
 
     if (isHaveSelectControl || isIllegalFormat(calendarInfo)) {
       return (
@@ -687,6 +695,7 @@ class RecordCalendar extends Component {
                     };
                   }
                   this.props.saveView(data, { ...viewNew, ...viewData });
+                  setViewConfigVisible(true);
                 }}
                 view={currentView}
                 isDelete={isDelete}
@@ -766,7 +775,7 @@ class RecordCalendar extends Component {
               themeSystem="bootstrap"
               height={height}
               ref={this.calendarComponentRef}
-              initialView={!this.browserIsMobile() ? initialView : mobileInitialView} // 选中的日历模式
+              initialView={!this.browserIsMobile() ? initialView : 'dayGridMonth'} // 选中的日历模式
               headerToolbar={{
                 right: this.browserIsMobile() ? 'today' : btnList,
                 center: this.browserIsMobile() ? 'prev,title next' : 'title',
@@ -907,6 +916,9 @@ class RecordCalendar extends Component {
                   rows: this.getRows(eventInfo.event.start, eventInfo.event.start),
                   showPrevNext: true,
                 });
+                if (location.pathname.indexOf('public') === -1) {
+                  addBehaviorLog('worksheetRecord', worksheetId, { rowId: extendedProps.rowid }); // 埋点
+                }
               }}
               eventDidMount={info => {
                 let startData = _.get(info, ['event', 'extendedProps', 'startData']) || {};
@@ -1001,7 +1013,7 @@ class RecordCalendar extends Component {
               eventResize={info => {
                 let endData = _.get(info, ['event', 'extendedProps', 'endData']) || {};
                 if (!endData.controlId) {
-                  alert(_l('请配置结束控件'));
+                  alert(_l('请配置结束控件'), 3);
                   this.getEventsFn();
                   return;
                 }
@@ -1200,6 +1212,15 @@ class RecordCalendar extends Component {
               });
               this.setState({ recordInfoVisible: false });
             }}
+            hideRows={() => {
+              this.getEventsFn();
+              this.props.refreshEventList();
+              this.props.fetchExternal();
+              this.setState({
+                rows: [],
+                showPrevNext: false,
+              });
+            }}
             handleAddSheetRow={data => {
               this.getEventsFn();
               this.props.refreshEventList();
@@ -1217,8 +1238,6 @@ class RecordCalendar extends Component {
 export default connect(
   state => ({
     ...state.sheet,
-    chatVisible: state.chat.visible,
-    sheetListVisible: state.sheetList.isUnfold,
     sheetSwitchPermit: state.sheet.sheetSwitchPermit || [],
     worksheetInfo: state.sheet.worksheetInfo,
     mobileMoreClickVisible: state.sheet.calendarview.mobileMoreClickVisible,

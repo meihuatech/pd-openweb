@@ -108,11 +108,11 @@ export default function CreateBackupModal(props) {
         const { state } = res;
         getList(1);
         if (state === 2) {
-          alert(_l('程序异常', 3));
+          alert(_l('程序异常'), 3);
         } else if (state == 3) {
-          alert(_l('token失效', 3));
+          alert(_l('token失效'), 3);
         } else if (state == 4) {
-          alert(_l('网络版本过低，无法使用高版本功能', 3));
+          alert(_l('网络版本过低，无法使用高版本功能'), 3);
         }
       });
     });
@@ -147,11 +147,11 @@ export default function CreateBackupModal(props) {
         <div>
           <span>{_l('此操作仅备份')}</span>
           <span>{_l('当前应用的结构和配置，该应用下的数据不会备份。每个备份文件仅保留')}</span>
-          <span className="Black FontW">{_l('60天')}</span>
-          <span>{_l('有效期，超过60天的会自动删除，每个应用最多可备份')}</span>
+          <span className="Black FontW">{_l('%0天', md.global.SysSettings.appBackupRecycleDays)}</span>
+          <span>{_l('有效期，超过%0天的会自动删除，每个应用最多可备份', md.global.SysSettings.appBackupRecycleDays)}</span>
           <span className="Black FontW">{_l('10个')}</span>
           <span>{_l('文件。')}</span>
-          <Support text={_l('帮助')} type={3} href="https://help.mingdao.com/backup.html" />
+          <Support text={_l('帮助')} type={3} href="https://help.mingdao.com/backup" />
         </div>
 
         <div className="mTop24">

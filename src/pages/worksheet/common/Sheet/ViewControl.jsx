@@ -9,6 +9,7 @@ import { Tooltip } from 'ming-ui';
 import ViewConfig from 'worksheet/common/ViewConfig';
 import CreateCustomBtn from 'worksheet/common/CreateCustomBtn';
 import { exportSheet } from 'worksheet/common/ExportSheet';
+import { exportAttachment } from 'src/pages/worksheet/common/ExportAttachment';
 import ViewItems from 'worksheet/components/ViewItems';
 import Pagination from 'worksheet/components/Pagination';
 import SearchRecord from 'worksheet/views/components/SearchRecord';
@@ -31,6 +32,9 @@ import EditFastFilter from 'src/pages/worksheet/common/ViewConfig/components/fas
 import { openShareDialog } from 'src/pages/worksheet/components/Share';
 import { isOpenPermit } from 'src/pages/FormSet/util.js';
 import { permitList } from 'src/pages/FormSet/config.js';
+import { filterHidedControls } from 'worksheet/util';
+import { canEditData } from 'worksheet/redux/actions/util';
+import { APP_ROLE_TYPE } from 'src/pages/worksheet/constants/enum';
 
 const Con = styled.div`
   display: flex;
@@ -50,6 +54,7 @@ function ViewControl(props) {
     view,
     viewId,
     isCharge,
+    chartId,
     filters,
     quickFilter,
     navGroupFilters,
@@ -79,6 +84,7 @@ function ViewControl(props) {
     addMultiRelateHierarchyControls,
     updateWorksheetControls,
     updateSearchRecord,
+    appPkg,
   } = props;
   const { worksheetId, projectId } = worksheetInfo;
   const { count, pageCountAbnormal, rowsSummary } = sheetViewData;
@@ -98,6 +104,7 @@ function ViewControl(props) {
   return (
     <Con>
       <ViewItems
+        worksheetInfo={worksheetInfo}
         sheetSwitchPermit={sheetSwitchPermit}
         isCharge={isCharge}
         appId={appId}
@@ -105,6 +112,7 @@ function ViewControl(props) {
         worksheetControls={controls}
         currentViewId={viewId}
         worksheetId={worksheetId}
+        isLock={_.get(appPkg, 'isLock')}
         updateCurrentView={data => {
           saveView(viewId, _.pick(data, data.editAttrs || []));
         }}
@@ -116,17 +124,24 @@ function ViewControl(props) {
         }}
         onAddView={(newViews, newView) => {
           updateViews(newViews);
-          if (Number(newView.viewType) === 0) {
+          if ([0, 3].includes(Number(newView.viewType))) {
             setViewConfigVisible(true);
           }
           navigateTo(`/app/${appId}/${groupId}/${worksheetId}/${newView.viewId}`);
         }}
         onShare={() => {
+          const hasCharge =
+            isCharge ||
+            canEditData(_.get(appPkg, 'permissionType')) ||
+            _.get(appPkg, 'permissionType') === APP_ROLE_TYPE.DEVELOPERS_ROLE; //开发者|管理员|运营者
           openShareDialog({
             from: 'view',
-            isCharge,
+            isCharge: hasCharge,
             title: _l('分享视图'),
             isPublic: view.shareRange === 2,
+            hidePublicShare: !(
+              isOpenPermit(permitList.viewShareSwitch, sheetSwitchPermit, viewId) && !md.global.Account.isPortal
+            ),
             params: {
               appId,
               worksheetId,
@@ -140,6 +155,7 @@ function ViewControl(props) {
           });
         }}
         onExport={() => {
+          const hasCharge = isCharge || canEditData(_.get(appPkg, 'permissionType'));
           exportSheet({
             sheetHiddenColumns,
             allCount: count,
@@ -148,24 +164,45 @@ function ViewControl(props) {
             exportView: view,
             worksheetId: worksheetId,
             projectId: projectId,
+            chartId,
             searchArgs: filters,
             selectRowIds: sheetSelectedRows.map(item => item.rowid),
             sheetSwitchPermit,
-            columns: controls.filter(item => {
-              return (
-                !_.find(view.controls, hideId => item.controlId === hideId) &&
-                item.controlPermissions &&
-                item.controlPermissions[0] === '1' &&
-                item.controlId !== 'rowid'
-              );
-            }),
+            columns: hasCharge
+              ? controls.filter(item => {
+                  return item.controlId !== 'rowid';
+                })
+              : filterHidedControls(controls, view.controls, false).filter(item => {
+                  return (
+                    ((item.controlPermissions && item.controlPermissions[0] === '1') || !item.controlPermissions) &&
+                    item.controlId !== 'rowid'
+                  );
+                }),
             downLoadUrl: worksheetInfo.downLoadUrl,
             worksheetSummaryTypes: rowsSummary.types,
             quickFilter,
             navGroupFilters,
-
+            isCharge: hasCharge,
             // 支持列统计结果
             hideStatistics: false,
+          });
+        }}
+        onExportAttachment={() => {
+          const hasCharge = isCharge || canEditData(_.get(appPkg, 'permissionType'));
+          exportAttachment({
+            appId,
+            worksheetId,
+            viewId,
+            attachmentControls: hasCharge
+              ? controls.filter(item => item.type === 14)
+              : filterHidedControls(controls, view.controls).filter(
+                  item => item.controlPermissions && item.controlPermissions[0] === '1' && item.type === 14,
+                ),
+            quickFilter,
+            searchArgs: filters,
+            navGroupFilters,
+            selectRowIds: sheetSelectedRows.map(item => item.rowid),
+            isCharge: hasCharge,
           });
         }}
         onRemoveView={(newViewList, newViewId) => {
@@ -340,6 +377,7 @@ function ViewControl(props) {
             '.Tooltip',
           ]}
           onClickAway={() => setCreateCustomBtnVisible(false)}
+          sheetSwitchPermit={sheetSwitchPermit}
           isEdit={createBtnIsEdit}
           onClose={() => setCreateCustomBtnVisible(false)}
           columns={controls
@@ -366,9 +404,18 @@ function ViewControl(props) {
       )}
       {showFastFilter && (
         <EditFastFilter
+          currentSheetInfo={worksheetInfo}
           view={view}
           worksheetControls={controls}
-          onClickAwayExceptions={['.addControlDrop']}
+          onClickAwayExceptions={[
+            '.addControlDrop',
+            '.nano',
+            '.mui-dialog-container',
+            '.ant-select-dropdown',
+            '.rc-trigger-popup',
+            '.selectize-dropdown',
+            '.selectUserBox',
+          ]}
           showFastFilter={showFastFilter}
           onClickAway={() => setShowFastFilter(false)}
           activeFastFilterId={activeFastFilterId}
@@ -422,6 +469,7 @@ export default connect(
     buttons: state.sheet.buttons,
     sheetButtons: state.sheet.sheetButtons,
     searchData: getSearchData(state.sheet),
+    appPkg: state.appPkg,
   }),
   dispatch =>
     bindActionCreators(

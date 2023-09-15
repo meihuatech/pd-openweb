@@ -7,24 +7,18 @@ import userController from 'src/api/user';
 import UserHead from 'src/pages/feed/components/userHead';
 import { LoadDiv, Checkbox, Dialog } from 'ming-ui';
 import { Input } from 'antd';
-import captcha from 'src/components/captcha';
 import withClickAway from 'ming-ui/decorators/withClickAway';
 import createDecoratedComponent from 'ming-ui/decorators/createDecoratedComponent';
 const ClickAwayable = createDecoratedComponent(withClickAway);
 
-import 'src/components/pager/pager';
+import PaginationWrap from '../../components/PaginationWrap';
 import './style.less';
 import Empty from '../../common/TableEmpty';
-import AccountController from 'src/api/account';
-import { encrypt } from 'src/util';
+import { verifyPassword } from 'src/util';
 import { getPssId } from 'src/util/pssId';
+import { purchaseMethodFunc } from 'src/components/upgrade/choose/PurchaseMethodModal';
 import _ from 'lodash';
 import moment from 'moment';
-
-const errorMsg = {
-  6: _l('密码错误'),
-  8: _l('验证码错误'),
-};
 
 export default class ResignList extends React.Component {
   static propTypes = {
@@ -61,20 +55,6 @@ export default class ResignList extends React.Component {
         },
         this.fetchList.bind(this),
       );
-    }
-  }
-
-  componentDidUpdate() {
-    const { allCount, pageIndex } = this.state;
-    if (this.pager) {
-      $(this.pager).Pager({
-        pageIndex,
-        pageSize: 20,
-        count: allCount,
-        changePage: pageIndex => {
-          this.setState({ pageIndex }, this.fetchList.bind(this));
-        },
-      });
     }
   }
 
@@ -147,7 +127,7 @@ export default class ResignList extends React.Component {
     })
       .then(response => response.blob())
       .then(blob => {
-        let date = moment(new Date()).format('YYYYMMDDHHmmss');
+        let date = moment().format('YYYYMMDDHHmmss');
         const fileName = `${date}` + '.xlsx';
         const link = document.createElement('a');
 
@@ -164,30 +144,13 @@ export default class ResignList extends React.Component {
       alert(_l('请输入登录密码'), 3);
       return;
     }
-    let throttled = function (res) {
-      if (res.ret !== 0) {
-        return;
-      }
-      AccountController.checkAccount({
-        ticket: res.ticket,
-        randStr: res.randstr,
-        captchaType: md.staticglobal.getCaptchaType(),
-        password: encrypt(password),
-      }).then(res => {
-        if (res === 1) {
-          _this.exportList();
-          _this.setState({ showInputPassword: false });
-        } else {
-          alert(errorMsg[res] || _l('操作失败'), 2);
-        }
-      });
-    };
-
-    if (md.staticglobal.getCaptchaType() === 1) {
-      new captcha(throttled);
-    } else {
-      new TencentCaptcha(md.global.Config.CaptchaAppId.toString(), throttled).show();
-    }
+    verifyPassword({
+      password,
+      success: () => {
+        _this.exportList();
+        _this.setState({ showInputPassword: false });
+      },
+    });
   };
   dialogInputPassword = () => {
     let { showInputPassword, password } = this.state;
@@ -235,7 +198,7 @@ export default class ResignList extends React.Component {
               this.fetchList();
               alert(_l('恢复成功'));
             } else if (data == 4) {
-              alert(_l('当前用户数已超出人数限制'), 3, false);
+              alert(_l('当前用户数已超出人数限制'), 3);
             } else {
               alert(_l('恢复失败'), 2);
             }
@@ -322,7 +285,7 @@ export default class ResignList extends React.Component {
   }
 
   renderContent() {
-    const { allCount, isLoading, list, selectedAccountIds = {}, showMenu } = this.state;
+    const { allCount, isLoading, list, selectedAccountIds = {}, showMenu, pageIndex } = this.state;
     const accountIds = _.keys(selectedAccountIds).filter(id => selectedAccountIds[id]);
 
     const isAllChecked = !!(
@@ -388,10 +351,15 @@ export default class ResignList extends React.Component {
             <tbody>{this.renderList()}</tbody>
           </table>
         </div>
-        {!isLoading && allCount && allCount > 10 ? (
-          <div
-            ref={el => {
-              this.pager = el;
+        {!isLoading && allCount && allCount > 20 ? (
+          <PaginationWrap
+            total={allCount}
+            pageIndex={pageIndex}
+            pageSize={20}
+            onChange={pageIndex => {
+              this.setState({ pageIndex }, () => {
+                this.fetchList();
+              });
             }}
           />
         ) : null}

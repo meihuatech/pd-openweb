@@ -1,12 +1,26 @@
-import _, { get, keys, flatten, sortBy, omit, isEmpty, upperFirst, findIndex, isArray, isObject } from 'lodash';
+import _, {
+  get,
+  keys,
+  flatten,
+  sortBy,
+  omit,
+  isEmpty,
+  upperFirst,
+  findIndex,
+  isArray,
+  isObject,
+  includes,
+} from 'lodash';
 import update from 'immutability-helper';
 import { navigateTo } from 'src/router/navigateTo';
 import { WHOLE_SIZE } from '../config/Drag';
 import { NOT_AS_TITLE_CONTROL } from '../config';
 import { RELATION_OPTIONS, DEFAULT_TEXT } from '../config/setting';
+import { isRelateRecordTableControl } from 'src/pages/worksheet/util.js';
 import { compose } from 'redux';
-import { DEFAULT_CONFIG, DEFAULT_DATA, WIDGETS_TO_API_TYPE_ENUM } from '../config/widget';
+import { DEFAULT_CONFIG, DEFAULT_DATA, WIDGETS_TO_API_TYPE_ENUM, SYS_CONTROLS } from '../config/widget';
 import { getCurrentRowSize } from './widgets';
+import { browserIsMobile } from 'src/util';
 
 const FORMULA_FN_LIST = [
   'SUM',
@@ -107,6 +121,24 @@ export const getDefaultSizeByData = data => {
   return getDefaultSizeByType(type);
 };
 
+// export const putControlBySection = controls => {
+//   const map = {};
+//   let result = [];
+
+//   controls.forEach(item => {
+//     map[item.controlId] = item;
+//   });
+//   controls.forEach(item => {
+//     const parent = map[item.sectionId];
+//     if (parent) {
+//       parent.sectionControls = (parent.sectionControls || []).concat(item);
+//     } else {
+//       result.push(item);
+//     }
+//   });
+//   return result;
+// };
+
 // 按顺序将控件摆放在二维数组中
 export const putControlByOrder = controls => {
   const obj = {};
@@ -194,7 +226,7 @@ export const canSetAsTitle = data => {
       return false;
     }
   }
-  return !_.includes(NOT_AS_TITLE_CONTROL, type);
+  return !includes(NOT_AS_TITLE_CONTROL, type);
 };
 
 function genWidgetRowAndCol(widgets) {
@@ -274,7 +306,11 @@ export const getWidgetInfo = type => {
   if (typeof type === 'number') {
     type = enumWidgetType[type];
   }
-  return DEFAULT_CONFIG[type] || {};
+  let info = DEFAULT_CONFIG[type] || {};
+  // if (type === 'SPLIT_LINE') {
+  //   info.widgetName = _l('分段（旧）');
+  // }
+  return info;
 };
 
 export const getIconByType = type => {
@@ -367,4 +403,25 @@ export const getRgbaByColor = (color, alpha) => {
     sColorChange.push(parseInt(`0x${color.slice(i, i + 2)}`));
   }
   return `rgba(${sColorChange.join(',')},${alpha})`;
+};
+
+// 支持左右布局的控件
+export const supportDisplayRow = item => {
+  // 附件、单条关联记录、多条关联记录（列表、卡片）、子表、分割线、备注、分段
+  if (browserIsMobile()) {
+    return (
+      !includes([14, 29, 34, 22, 51, 52], item.type) ||
+      ((item.type === 29 || item.type === 51) && _.get(item, 'advancedSetting.showtype') === '3')
+    );
+  }
+  // 多条关联记录（列表）、查询记录列表、子表、分割线、备注
+  return (
+    ((item.type === 29 || item.type === 51) && _.get(item, 'advancedSetting.showtype') !== '2') ||
+    !includes([29, 34, 22, 51, 52], item.type)
+  );
+};
+
+// 关联记录、关联查询须过滤的字段
+export const getFilterRelateControls = (controls = []) => {
+  return _.filter(controls, item => !_.includes([22, 43, 45, 47, 49, 51, ...SYS_CONTROLS], item.type));
 };

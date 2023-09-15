@@ -7,6 +7,14 @@ export const PAGE_HEADER_ROUTE_CONFIG = {
     path: '/app/lib',
     component: () => import('src/pages/PageHeader/AppCenterHeader'),
   },
+  appLogs: {
+    path: '/app/:appId/logs/:projectId',
+    component: () => import('src/pages/PageHeader/AppPkgSimpleHeader'),
+  },
+  analytics: {
+    path: '/app/:appId/analytics/:projectId',
+    component: () => import('src/pages/PageHeader/AppPkgSimpleHeader'),
+  },
   appPkg: {
     path: '/app/:appId/:groupId?/:worksheetId?/:viewId?',
     component: () => import('src/pages/PageHeader/AppPkgHeader'),
@@ -51,14 +59,6 @@ export const PAGE_HEADER_ROUTE_CONFIG = {
     path: '/apps/kc',
     component: () => import('src/pages/PageHeader/NativeHeader'),
   },
-  hr: {
-    path: '/src/pages/hr',
-    component: () => import('src/pages/PageHeader/NativeHeader'),
-  },
-  hrPage: {
-    path: '/hr',
-    component: () => import('src/pages/PageHeader/NativeHeader'),
-  },
   personal: {
     path: '/personal',
     component: () => import('src/pages/PageHeader/NetManageHeader'),
@@ -101,7 +101,7 @@ export const PAGE_HEADER_ROUTE_CONFIG = {
   },
   search: {
     path: '/search',
-    component: () => import('src/pages/PageHeader/NetManageHeader'),
+    component: () => import('src/pages/PageHeader/GlobalSearchHeader'),
   },
   integration: {
     path: '/integration',

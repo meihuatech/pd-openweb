@@ -65,12 +65,13 @@ function loadAttachment(attachment, options = {}) {
     if (window.shareState && window.shareState.shareId) {
       args.shareId = window.shareState.shareId;
       args.type =
-        window.shareState.isRecordShare || window.shareState.isPublicRecord
+        window.shareState.isRecordShare || window.shareState.isPublicRecord || _.get(window, 'shareState.isPublicView')
           ? 3
-          : window.shareState.isPublicQuery || window.shareState.isPublicView
+          : _.get(window, 'shareState.isPublicQuery') || _.get(window, 'shareState.isPublicForm')
           ? 11
           : 14;
     }
+    args.worksheetId = options.worksheetId;
     attachmentPromise = attachmentAjax.getAttachmentDetail(args).then(data => {
       if (!data) {
         promise.reject({
@@ -100,8 +101,8 @@ function loadAttachment(attachment, options = {}) {
       previewAttachmentType = newAttachment.previewAttachmentType;
       previewType = newAttachment.previewType;
       if (previewAttachmentType === 'COMMON') {
-        if (previewType === PREVIEW_TYPE.IFRAME || previewType === PREVIEW_TYPE.VIDEO) {
-          newAttachment.viewUrl = attachment.sourceNode.viewUrl || newAttachment.viewUrl;
+        if (attachment.sourceNode.viewUrl) {
+          newAttachment.viewUrl = attachment.sourceNode.viewUrl;
           promise.resolve(newAttachment);
         } else {
           promise.resolve(newAttachment);
@@ -588,6 +589,15 @@ export function onClose() {
     if (state.onClose) {
       state.onClose();
     }
+  };
+}
+
+export function changePreviewService(previewService) {
+  return dispatch => {
+    dispatch({
+      type: 'CHANGE_PREVIEW_SERVICE',
+      previewService,
+    });
   };
 }
 

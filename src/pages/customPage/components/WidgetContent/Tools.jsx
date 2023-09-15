@@ -3,9 +3,11 @@ import { string } from 'prop-types';
 import styled from 'styled-components';
 import cx from 'classnames';
 import Trigger from 'rc-trigger';
+import { Tooltip } from 'antd';
 import 'rc-trigger/assets/index.css';
 import { useToggle } from 'react-use';
 import { getEnumType } from '../../util';
+import { reportTypes } from 'statistics/Charts/common';
 import PageMove from 'statistics/components/PageMove';
 import _ from 'lodash';
 
@@ -125,9 +127,9 @@ const DelVerify = styled.div`
   }
 `;
 
-const getTools = ({ widgetType, layoutType }) => {
+const getTools = ({ widgetType, layoutType, reportType }) => {
   if (layoutType === 'mobile') {
-    return widgetType === 'button' ? MOBILE_BUTTON_TOOLS : MOBILE_CONTENT_TOOLS;
+    return (['button'].includes(widgetType) || (widgetType === 'analysis' && [reportTypes.NumberChart, reportTypes.ProgressChart].includes(reportType))) ? MOBILE_BUTTON_TOOLS : MOBILE_CONTENT_TOOLS;
   };
   if (['view', 'filter'].includes(widgetType)) {
     return WEB_CONTENT_TOOLS.filter(item => !['move', 'copy'].includes(item.type));
@@ -140,6 +142,7 @@ const getTools = ({ widgetType, layoutType }) => {
 export default function Tools({ appId, pageId, widget, layoutType, handleToolClick, titleVisible, updatePageInfo }) {
   const [visible, toggle] = useToggle(false);
   const [moveVisible, setMoveVisible] = useState(false);
+  const { reportType } = widget;
   const widgetType = getEnumType(widget.type);
   const ref = useRef(null);
   const isHighlight = type => {
@@ -148,13 +151,13 @@ export default function Tools({ appId, pageId, widget, layoutType, handleToolCli
     return false;
   };
   const isSwitchButton = type => {
-    return widgetType === 'button' && type === 'switchButtonDisplay';
+    return (widgetType === 'button' || (widgetType === 'analysis' && [reportTypes.NumberChart, reportTypes.ProgressChart].includes(reportType))) && type === 'switchButtonDisplay';
   };
-  const TOOLS = getTools({ widgetType, layoutType });
+  const TOOLS = getTools({ widgetType, layoutType, reportType });
   const getTip = (type, tip) => {
     if (type === 'insertTitle' && titleVisible) return _l('取消标题行');
     if (isSwitchButton(type)) {
-      const value = _.get(widget, ['button', 'mobileCount']);
+      const value = widgetType === 'button' ? _.get(widget, ['button', 'mobileCount']) : _.get(widget, ['config', 'mobileCount']);
       const { direction } = _.get(widget, ['button', 'config']) || {};
       if (direction === 1) {
         if (value === 1) return _l('一行两个');
@@ -170,7 +173,7 @@ export default function Tools({ appId, pageId, widget, layoutType, handleToolCli
   };
   const getIcon = (type, icon, next) => {
     if (isSwitchButton(type)) {
-      const value = _.get(widget, ['button', 'mobileCount']);
+      const value = widgetType === 'button' ? _.get(widget, ['button', 'mobileCount']) : _.get(widget, ['config', 'mobileCount']);
       if (next) {
         const { direction } = _.get(widget, ['button', 'config']) || {};
         if (direction === 1) {
@@ -220,33 +223,35 @@ export default function Tools({ appId, pageId, widget, layoutType, handleToolCli
               </DelVerify>
             }
           >
-            <li
-              className={cx(type, { highlight: isHighlight(type) })}
-              key={type}
-              data-tip={tip}
-              onClick={e => {
-                toggle(true);
-              }}
-            >
-              <i className={`icon-${icon} Font18`}></i>
-            </li>
+            <Tooltip title={tip} placement="bottom">
+              <li
+                className={cx(type, { highlight: isHighlight(type) })}
+                key={type}
+                onClick={e => {
+                  toggle(true);
+                }}
+              >
+                <i className={`icon-${icon} Font18`}></i>
+              </li>
+            </Tooltip>
           </Trigger>
         ) : (
-          <li
-            className={cx(type, { highlight: isHighlight(type), switchButton: isSwitchButton(type) })}
-            key={type}
-            data-tip={getTip(type, tip)}
-            onClick={e => {
-              if (type === 'move') {
-                setMoveVisible(true);
-              } else {
-                handleToolClick(type);
-              }
-            }}
-          >
-            <i className={`icon-${getIcon(type, icon)} Font18 current`}></i>
-            {isSwitchButton(type) && <i className={`icon-${getIcon(type, icon, true)} Font18 next`}></i>}
-          </li>
+          <Tooltip title={getTip(type, tip)} placement="bottom">
+            <li
+              className={cx(type, { highlight: isHighlight(type), switchButton: isSwitchButton(type) })}
+              key={type}
+              onClick={e => {
+                if (type === 'move') {
+                  setMoveVisible(true);
+                } else {
+                  handleToolClick(type);
+                }
+              }}
+            >
+              <i className={`icon-${getIcon(type, icon)} Font18 current`}></i>
+              {isSwitchButton(type) && <i className={`icon-${getIcon(type, icon, true)} Font18 next`}></i>}
+            </li>
+          </Tooltip>
         )
       )}
       {moveVisible && (

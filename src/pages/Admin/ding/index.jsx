@@ -8,8 +8,10 @@ import Ajax from 'src/api/workWeiXin';
 import Config from '../config';
 import Dialog from 'ming-ui/components/Dialog';
 import IntegrationSetPssword from '../components/IntegrationSetPssword';
-import UpgradeVersion from '../components/UpgradeVersion';
-import { getFeatureStatus } from 'src/util';
+import VertifyClearIntegationData from '../components/VertifyClearIntegationData';
+import { getFeatureStatus, buriedUpgradeVersionDialog } from 'src/util';
+import { VersionProductType } from 'src/util/enum';
+import { integrationFailed } from '../utils';
 import './style.less';
 import _ from 'lodash';
 
@@ -17,7 +19,10 @@ const optionTypes = [
   { label: _l('新开浏览器打开'), key: 1 },
   { label: _l('钉钉内打开'), key: 2 },
 ];
-const FEATURE_ID = 10;
+const messageLinkTypes = [
+  { label: _l('独立窗口'), key: 2 },
+  { label: _l('侧边栏打开'), key: 1 },
+];
 
 export default class Ding extends React.Component {
   constructor(props) {
@@ -78,6 +83,7 @@ export default class Ding extends React.Component {
           show2: !(res.corpId && res.agentId && res.appKey && res.appSecret && res.status != 2),
           intergrationClientWorkingPattern: res.intergrationClientWorkingPattern,
           intergrationTodoMessageEnabled: res.intergrationTodoMessageEnabled,
+          ddMessagUrlPcSlide: res.ddMessagUrlPcSlide,
           status: res.status,
         });
       }
@@ -87,7 +93,7 @@ export default class Ding extends React.Component {
   // 保存信息/编辑信息
   editInfo = () => {
     if (!this.state.AppKey || !this.state.AppSecret || !this.state.CorpId || !this.state.AgentId) {
-      alert('请输入相关信息');
+      alert(_l('请输入相关信息'), 2);
       return;
     }
     Ajax.editDDProjectSetting({
@@ -96,7 +102,13 @@ export default class Ding extends React.Component {
       appSecret: this.state.AppSecret,
       corpId: this.state.CorpId,
     }).then(res => {
-      if (res.item1) {
+      if (res.item1 === -1) {
+        VertifyClearIntegationData({
+          projectId: Config.projectId,
+          callback: this.editInfo,
+        });
+        return;
+      } else if (res.item1) {
         Ajax.editDDAppNoticeSetting({
           projectId: Config.projectId,
           agentId: this.state.AgentId,
@@ -188,7 +200,7 @@ export default class Ding extends React.Component {
                 value={!this.state[`isShow${strId}`] ? this.state[`${strId}Format`] : this.state[strId]}
               />
               <Icon
-                icon={!this.state[`isShow${strId}`] ? 'circulated' : 'visibility_off'}
+                icon={!this.state[`isShow${strId}`] ? 'visibility_off' : 'circulated'}
                 className="Gray_9e Font18 isShowIcon"
                 onClick={() => {
                   this.setState({
@@ -446,7 +458,7 @@ export default class Ding extends React.Component {
       if (res) {
         callback();
       } else {
-        alert('失败');
+        integrationFailed(Config.projectId);
       }
     });
   };
@@ -464,7 +476,7 @@ export default class Ding extends React.Component {
           intergrationTodoMessageEnabled: !this.state.intergrationTodoMessageEnabled,
         });
       } else {
-        alert('失败');
+        alert(_l('失败'), 2);
       }
     });
   }
@@ -482,10 +494,25 @@ export default class Ding extends React.Component {
           intergrationClientWorkingPattern: value,
         });
       } else {
-        alert('失败');
+        alert(_l('失败'), 2);
       }
     });
   }
+
+  handleChangeMessageLinkWay = value => {
+    Ajax.editDDMessagUrlPcSlide({
+      projectId: Config.projectId,
+      status: value,
+    }).then(res => {
+      if (res) {
+        this.setState({
+          ddMessagUrlPcSlide: value,
+        });
+      } else {
+        alert(_l('失败'), 2);
+      }
+    });
+  };
 
   // 获取初始密码值
   getInitialPassword = () => {
@@ -502,19 +529,26 @@ export default class Ding extends React.Component {
     }
   };
   render() {
-    const featureType = getFeatureStatus(Config.projectId, FEATURE_ID);
+    const featureType = getFeatureStatus(Config.projectId, VersionProductType.dingIntergration);
     if (featureType === '2') {
-      return <UpgradeVersion projectId={Config.projectId} featureId={FEATURE_ID} />;
+      return (
+        <div className="orgManagementWrap">
+          {buriedUpgradeVersionDialog(Config.projectId, VersionProductType.dingIntergration, 'content')}
+        </div>
+      );
     }
     if (this.state.pageLoading) {
       return <LoadDiv className="mTop80" />;
     }
     return (
-      <div className="dingMainContent">
+      <div className="orgManagementWrap dingMainContent">
         <Tabs
           defaultActiveKey="base"
           onChange={this.changeTab}
-          className={cx({ tabStyle: !(this.state.status === 1 && !this.state.isCloseDing) })}
+          className={cx('mdAntTabs', {
+            tabStyle: !(this.state.status === 1 && !this.state.isCloseDing),
+            singleTab: !(this.state.status === 1 && !this.state.isCloseDing),
+          })}
         >
           <Tabs.TabPane tab={_l('钉钉集成')} key="base">
             {this.stepRender()}
@@ -531,6 +565,20 @@ export default class Ding extends React.Component {
                       checked={this.state.intergrationClientWorkingPattern === item.key}
                       text={item.label}
                       onClick={e => this.handleChangePattern(item.key)}
+                    />
+                  );
+                })}
+              </div>
+              <div className="stepItem">
+                <h3 className="stepTitle Font16 Gray pBottom5">{_l('消息链接')}</h3>
+                {messageLinkTypes.map(item => {
+                  return (
+                    <Radio
+                      className="Block mTop20"
+                      disabled={this.state.isCloseDing}
+                      checked={this.state.ddMessagUrlPcSlide === item.key}
+                      text={item.label}
+                      onClick={e => this.handleChangeMessageLinkWay(item.key)}
                     />
                   );
                 })}
@@ -553,7 +601,7 @@ export default class Ding extends React.Component {
                         dangerouslySetInnerHTML={{
                           __html: _l(
                             '此功能需要在钉钉中开启添加待办任务接口权限。%0如何开启？%1',
-                            '<a href="https://help.mingdao.com/dingding.html#1%E3%80%81%E5%BE%85%E5%8A%9E%E6%B6%88%E6%81%AF%E5%90%8C%E6%AD%A5" target="_blank">',
+                            '<a href="https://help.mingdao.com/dingding#1%E3%80%81%E5%BE%85%E5%8A%9E%E6%B6%88%E6%81%AF%E5%90%8C%E6%AD%A5" target="_blank">',
                             '</a>',
                           ),
                         }}

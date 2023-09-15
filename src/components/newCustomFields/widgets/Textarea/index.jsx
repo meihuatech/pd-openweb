@@ -34,9 +34,15 @@ export default class Widgets extends Component {
   }
 
   onFocus = e => {
-    // 多行文本 tab键聚焦 值不写入问题
-    if (this.props.enumDefault !== 2 && this.text && this.text.value !== this.props.value) {
-      this.joinTextareaEdit(e)
+    // 单多行均有此问题
+    // 文本框 tab键聚焦或shift+tab键聚焦 值不写入问题
+    if ((!this.text && this.props.value) || (this.text && this.text.value !== this.props.value)) {
+      // 客户配置出现enumDefault为0的情况，统一按单行来
+      if (!_.includes([0, 2], this.props.enumDefault)) {
+        this.joinTextareaEdit(e);
+      } else {
+        e.target.value = this.props.value || '';
+      }
     }
     this.setState({ originValue: e.target.value.trim() });
   };
@@ -45,7 +51,7 @@ export default class Widgets extends Component {
     this.props.onChange(value);
   };
 
-  onBlur = () => {
+  onBlur = newValue => {
     const { onBlur } = this.props;
     const { originValue } = this.state;
 
@@ -54,7 +60,7 @@ export default class Widgets extends Component {
       // 处理微信webview键盘收起 网页未撑开
       window.scrollTo(0, 0);
     }
-    onBlur(originValue);
+    onBlur(originValue, newValue);
   };
 
   /**
@@ -132,7 +138,7 @@ export default class Widgets extends Component {
 
     // 开启扫码输入并且禁止手动输入
     if (startTextScanCode && disabledInput) {
-      hint = _l('请扫码输入');
+      hint = hint || _l('请扫码输入');
     } else if (disabledInput) {
       hint = _l('请在移动端扫码输入');
     }
@@ -151,6 +157,7 @@ export default class Widgets extends Component {
               minHeight: enumDefault === 1 ? 90 : 36,
               width: startTextScanCode ? 'calc(100% - 42px)' : '100%',
               lineHeight: 1.5,
+              ...(disabled ? { wordBreak: 'break-all' } : {}),
             }}
             onClick={this.joinTextareaEdit}
           >
@@ -177,6 +184,7 @@ export default class Widgets extends Component {
             ref={text => {
               this.text = text;
             }}
+            autoFocus={isEditing}
             placeholder={hint}
             onFocus={this.onFocus}
             onChange={event => {
@@ -189,7 +197,7 @@ export default class Widgets extends Component {
               if (trimValue !== value) {
                 this.onChange(trimValue);
               }
-              this.onBlur();
+              this.onBlur(trimValue);
             }}
             {...compositionOptions}
           />
@@ -216,13 +224,19 @@ export default class Widgets extends Component {
               if (trimValue !== value) {
                 this.onChange(trimValue);
               }
-              this.onBlur();
+              this.onBlur(trimValue);
             }}
             {...compositionOptions}
           />
         )}
 
-        {startTextScanCode && <TextScanQRCode projectId={projectId} onChange={this.onChange} />}
+        {startTextScanCode && (
+          <TextScanQRCode
+            projectId={projectId}
+            disablePhoto={strDefault.split('')[0] === '1'}
+            onChange={this.onChange}
+          />
+        )}
       </Fragment>
     );
   }

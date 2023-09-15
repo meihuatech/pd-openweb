@@ -42,7 +42,7 @@ export const SettingItem = styled.div`
   }
   .labelWrap {
     display: flex;
-    margin-top: 4px;
+    margin-top: 10px;
     .icon-help {
       margin-left: 4px;
     }
@@ -100,6 +100,30 @@ export const SettingItem = styled.div`
   .Calendar-column-header {
     flex: 1;
   }
+  .attachmentDisplayType {
+    width: 310px !important;
+    .ming.Item {
+      height: auto !important;
+      line-height: normal !important;
+    }
+    .ming.Item .Item-content .Icon {
+      line-height: normal !important;
+      position: relative;
+      left: 0px !important;
+    }
+  }
+  .arrangeBtn {
+    cursor: pointer;
+    font-weight: bold;
+    color: #9e9e9e;
+    &:hover {
+      color: #2196f3;
+    }
+    &.disabled {
+      cursor: not-allowed;
+      color: #bdbdbd !important;
+    }
+  }
 `;
 export const RelateInfo = styled.div`
   margin-top: 12px;
@@ -128,13 +152,23 @@ export const EditInfo = styled(InfoWrap)`
   align-items: center;
   justify-content: space-between;
   cursor: pointer;
-  .edit {
+  .edit,
+  .clearBtn {
     font-size: 15px;
     color: #9e9e9e;
+  }
+  .clearBtn {
+    visibility: hidden;
   }
   &:hover {
     background-color: #fafafa;
     border: 1px solid #d8d8d8;
+    .clearBtn {
+      visibility: visible;
+      &:hover {
+        color: #2196f3;
+      }
+    }
     .edit {
       color: #2196f3;
     }
@@ -143,6 +177,11 @@ export const EditInfo = styled(InfoWrap)`
     border-color: #f44336;
     background: #fef2f4;
     color: #f44336;
+  }
+  &.disabled {
+    cursor: not-allowed;
+    background: #f7f7f7 !important;
+    height: 36px;
   }
 `;
 
@@ -271,6 +310,9 @@ export const SelectFieldsWrap = styled.div`
       line-height: 36px;
       padding: 0 16px;
       cursor: pointer;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
       &:hover {
         background-color: #2196f3;
         color: #fff;
@@ -340,7 +382,7 @@ export const CircleAdd = styled.div`
   height: ${props => props.size || 24}px;
   border-radius: 50%;
   border: 1px solid #ddd;
-  margin-top: 12px;
+  margin-top: ${props => (props.displayRow ? '5px' : '12px')};
   i {
     font-size: 14px;
   }
@@ -351,22 +393,24 @@ export const OptionsWrap = styled.div`
   flex-direction: column;
   &.horizontal {
     flex-direction: row;
-    .option {
-      width: 140px;
-    }
   }
   flex-wrap: wrap;
   .option {
     display: flex;
-    align-items: center;
-    max-width: 100%;
-    margin-right: 16px;
-    margin-top: 8px;
+    .optionItem {
+      display: flex;
+      max-width: 100%;
+      margin-right: 16px;
+      margin-top: 8px;
+      ${props => (props.direction === '0' ? `width: ${props.width}px;` : 'width: fit-content;')}
+    }
     .ming.Radio {
       margin: 0;
+      line-height: 22px;
     }
     .ming.Checkbox {
       flex-shrink: 0;
+      line-height: 22px;
     }
   }
 `;
@@ -375,11 +419,11 @@ export const OptionWrap = styled.div`
   line-height: 24px;
   border-radius: 18px;
   color: #fff;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  ${props =>
+    props.direction !== '0' ? 'white-space: normal' : 'white-space: nowrap;overflow: hidden;text-overflow: ellipsis;'};
+
   &.horizontal {
-    max-width: 140px;
+    ${props => (props.direction === '0' ? `max-width: ${props.width}px;` : '')}
   }
   &.light {
     color: #333;
@@ -390,13 +434,9 @@ export const OptionWrap = styled.div`
     padding: 0 4px;
   }
   background-color: ${props => props.color || '#2196f3'};
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
 `;
 
 export const EditModelWrap = styled.div`
-  padding: 0px 0 20px 0;
   .desc {
     line-height: 13px;
     &.subList {
@@ -588,6 +628,100 @@ export const DialogFooter = styled.div`
   display: flex;
   align-items: center;
   justify-content: space-between;
+`;
+
+export const TitleContentWrap = styled.div`
+  position: relative;
+  border-radius: 3px;
+  display: flex;
+  flex-direction: ${props => (props.displayRow ? 'row' : 'column')};
+  .nameAndStatus {
+    display: flex;
+    line-height: 18px;
+    margin-right: ${props => (props.displayRow ? '1px' : '0px')};
+    margin-bottom: ${props => (props.displayRow ? '0px' : '6px')};
+    padding-top: ${props => (props.displayRow ? '7px' : '0px')};
+    .required {
+      position: absolute;
+      top: ${props => (props.displayRow ? '8px' : '4px')};
+      left: -8px;
+      color: #f44336;
+      transition: all 0.25s;
+    }
+    .titleContent {
+      display: flex;
+      position: relative;
+      margin-right: 10px;
+      ${({ displayRow, titleWidth }) => (displayRow && titleWidth ? `width:${titleWidth}px` : '')}
+    }
+    .iconWrap {
+    }
+    .typeIcon {
+      color: #9e9e9e;
+      font-size: 16px;
+    }
+    .controlName {
+      margin-left: 6px;
+      text-align: ${props => (props.textAlign === '1' ? 'left' : 'right')};
+    }
+    .isSplitLine {
+      font-size: 15px;
+      font-weight: bold;
+    }
+    &.minHeight18 {
+      min-height: 18px;
+    }
+  }
+
+  .desc {
+    color: #9e9e9e;
+    margin-top: 8px;
+    line-height: 13px;
+  }
+`;
+
+export const RelateDetail = styled.div`
+  display: flex;
+  align-items: center;
+  margin-top: 12px;
+  .text {
+    margin: 0 6px;
+  }
+  .name {
+    flex: 1;
+    &.needLink {
+      cursor: pointer;
+      color: #2196f3;
+    }
+  }
+`;
+
+export const AnimationWrap = styled.div`
+  display: flex;
+  padding: 2px;
+  background: #f8f8f8;
+  border-radius: 3px;
+  .animaItem {
+    height: 32px;
+    border-radius: 3px;
+    line-height: 32px;
+    text-align: center;
+    cursor: pointer;
+    font-weight: bold;
+    color: #757575;
+    flex: 1;
+    &:hover {
+      color: #2196f3;
+    }
+    &.active {
+      background: #ffffff;
+      color: #2196f3;
+    }
+    &.disabled {
+      color: #bdbdbd;
+      cursor: not-allowed;
+    }
+  }
 `;
 
 export { Button, DropdownOverlay } from './common';

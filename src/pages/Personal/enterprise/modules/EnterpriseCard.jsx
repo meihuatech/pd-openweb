@@ -10,6 +10,7 @@ import EditCardInfo from './EditCardInfo';
 import DialogLayer from 'src/components/mdDialog/dialog';
 import ReactDom from 'react-dom';
 import { navigateTo } from 'router/navigateTo';
+import { purchaseMethodFunc } from 'src/components/upgrade/choose/PurchaseMethodModal';
 
 import './index.less';
 
@@ -217,7 +218,7 @@ export default class EnterpriseCard extends Component {
           if (res) {
             alert(_l('取消成功'));
           } else {
-            alert(_l('取消失败'));
+            alert(_l('取消失败'), 2);
           }
         });
       },
@@ -252,7 +253,7 @@ export default class EnterpriseCard extends Component {
       case 'default':
         return (
           <span className="Gray_9e">
-            {card.isProjectAdmin ? (card.isCreateUser ? _l('管理员') + _l('(创建者)') : _l('管理员')) : _l('普通成员')}
+            {card.isProjectAdmin ? (card.isCreateUser ? _l('管理员') + _l('(创建人)') : _l('管理员')) : _l('普通成员')}
           </span>
         );
     }
@@ -260,7 +261,7 @@ export default class EnterpriseCard extends Component {
 
   //开通
   handleOpenCard(card) {
-    location.href = '/upgrade/choose?projectId=' + card.projectId;
+    purchaseMethodFunc({ projectId: card.projectId });
   }
 
   //待审核

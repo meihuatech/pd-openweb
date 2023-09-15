@@ -39,7 +39,7 @@ class Card extends Component {
       sheetVisible: false,
       activeData: undefined
     }
-    this.isPublicShare = location.href.includes('public/page') || window.shareAuthor;
+    this.isPublicShare = location.href.includes('public/page') || window.shareAuthor || window.share;
   }
   componentDidMount() {
     this.getData(this.props);
@@ -75,11 +75,12 @@ class Card extends Component {
     }
   }
   getData = (props, reload = false) => {
-    const { needTimingRefresh, report, filters, filtersGroup } = props;
+    const { needTimingRefresh, report, filters, filtersGroup } = props || this.props;
     const shareAuthor = window.shareAuthor;
     const headersConfig = {
       share: shareAuthor,
     };
+    const printFilter = location.href.includes('printPivotTable') && JSON.parse(sessionStorage.getItem(`printFilter-${report.id}`));
     this.setState({ loading: true });
     this.abortRequest();
     this.request = reportApi.getData(
@@ -87,7 +88,7 @@ class Card extends Component {
         reportId: report.id,
         version: '6.5',
         reload,
-        filters: [filters, filtersGroup].filter(_ => _)
+        filters: printFilter ? printFilter : [filters, filtersGroup].filter(_ => _)
       },
       {
         fireImmediately: true,
@@ -113,16 +114,24 @@ class Card extends Component {
     });
   }
   handleOpenChartDialog = (data) => {
-    const { id } = this.props.report;
+    const { report, filters, filtersGroup } = this.props;
     const { reportData } = this.state;
-    const { appId, filter, style } = reportData;
+    const { appId, filter, style, country } = reportData;
+    const { filterRangeId, rangeType, rangeValue, dynamicFilter } = filter;
+    const { drillParticleSizeType } = country || {};
     const viewDataType = style ? (style.viewDataType || 1) : 1;
     if (viewDataType === 2 && filter.viewId && [VIEW_DISPLAY_TYPE.sheet].includes(filter.viewType.toString())) {
       reportApi.getReportSingleCacheId({
         ...data,
-        ...filter,
+        appId,
+        filterRangeId,
+        rangeType,
+        rangeValue,
+        dynamicFilter,
+        particleSizeType: drillParticleSizeType,
+        filters: [filters, filtersGroup].filter(_ => _),
         isPersonal: true,
-        reportId: id
+        reportId: report.id
       }).then(result => {
         if (result.id) {
           window.open(`/worksheet/${appId}/view/${filter.viewId}?chartId=${result.id}&${getAppFeaturesPath()}`);
@@ -137,7 +146,8 @@ class Card extends Component {
     }
   }
   renderChart() {
-    const { id } = this.props.report;
+    const { report, mobileCount, layoutType, sourceType } = this.props;
+    const { id } = report;
     const { loading, reportData } = this.state;
     const { reportType } = reportData;
     const Chart = charts[reportType];
@@ -148,6 +158,9 @@ class Card extends Component {
           isThumbnail={true}
           isViewOriginalData={!this.isPublicShare}
           onOpenChartDialog={this.handleOpenChartDialog}
+          mobileCount={mobileCount}
+          layoutType={layoutType}
+          sourceType={sourceType}
           reportData={{
             ...reportData,
             reportId: id
@@ -159,14 +172,25 @@ class Card extends Component {
   renderContent() {
     const { reportType, map, contrastMap, contrast, data } = this.state.reportData;
 
-    if ([reportTypes.BarChart, reportTypes.LineChart, reportTypes.RadarChart, reportTypes.FunnelChart, reportTypes.DualAxes, reportTypes.CountryLayer].includes(reportType)) {
+    if ([
+      reportTypes.BarChart,
+      reportTypes.LineChart,
+      reportTypes.RadarChart,
+      reportTypes.FunnelChart,
+      reportTypes.DualAxes,
+      reportTypes.CountryLayer,
+      reportTypes.BidirectionalBarChart,
+      reportTypes.ScatterChart,
+      reportTypes.WordCloudChart,
+      reportTypes.TopChart
+    ].includes(reportType)) {
       return (map.length || contrastMap.length) ? this.renderChart() : <WithoutData />;
     }
-    if ([reportTypes.PieChart].includes(reportType)) {
-      return map.length ? this.renderChart() : <WithoutData />;
+    if ([reportTypes.GaugeChart, reportTypes.ProgressChart, reportTypes.PieChart].includes(reportType)) {
+      return _.isEmpty(map) ? <WithoutData /> : this.renderChart()
     }
     if ([reportTypes.NumberChart].includes(reportType)) {
-      return (map.length || contrastMap.length || contrast.length) ? this.renderChart() : <WithoutData />;
+      return this.renderChart();
     }
     if ([reportTypes.PivotTable].includes(reportType)) {
       return _.isEmpty(data.data) ? <WithoutData /> : this.renderChart();
@@ -184,24 +208,30 @@ class Card extends Component {
               <Loading />
             </div>
           )}
-          {reportData.status ? this.renderContent() : <Abnormal />}
+          {reportData.status > 0 ? this.renderContent() : <Abnormal status={reportData.status} />}
         </Fragment>
       );
     } else {
       return (
         <div className="content flexColumn">
-          {loading ? <Loading /> : reportData.status ? this.renderContent() : <Abnormal />}
+          {loading ? <Loading /> : reportData.status > 0 ? this.renderContent() : <Abnormal status={reportData.status} />}
         </div>
       );
     }
   }
   render() {
     const { dialogVisible, reportData, settingVisible, scopeVisible, sheetVisible, activeData } = this.state;
-    const { report, appId, ownerId, roleType, sourceType, needEnlarge, needRefresh = true, worksheetId, filters, filtersGroup, className, onRemove, isCharge } = this.props;
-    const permissions = ownerId || _.includes([1, 2], roleType);
+    const { showTitle = true } = reportData.displaySetup || {};
+    const { report, appId, ownerId, roleType, sourceType, needEnlarge, needRefresh = true, worksheetId, filters, filtersGroup, className, onRemove, isCharge, permissionType, isLock } = this.props;
+    const permissions = sourceType ? false : ownerId || isCharge;
     const isSheetView = ![reportTypes.PivotTable, reportTypes.NumberChart].includes(reportData.reportType);
     return (
-      <div className={cx(`statisticsCard statisticsCard-${report.id} statisticsCard-${reportData.reportType}`, className)}>
+      <div
+        className={cx(`statisticsCard statisticsCard-${report.id} statisticsCard-${reportData.reportType}`, className, {
+          hideChartHeader: !showTitle,
+          hideNumberChartName: !showTitle,
+        })}
+      >
         <div className="header">
           {permissions && (
             <span data-tip={_l('拖拽')} className="iconItem dragWrap Gray_9e">
@@ -214,13 +244,13 @@ class Card extends Component {
               <Tooltip title={reportData.desc} placement="bottom">
                 <Icon
                   icon="info"
-                  className="Font18 pointer Gray_9e mLeft7 mRight7"
+                  className="Font18 pointer Gray_9e mLeft7 mRight7 reportDesc"
                 />
               </Tooltip>
             )}
           </div>
           <div className="operateIconWrap valignWrapper Relative">
-            {needEnlarge && isSheetView && !!reportData.status && (
+            {needEnlarge && isSheetView && reportData.status > 0 && (
               <span
                 className="iconItem Gray_9e"
                 data-tip={_l('以表格显示')}
@@ -237,12 +267,12 @@ class Card extends Component {
                 <Icon icon="table" />
               </span>
             )}
-            {needRefresh && !!reportData.status && (
+            {needRefresh && reportData.status > 0 && (
               <span onClick={() => this.getData(this.props, true)} data-tip={_l('刷新')} className="iconItem Gray_9e freshDataIconWrap">
                 <Icon className="Font20" icon="refresh1" />
               </span>
             )}
-            {needEnlarge && !!reportData.status && (
+            {needEnlarge && reportData.status > 0 && (
               <span
                 className="iconItem Gray_9e"
                 data-tip={_l('放大')}
@@ -256,16 +286,18 @@ class Card extends Component {
                 <Icon icon="task-new-fullscreen" />
               </span>
             )}
-            {needEnlarge && !this.isPublicShare && (sourceType ? !!reportData.status : true) && (
+            {needEnlarge && !this.isPublicShare && (sourceType ? reportData.status > 0 : true) && (
               <MoreOverlay
                 className="iconItem Gray_9e Font20"
                 permissions={sourceType ? null : permissions}
+                permissionType={permissionType}
+                isLock={isLock}
                 isCharge={isCharge}
                 reportStatus={reportData.reportType}
                 reportType={reportData.reportType}
                 filter={reportData.filter}
                 isMove={permissions}
-                onRemove={permissions && sourceType !== 1 ? onRemove : null}
+                onRemove={(permissions && sourceType !== 1) ? onRemove : null}
                 exportData={{
                   filters,
                   filtersGroup
@@ -349,7 +381,7 @@ function SingleCard(props, ref) {
 
   return (
     <Provider store={store}>
-      <Card {...props}/>
+      <Card {...props} ref={props.$cardRef} />
     </Provider>
   );
 }

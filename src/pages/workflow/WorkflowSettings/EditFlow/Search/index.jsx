@@ -61,7 +61,7 @@ export default class Search extends Component {
   }
 
   render() {
-    const { processId, item, disabled, selectNodeId, openDetail } = this.props;
+    const { processId, item, disabled, selectNodeId, openDetail, isSimple } = this.props;
 
     return (
       <div className="flexColumn">
@@ -79,7 +79,9 @@ export default class Search extends Component {
               <i className={cx('workflowAvatar icon-search', item.appId ? 'BGYellow' : 'BGGray')} />
             </div>
             <NodeOperate nodeClassName="BGYellow" {...this.props} />
-            <div className="workflowContent Font13">{this.renderContent()}</div>
+            <div className="workflowContent Font13">
+              {isSimple ? <span className="pLeft8 pRight8 Gray_9e">{_l('加载中...')}</span> : this.renderContent()}
+            </div>
           </div>
           {item.resultTypeId ? <div className="workflowLineBtn" /> : <CreateNode {...this.props} />}
         </section>

@@ -18,31 +18,24 @@
       }
     }
   }
-  &.canedit:not(.isediting):hover,
-  &.canedit:not(.isediting).focus {
+  &.canedit:not(.isediting):not(.focusShowEditIcon):hover,&.canedit.focusShowEditIcon.focus:not(.isediting) {
     padding-right: 34px !important;
     .cellAttachments {
       width: auto;
     }
     .editIcon {
-      display: inline-block !important;
+      display: inline-block;
       position: absolute;
-      top: 0;
-      right: 0;
+      top: 2px;
+      right: 2px;
       width: 34px;
-      height: 34px;
+      height: 28px;
       text-align: center;
-      line-height: 34px;
+      line-height: 32px;
+      background: #fff;
     }
     .worksheetCellPureString {
       width: auto;
     }
-  }
-  .ghostAngle {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 6px;
-    height: 6px;
   }
 }

@@ -17,6 +17,8 @@ import {
   CAN_AS_FX_DYNAMIC_FIELD,
   CAN_NOT_AS_FIELD_DYNAMIC_FIELD,
   DYNAMIC_FROM_MODE,
+  CUR_OCR_TYPES,
+  CUR_OCR_URL_TYPES,
 } from '../config';
 import styled from 'styled-components';
 import cx from 'classnames';
@@ -59,8 +61,9 @@ export default class SelectOtherField extends Component {
     const { advancedSetting = {} } = data;
     const isText = _.includes([1, 2, 45], data.type);
     const isAsync = () => {
-      // 部门选成员 需要异步获取数据 isAsync设为true
-      if ((data.type === 27 || data.type === 48) && type === 26) return true;
+      // 部门选成员 | 成员选部门 需要异步获取数据 isAsync设为true
+      if ((_.includes([27, 48], data.type) && type === 26) || (data.type === 26 && _.includes([27, 48], type)))
+        return true;
       return false;
     };
 
@@ -97,7 +100,7 @@ export default class SelectOtherField extends Component {
           {
             rcid: '',
             cid: '',
-            staticValue: JSON.stringify({ departmentName: _l('当前用户所在部门'), departmentId: 'user-departments' }),
+            staticValue: JSON.stringify({ departmentName: data.text, departmentId: 'user-departments' }),
             isAsync: true,
           },
         ]);
@@ -108,7 +111,7 @@ export default class SelectOtherField extends Component {
           {
             rcid: '',
             cid: '',
-            staticValue: JSON.stringify({ organizeName: _l('当前用户的组织角色'), organizeId: 'user-role' }),
+            staticValue: JSON.stringify({ organizeName: data.text, organizeId: 'user-role' }),
             isAsync: true,
           },
         ]);
@@ -121,7 +124,7 @@ export default class SelectOtherField extends Component {
             cid: '',
             staticValue: JSON.stringify({
               accountId: data.id,
-              name: _l('当前用户'),
+              name: data.text,
             }),
             isAsync: false,
           },
@@ -137,6 +140,10 @@ export default class SelectOtherField extends Component {
         this.setState({ isDynamic: false });
         break;
       case OTHER_FIELD_TYPE.KEYWORD:
+        onDynamicValueChange([{ rcid: '', cid: `${data.id}`, staticValue: '' }]);
+        this.setState({ isDynamic: false });
+        break;
+      case OTHER_FIELD_TYPE.OCR:
         onDynamicValueChange([{ rcid: '', cid: `${data.id}`, staticValue: '' }]);
         this.setState({ isDynamic: false });
         break;
@@ -165,12 +172,16 @@ export default class SelectOtherField extends Component {
     ) {
       types = types.filter(item => item.key !== OTHER_FIELD_TYPE.FIELD);
     }
-    // 有其他字段的控件
+    // 有其他字段的控件 ｜ api查询其他字段
     if (
       _.includes(CAN_AS_OTHER_DYNAMIC_FIELD, data.type) ||
       (_.includes([2, 6], data.type) && DYNAMIC_FROM_MODE.SEARCH_PARAMS === this.props.from && data.isSearch)
     ) {
       types = (CURRENT_TYPES[data.type] || []).concat(types);
+    }
+    // ocr其他字段控件
+    if (_.includes([2, 14], data.type) && DYNAMIC_FROM_MODE.OCR_PARAMS === this.props.from) {
+      types = (data.type === 2 ? CUR_OCR_URL_TYPES : CUR_OCR_TYPES).concat(types);
     }
     //子表里的字段默认值没有查询和函数配置
     if (this.props.hideSearchAndFun) {

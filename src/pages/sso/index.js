@@ -33,7 +33,7 @@ function start() {
               location.href = isMobile ? `/mobile` : `/app`;
             }
           } else {
-            _alert('登录失败');
+            window.nativeAlert('登录失败');
             login();
           }
         },
@@ -81,10 +81,10 @@ function start() {
       const hosts = location.host.split('.');
       const projectId = p || hosts[0];
       function onFail(err) {
-        _alert(JSON.stringify(err));
+        window.nativeAlert(JSON.stringify(err));
       }
       // if (!dd.ios && !dd.android && !dd.pc) {
-      //   _alert('请在钉钉客户端内打开');
+      //   window.nativeAlert('请在钉钉客户端内打开');
       //   location.href = 'https://www.mingdao.com';
       // }
 
@@ -103,11 +103,10 @@ function start() {
                 corpId: corpId,
                 onSuccess: function (result) {
                   const { code } = result;
-                  const isDingDingSidebar = (ret || '').includes('#noredirect') || isPcSlide;
                   const dingdingLoginUrl = `/sso/dingding?state=${state}&ret=${encodeURIComponent(ret || '')}&i=${
                     i || ''
                   }&code=${code}&pc_slide=${pc_slide}`;
-                  if (dd.pc && !isDingDingSidebar) {
+                  if (dd.pc && !isPcSlide) {
                     if (clientWorkingPattern === 1) {
                       document.body.innerText = '已在默认浏览器打开';
                       window.open(dingdingLoginUrl);

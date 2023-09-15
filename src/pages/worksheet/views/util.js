@@ -100,7 +100,7 @@ export function getRecordAttachments(coverImageStr) {
       }
     }
   } catch (error) {
-    alert(_l('获取记录封面失败'));
+    alert(_l('获取记录封面失败'), 2);
     console.log(error);
   }
   return { ...res, coverImage, allAttachments };
@@ -159,7 +159,7 @@ export const isDisabledCreate = permit => {
   return !isOpenPermit(permitList.createButtonSwitch, permit);
 };
 
-export const isAllowQuickSwitch = permit => isOpenPermit(permitList.quickSwitch, permit);
+export const isAllowQuickSwitch = (permit, viewId) => isOpenPermit(permitList.quickSwitch, permit, viewId);
 
 export const getSearchData = sheet => {
   const {

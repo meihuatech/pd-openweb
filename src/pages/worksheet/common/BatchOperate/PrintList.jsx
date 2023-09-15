@@ -6,7 +6,9 @@ import worksheetAjax from 'src/api/worksheet';
 import webCacheAjax from 'src/api/webCache';
 import IconText from 'worksheet/components/IconText';
 import { printQrBarCode, generatePdf } from 'worksheet/common/PrintQrBarCode';
-import { getFeatureStatus, buriedUpgradeVersionDialog } from 'src/util';
+import { getFeatureStatus, buriedUpgradeVersionDialog, addBehaviorLog } from 'src/util';
+import { VersionProductType } from 'src/util/enum';
+import { PRINT_TYPE_STYLE, PRINT_TYPE } from 'src/pages/Print/config';
 import _ from 'lodash';
 
 const Con = styled.div`
@@ -40,6 +42,13 @@ const Con = styled.div`
     .ming.Item .Item-content .Icon {
       left: 16px;
     }
+    .ming.Item .Item-content .fileIcon {
+      width: 13px;
+      height: 15px;
+      position: absolute;
+      margin-top: 10px;
+      left: 16px;
+    }
     .Item.noIcon .Item-content {
       padding-left: 16px !important;
     }
@@ -60,28 +69,49 @@ const TemplateList = styled.div`
 
 const codePrintList = [
   {
-    name: _l('打印二维码'),
+    name: _l('打印二维码%02056'),
     printType: 1,
   },
   {
-    name: _l('打印条形码'),
+    name: _l('打印条形码%02057'),
     printType: 3,
   },
 ];
 
 export default function PrintList(props) {
-  const { showCodePrint, appId, projectId, worksheetId, viewId, controls, selectedRows, selectedRowIds } = props;
+  const {
+    isCharge,
+    showCodePrint,
+    appId,
+    projectId,
+    worksheetId,
+    viewId,
+    controls,
+    selectedRows,
+    selectedRowIds,
+    allowLoadMore,
+    count,
+    filterControls,
+    fastFilters,
+    navGroupFilters,
+  } = props;
   const [menuVisible, setMenuVisible] = useState(false);
   const [templateList, setTemplateList] = useState(props.templateList || []);
-  const featureType = getFeatureStatus(projectId, 20);
+  const featureType = getFeatureStatus(projectId, VersionProductType.wordPrintTemplate);
+  const values = _.values(PRINT_TYPE);
   function loadPrintList() {
-    worksheetAjax.getPrintList({
-      worksheetId,
-      viewId,
-    }).then(data => {
-      setTemplateList(data.filter(d => d.type >= 2).sort((a, b) => a.type - b.type));
-    });
+    worksheetAjax
+      .getPrintList({
+        worksheetId,
+        viewId,
+      })
+      .then(data => {
+        setTemplateList(data.filter(d => d.type >= 2).sort((a, b) => values.indexOf(a.type) - values.indexOf(b.type)));
+      });
   }
+  useEffect(() => {
+    setTemplateList(props.templateList);
+  }, [props.templateList]);
   useEffect(() => {
     if (!props.templateList) {
       loadPrintList();
@@ -114,9 +144,15 @@ export default function PrintList(props) {
         projectId,
         selectedRows,
         controls,
+        count,
+        allowLoadMore,
+        filterControls,
+        fastFilters,
+        navGroupFilters,
       });
     } else {
       printQrBarCode({
+        isCharge,
         printType,
         appId,
         viewId,
@@ -125,7 +161,16 @@ export default function PrintList(props) {
         worksheetName: name,
         controls,
         selectedRows,
-        onClose: loadPrintList,
+        count,
+        allowLoadMore,
+        filterControls,
+        fastFilters,
+        navGroupFilters,
+        onClose: () => {
+          if (!props.templateList) {
+            loadPrintList();
+          }
+        },
       });
     }
   }
@@ -154,13 +199,24 @@ export default function PrintList(props) {
               templateList.map((template, i) => (
                 <MenuItem
                   key={i}
-                  icon={<Icon icon={getPrintCardInfoOfTemplate(template).icon} className="Font18" />}
+                  icon={
+                    [2, 5].includes(template.type) ? (
+                      <span className={`${PRINT_TYPE_STYLE[template.type].fileIcon} fileIcon`}></span>
+                    ) : (
+                      <Icon icon={getPrintCardInfoOfTemplate(template).icon} className="Font18" />
+                    )
+                  }
                   onClick={() => {
                     if (_.includes([3, 4], template.type)) {
+                      const logType = template.type === 3 ? 'printQRCode' : 'printBarCode';
+                      addBehaviorLog(logType, worksheetId, {
+                        printId: template.id,
+                        msg: [allowLoadMore ? count : selectedRows.length],
+                      }); // 埋点
                       handlePrintQrCode({ id: template.id, printType: template.type === 3 ? 1 : 3 });
                     } else {
                       if (featureType === '2') {
-                        buriedUpgradeVersionDialog(projectId, 20);
+                        buriedUpgradeVersionDialog(projectId, VersionProductType.wordPrintTemplate);
                         return;
                       }
                       let printId = template.id;
@@ -175,6 +231,7 @@ export default function PrintList(props) {
                         appId,
                         name: template.name,
                         isBatch: true,
+                        fileTypeNum: template.type,
                       };
                       let printKey = Math.random().toString(36).substring(2);
                       webCacheAjax.add({

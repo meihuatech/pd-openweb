@@ -1,12 +1,32 @@
 import React, { Component } from 'react';
 import PropTypes from 'prop-types';
 import cx from 'classnames';
+import { useKey } from 'react-use';
+import _ from 'lodash';
 import Icon from 'ming-ui/components/Icon';
 import DialogHeader from './DialogHeader';
 import DialogFooter from './DialogFooter';
 import DialogBase from './DialogBase';
 import '../less/Dialog.less';
 
+function enterHandle(Comp) {
+  return function UseKey(props) {
+    useKey('Enter', e => {
+      if (!props.visible || !props.bindEnterTriggerOk) {
+        return;
+      }
+      if (_.isFunction(props.confirmOnOk)) {
+        props.confirmOnOk();
+        props.onCancel();
+      } else if (_.isFunction(props.onOk)) {
+        props.onOk();
+      }
+    });
+    return <Comp {...props} />;
+  };
+}
+
+@enterHandle
 class Dialog extends Component {
   static propTypes = {
     /**
@@ -145,6 +165,10 @@ class Dialog extends Component {
      * 滚动事件
      */
     onScroll: PropTypes.func,
+    /**
+     * 底部左侧内容自定义
+     */
+    footerLeftElement: PropTypes.element,
   };
 
   static defaultProps = {
@@ -254,6 +278,7 @@ class Dialog extends Component {
               confirm={props.confirm}
               showCancel={props.showCancel}
               buttonType={props.buttonType}
+              footerLeftElement={props.footerLeftElement}
             />
           )}
         </DialogBase>

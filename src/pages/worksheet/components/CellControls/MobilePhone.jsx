@@ -6,25 +6,14 @@ import Trigger from 'rc-trigger';
 import MobilePhoneEdit from 'src/components/newCustomFields/widgets/MobilePhone';
 import withClickAway from 'ming-ui/decorators/withClickAway';
 import createDecoratedComponent from 'ming-ui/decorators/createDecoratedComponent';
-import { isKeyBoardInputChar } from 'worksheet/util';
+import { emitter, isKeyBoardInputChar } from 'worksheet/util';
+import { formatNumberFromInput } from 'src/util';
 import CellErrorTips from './comps/CellErrorTip';
 const ClickAwayable = createDecoratedComponent(withClickAway);
 import EditableCellCon from '../EditableCellCon';
 import renderText from './renderText';
 import { FROM } from './enum';
 
-function replaceNotNumber(value) {
-  return value
-    .replace(/[^-\d.]/g, '')
-    .replace(/^\./g, '')
-    .replace(/^-/, '$#$')
-    .replace(/-/g, '')
-    .replace('$#$', '-')
-    .replace(/^-\./, '-')
-    .replace('.', '$#$')
-    .replace(/\./g, '')
-    .replace('$#$', '.');
-}
 export default class MobilePhone extends React.Component {
   static propTypes = {
     className: PropTypes.string,
@@ -162,7 +151,7 @@ export default class MobilePhone extends React.Component {
     switch (e.key) {
       default:
         (() => {
-          const value = cell.type === 6 || cell.type === 8 ? replaceNotNumber(e.key) : e.key;
+          const value = cell.type === 6 || cell.type === 8 ? formatNumberFromInput(e.key, false) : e.key;
           if (!value || !isKeyBoardInputChar(e.key)) {
             return;
           }
@@ -184,7 +173,7 @@ export default class MobilePhone extends React.Component {
 
   @autobind
   handleKeydown(e) {
-    const { cell, updateEditingStatus } = this.props;
+    const { tableId, cell, updateEditingStatus } = this.props;
     if (e.keyCode === 27) {
       updateEditingStatus(false);
       this.setState({
@@ -194,6 +183,15 @@ export default class MobilePhone extends React.Component {
     } else if (e.keyCode === 13) {
       e.preventDefault();
       this.handleBlur();
+      setTimeout(
+        () =>
+          emitter.emit('TRIGGER_TABLE_KEYDOWN_' + tableId, {
+            keyCode: 40,
+            stopPropagation: () => {},
+            preventDefault: () => {},
+          }),
+        100,
+      );
     }
   }
 

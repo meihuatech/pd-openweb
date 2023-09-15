@@ -11,6 +11,7 @@ import homeAppAjax from 'src/api/homeApp';
 import worksheetAjax from 'src/api/worksheet';
 import SelectControl from '../SelectControl';
 import { getControls } from '../DynamicDefaultValue/util';
+import { SYS_CONTROLS, FORM_HIDDEN_CONTROL_IDS } from 'src/pages/widgetConfig/config/widget.js';
 import '../DynamicDefaultValue/inputTypes/SubSheet/style.less';
 import cx from 'classnames';
 import _ from 'lodash';
@@ -150,7 +151,7 @@ export default class SearchWorksheetDialog extends Component {
 
   // 获取子表下拉数据或查询表下拉数据
   getDropData = (controls = [], control = {}, hasRowId) => {
-    let filterControls = getControls({ data: control, controls, isCurrent: true, fromSearch: true });
+    let filterControls = getControls({ data: control, controls, isCurrent: true, needFilter: true });
     filterControls = filterControls.filter(i => !_.includes(['wfftime', 'rowid'], i.controlId));
     // 有记录id选项(同查询表的关联记录或者文本类控件)
     if (hasRowId) {
@@ -163,7 +164,7 @@ export default class SearchWorksheetDialog extends Component {
   // 过滤已经选中的映射字段
   filterSelectControls = (controls = []) => {
     const { configs = [] } = this.state;
-    controls = controls.filter(i => !_.includes(['wfftime', 'rowid'], i.controlId));
+    controls = controls.filter(i => !_.includes([...SYS_CONTROLS, ...FORM_HIDDEN_CONTROL_IDS], i.controlId));
     controls = controls.filter(co => {
       return (
         _.includes([2, 3, 4, 5, 6, 8, 15, 16, 19, 23, 24, 26, 27, 28, 36, 46, 48], co.type) ||
@@ -273,7 +274,7 @@ export default class SearchWorksheetDialog extends Component {
     //空白子表、关联类型子表
     const subField = _.includes([34], data.type);
 
-    const checkFilters = _.isEmpty(items) || !checkConditionCanSave(items);
+    const checkFilters = _.isEmpty(items) || !checkConditionCanSave(items, true);
     const checkConfigs = _.isEmpty(configs) || !_.every(configs, con => !!con.cid);
     const okDisabled = normalField
       ? !sheetId || checkFilters || _.isEmpty(configs)
@@ -426,7 +427,7 @@ export default class SearchWorksheetDialog extends Component {
                     <span
                       onClick={e => {
                         if (!sheetId) {
-                          alert(_l('请选择工作表'));
+                          alert(_l('请选择工作表'), 3);
                           return;
                         }
                       }}
@@ -517,7 +518,7 @@ export default class SearchWorksheetDialog extends Component {
                         <span
                           onClick={() => {
                             if (!sheetId) {
-                              alert(_l('请选择工作表'));
+                              alert(_l('请选择工作表'), 3);
                               return;
                             }
                           }}

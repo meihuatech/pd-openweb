@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import ReactDOM from 'react-dom';
 import styled from 'styled-components';
 import cx from 'classnames';
-import 'src/components/uploadAttachment/uploadAttachment';
 import { browserIsMobile } from 'src/util';
 import Container from './Container';
 import { LoadDiv, Icon } from 'ming-ui';
@@ -275,7 +274,10 @@ function ContainerCon(props) {
             ) : (
               <span className={cx('logoImageUrlIcon')} style={{ backgroundColor: baseSetInfo.appColor || '#00bcd4' }}>
                 <SvgIcon
-                  url={baseSetInfo.appLogoUrl || 'https://fp1.mingdaoyun.cn/customIcon/0_lego.svg'}
+                  url={
+                    baseSetInfo.appLogoUrl ||
+                    md.global.FileStoreConfig.pubHost.replace(/\/$/, '') + '/customIcon/0_lego.svg'
+                  }
                   fill={'#fff'}
                   size={28}
                 />

@@ -38,7 +38,7 @@ export default {
   * @param {string} args.keywords 关键词
   * @param {integer} args.pageSize 页大小
   * @param {integer} args.pageIndex 页码
-  * @param {boolean} args.directOnly 是否只查询直系下属
+  * @param {boolean} args.onlyNormalStatus 是否 仅有效用户
   * @param {Object} options 配置参数
   * @param {Boolean} options.silent 是否禁止错误弹层
   * @returns {Promise<Boolean, ErrorModel>}
@@ -60,6 +60,34 @@ export default {
    pagedTopAccountIdsWith3Level: function (args, options = {}) {
      
      return $.api('Structure', 'PagedTopAccountIdsWith3Level', args, options);
+   },
+  /**
+  * 分页获取最顶层员工
+  * @param {Object} args 请求参数
+  * @param {string} args.projectId 网络id
+  * @param {string} args.parentId 父级id
+  * @param {integer} args.pageIndex 页码
+  * @param {integer} args.pageSize 每页条数
+  * @param {Object} options 配置参数
+  * @param {Boolean} options.silent 是否禁止错误弹层
+  * @returns {Promise<Boolean, ErrorModel>}
+  **/
+   pagedGetAccountList: function (args, options = {}) {
+     
+     return $.api('Structure', 'PagedGetAccountList', args, options);
+   },
+  /**
+  * 获取员工上级用户信息
+  * @param {Object} args 请求参数
+  * @param {string} args.projectId 网络id
+  * @param {string} args.accountId 账号id
+  * @param {Object} options 配置参数
+  * @param {Boolean} options.silent 是否禁止错误弹层
+  * @returns {Promise<Boolean, ErrorModel>}
+  **/
+   getTreesByAccountId: function (args, options = {}) {
+     
+     return $.api('Structure', 'GetTreesByAccountId', args, options);
    },
   /**
   * 获取员工下属

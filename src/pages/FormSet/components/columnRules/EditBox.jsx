@@ -54,6 +54,7 @@ class EditBox extends React.Component {
       ruleError = {},
       updateFilterError,
       appId,
+      sheetSwitchPermit,
     } = this.props;
     const filterControls = worksheetControls
       .filter(i => !_.includes(['wfname', 'wfcuaids', 'wfcaid', 'wfctime', 'wfrtime', 'wfftime', 'rowid'], i.controlId))
@@ -70,6 +71,7 @@ class EditBox extends React.Component {
           appId={appId}
           from={'rule'}
           columns={filterControls}
+          sheetSwitchPermit={sheetSwitchPermit}
           currentColumns={filterControls}
           conditions={selectRules.filters}
           filterError={ruleError.filterError || []}
@@ -136,7 +138,7 @@ class EditBox extends React.Component {
                   }
                   // 过滤不符合条件的已选字段
                   if (_.includes([3, 4, 5], type)) {
-                    currentActionData = filterUnAvailable(currentActionData, worksheetControls);
+                    currentActionData = filterUnAvailable(currentActionData, worksheetControls, type);
                   }
                   ruleItems.splice(actionIndex, 1, currentActionData);
                   updateAction(ruleItems);
@@ -203,13 +205,8 @@ class EditBox extends React.Component {
               {listData.map(i => (
                 <div onClick={() => updateAction(ruleItems.concat({ ...originActionItem, type: i.value }), true)}>
                   {i.label}
-                  {i.value === 7 && (
-                    <Tooltip
-                      placement="bottom"
-                      title={_l(
-                        '锁定状态在记录保存后生效。锁定的记录不允许用户直接编辑，但可以通过自定义动作和工作流进行填写',
-                      )}
-                    >
+                  {i.warnText && (
+                    <Tooltip placement="bottom" title={i.warnText}>
                       <i className="icon-info_outline Gray_9e Font16"></i>
                     </Tooltip>
                   )}
@@ -259,6 +256,7 @@ const mapStateToProps = state => ({
   appId: state.formSet.worksheetInfo.appId,
   ruleError: state.formSet.ruleError,
   editingId: state.formSet.editingId,
+  sheetSwitchPermit: state.formSet.worksheetInfo.switches,
 });
 const mapDispatchToProps = dispatch => bindActionCreators({ ...actions, ...columnRules }, dispatch);
 

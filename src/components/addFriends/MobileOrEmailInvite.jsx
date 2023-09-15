@@ -7,8 +7,10 @@ import EmailInput from 'src/pages/Role/PortalCon/components/Email';
 import { FROM_TYPE, DETAIL_MODE } from './addFriends';
 import default_img from 'staticfiles/images/default_user_avatar.jpg';
 import cx from 'classnames';
+import captcha from 'src/components/captcha';
 import _ from 'lodash';
 import { existAccountHint } from 'src/components/common/function';
+import { encrypt } from 'src/util';
 
 const DISPLAY_OPTIONS = [
   {
@@ -41,7 +43,10 @@ export default class MobileOrEmailInvite extends Component {
   }
 
   getValue = () => {
-    return this.state.keywords.indexOf('@') > -1 ? this.state.keywords : `+86${this.state.keywords}`;
+    // 邮箱或者国际号码带+
+    return this.state.keywords.indexOf('@') > -1 || (this.state.keywords || '').startsWith('+')
+      ? this.state.keywords
+      : `+86${this.state.keywords}`;
   };
 
   handleSearch = () => {
@@ -51,17 +56,31 @@ export default class MobileOrEmailInvite extends Component {
       return;
     }
 
-    Requests.getAccountByAccount({
-      account: this.getValue(),
-    })
-      .done(res => {
-        this.setState({ searchData: res.list });
-      })
-      .fail(err => {
-        if (err) {
-          alert(_l('请输入手机号/邮箱地址'), 3);
-        }
-      });
+    const _this = this;
+    var throttled = function (res) {
+      if (res.ret === 0) {
+        Requests.getAccountByAccount({
+          account: _this.getValue(),
+          ticket: res.ticket,
+          randStr: res.randstr,
+          captchaType: md.staticglobal.getCaptchaType(),
+        })
+          .done(res => {
+            _this.setState({ searchData: res.list });
+          })
+          .fail(err => {
+            if (err) {
+              alert(_l('请输入手机号/邮箱地址'), 3);
+            }
+          });
+      }
+    };
+
+    if (md.staticglobal.getCaptchaType() === 1) {
+      new captcha(throttled);
+    } else {
+      new TencentCaptcha(md.global.Config.CaptchaAppId.toString(), throttled).show();
+    }
   };
 
   handleAdd = () => {
@@ -85,6 +104,7 @@ export default class MobileOrEmailInvite extends Component {
 
   invite = (accounts, cb) => {
     const { projectId, onCancel, fromType } = this.props;
+
     InviteController.inviteUser({
       sourceId: projectId || md.global.Account.accountId,
       accounts: accounts,
@@ -110,14 +130,14 @@ export default class MobileOrEmailInvite extends Component {
 
   inviteFriend = item => {
     if (item.accountId === md.global.Account.accountId) {
-      alert(_l('不能添加自己为好友'));
+      alert(_l('不能添加自己为好友'), 3);
       return;
     }
 
     if (this.state.loading) return;
     this.setState({ loading: true });
 
-    this.invite({ [this.getValue()]: '' }, () => {
+    this.invite({ [encrypt(this.getValue())]: '' }, () => {
       this.setState({
         searchData: this.state.searchData.map(i => (i.accountId === item.accountId ? { ...i, disabled: true } : i)),
       });
@@ -134,7 +154,7 @@ export default class MobileOrEmailInvite extends Component {
     let accountObj = {};
     for (var i = 0, length = list.length; i < length; i++) {
       if (list[i] && list[i].phone) {
-        accountObj[list[i].phone] = '';
+        accountObj[encrypt(list[i].phone)] = '';
       }
     }
     InviteController.getInviteAccountInfo({
@@ -278,7 +298,7 @@ export default class MobileOrEmailInvite extends Component {
           <div className="flexRow flexCenter">
             {fromType !== FROM_TYPE.GROUPS && (
               <div className="addBox Gray_9e">
-                <span onClick={() => window.open(`${location.origin}/admin/structure/${projectId}`)}>
+                <span onClick={() => window.open(`${location.origin}/admin/structure/${projectId}/isShowSetting`)}>
                   <Icon icon="settings1" />
                   {_l('邀请设置')}
                 </span>
@@ -286,7 +306,7 @@ export default class MobileOrEmailInvite extends Component {
             )}
             {fromType !== FROM_TYPE.GROUPS && (
               <div className="addBox Gray_9e mLeft16">
-                <span onClick={() => window.open(`${location.origin}/admin/structure/${projectId}`)}>
+                <span onClick={() => window.open(`${location.origin}/admin/structure/${projectId}/importusers`)}>
                   <Icon icon="add_software" />
                   {_l('批量导入')}
                 </span>

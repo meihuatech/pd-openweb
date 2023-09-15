@@ -7,6 +7,25 @@ function data(state = [], action) {
       return action.data;
     case 'ADD_LEFT_ITEM':
       return state.concat(action.data);
+    case 'ADD_LEFT_SUB_ITEM':
+      const { id, data } = action.data;
+      return state.map(item => {
+        if (item.workSheetId === id) {
+          item.items = item.items.concat(data);
+          return item;
+        } else {
+          return item;
+        }
+      });
+    default:
+      return state;
+  }
+}
+
+function appSectionDetail(state = [], action) {
+  switch (action.type) {
+    case 'SHEET_ALL_LIST':
+      return action.data;
     default:
       return state;
   }
@@ -23,8 +42,17 @@ function loading(state = true, action) {
 
 function isCharge(state = false, action) {
   switch (action.type) {
-    case 'SHEET_LIST_UPDATE_IS_CHARGE':
+    case 'WORKSHEET_UPDATE_IS_CHARGE':
       return action.isCharge;
+    default:
+      return state;
+  }
+}
+
+function appPkgData(state = false, action) {
+  switch (action.type) {
+    case 'WORKSHEET_UPDATE_APPPKGDATA':
+      return action.appPkgData;
     default:
       return state;
   }
@@ -61,9 +89,11 @@ function isValidAppSectionId(state = true, action) {
 
 export default combineReducers({
   data,
+  appSectionDetail,
   loading,
   isCharge,
   isUnfold,
   guidanceVisible,
   isValidAppSectionId,
+  appPkgData
 });

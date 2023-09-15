@@ -49,7 +49,7 @@ const WEEKDAY_TYPE = [
 ];
 
 export default function WeekdaySetting({ data, onChange }) {
-  const { unit, dot = 0 } = data;
+  const { unit } = data;
   const { weekday = '' } = getAdvanceSetting(data);
   const [visible, setVisible] = useState(false);
   const weekdayArr = weekday.split('');
@@ -73,7 +73,7 @@ export default function WeekdaySetting({ data, onChange }) {
     });
     return isContinue && weekdayText.length > 1
       ? _l('%0至%1', weekdayText[0], weekdayText[weekdayText.length - 1])
-      : _l(`${weekdayText.join('、')}`);
+      : weekdayText.join('、');
   };
 
   const renderPanel = () => {
@@ -111,8 +111,14 @@ export default function WeekdaySetting({ data, onChange }) {
     <SettingItem>
       {pointerStr.indexOf(unit) > -1 && (
         <PointerConfig
-          data={{ dot }}
-          onChange={value => onChange(handleAdvancedSettingChange({ ...data, ...value }, value))}
+          data={data}
+          onChange={value => {
+            if (value.advanceSetting) {
+              onChange(value);
+            } else {
+              onChange({ ...handleAdvancedSettingChange(data, value), ...value });
+            }
+          }}
         />
       )}
       {weekdayStr.indexOf(unit) > -1 && (

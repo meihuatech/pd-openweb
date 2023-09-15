@@ -7,6 +7,7 @@ export const HomePageWrap = styled.div`
   padding-top: 0;
   box-sizing: border-box;
   overflow-y: auto;
+  background: #f5f5f5;
   .infoWrap {
     display: flex;
     @media (max-width: 1320px) {
@@ -42,7 +43,7 @@ export const HomePageWrap = styled.div`
         padding-top: 32px !important;
       }
     }
-    @media (max-width: 1919px) {
+    @media screen and (max-width: 1920px) {
       display: block;
       .infoBox {
         width: 100%;
@@ -152,6 +153,12 @@ export const HomePageWrap = styled.div`
           border-radius: 15px;
           background-color: #f5f5f5;
         }
+        &.effectiveDataPipelineRowCount {
+          &:hover {
+            cursor: auto;
+            background-color: #fff;
+          }
+        }
       }
     }
   }
@@ -195,6 +202,8 @@ export const HomePageWrap = styled.div`
     width: calc(100% - 48px);
     .inviteUserBox {
       width: 25%;
+      display: flex;
+      justify-content: center;
       .inviteUser {
         position: unset;
         background-color: rgb(76, 175, 80, 0.1);

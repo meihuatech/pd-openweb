@@ -15,26 +15,55 @@ export default class BranchItem extends Component {
     clearBorderType: 0,
   };
 
+  state = {
+    isMove: false,
+  };
+
+  componentDidMount() {
+    this.mounted = true;
+  }
+
+  componentWillReceiveProps(nextProps, nextState) {
+    if (nextProps.index !== this.props.index && this.state.isMove) {
+      setTimeout(() => {
+        this.mounted && this.setState({ isMove: false });
+      }, 200);
+    }
+  }
+
+  componentWillUnmount() {
+    this.mounted = false;
+  }
+
   /**
    * 渲染内容
    */
   renderContent() {
-    const { item, prveId, processId } = this.props;
+    const { item, prveId, processId, disabled, updateBranchSort } = this.props;
 
     return (
-      <div className="workflowName workflowBranchItem">
+      <div
+        className={cx('workflowName workflowBranchItem', {
+          pBottom10: !_.includes([1, 2, 3, 4], item.resultTypeId) && disabled,
+        })}
+      >
         <div className="flexRow mBottom4" style={{ alignItems: 'center' }}>
           <NodeOperate
-            copyBranchNode={() =>
+            {...this.props}
+            updateBranchSort={(processId, nodeId, flowIds) => {
+              this.setState({ isMove: true });
+              updateBranchSort(processId, nodeId, flowIds);
+            }}
+            copyBranchNode={all =>
               this.props.dispatch(
                 addFlowNode(processId, {
                   prveId,
                   nodeIds: [item.id],
                   name: item.name ? _l('-复制') : _l('分支-复制'),
+                  all,
                 }),
               )
             }
-            {...this.props}
           />
         </div>
 
@@ -75,7 +104,7 @@ export default class BranchItem extends Component {
             );
           })
         ) : (
-          <div className="pLeft8 pRight8">{_l('所有数据可进入该分支')}</div>
+          <div className="workflowBranchItemTag Gray_75">{_l('所有数据可进入该分支')}</div>
         )}
       </div>
     );
@@ -173,18 +202,9 @@ export default class BranchItem extends Component {
   }
 
   render() {
-    const {
-      processId,
-      data,
-      item,
-      disabled,
-      renderNode,
-      clearBorderType,
-      openDetail,
-      isCopy,
-      isApproval,
-      approvalSelectNodeId,
-    } = this.props;
+    const { processId, data, item, disabled, renderNode, clearBorderType, openDetail, isCopy, isApproval, isSimple } =
+      this.props;
+    const { isMove } = this.state;
     const resultTypeText = {
       1: _l('通过'),
       2: _l('否决'),
@@ -193,7 +213,7 @@ export default class BranchItem extends Component {
     };
 
     return (
-      <div className="flexColumn">
+      <div className={cx('flexColumn', { Alpha2: isMove })}>
         {clearBorderType === -1 && <div className="clearLeftBorder" />}
         {clearBorderType === 1 && <div className="clearRightBorder" />}
 
@@ -205,9 +225,7 @@ export default class BranchItem extends Component {
               { workflowBranchSpecial: _.includes([1, 2, 3, 4], item.resultTypeId) },
               { errorShadow: item.isException },
             )}
-            onMouseDown={() =>
-              !disabled && !item.resultTypeId && openDetail(processId, item.id, item.typeId, approvalSelectNodeId)
-            }
+            onMouseDown={() => !disabled && !item.resultTypeId && openDetail(processId, item.id, item.typeId)}
           >
             {_.includes([1, 2, 3, 4], item.resultTypeId) ? (
               <Fragment>
@@ -229,17 +247,20 @@ export default class BranchItem extends Component {
               </Fragment>
             ) : (
               <Fragment>
-                {this.renderContent()}
-                <div className="workflowContent">
-                  <div className="pLeft8 pRight8 blue">{_l('配置筛选条件')}</div>
-                </div>
+                {isSimple ? (
+                  <div className="workflowName workflowBranchItem">
+                    <span className="pLeft8 pRight8 Gray_9e">{_l('加载中...')}</span>
+                  </div>
+                ) : (
+                  this.renderContent()
+                )}
               </Fragment>
             )}
           </div>
           <CreateNode {...this.props} />
         </section>
 
-        {item.nextId && renderNode({ processId, data, firstId: item.nextId, isApproval, approvalSelectNodeId })}
+        {item.nextId && renderNode({ processId, data, firstId: item.nextId, isApproval })}
       </div>
     );
   }

@@ -6,8 +6,8 @@ import Config from '../config';
 import DialogLayer from 'src/components/mdDialog/dialog';
 import ReactDom from 'react-dom';
 import groupController from 'src/api/group';
+import PaginationWrap from '../components/PaginationWrap';
 import './index.less';
-import 'src/components/pager/pager';
 
 const { Search } = Input;
 
@@ -70,30 +70,17 @@ export default class MemberList extends Component {
     this.getGroupsList();
   }
 
-  setPager() {
-    const _this = this;
-    $('#divPager')
-      .show()
-      .Pager({
-        pageIndex: _this.state.pageIndex,
-        pageSize: _this.state.pageSize,
-        count: _this.state.count,
-        changePage: function (pIndex) {
-          _this.setState(
-            {
-              pageIndex: pIndex,
-              selectKeys: [],
-            },
-            () => {
-              _this.getGroupsList();
-            },
-          );
-        },
-      });
-  }
+  changePage = page => {
+    this.setState(
+      {
+        pageIndex: page,
+        selectKeys: [],
+      },
+      () => this.getGroupsList(),
+    );
+  };
 
   getGroupsList() {
-    console.log(this.props);
     this.setState({ loading: true });
     const reqData = {
       pageIndex: this.state.pageIndex,
@@ -105,20 +92,11 @@ export default class MemberList extends Component {
     };
 
     groupController.getGroupUsers(reqData).then(res => {
-      this.setState(
-        {
-          count: res.groupUsers && res.groupUsers.length,
-          list: res.groupUsers || [],
-          loading: false,
-        },
-        () => {
-          if (this.state.count > this.state.pageSize) {
-            this.setPager();
-          } else {
-            $('#divPager').hide();
-          }
-        },
-      );
+      this.setState({
+        count: res.groupMemberCount,
+        list: res.groupUsers || [],
+        loading: false,
+      });
     });
   }
 
@@ -135,9 +113,9 @@ export default class MemberList extends Component {
     );
   }
 
-  handleSet(id) {
+  handleSet = id => {
     const reqData = {
-      accountIds: [id] || this.state.selectKeys,
+      accountIds: id ? [id] : this.state.selectKeys,
       groupId: this.props.groupId,
     };
     const _this = this;
@@ -161,7 +139,7 @@ export default class MemberList extends Component {
       height: '150',
     };
     ReactDom.render(<DialogLayer {...options} />, document.createElement('div'));
-  }
+  };
 
   handleDelete(id, name) {
     const reqData = {
@@ -198,7 +176,7 @@ export default class MemberList extends Component {
   };
 
   render() {
-    const { selectKeys, pageSize, count, list, loading } = this.state;
+    const { selectKeys, pageSize, count, pageIndex, list, loading } = this.state;
     const rowSelection = {
       selectKeys,
       onChange: this.onSelectChange,
@@ -222,17 +200,21 @@ export default class MemberList extends Component {
             {selectKeys.length ? (
               <Fragment>
                 <span className="Font16 color_b Bold">{_l(`已选择%0条`, selectKeys.length)}</span>
-                <div className="ThemeColor3 mLeft30 Hand" onClick={this.handleSet.bind(this)}>
+                <div className="ThemeColor3 mLeft30 Hand" onClick={() => this.handleSet()}>
                   <span className="icon icon-sp_filter_none_white"></span>
                   <span>{_l('设置为管理员')}</span>
                 </div>
               </Fragment>
             ) : (
-              <Search allowClear placeholder={_l('搜索')} onSearch={value => this.handleInputChange(value)} />
+              <Search
+                allowClear
+                placeholder={_l('搜索')}
+                onSearch={_.debounce(value => this.handleInputChange(value), 500)}
+              />
             )}
           </div>
         </div>
-        <div className="tableList Relative">
+        <div className="tableList">
           <ConfigProvider renderEmpty={MemberEmpty}>
             <Spin indicator={<LoadDiv />} spinning={loading}>
               <Table
@@ -241,9 +223,11 @@ export default class MemberList extends Component {
                 columns={this.columns}
                 dataSource={list}
                 pagination={false}
-                scroll={{ y: count > pageSize ? 'calc(100vh - 330px)' : 'calc(100vh - 280px)' }}
+                scroll={count == 0 ? {} : { y: count > pageSize ? 'calc(100vh - 300px)' : 'calc(100vh - 260px)' }}
               />
-              <div id="divPager"></div>
+              {count > pageSize && (
+                <PaginationWrap total={count} pageIndex={pageIndex} pageSize={pageSize} onChange={this.changePage} />
+              )}
             </Spin>
           </ConfigProvider>
         </div>

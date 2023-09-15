@@ -175,7 +175,7 @@ export const getVerifyInfo = (data, { controls }) => {
   }
   if (type === 43) {
     const ocrMap = getAdvanceSetting(data, 'ocrmap') || [];
-    if (ocrMap.length < 1) {
+    if (ocrMap.length < 1 && advancedSetting.ocrapitype !== '1') {
       return { isValid: false, text: _l('没有配置映射字段') };
     }
   }
@@ -207,10 +207,10 @@ export const isAutoNumberSelectableControl = item => {
  * 控件数量200以内
  * @param {*} controls
  */
-export const isExceedMaxControlLimit = (controls = []) => {
+export const isExceedMaxControlLimit = (controls = [], addCount = 0) => {
   const existedControls = controls.filter(item => !NO_CONTENT_CONTROL.includes(item.type)) || [];
-  if (existedControls.length >= MAX_CONTROLS_COUNT) {
-    alert(_l('表单中添加字段数量已达上限（%0个)', MAX_CONTROLS_COUNT));
+  if (existedControls.length + addCount > MAX_CONTROLS_COUNT) {
+    alert(_l('表单中添加字段数量已达上限（%0个)', MAX_CONTROLS_COUNT), 3);
     return true;
   }
   return false;
@@ -221,7 +221,10 @@ export const getOptions = data => (data.options || []).filter(item => !item.isDe
 
 export const getShowControls = (controls = [], showControls = []) => {
   // 删除掉showControls 中已经被删掉的控件
-  const allControlId = controls.concat(SYSTEM_CONTROLS).map(item => item.controlId);
+  const allControlId = controls
+    .filter(i => !_.includes([51], i.type))
+    .concat(SYSTEM_CONTROLS)
+    .map(item => item.controlId);
   return showControls
     .map(id => {
       if (!allControlId.includes(id)) return '';
@@ -307,6 +310,20 @@ export const getDatePickerConfigs = data => {
         formatMode: 'YYYY-MM-DD HH:mm:ss',
         showSecond: true,
       };
+    // 时分
+    case 8:
+      return {
+        mode: 'time',
+        formatMode: 'HH:mm',
+        showSecond: true,
+      };
+    // 时分秒
+    case 9:
+      return {
+        mode: 'time',
+        formatMode: 'HH:mm:ss',
+        showSecond: true,
+      };
     default:
       return data.type === 16
         ? { mode: 'datetime', formatMode: 'YYYY-MM-DD HH:mm' }
@@ -329,4 +346,25 @@ export const getShowFormat = data => {
     return showformat === '1' ? _l('YYYY年M月') : _.includes(['2', '3'], showformat) ? 'M/YYYY' : formatMode;
   }
   return formatMode.replace('YYYY-MM-DD', showType);
+};
+
+// 计算矩阵选项均分多少份
+export const getItemOptionWidth = (data, fromType) => {
+  let itemWidth = 100;
+  const options = getOptions(data);
+  const displayWidth =
+    fromType === 'public'
+      ? (document.querySelector('.publicWorksheetForm .rowsWrap') || {}).clientWidth
+      : (document.querySelector('#widgetDisplayWrap .rowsWrap') || {}).clientWidth;
+  const widthSize = data.size / 12;
+  const { direction = '2', width = '200' } = getAdvanceSetting(data);
+  if (displayWidth && direction === '0') {
+    // padding: 8
+    const boxWidth = (displayWidth - 8 * 2) * widthSize;
+    // padding: 12, border: 2
+    const optionsWidth = boxWidth - 14 * 2;
+    const num = Math.floor(optionsWidth / Number(width)) || 1;
+    itemWidth = 100 / (num > options.length ? options.length : num);
+  }
+  return itemWidth;
 };

@@ -13,6 +13,8 @@ import SheetView from '../View/SheetView';
 import GalleryView from '../View/GalleryView';
 import { VIEW_DISPLAY_TYPE } from 'src/pages/worksheet/constants/enum';
 import { getAdvanceSetting } from 'src/util';
+import { FILTER_CONDITION_TYPE } from 'src/pages/worksheet/common/WorkSheetFilter/enum';
+import { handleCondition } from 'src/pages/widgetConfig/util/data';
 import cx from 'classnames';
 import './index.less';
 import _ from 'lodash';
@@ -36,6 +38,7 @@ const GroupFilter = props => {
     worksheetInfo,
     appColor,
     mobileNavGroupFilters,
+    appNaviStyle,
   } = props;
   const { appId, viewId } = base;
   const view = _.find(views, { viewId }) || (!viewId && views[0]) || {};
@@ -61,6 +64,8 @@ const GroupFilter = props => {
   };
   const canDelete = isOpenPermit(permitList.delete, sheetSwitchPermit, view.viewId);
   const showCusTomBtn = isOpenPermit(permitList.execute, sheetSwitchPermit, view.viewId);
+  const { advancedSetting = {} } = view;
+  const { showallitem, allitemname, shownullitem, nullitemname } = advancedSetting;
   useEffect(() => {
     let height = breadNavBar.current ? breadNavBar.current.clientHeight : 0;
     setBreadMavHeight(height);
@@ -68,6 +73,13 @@ const GroupFilter = props => {
   useEffect(() => {
     fetch();
   }, [keywords]);
+  useEffect(() => {
+    let soucre = controls.find(o => o.controlId === navGroup.controlId) || {};
+    let { navshow } = getAdvanceSetting(view);
+    if (29 === soucre.type && navshow === '1') {
+      fetch();
+    }
+  }, [navGroupCounts]);
   useEffect(() => {
     setCurrentNodeId();
     setKeywords('');
@@ -94,12 +106,30 @@ const GroupFilter = props => {
     let data = [];
     //级联选择字段 或 已配置层级展示的关联字段
     if ([29, 35].includes(soucre.type)) {
-      fetchData({
-        worksheetId: soucre.dataSource,
-        viewId: 29 === soucre.type ? navGroup.viewId : soucre.viewId,
-        rowId,
-        cb,
-      });
+      let { navshow } = getAdvanceSetting(view);
+      if (29 === soucre.type && navshow === '1') {
+        dataUpdate({
+          filterData: navGroupData,
+          data: navGroupCounts
+            .filter(o => !['all', ''].includes(o.key)) //排除全部和空
+            .map(item => {
+              return {
+                value: item.key,
+                txt: item.name, //renderTxt(item, control, viewId),
+                isLeaf: false,
+              };
+            }),
+          rowId,
+          cb,
+        });
+      } else {
+        fetchData({
+          worksheetId: soucre.dataSource,
+          viewId: 29 === soucre.type ? navGroup.viewId : soucre.viewId,
+          rowId,
+          cb,
+        });
+      }
     } else {
       let options = (controls.find(o => o.controlId === navGroup.controlId) || {}).options || [];
       data = !navGroup.isAsc ? options.slice().reverse() : options;
@@ -221,7 +251,7 @@ const GroupFilter = props => {
                 <Breadcrumb.Item
                   key={item.value}
                   onClick={e => {
-                    if (!item.value && item.txt === _l('全部')) {
+                    if (!item.value && (item.txt === _l('全部') || item.txt === allitemname)) {
                       fetchData({ worksheetId: item.wsid, appId, viewId: navGroup.viewId });
                     } else {
                       fetchData({
@@ -248,12 +278,26 @@ const GroupFilter = props => {
     setDrawerVisible(true);
     setCurrentGroup(item);
     let obj = _.omit(navGroup, ['isAsc']);
+    let filterType = 2; //选项的选中
+    if ([29, 35].includes(soucre.type)) {
+      if (soucre.type === 29 && !navGroup.viewId) {
+        //未选择了层级视图 按是筛选
+        filterType = 24;
+      } else {
+        filterType = navGroup.filterType === 11 ? navGroup.filterType : 24; //筛选方式 24是 | 11包含 老数据是0 按照24走
+      }
+    }
+    if (item.value === 'null') {
+      //为空
+      filterType = FILTER_CONDITION_TYPE.ISNULL;
+    }
+
     let navGroupFilters = [
       {
         ...obj,
-        values: [item.value],
+        values: item.value === 'null' ? [] : [item.value],
         dataType: soucre.type,
-        filterType: soucre.type === 29 || soucre.type === 35 ? 24 : 2,
+        filterType,
         navNames: [item.txt],
       },
     ];
@@ -267,7 +311,10 @@ const GroupFilter = props => {
   };
   const renderContent = data => {
     return data.map(item => {
-      let count = Number((navGroupCounts.find(o => o.key === (!item.value ? 'all' : item.value)) || {}).count || 0);
+      let count = Number(
+        (navGroupCounts.find(o => o.key === (!item.value ? 'all' : item.value === 'null' ? '' : item.value)) || {})
+          .count || 0,
+      );
       let { navshow } = getAdvanceSetting(view);
       let hasChildren = !item.isLeaf;
       if (isSoucreTree()) {
@@ -369,11 +416,40 @@ const GroupFilter = props => {
         </div>
       );
     }
-    let tempData = keywords
-      ? renderData
-      : !keywords && navGroupData && currentNodeId
-      ? renderData
-      : [{ txt: _l('全部'), value: '', isLeaf: true }].concat(renderData);
+
+    let tempData = renderData;
+    if (!keywords && !currentNodeId) {
+      if ((soucre.type === 29 && !!navGroup.viewId) || [35].includes(soucre.type)) {
+        //关联记录以层级视图时|| 级联没有显示项
+        tempData = [
+          {
+            txt: _l('全部'),
+            value: '',
+            isLeaf: true,
+          },
+        ].concat(tempData);
+      } else {
+        tempData =
+          showallitem !== '1'
+            ? [
+                {
+                  txt: allitemname || _l('全部'),
+                  value: '',
+                  isLeaf: true,
+                },
+              ].concat(tempData)
+            : tempData;
+        tempData =
+          shownullitem === '1'
+            ? tempData.concat({
+                txt: nullitemname || _l('为空'),
+                value: 'null',
+                isLeaf: true,
+              })
+            : tempData;
+      }
+    }
+
     let { navfilters = '[]', navshow } = getAdvanceSetting(view);
     try {
       navfilters = JSON.parse(navfilters);
@@ -538,7 +614,11 @@ const GroupFilter = props => {
               ) : null}
             </div>
             {(canDelete || showCusTomBtn) && view.viewType === 0 && !batchOptVisible && (
-              <div className="batchOperation" onClick={() => props.changeBatchOptVisible(true)}>
+              <div
+                className="batchOperation"
+                style={{ bottom: appNaviStyle === 2 && view.viewType === 0 ? '70px' : '20px' }}
+                onClick={() => props.changeBatchOptVisible(true)}
+              >
                 <Icon icon={'task-complete'} className="Font24" />
               </div>
             )}

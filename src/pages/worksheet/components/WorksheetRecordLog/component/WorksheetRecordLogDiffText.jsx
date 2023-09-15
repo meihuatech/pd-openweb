@@ -1,12 +1,13 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Dialog } from 'ming-ui';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { Dialog, RichText } from 'ming-ui';
 import cx from 'classnames';
-import filterXSS from 'xss';
 import _ from 'lodash';
 import { diffChars } from 'diff';
 import WorksheetRecordLogSelectTags from './WorksheetRecordLogSelectTags';
 import { browserIsMobile } from 'src/util';
 import '../WorksheetRecordLogValue.less';
+
+const TEXT_MAX_LENGTH = 500;
 
 const renderDiffText = props => {
   return (
@@ -28,7 +29,71 @@ function WorksheetRecordLogDiffText(props) {
   const [dialog, setDialog] = useState(false);
   const textRef = useRef(null);
   const isMobile = browserIsMobile();
+  const [diffCount, setDiffCount] = useState(1);
+
   let diff = null;
+  let _oldValue = oldValue.slice(0, TEXT_MAX_LENGTH);
+  let _newValue = newValue.slice(0, TEXT_MAX_LENGTH);
+  if (type === 'rich_text') {
+    diff = diffChars(
+      _oldValue.replace(/<[^>]+>|&[^>]+;/g, '').trim(),
+      _newValue.replace(/<[^>]+>|&[^>]+;/g, '').trim(),
+    );
+  } else {
+    diff = diffChars(_oldValue, _newValue);
+  }
+  const [diff2, setDiff2] = useState(diff);
+
+  useEffect(() => {
+    if(control && control.enumDefault !== 2) {
+      let textComputeStyle = getComputedStyle(textRef.current);
+      let textHeight = Number(textComputeStyle.height.replace('px', ''));
+      let lineHeight = Number(textComputeStyle.lineHeight.replace('px', ''));
+      if (textHeight > lineHeight * 5) {
+        setNeedOpen(true);
+      }
+    }
+  }, []);
+
+  let renderDiff = useMemo(() => {
+    if (!diff2) return null;
+    return diff2.map((item, index) => (
+      <React.Fragment key={`renderDiffText-${item.value}-${index}`}>{renderDiffText(item)}</React.Fragment>
+    ));
+  }, [diff2]);
+
+  const clickHandle = sign => {
+    if (sign === 0) {
+      setOpen(false);
+      return;
+    }
+    if (sign === 1) {
+      if (oldValue.length > diffCount * 500 || newValue.length > diffCount * 500) {
+        let _diff = null;
+        setOpen(true);
+        let preDiffCount = diffCount;
+        setDiffCount(preDiffCount + 1);
+        let _oldValue = oldValue.slice(preDiffCount * 500, (preDiffCount + 1) * 500);
+        let _newValue = newValue.slice(preDiffCount * 500, (preDiffCount + 1) * 500);
+        if (type === 'rich_text') {
+          _diff = diff2.concat(
+            diffChars(
+              _oldValue.replace(/<[^>]+>|&[^>]+;/g, '').trim(),
+              _newValue.replace(/<[^>]+>|&[^>]+;/g, '').trim(),
+            ),
+          );
+        } else {
+          _diff = diff2.concat(diffChars(_oldValue, _newValue));
+        }
+        setDiff2(_diff);
+      } else {
+        setOpen(true);
+      }
+    }
+  };
+
+  const closeDialog = () => setDialog(false);
+
   if (control && control.enumDefault === 2) {
     return (
       <WorksheetRecordLogSelectTags
@@ -40,23 +105,6 @@ function WorksheetRecordLogDiffText(props) {
       />
     );
   }
-  if (type === 'rich_text') {
-    diff = diffChars(oldValue.replace(/<[^>]+>|&[^>]+;/g, '').trim(), newValue.replace(/<[^>]+>|&[^>]+;/g, '').trim());
-  } else {
-    diff = diffChars(oldValue, newValue);
-  }
-
-  useEffect(() => {
-    let textComputeStyle = getComputedStyle(textRef.current);
-    let textHeight = Number(textComputeStyle.height.replace('px', ''));
-    let lineHeight = Number(textComputeStyle.lineHeight.replace('px', ''));
-    if (textHeight > lineHeight * 5) {
-      setNeedOpen(true);
-    }
-  }, []);
-
-  const clickHandle = () => setOpen(!open);
-  const closeDialog = () => setDialog(false);
 
   return (
     <React.Fragment>
@@ -69,18 +117,23 @@ function WorksheetRecordLogDiffText(props) {
           ellipsis5: needOpen && !open,
         })}
       >
-        {diff && diff.map((item, index) => (
-          <React.Fragment key={`renderDiffText-${item.value}-${index}`}>
-            {renderDiffText(item)}
-          </React.Fragment>
-        ))}
+        {renderDiff}
       </div>
       {(needOpen || type === 'rich_text') && (
         <div className="WorksheetRecordLogDiffTextBottomButtons paddingLeft27">
           {needOpen ? (
-            <span className="WorksheetRecordLogOpen" onClick={clickHandle}>
-              {open ? _l('收起') : _l('展开')}
-            </span>
+            <div>
+              {open && (
+                <span className="WorksheetRecordLogOpen mRight25" onClick={() => clickHandle(0)}>
+                  {_l('收起')}
+                </span>
+              )}
+              {(oldValue.length > diffCount * 500 || newValue.length > diffCount * 500 || !open) && (
+                <span className="WorksheetRecordLogOpen" onClick={() => clickHandle(1)}>
+                  {_l('查看更多')}
+                </span>
+              )}
+            </div>
           ) : (
             <span></span>
           )}
@@ -112,10 +165,10 @@ function WorksheetRecordLogDiffText(props) {
         >
           <div className="richTextContent flexRow flex">
             <div className="leftCon">
-              <div className="contentCon" dangerouslySetInnerHTML={{ __html: filterXSS(oldValue) }} />
+              {oldValue ? <RichText data={oldValue} className="richText" disabled={true} /> : null}
             </div>
             <div className="rightCon">
-              <div className="contentCon" dangerouslySetInnerHTML={{ __html: filterXSS(newValue) }} />
+              {newValue ? <RichText data={newValue} className="richText" disabled={true} /> : null}
             </div>
           </div>
         </Dialog>
@@ -124,4 +177,17 @@ function WorksheetRecordLogDiffText(props) {
   );
 }
 
-export default WorksheetRecordLogDiffText;
+export default React.memo(WorksheetRecordLogDiffText, (prevProps, nextProps) => {
+  let preType = prevProps.type || 'text';
+  let nextType = prevProps.type || 'text';
+
+  if (
+    preType === nextType &&
+    _.isEqual(prevProps.control, nextProps.control) &&
+    prevProps.oldValue === nextProps.oldValue &&
+    prevProps.newValue === nextProps.newValue
+  ) {
+    return true;
+  }
+  return false;
+});

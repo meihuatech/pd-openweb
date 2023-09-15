@@ -43,7 +43,7 @@ const MenuWrap = styled(Menu)`
   position: relative !important;
   overflow: auto;
   padding: 6px 0 !important;
-  width: 200px !important;
+  width: 240px !important;
 `;
 
 const MenuItemWrap = styled(MenuItem)`
@@ -141,12 +141,11 @@ export default function RecordOperate(props) {
     onPopupVisibleChange = () => {},
     hideRecordInfo = () => {},
   } = props;
-  const showShare =
-    _.includes(shows, 'share') &&
-    isOpenPermit(permitList.recordShareSwitch, sheetSwitchPermit, viewId) &&
-    !md.global.Account.isPortal;
+  const showShare = _.includes(shows, 'share') && !md.global.Account.isPortal;
   const showCopy =
-    _.includes(shows, 'copy') && allowCopy && isOpenPermit(permitList.recordCopySwitch, sheetSwitchPermit, viewId);
+    _.includes(shows, 'copy') &&
+    allowCopy &&
+    (isOpenPermit(permitList.recordCopySwitch, sheetSwitchPermit, viewId) || isSubList);
   const showPrint = _.includes(shows, 'print');
   const showTask = _.includes(shows, 'task') && !md.global.Account.isPortal;
   const showRemoveRelation = _.includes(shows, 'removeRelation');
@@ -161,11 +160,11 @@ export default function RecordOperate(props) {
   const [customButtonLoading, setCustomButtonLoading] = useState();
   const [popupVisible, setPopupVisible] = useState(false);
   const DeleteItemWrap = isRelateRecordTable ? MenuItemWrap : RedMenuItemWrap;
-  function changePopupVisible(vallue) {
+  function changePopupVisible(value) {
     if (customButtonActive.current) {
       return;
     }
-    setPopupVisible(vallue);
+    setPopupVisible(value);
   }
   async function loadButtons() {
     try {
@@ -195,7 +194,9 @@ export default function RecordOperate(props) {
       popupVisible={popupVisible}
       onPopupVisibleChange={value => {
         onPopupVisibleChange(value);
-        changePopupVisible(value);
+        if (value) {
+          changePopupVisible(value);
+        }
       }}
       popupAlign={Object.assign(
         {},
@@ -212,7 +213,17 @@ export default function RecordOperate(props) {
       zIndex={1000}
       destroyPopupOnHide
       popup={
-        <MenuWrap style={{ maxHeight: `${maxHeight || 508}px` }}>
+        <MenuWrap
+          style={{ maxHeight: `${maxHeight || 508}px` }}
+          onClickAwayExceptions={[
+            '.customButtonConfirm',
+            '.verifyPasswordConfirm',
+            '.DropdownPrintTrigger',
+            '#t_mask',
+            '.templateListSelect',
+          ]}
+          onClickAway={() => changePopupVisible(false)}
+        >
           {showRemoveRelation && (
             <React.Fragment>
               <MenuItemWrap
@@ -265,7 +276,7 @@ export default function RecordOperate(props) {
           {!!(disableLoadCustomButtons ? defaultCustomButtons : customButtons).length && (
             <CustomButtons
               type="menu"
-              {...{ projectId, appId, viewId, worksheetId, recordId }}
+              {...{ projectId, appId, viewId, worksheetId, recordId, isCharge }}
               buttons={disableLoadCustomButtons ? defaultCustomButtons : customButtons}
               loadBtns={loadButtons}
               triggerCallback={() => changePopupVisible(false)}
@@ -289,11 +300,14 @@ export default function RecordOperate(props) {
                   worksheetId,
                   viewId,
                   recordId,
+                  hidePublicShare: !(
+                    isOpenPermit(permitList.recordShareSwitch, sheetSwitchPermit, viewId) && !md.global.Account.isPortal
+                  ),
                 });
                 changePopupVisible(false);
               }}
             >
-              {_l('分享')}
+              {_l('分享%02004')}
             </MenuItemWrap>
           )}
           {showCopy && (
@@ -328,11 +342,12 @@ export default function RecordOperate(props) {
                 }
               }}
             >
-              {_l('复制')}
+              {_l('复制%02003')}
             </MenuItemWrap>
           )}
           {showPrint && (
             <PrintList
+              isCharge={isCharge}
               controls={formdata || []}
               {...{ appId, viewId, worksheetId, projectId, workId, instanceId }}
               sheetSwitchPermit={sheetSwitchPermit}
@@ -369,7 +384,7 @@ export default function RecordOperate(props) {
                 changePopupVisible(false);
               }}
             >
-              {_l('新页面打开')}
+              {_l('新页面打开%02001')}
             </MenuItemWrap>
           )}
           {allowDelete && (!isRelateRecordTable || allowAdd) && from !== RECORD_INFO_FROM.WORKFLOW && (
@@ -403,11 +418,11 @@ export default function RecordOperate(props) {
                 if (showRemoveRelation) {
                   Dialog.confirm({
                     onlyClose: true,
-                    title: <DangerConfirmTitle>{_l('注意：此操作将彻底删除原始记录')}</DangerConfirmTitle>,
+                    title: <DangerConfirmTitle>{_l('注意：此操作将删除原始记录')}</DangerConfirmTitle>,
                     description: _l('如果只需要取消与当前记录的关联关系，仍保留原始记录。可以选择仅取消关联关系'),
                     buttonType: 'danger',
                     cancelType: 'ghostgray',
-                    okText: _l('彻底删除记录'),
+                    okText: _l('删除记录'),
                     cancelText: _l('仅取消关联关系'),
                     onOk: deleteRow,
                     onCancel: () => onRemoveRelation({ confirm: false }),
@@ -421,7 +436,7 @@ export default function RecordOperate(props) {
                 }
               }}
             >
-              {_l('删除')}
+              {_l('删除%02000')}
             </DeleteItemWrap>
           )}
           {showHr && showEditForm && <Hr />}

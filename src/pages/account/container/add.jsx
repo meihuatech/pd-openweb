@@ -4,6 +4,9 @@ import cx from 'classnames';
 import RegisterController from 'src/api/register';
 import captcha from 'src/components/captcha';
 import { inputFocusFn, inputBlurFn } from '../util';
+import { Support } from 'ming-ui';
+import { mdAppResponse } from 'src/util';
+
 export default class Add extends React.Component {
   constructor(props) {
     super(props);
@@ -47,6 +50,7 @@ export default class Add extends React.Component {
             ...registerData,
             projectId: data.userCard.user.projectId,
             userCard: data.userCard,
+            tokenProjectCode: data.token,
           });
           callback();
         } else if (data.joinProjectResult === 11) {
@@ -59,8 +63,17 @@ export default class Add extends React.Component {
             loading: false,
           });
           let str = _l('操作失败');
+          let { dialCode, password = '', emailOrTel = '' } = registerData;
+          const isMingdao = navigator.userAgent.toLowerCase().indexOf('mingdao application') >= 0;
           if (data.joinProjectResult === 2) {
             str = _l('您已提交申请，请耐心等待管理员审批！');
+            if (isMingdao) {
+              mdAppResponse({
+                sessionId: 'register',
+                type: 'native',
+                settings: { action: 'enterpriseRegister.addPending', account: dialCode + emailOrTel, password },
+              });
+            }
           } else if (data.joinProjectResult === 3) {
             str = _l('您已是该组织成员');
           } else if (data.joinProjectResult === 4) {
@@ -73,9 +86,18 @@ export default class Add extends React.Component {
             str = _l('该组织未开启搜索加入，请联系组织管理员');
           } else if (data.joinProjectResult === 12) {
             str = _l('您提交的加入申请未被通过');
+          } else if (data.joinProjectResult === 13) {
+            str = _l('申请加入失败，您在该企业已离职，请联系管理员恢复权限');
           }
           if (data.joinProjectResult === 3) {
             alert(str, 1, 2000, function () {
+              if (isMingdao) {
+                mdAppResponse({
+                  sessionId: 'register',
+                  type: 'native',
+                  settings: { action: 'enterpriseRegister.addSuccess', account: dialCode + emailOrTel, password },
+                });
+              }
               location.href = '/personal?type=enterprise';
             });
           } else {
@@ -158,6 +180,12 @@ export default class Add extends React.Component {
         <div className="title mTop24 Font20">{_l('请填写组织门牌号')}</div>
         <p className="mTop10 Gray_9e Font15">{_l('组织门牌号可以通过管理员获取')}</p>
         {this.renderCon()}
+        <Support
+          type={3}
+          href="https://help.mingdao.com/zuzhiid"
+          text={_l('没有组织门牌号？')}
+          className="mTop16 InlineBlock"
+        />
         <span
           className="btnForRegister Hand mTop40"
           onClick={() => {

@@ -17,11 +17,11 @@ import socketInit from '../socket';
 import './index.less';
 import { Dialog, Icon } from 'ming-ui';
 import { getAppFeaturesVisible } from 'src/util';
-import api from 'src/api/homeApp';
-import { getSuffix } from 'src/pages/PortalAccount/util';
+import GlobalSearch from 'src/pages/PageHeader/components/GlobalSearch/index';
 import privateGuide from 'src/api/privateGuide';
 import Trigger from 'rc-trigger';
-import weixinCode from 'src/pages/privateDeployment/images/weixin.png';
+import weixinCode from 'src/pages/NewPrivateDeployment/images/weixin.png';
+import { compatibleWorksheetRoute } from 'src/pages/Portal/util.js';
 import _ from 'lodash';
 
 @preall
@@ -75,15 +75,11 @@ export default class App extends Component {
     $('body').on('click', 'a', function interceptLinkClick(e) {
       if (e.which !== 1) return;
       if (e.ctrlKey || e.shiftKey || e.metaKey) return;
-      if (e.originalEvent && e.originalEvent.defaultPrevented) return;
+      // if (e.originalEvent && e.originalEvent.defaultPrevented) return;
       if ($(e.target).closest('.mdEditorContent').length) return;
+      if ($(e.target).closest('.stopPropagation').length) return;
       const $a = $(this);
-      if (
-        $a.hasClass('DisableInterceptClick') ||
-        $a.attr('download') ||
-        $a.attr('rel') === 'external' ||
-        (!isMDClient && $a.attr('target'))
-      ) {
+      if ($a.attr('download') || $a.attr('rel') === 'external' || (!isMDClient && $a.attr('target'))) {
         return;
       }
       const link = $a.attr('href');
@@ -108,11 +104,12 @@ export default class App extends Component {
       let url = `${pathname}${search}${hash}`;
       //外部门户 worksheet老地址兼容处理
       if (md.global.Account.isPortal && url.startsWith('/worksheet/')) {
-        that.compatibleWorksheetRoute(
+        compatibleWorksheetRoute(
           url
             .split(/\/worksheet\/(.*)/)
             .filter(o => o)[0]
             .split(/\/(.*)/)[0],
+          url.split(/\/row\/(.*)/).filter(o => o)[1],
         );
         return;
       }
@@ -144,19 +141,6 @@ export default class App extends Component {
     if (nextProps.location !== this.props.location) {
       this.setState({ prevPath: this.props.location });
     }
-  }
-
-  compatibleWorksheetRoute(worksheetId) {
-    //工作表老路由id补齐
-    api.getAppSimpleInfo({ workSheetId: worksheetId }).then(({ appId, appSectionId, workSheetId }) => {
-      if (appId && appSectionId) {
-        if (getSuffix(location.href) !== md.global.Account.addressSuffix) {
-          navigateTo(`/app/${appId}/${appSectionId}/${workSheetId}`, true);
-        } else {
-          navigateTo(`/${md.global.Account.addressSuffix}/${appSectionId}/${workSheetId}`, true);
-        }
-      }
-    });
   }
 
   parseUrl(url) {
@@ -200,15 +184,23 @@ export default class App extends Component {
           store.dispatch(actions.setShowAddressBook(true));
           break;
         case 102:
-          $('.commonUserHandleWrap .icon-search').click();
-          $('.globalSearch').focus();
+          let path = location.pathname.split('/');
+          GlobalSearch({
+            match: {
+              params: {
+                appId:
+                  location.pathname.startsWith('/app/') && path.length > 2 && path[2].length > 20 ? path[2] : undefined,
+              },
+            },
+            onClose: () => {},
+          });
           break;
         default:
           break;
       }
     }, 200);
 
-    $(document).on('keypress', function (e) {
+    $(document).on('keypress', function(e) {
       if (e.ctrlKey || e.shiftKey || e.altKey || e.cmdKey || e.metaKey) return;
       var tag = e.target.tagName && e.target.tagName.toLowerCase();
       if (tag === 'input' || tag === 'textarea' || $(e.target).is('[contenteditable]')) return;
@@ -225,7 +217,7 @@ export default class App extends Component {
       : [];
     let isContain = false;
 
-    if (url.indexOf('hr') > -1 || url.indexOf('dossier') > -1) return true;
+    if (url.indexOf('hr') > -1 || url.indexOf('dossier') > -1 || url.indexOf('public') > -1) return true;
 
     clientOpenList.forEach(item => {
       if (url.indexOf(item) > -1) {
@@ -329,7 +321,6 @@ export default class App extends Component {
                 path="*"
                 render={({ location }) => {
                   if (
-                    location.pathname === '/form/edit' ||
                     /(\/upgrade\/choose|\/admin\/expansionservice|\/admin\/upgradeservice|\/upgrade\/upgrade|\/upgrade\/temp).*/.test(
                       location.pathname,
                     )

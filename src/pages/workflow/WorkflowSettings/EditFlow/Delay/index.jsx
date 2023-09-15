@@ -15,6 +15,8 @@ export default class Delay extends Component {
     const { item } = this.props;
     const { timerNode } = item;
 
+    if (!timerNode) return false;
+
     if (timerNode.actionId === '300') {
       return !!timerNode.fieldValue || !!timerNode.fieldControlId || !!timerNode.fieldNodeId;
     }
@@ -25,7 +27,9 @@ export default class Delay extends Component {
       !!timerNode.hourFieldValue.fieldValue ||
       !!timerNode.hourFieldValue.fieldControlId ||
       !!timerNode.minuteFieldValue.fieldValue ||
-      !!timerNode.minuteFieldValue.fieldControlId
+      !!timerNode.minuteFieldValue.fieldControlId ||
+      !!timerNode.secondFieldValue.fieldValue ||
+      !!timerNode.secondFieldValue.fieldControlId
     );
   }
 
@@ -51,7 +55,7 @@ export default class Delay extends Component {
   }
 
   renderDelayTimeText(timerNode) {
-    const { numberFieldValue, hourFieldValue, minuteFieldValue } = timerNode;
+    const { numberFieldValue, hourFieldValue, minuteFieldValue, secondFieldValue } = timerNode;
     const getDesc = ({ fieldValue, fieldControlId, fieldControlName }, label) => {
       if (!fieldValue && !fieldControlId) {
         return '';
@@ -72,6 +76,7 @@ export default class Delay extends Component {
         {getDesc(numberFieldValue, _l('天'))}
         {getDesc(hourFieldValue, _l('小时'))}
         {getDesc(minuteFieldValue, _l('分钟'))}
+        {getDesc(secondFieldValue, _l('秒钟'))}
       </Fragment>
     );
   }
@@ -95,7 +100,7 @@ export default class Delay extends Component {
   }
 
   render() {
-    const { processId, item, disabled, selectNodeId, openDetail } = this.props;
+    const { processId, item, disabled, selectNodeId, openDetail, isSimple } = this.props;
 
     return (
       <div className="flexColumn">
@@ -115,7 +120,9 @@ export default class Delay extends Component {
               />
             </div>
             <NodeOperate nodeClassName="BGBlueAsh" {...this.props} />
-            <div className="workflowContent Font13">{this.renderContent()}</div>
+            <div className="workflowContent Font13">
+              {isSimple ? <span className="pLeft8 pRight8 Gray_9e">{_l('加载中...')}</span> : this.renderContent()}
+            </div>
           </div>
           <CreateNode {...this.props} />
         </section>

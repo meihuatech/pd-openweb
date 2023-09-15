@@ -72,11 +72,15 @@ export default class SelectApprovalProcess extends Component {
    */
   getProcessByApp(appId) {
     processVersion.list({ relationId: appId, processListType: 11 }).then(data => {
-      const processList = data[0].processList.map(({ id, name }) => {
-        return {
-          value: id,
-          text: name,
-        };
+      const processList = [];
+
+      data.forEach(item => {
+        item.processList.forEach(({ id, name }) => {
+          processList.push({
+            value: id,
+            text: name,
+          });
+        });
       });
 
       this.setState({ processList });
@@ -100,6 +104,7 @@ export default class SelectApprovalProcess extends Component {
               className="w100"
               placeholder={_l('请选择')}
               noData={_l('没有可选的应用')}
+              openSearch
               value={selectAppId}
               data={appList}
               onChange={id => {
@@ -117,6 +122,7 @@ export default class SelectApprovalProcess extends Component {
               className="w100"
               placeholder={_l('请选择')}
               noData={_l('没有可选的审批流程')}
+              openSearch
               value={selectProcessId}
               data={processList}
               onChange={id => this.setState({ selectProcessId: id })}

@@ -160,6 +160,7 @@ export const SelectOtherFieldWrap = styled(FlexCenter)`
   }
   i {
     font-size: 22px;
+    color: #9e9e9e;
   }
 `;
 
@@ -418,6 +419,11 @@ export const SearchWorksheetWrap = styled.div`
       .conditionValue {
         flex: 1;
         min-width: 0;
+        .optionCheckbox {
+          word-break: break-all;
+          display: inline-block;
+          line-height: 26px;
+        }
       }
     }
     .worksheetFilterDateCondition {

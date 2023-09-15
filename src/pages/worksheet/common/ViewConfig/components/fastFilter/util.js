@@ -37,6 +37,9 @@ const SHOW_TYPE = [
   { text: _l('下拉框'), value: 2 },
   { text: _l('平铺'), value: 1 },
 ];
+
+export const DATE_TYPE_M = [7, 8, 9, 12, 13, 14, 15, 16, 17];
+export const DATE_TYPE_Y = [15, 16, 17];
 //时间
 export const DATE_TYPE = [
   [{ text: _l('全选'), value: 'all' }],
@@ -160,6 +163,33 @@ export const SHOW_RELATE_TYPE = {
   ],
   txt: '显示方式',
 };
+
+//显示项
+export const NAV_SHOW_TYPE = {
+  //选项
+  key: 'navShow',
+  // default: 2, //下拉框
+  keys: [
+    29, // 关联表
+    11, // 选项
+    10, // 多选
+    9, // 单选 平铺
+    26, //成员
+  ],
+  txt: '显示项',
+};
+// //显示项 为空设置
+// export const NAVSHOW_NULL_TYPE = {
+//   key: 'shownullitem',
+//   default: 1, //显示
+//   keys: [
+//     29, // 关联表
+//     11, // 选项
+//     10, // 多选
+//     9, // 单选 平铺
+//     26 //成员
+//   ],
+// };
 const list = _.flattenDeep(DATE_TYPE)
   .map(o => o.value)
   .filter(o => o !== 'all');
@@ -252,7 +282,7 @@ export const FASTFILTER_CONDITION_TYPE = [
   23, // 地区 19'省23'省-市'24'省-市-县'
   24, // 地区 19'省23'省-市'24'省-市-县'
   // 21, // 自由连接
-  // 22, // 分段
+  // 22, // 分割线
   // 25, // 大写金额
   26, // 成员
   27, // 部门
@@ -274,8 +304,19 @@ export const FASTFILTER_CONDITION_TYPE = [
   48, // 组织角色
   50, // API 查询
 ];
-
-export const ADVANCEDSETTING_KEYS = ['allowscan', 'daterange', 'allowitem', 'direction'];
+//处理这些变更时，需要格式化处理fastFilter里的navfilters
+export const ADVANCEDSETTING_KEYS = [
+  'allowscan',
+  'daterange',
+  'allowitem',
+  'direction',
+  'searchtype',
+  'searchcontrol',
+  'clicksearch',
+];
+export const Filter_KEYS = [
+  'filterType',
+];
 
 export const getControlFormatType = (control = {}) => {
   return redefineComplexControl(control).type;
@@ -295,15 +336,28 @@ export const getSetDefault = (control = {}) => {
           [o.key]: control[o.key] || o.default,
         };
       } else {
+        let defaultValue = o.default;
+        if (DATE_RANGE.keys.includes(control.type)) {
+          defaultValue =
+            _.get(control, 'advancedSetting.showtype') === '5'
+              ? DATE_TYPE_Y
+              : _.get(control, 'advancedSetting.showtype') === '4'
+                ? DATE_TYPE_M
+                : defaultValue;
+        }
         fastFilterSet = {
           ...fastFilterSet,
           advancedSetting: {
             ...advancedSetting,
-            [o.key]: JSON.stringify(control[o.key] || o.default),
+            [o.key]: JSON.stringify(control[o.key] || defaultValue),
           },
         }; //预设时间为多选
       }
     }
   });
+  //设置了加密
+  if (!!control.encryId) {
+    fastFilterSet = { ...fastFilterSet, filterType: FILTER_CONDITION_TYPE.EQ };
+  }
   return fastFilterSet;
 };

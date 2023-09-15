@@ -5,7 +5,7 @@ import { Provider } from 'react-redux';
 import store from 'src/redux/configureStore';
 import SvgIcon from 'src/components/SvgIcon';
 import appManagement from 'src/api/appManagement';
-import CustomPageContent from 'worksheet/components/CustomPageContent';
+import CustomPageContent from 'src/pages/customPage/pageContent';
 import { ShareState, VerificationPass, SHARE_STATE } from 'worksheet/components/ShareState';
 import { LoadDiv } from 'ming-ui';
 import styled from 'styled-components';
@@ -30,7 +30,8 @@ const Entry = props => {
   const [share, setShare] = useState({});
 
   useEffect(() => {
-    getEntityShareById().then(data => {
+    const clientId = sessionStorage.getItem(id);
+    getEntityShareById({ clientId }).then(data => {
       setLoading(false);
     });
   }, []);
@@ -39,7 +40,9 @@ const Entry = props => {
     return new Promise(async (resolve, reject) => {
       const result = await appManagement.getEntityShareById({ id, sourceType: 21, ...data });
       const shareAuthor = _.get(result, 'data.shareAuthor');
+      const clientId = _.get(result, 'data.clientId');
       window.share = shareAuthor;
+      clientId && sessionStorage.setItem(id, clientId);
       setShare(result);
       resolve(result);
     });
@@ -84,7 +87,7 @@ const Entry = props => {
   if (share.resultCode === 1) {
     return (
       <Provider store={store}>
-        <CustomPageContent ids={{}} currentSheet={{ workSheetId: share.data.sourceId }} />
+        <CustomPageContent id={share.data.sourceId} />
       </Provider>
     );
   }

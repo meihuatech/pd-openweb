@@ -13,14 +13,16 @@ import BuildAppNewRules from './BuildAppNewRules';
 import IntegrationSetPssword from '../components/IntegrationSetPssword';
 import SyncDialog from './components/SyncDialog';
 import InterfaceLicense from './components/InterfaceLicense';
-import UpgradeVersion from '../components/UpgradeVersion';
-import { getFeatureStatus } from 'src/util';
+import VertifyClearIntegationData from '../components/VertifyClearIntegationData';
+import { getFeatureStatus, buriedUpgradeVersionDialog } from 'src/util';
+import { VersionProductType } from 'src/util/enum';
+import { integrationFailed } from '../utils';
+import { purchaseMethodFunc } from 'src/components/upgrade/choose/PurchaseMethodModal';
 import fucExampleImg from 'src/pages/Admin/workwx/img/fucExample.png';
 import setApiExampleImg from 'src/pages/Admin/workwx/img/setApiExample.png';
 import './style.less';
 import _ from 'lodash';
 
-const FEATURE_ID = 19;
 const quickAprData = [
   { label: 'URL', key: 'url' },
   { label: 'Token', key: 'token' },
@@ -59,7 +61,7 @@ export default class Workwx extends React.Component {
       fieldRadio: null,
       isSetPassword: false,
       passwordError: false,
-      syncWXLabel: md.global.Config.IsLocal ? 'job' : 'organize',
+      syncWXLabel: md.global.Config.IsLocal && !md.global.Config.IsPlatformLocal ? 'job' : 'organize',
       qwQuickAprData: {},
     };
   }
@@ -75,7 +77,7 @@ export default class Workwx extends React.Component {
           corpId: '',
           agentId: '',
           secret: '',
-          status: md.global.Config.IsLocal ? 1 : '',
+          status: md.global.Config.IsLocal && !md.global.Config.IsPlatformLocal ? 1 : '',
         };
       }
       if (res) {
@@ -117,7 +119,7 @@ export default class Workwx extends React.Component {
   // 保存信息/编辑信息
   editInfo = () => {
     if (!this.state.AgentId || !this.state.Secret || !this.state.CorpId) {
-      alert('请输入相关信息');
+      alert('请输入相关信息', 3);
       return;
     }
     Ajax.editWXProjectSetting({
@@ -126,15 +128,19 @@ export default class Workwx extends React.Component {
       secret: this.state.Secret,
       corpId: this.state.CorpId,
     }).then(res => {
-      if (res) {
-        if (res.item1) {
-          this.setState({
-            isHasInfo: true,
-            canEditInfo: false,
-          });
-        } else {
-          alert(res.item2);
-        }
+      if (res.item1 === -1) {
+        VertifyClearIntegationData({
+          projectId: Config.projectId,
+          callback: this.editInfo,
+        });
+        return;
+      } else if (res.item1) {
+        this.setState({
+          isHasInfo: true,
+          canEditInfo: false,
+        });
+      } else {
+        alert(res.item2, 2);
       }
     });
   };
@@ -274,7 +280,7 @@ export default class Workwx extends React.Component {
                 value={!this.state[`isShow${strId}`] ? this.state[`${strId}Format`] : this.state[strId]}
               />
               <Icon
-                icon={!this.state[`isShow${strId}`] ? 'circulated' : 'public-folder-hidden'}
+                icon={!this.state[`isShow${strId}`] ? 'public-folder-hidden' : 'circulated'}
                 className="Gray_9e Font18 isShowIcon"
                 onClick={() => {
                   this.setState({
@@ -321,7 +327,7 @@ export default class Workwx extends React.Component {
     }).then(res => {
       const { item1, item2, item3 = {} } = res;
       if (!item1) {
-        alert(_l('同步失败'));
+        alert(_l('同步失败'), 2);
         this.setState({ loading: false });
         return;
       }
@@ -471,7 +477,22 @@ export default class Workwx extends React.Component {
         <div className="stepItem">
           <h3 className="stepTitle Font16 Gray">{_l('%0数据同步', intergrationType !== 2 ? '3.' : '2.')}</h3>
           <div className="mTop16 syncBox">
-            <span className="Font14 syncTxt Gray_75">{_l('从企业微信通讯录同步到该系统')}</span>
+            <span className="Font14 syncTxt Gray_75">
+              {_l('从企业微信通讯录同步到该系统')}{' '}
+              {md.global.Config.IsPlatformLocal && (
+                <span
+                  className="ThemeColor Hand"
+                  onClick={() => {
+                    this.setState({
+                      showSyncDiaLog: true,
+                      isBindRelationship: true,
+                    });
+                  }}
+                >
+                  {_l('账号绑定关系列表')}
+                </span>
+              )}
+            </span>
             <Button
               type="primary"
               disabled={loading}
@@ -510,7 +531,7 @@ export default class Workwx extends React.Component {
       if (res) {
         callback();
       } else {
-        alert('失败');
+        integrationFailed(Config.projectId);
       }
     });
   };
@@ -539,7 +560,7 @@ export default class Workwx extends React.Component {
       if (res) {
         this.setState({ syncWXLabel: value });
       } else {
-        alert(_l('操作失败'));
+        alert(_l('操作失败'), 2);
       }
     });
   };
@@ -551,7 +572,7 @@ export default class Workwx extends React.Component {
       if (res) {
         this.setState({ syncWXLabelChecked: !checked });
       } else {
-        alert(_l('操作失败'));
+        alert(_l('操作失败'), 2);
       }
     });
   };
@@ -577,7 +598,7 @@ export default class Workwx extends React.Component {
           });
         }
       } else {
-        alert(_l('操作失败'));
+        alert(_l('操作失败'), 2);
       }
     });
   };
@@ -595,16 +616,22 @@ export default class Workwx extends React.Component {
       logDetailItems = [],
       qwQuickAprData = {},
     } = this.state;
-    const featureType = getFeatureStatus(Config.projectId, FEATURE_ID);
+    const featureType = getFeatureStatus(Config.projectId, VersionProductType.workwxIntergration);
     if (featureType === '2') {
-      return <UpgradeVersion projectId={Config.projectId} featureId={FEATURE_ID} />;
+      return (
+        <div className="orgManagementWrap">
+          {buriedUpgradeVersionDialog(Config.projectId, VersionProductType.workwxIntergration, 'content')}
+        </div>
+      );
     }
     if (this.state.pageLoading) {
       return <LoadDiv className="mTop80" />;
     }
     return (
-      <div className="workwxMainContent">
-        {!this.state.isPassApply && !(!this.state.CorpId && !md.global.Config.IsLocal) && intergrationType !== 2 ? (
+      <div className="orgManagementWrap workwxMainContent">
+        {!this.state.isPassApply &&
+        !(!this.state.CorpId && (!md.global.Config.IsLocal || md.global.Config.IsPlatformLocal)) &&
+        intergrationType !== 2 ? (
           <div className="TxtMiddle">
             <div className="TxtCenter logoBox">
               {this.state.isReject ? (
@@ -653,7 +680,7 @@ export default class Workwx extends React.Component {
                       className="applyBtn mBottom10 mTop25"
                       onClick={e => {
                         // 前往付费
-                        navigateTo(`/upgrade/choose?projectId=${Config.projectId}`);
+                        purchaseMethodFunc({ projectId: Config.projectId });
                       }}
                     >
                       {_l('前往付费')}
@@ -673,11 +700,16 @@ export default class Workwx extends React.Component {
         ) : (
           <Tabs
             defaultActiveKey="base"
-            className={cx({ tabStyle: !this.state.status === 1 })}
+            className={cx('mdAntTabs', {
+              tabStyle: !this.state.status === 1,
+              singleTab: !(this.state.status === 1 || intergrationType === 2),
+            })}
             onChange={this.changeTab}
           >
             <Tabs.TabPane tab={_l('企业微信集成')} key="base" className="tabStyles">
-              {!this.state.CorpId && !md.global.Config.IsLocal && (this.state.status === 0 || !this.state.status) ? (
+              {!this.state.CorpId &&
+              (!md.global.Config.IsLocal || md.global.Config.IsPlatformLocal) &&
+              (this.state.status === 0 || !this.state.status) ? (
                 <BuildAppNewRules
                   editWXProjectSettingStatus={this.editWXProjectSettingStatus}
                   isPassApply={isPassApply}
@@ -717,7 +749,7 @@ export default class Workwx extends React.Component {
                       ) : (
                         <a
                           target="_blank"
-                          href="https://help.mingdao.com/Wecom3.html#%E4%BA%8C%E3%80%81%E5%9C%A8%E6%98%8E%E9%81%93%E4%BA%91%E4%BA%8C%E7%BA%A7%E7%99%BB%E5%BD%95%E9%A1%B5%E9%9D%A2%EF%BC%8C%E4%BD%BF%E7%94%A8%E4%BC%81%E4%B8%9A%E5%BE%AE%E4%BF%A1%E6%89%AB%E7%A0%81%E7%99%BB%E5%BD%95"
+                          href="https://help.mingdao.com/wecom3#%E4%BA%8C%E3%80%81%E5%9C%A8%E6%98%8E%E9%81%93%E4%BA%91%E4%BA%8C%E7%BA%A7%E7%99%BB%E5%BD%95%E9%A1%B5%E9%9D%A2%EF%BC%8C%E4%BD%BF%E7%94%A8%E4%BC%81%E4%B8%9A%E5%BE%AE%E4%BF%A1%E6%89%AB%E7%A0%81%E7%99%BB%E5%BD%95"
                           className="helpEntry"
                         >
                           {_l('如何实现企业微信扫码登录？')}
@@ -849,7 +881,7 @@ export default class Workwx extends React.Component {
                     {this.state.openQuickApproval && (
                       <Fragment>
                         {quickAprData.map((it, index) => {
-                          
+
                           return (
                             <div
                               className={cx('flexRow alignItemsCenter', { mTop24: index == 0, mTop32: index !== 0 })}
@@ -872,7 +904,7 @@ export default class Workwx extends React.Component {
                 )} */}
               </Tabs.TabPane>
             )}
-            {intergrationType === 2 && this.state.status === 1 && (
+            {!md.global.Config.IsLocal && intergrationType === 2 && this.state.status === 1 && (
               <Tabs.TabPane tab={_l('接口许可')} key="interfaceLicense">
                 <InterfaceLicense projectId={Config.projectId} />
               </Tabs.TabPane>

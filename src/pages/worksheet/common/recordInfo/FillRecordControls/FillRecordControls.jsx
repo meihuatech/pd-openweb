@@ -38,98 +38,112 @@ class FillRecordControls extends React.Component {
     writeControls: PropTypes.arrayOf(PropTypes.shape({})),
     hideDialog: PropTypes.func,
     onSubmit: PropTypes.func,
+    customButtonConfirm: PropTypes.func,
   };
 
   constructor(props) {
     super(props);
     const { projectId } = props;
-    const controls = update(props.formData.concat(props.masterFormData || []), {
-      $apply: formData => {
-        let hasDefaultControlIs = [];
-        const formDataForDataFormat = formData.map(c => {
-          const newControl = { ...c };
-          const writeControl = _.find(props.writeControls, wc => newControl.controlId === wc.controlId);
-          newControl.advancedSetting = { ...(newControl.advancedSetting || {}), defsource: '', defaultfunc: '' };
-          if (writeControl && writeControl.defsource && writeControl.defsource !== '[]') {
-            hasDefaultControlIs.push(c.controlId);
-            newControl.value = '';
-            if (_.includes([9, 10, 11], newControl.type)) {
-              newControl.value = newControl.default = safeParse(writeControl.defsource)[0].staticValue;
-            } else {
-              newControl.advancedSetting = { ...(newControl.advancedSetting || {}), defsource: writeControl.defsource };
+    const controls = update(
+      props.formData.concat((props.masterFormData || []).map(c => ({ ...c, fromMaster: true }))),
+      {
+        $apply: formData => {
+          let hasDefaultControls = [];
+          const formDataForDataFormat = formData.map(c => {
+            const newControl = { ...c };
+            const writeControl = _.find(props.writeControls, wc => newControl.controlId === wc.controlId);
+            newControl.advancedSetting = { ...(newControl.advancedSetting || {}), defsource: '', defaultfunc: '' };
+            if (writeControl && writeControl.defsource && writeControl.defsource !== '[]') {
+              newControl.value = '';
+              if (_.includes([9, 10, 11], newControl.type)) {
+                newControl.value = newControl.default = safeParse(writeControl.defsource)[0].staticValue;
+              } else {
+                newControl.advancedSetting = {
+                  ...(newControl.advancedSetting || {}),
+                  defsource: writeControl.defsource,
+                };
+              }
+              hasDefaultControls.push(newControl);
             }
-          }
-          return newControl;
-        });
-        const defaultFormData = hasDefaultControlIs.length
-          ? new DataFormat({
-              data: formDataForDataFormat.filter(c => _.includes(hasDefaultControlIs, c.controlId)),
-              isCreate: true,
-              from: 2,
-              projectId,
-              onAsyncChange: ({ controlId, value }) => {
-                const updatedControl = _.find(formData, { controlId });
-                if (
-                  updatedControl &&
-                  _.includes(
-                    [
-                      26, // 人员
-                      27, // 部门
-                      48, // 组织
-                    ],
-                    updatedControl.type,
-                  )
-                ) {
-                  this.setState(oldState => ({
-                    formFlag: Math.random(),
-                    formData: oldState.formData.map(c => (c.controlId === controlId ? { ...c, value } : c)),
-                  }));
-                }
-              },
-            })
-              .getDataSource()
-              .filter(
-                c =>
-                  _.includes(
-                    props.writeControls.map(c => c.controlId),
-                    c.controlId,
-                  ) && !_.includes([30, 31, 37, 38], c.type),
-              )
-          : [];
-        formData = formData
-          .map(c => {
-            const writeControl = _.find(props.writeControls, wc => c.controlId === wc.controlId);
-            if (_.isUndefined(c.dataSource)) {
-              return undefined;
-            }
-            if (!writeControl) {
-              return {
-                ...c,
-                controlPermissions: '000',
-              };
-            }
-            if (c.type === 29 && c.enumDefault === 2 && c.advancedSetting.showtype === '2') {
-              return {
-                ...c,
-                value: '',
-                controlPermissions: '000',
-              };
-            }
+            return newControl;
+          });
+          const defaultFormData = hasDefaultControls.length
+            ? new DataFormat({
+                data: formDataForDataFormat.filter(c => {
+                  return _.find(
+                    hasDefaultControls,
+                    dc =>
+                      dc.controlId === c.controlId ||
+                      (_.get(dc, 'advancedSetting.defsource') || '').indexOf(c.controlId) > -1,
+                  );
+                }),
+                isCreate: true,
+                from: 2,
+                projectId,
+                onAsyncChange: ({ controlId, value }) => {
+                  const updatedControl = _.find(formData, { controlId });
+                  if (
+                    updatedControl &&
+                    _.includes(
+                      [
+                        26, // 人员
+                        27, // 部门
+                        48, // 组织
+                      ],
+                      updatedControl.type,
+                    )
+                  ) {
+                    this.setState(oldState => ({
+                      formFlag: Math.random(),
+                      formData: oldState.formData.map(c => (c.controlId === controlId ? { ...c, value } : c)),
+                    }));
+                  }
+                },
+              })
+                .getDataSource()
+                .filter(
+                  c =>
+                    _.includes(
+                      props.writeControls.map(c => c.controlId),
+                      c.controlId,
+                    ) && !_.includes([30, 31, 37, 38], c.type),
+                )
+            : [];
+          formData = formData
+            .map(c => {
+              const writeControl = _.find(props.writeControls, wc => c.controlId === wc.controlId);
+              if (_.isUndefined(c.dataSource)) {
+                return undefined;
+              }
+              if (!writeControl || c.fromMaster) {
+                return {
+                  ...c,
+                  controlPermissions: '000',
+                };
+              }
+              if (c.type === 29 && c.enumDefault === 2 && c.advancedSetting.showtype === '2') {
+                return {
+                  ...c,
+                  value: '',
+                  controlPermissions: '000',
+                };
+              }
 
-            c.controlPermissions =
-              c.controlPermissions[0] + (writeControl.type === 1 ? '0' : '1') + c.controlPermissions[2];
-            c.required = writeControl.type === 3;
-            c.fieldPermission = '111';
-            const defultFormControl = _.find(defaultFormData, dfc => dfc.controlId === c.controlId);
-            if (defultFormControl) {
-              c.value = defultFormControl.value;
-            }
-            return c;
-          })
-          .filter(c => !!c && (!props.isBatchOperate || !_.includes([34], c.type)));
-        return formData;
+              c.controlPermissions =
+                c.controlPermissions[0] + (writeControl.type === 1 ? '0' : '1') + c.controlPermissions[2];
+              c.required = writeControl.type === 3;
+              c.fieldPermission = '111';
+              const defultFormControl = _.find(defaultFormData, dfc => dfc.controlId === c.controlId);
+              if (defultFormControl) {
+                c.value = defultFormControl.value;
+              }
+              return c;
+            })
+            .filter(c => !!c && (!props.isBatchOperate || !_.includes([34], c.type)));
+          return formData;
+        },
       },
-    });
+    );
     this.state = {
       formData: controls,
       showError: false,
@@ -148,12 +162,12 @@ class FillRecordControls extends React.Component {
     this.setState({ submitLoading: true });
     this.customwidget.current.submitFormData();
   }
-  onSave(error, { data, updateControlIds }) {
+  async onSave(error, { data, updateControlIds }) {
     if (error) {
       this.setState({ submitLoading: false });
       return;
     }
-    const { writeControls, onSubmit } = this.props;
+    const { writeControls, onSubmit, customButtonConfirm } = this.props;
     let hasError;
     const newData = data.filter(item =>
       _.find(writeControls, writeControl => writeControl.controlId === item.controlId),
@@ -172,7 +186,7 @@ class FillRecordControls extends React.Component {
                 ...control.value,
                 rules: _.get(this.cellObjs || {}, `${control.controlId}.cell.worksheettable.current.table.rules`),
               },
-              _.get(this.cellObjs || {}, `${control.controlId}.cell.controls`) || control.relationControls,
+              _.get(this.cellObjs || {}, `${control.controlId}.cell.state.controls`) || control.relationControls,
               control.showControls,
               3,
             ),
@@ -211,10 +225,22 @@ class FillRecordControls extends React.Component {
       });
       return;
     }
+    if (customButtonConfirm) {
+      try {
+        await customButtonConfirm();
+      } catch (err) {
+        this.setState({
+          submitLoading: false,
+        });
+        return;
+      }
+    }
     this.setState({ isSubmitting: true, submitLoading: false });
     updateControlIds = _.uniq(updateControlIds.concat(writeControls.filter(c => c.defsource).map(c => c.controlId)));
     onSubmit(
-      newData.filter(c => _.find(updateControlIds, controlId => controlId === c.controlId)).map(formatControlToServer),
+      newData
+        .filter(c => _.find(updateControlIds, controlId => controlId === c.controlId))
+        .map(c => formatControlToServer(c, { needFullUpdate: true })),
       {
         ..._.pick(this.props, ['appId', 'projectId', 'worksheetId', 'viewId', 'recordId']),
       },
@@ -223,7 +249,8 @@ class FillRecordControls extends React.Component {
   }
 
   render() {
-    const { recordId, visible, className, title, worksheetId, projectId, hideDialog } = this.props;
+    const { isCharge, widgetStyle, recordId, visible, className, title, worksheetId, projectId, hideDialog } =
+      this.props;
     const { submitLoading, formData, showError, formFlag, isSubmitting } = this.state;
     return (
       <Modal
@@ -246,6 +273,8 @@ class FillRecordControls extends React.Component {
         )}
         <div ref={this.formcon}>
           <CustomFields
+            isCharge={isCharge}
+            widgetStyle={widgetStyle}
             isWorksheetQuery
             ignoreLock
             flag={formFlag}

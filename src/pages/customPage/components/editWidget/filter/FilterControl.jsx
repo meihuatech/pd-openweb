@@ -115,7 +115,8 @@ export default function FilterControl(props) {
             });
             const param = { objectControls: newControls };
             if (!index) {
-              const control = _.find(_.get(sheetList[0], 'template.controls'), { controlId: value }) || {};
+              const firstSheet = _.find(sheetList, { worksheetId: _.get(filterObjectControls[0], 'worksheetId') });
+              const control = _.find(_.get(firstSheet, 'template.controls'), { controlId: value }) || {};
               const { type } = control;
               const { controlId, ...data } = getSetDefault(control);
               param.control = control;
@@ -131,7 +132,17 @@ export default function FilterControl(props) {
         >
           {filterOnlyShowField(templateControls)
           .filter(c => FASTFILTER_CONDITION_TYPE.includes(c.type) || (c.type === WIDGETS_TO_API_TYPE_ENUM.SHEET_FIELD && FASTFILTER_CONDITION_TYPE.includes((c.sourceControl || {}).type)))
-          .filter(c => index ? c.type === firstControlData.type : true)
+          .filter(c => {
+            if (index) {
+              // 兼容单选控件(平铺和下拉菜单)
+              if ([9, 11].includes(c.type) === [9, 11].includes(firstControlData.type)) {
+                return true;
+              }
+              return c.type === firstControlData.type;
+            } else {
+              return true;
+            }
+          })
           .filter(c => {
             if (isOptionControl || isRelateControl) {
               if (c.dataSource && firstControlData.dataSource) {

@@ -11,6 +11,8 @@ import sheetAjax from 'src/api/worksheet';
 import { filterOnlyShowField } from 'src/pages/widgetConfig/util';
 import { updateViewAdvancedSetting } from 'src/pages/worksheet/common/ViewConfig/util';
 import NavShow from './NavShow';
+import { setSysWorkflowTimeControlFormat } from 'src/pages/worksheet/views/CalendarView/util.js';
+
 import _ from 'lodash';
 const Wrap = styled.div`
   .hasData {
@@ -141,7 +143,7 @@ const Wrap = styled.div`
     .cover {
       padding-top: 60px;
       img {
-        height: 212px;
+        width: 100%;
         display: block;
       }
     }
@@ -196,6 +198,9 @@ const Wrap = styled.div`
         }
       }
     }
+  }
+  .RelateRecordDropdown-selected {
+    height: auto;
   }
 `;
 
@@ -255,7 +260,7 @@ export default function NavGroup(params) {
   const addNavGroups = data => {
     const d = getSetDefault(data);
     updateView(d, {
-      navshow: '0',
+      navshow: !['0', '1'].includes(navshow + '') ? '0' : navshow, //新配置需要前端把这个值设为1
       navfilters: JSON.stringify([]),
       usenav: '1', //新配置需要前端把这个值设为1
     });
@@ -295,12 +300,15 @@ export default function NavGroup(params) {
       <AddCondition
         renderInParent
         className="addControl"
-        columns={filterOnlyShowField(worksheetControls).filter(
-          o => canNavGroup(o, worksheetId), // && !navGroup.controlId === o.controlId,
+        columns={setSysWorkflowTimeControlFormat(
+          filterOnlyShowField(worksheetControls).filter(
+            o => canNavGroup(o, worksheetId), // && !navGroup.controlId === o.controlId,
+          ),
+          currentSheetInfo.switches || [],
         )}
         onAdd={addNavGroups}
         style={{
-          width: width || '360px',
+          width: width || '440px',
         }}
         offset={[0, 0]}
         classNamePopup="addControlDrop"
@@ -340,6 +348,8 @@ export default function NavGroup(params) {
       if (o.key === 'navshow') {
         return (
           <NavShow
+            canShowAll
+            canShowNull
             params={o}
             value={navshow}
             onChange={newValue => {
@@ -352,6 +362,7 @@ export default function NavGroup(params) {
                 }),
               );
             }}
+            advancedSetting={view.advancedSetting}
             navfilters={navfilters}
             filterInfo={{
               relateControls: relateControls,
@@ -363,6 +374,7 @@ export default function NavGroup(params) {
                 'projectId',
                 'roleType',
                 'worksheetId',
+                'switches',
               ]),
               columns,
               viewControl: data.controlId,
@@ -386,6 +398,7 @@ export default function NavGroup(params) {
                   : null,
               );
             }}
+            border
             cancelAble={[29, 35].includes(data.type)}
             renderError={() => {
               if (data.type === 29 && relateSheetInfo.length > 0 && o.key === 'viewId') {

@@ -50,12 +50,12 @@ const SortableTreeWrap = styled.div`
     canvas.nodeItemCanvas {
       position: absolute;
       top: 50%;
-      left: -120px;
-      width: 120px;
+      left: ${props => (props.isStraightLine ? '-100px' : '-120px')};
+      width: ${props => (props.isStraightLine ? '100px' : '120px')};
     }
   }
   .childNodeWrap {
-    transform: translateX(120px);
+    transform: ${props => (props.isStraightLine ? 'translateX(100px)' : 'translateX(120px)')};
   }
 `;
 
@@ -135,16 +135,22 @@ function Hierarchy(props) {
 
   useEffect(() => {
     getDefaultHierarchyData();
+    const { level } = getItem(`hierarchyConfig-${viewId}`) || {};
+    level && setState({ level: level });
     // 多表关联把所有的关联控件获取到 以便后续展示
     const { viewType, childType } = view;
     if (viewType === 2 && childType === 2) {
       const ids = (viewControls || []).slice(1).map(item => item.worksheetId);
-      worksheetAjax.getWorksheetsControls({ worksheetIds: ids, handControlSource: true }).then(({ code, data }) => {
-        if (code === 1) {
-          const relateControls = ids.map(id => _.get(_.find(data || [], i => i.worksheetId === id) || {}, 'controls'));
-          initHierarchyRelateSheetControls({ ids, controls: relateControls });
-        }
-      });
+      worksheetAjax
+        .getWorksheetsControls({ worksheetIds: ids, handControlSource: true, appId: _.get(props, 'appId') })
+        .then(({ code, data }) => {
+          if (code === 1) {
+            const relateControls = ids.map(id =>
+              _.get(_.find(data || [], i => i.worksheetId === id) || {}, 'controls'),
+            );
+            initHierarchyRelateSheetControls({ ids, controls: relateControls });
+          }
+        });
     }
   }, [viewId, viewControl, viewControls]);
 
@@ -163,7 +169,7 @@ function Hierarchy(props) {
         document.querySelector('body').removeChild(copyDom);
       });
     } catch (error) {
-      alert(_l('生成失败'));
+      alert(_l('生成失败'), 2);
       document.querySelector('body').removeChild(copyDom);
     }
   };
@@ -187,12 +193,15 @@ function Hierarchy(props) {
     setViewConfigVisible(true);
     saveView(viewId, { ...obj, viewType: 2 }, newView => {
       getDefaultHierarchyData(newView);
-      worksheetAjax.getWorksheetsControls({ worksheetIds: [worksheetId] }).then(({ code, data }) => {
-        if (code === 1) {
-          const allControls = data.map(item => item.controls);
-          updateWorksheetControls(allControls[0]);
-        }
-      });
+      worksheetAjax
+        .getWorksheetInfo({
+          worksheetId: worksheetId,
+          getTemplate: true,
+        })
+        .then(res => {
+          const allControls = _.get(res, 'template.controls') || [];
+          updateWorksheetControls(allControls);
+        });
     });
   };
 
@@ -250,7 +259,7 @@ function Hierarchy(props) {
 
   const handleAddRecord = obj => {
     const { isTextTitle, value = '', pid, visible, ...rest } = obj;
-    if (isTextTitle && isAllowQuickSwitch(sheetSwitchPermit)) {
+    if (isTextTitle && isAllowQuickSwitch(sheetSwitchPermit, viewId)) {
       createTextTitleTempRecord({ ...rest, visible, pid });
       setState({ addRecordDefaultValue: value, addRecordPath: rest });
     } else {
@@ -261,10 +270,11 @@ function Hierarchy(props) {
       });
     }
   };
-  const getNewRecordPara = pathId => {
+  const getNewRecordPara = ({ path, pathId }) => {
     const { viewControls, childType, viewId } = view;
+    // 兼容错误格式{path: [],pathId: ['12123']},顶级记录
     if (pathId.length > 0 && String(childType) === '2' && viewControls.length > 1) {
-      const { worksheetId, worksheetName, controlId } = viewControls[pathId.length];
+      const { worksheetId, worksheetName, controlId } = viewControls[_.isEmpty(path) ? 0 : pathId.length];
       const { worksheetId: masterWorksheetId } = viewControls[pathId.length - 1];
       return {
         worksheetId,
@@ -373,6 +383,7 @@ function Hierarchy(props) {
   };
 
   const getLayerLength = () => {
+    if (view.childType === 2) return (view.viewControls || []).length || 1;
     return _.max(_.flattenDeep(getLayerCount(hierarchyViewState))) || 1;
   };
 
@@ -385,8 +396,8 @@ function Hierarchy(props) {
   // 展开多级
   const showLevelData = obj => {
     const isCurrentSheetRelate = _.get(view, 'childType') !== 2;
+    setState({ level: obj.layer });
     if (isCurrentSheetRelate) {
-      setState({ level: obj.layer });
       expandedMultiLevelHierarchyData(obj);
     } else {
       expandMultiLevelHierarchyDataOfMultiRelate(+obj.layer);
@@ -436,6 +447,7 @@ function Hierarchy(props) {
     }
 
     const renderHierarchy = () => {
+      const { advancedSetting = {} } = view;
       return (isEmpty(hierarchyViewState) && (filters.keyWords || !isEmpty(filters.filterControls))) ||
         (isEmpty(hierarchyViewState) && browserIsMobile()) ? (
         <ViewEmpty filters={filters} viewFilter={view.filters || []} />
@@ -447,9 +459,10 @@ function Hierarchy(props) {
               layerLength={getLayerLength()}
               layersName={_.isEmpty(layersName) ? initLayerTitle(view) : layersName}
               updateLayersName={names => saveView(viewId, { layersName: names })}
+              isStraightLine={advancedSetting.hierarchyViewConnectLine === '1'}
             />
           )}
-          <SortableTreeWrap scale={scale}>
+          <SortableTreeWrap scale={scale} id={viewId} isStraightLine={advancedSetting.hierarchyViewConnectLine === '1'}>
             {_.isEmpty(hierarchyViewState) ? (
               <EmptyHierarchy
                 layersName={layersName}
@@ -470,6 +483,7 @@ function Hierarchy(props) {
                     {..._.pick(props, [
                       'hierarchyRelateSheetControls',
                       'deleteHierarchyRecord',
+                      'hideHierarchyRecord',
                       'updateHierarchyData',
                       'appId',
                       'worksheetInfo',
@@ -564,7 +578,7 @@ function Hierarchy(props) {
           hideNewRecord={() => setState({ createRecordVisible: false })}
           defaultFormData={getDefaultValueInCreate()}
           changeWorksheetStatusCode={changeWorksheetStatusCode}
-          {...getNewRecordPara(addRecordPath.pathId)}
+          {...getNewRecordPara(addRecordPath)}
         />
       )}
     </div>

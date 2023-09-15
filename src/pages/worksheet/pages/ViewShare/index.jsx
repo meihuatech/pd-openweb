@@ -6,6 +6,7 @@ import sheetApi from 'src/api/worksheet';
 import SvgIcon from 'src/components/SvgIcon';
 import { ShareState, VerificationPass, SHARE_STATE } from 'worksheet/components/ShareState';
 import ViewSahre from './ViewSahre';
+import DocumentTitle from 'react-document-title';
 import styled from 'styled-components';
 import _ from 'lodash';
 
@@ -53,7 +54,8 @@ const Entry = props => {
   const [share, setShare] = useState({});
 
   useEffect(() => {
-    getShareInfoByShareId().then(data => {
+    const clientId = sessionStorage.getItem(shareId);
+    getShareInfoByShareId({ clientId }).then(data => {
       setLoading(false);
     });
   }, []);
@@ -62,7 +64,9 @@ const Entry = props => {
     return new Promise(async (resolve, reject) => {
       const result = await sheetApi.getShareInfoByShareId({ shareId, ...data });
       const shareAuthor = _.get(result, 'data.shareAuthor');
+      const clientId = _.get(result, 'data.clientId');
       window.share = shareAuthor;
+      clientId && sessionStorage.setItem(shareId, clientId);
       setShare(result);
       resolve(result);
     });
@@ -115,6 +119,7 @@ const Entry = props => {
         )}
         <div className="flex ellipsis">
           {appName && `${appName}-${worksheetName}-${viewName}`}
+          {appName && <DocumentTitle title={`${appName}-${worksheetName}-${viewName}`} />}
         </div>
       </div>
     );

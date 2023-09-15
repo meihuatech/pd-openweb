@@ -1,24 +1,25 @@
 import React, { Fragment, Component } from 'react';
 import cx from 'classnames';
-import { getRequest } from 'src/util';
+import { getRequest, verifyPassword } from 'src/util';
 import worksheetAjax from 'src/api/worksheet';
 import { getRowDetail } from 'worksheet/api';
 import { Modal, Progress, WingBlank } from 'antd-mobile';
 import { message } from 'antd';
 import { Icon } from 'ming-ui';
+import MobileVertifyPassword from 'src/ming-ui/components/VertifyPasswordMoibile';
 import FillRecordControls from 'src/pages/worksheet/common/recordInfo/FillRecordControls/MobileFillRecordControls';
 import NewRecord from 'src/pages/worksheet/common/newRecord/MobileNewRecord';
+import { doubleConfirmFunc } from './DoubleConfirm';
 import CustomRecordCard from 'mobile/RecordList/RecordCard';
 import processAjax from 'src/pages/workflow/api/process';
 import { isOpenPermit } from 'src/pages/FormSet/util.js';
 import { permitList } from 'src/pages/FormSet/config.js';
-import homeAppAjax from 'src/api/homeApp';
 import { RecordInfoModal } from 'mobile/Record';
-import SoketMessage from '../SoketMessage';
+import workflowPushSoket from '../socket/workflowPushSoket';
+import customBtnWorkflow from '../socket/customBtnWorkflow';
 import './index.less';
 import _ from 'lodash';
 
-let timeout = null;
 const CUSTOM_BUTTOM_CLICK_TYPE = {
   IMMEDIATELY: 1,
   CONFIRM: 2,
@@ -36,91 +37,167 @@ class RecordAction extends Component {
       previewRecord: {},
       percent: 0,
       num: 0,
-      runInfoVisible: false,
     };
     const { isSubList, editable } = getRequest();
     this.isSubList = isSubList == 'true';
     this.editable = editable == 'true';
   }
-
-  componentWillReceiveProps(nextProps) {
-    if (nextProps.runInfoVisible !== this.props.runInfoVisible) {
-      this.setState({ runInfoVisible: nextProps.runInfoVisible });
-    }
+  componentDidMount() {
+    workflowPushSoket({ viewId: this.props.viewId });
+    customBtnWorkflow();
   }
+  componentWillUnmount() {
+    if (!window.IM) return;
+    IM.socket.off('workflow_push');
+    IM.socket.off('workflow');
+  }
+
   recef = React.createRef();
+
   handleTriggerCustomBtn = btn => {
-    const { handleBatchOperateCustomBtn } = this.props;
+    const {
+      worksheetId,
+      rowId,
+      handleUpdateWorksheetRow,
+      handleBatchOperateCustomBtn, // 批量处理
+      batchOptCheckedData = [],
+    } = this.props;
     this.setState({ custBtnName: btn.name });
+    this.remark = undefined;
+    const _this = this;
     if (window.isPublicApp) {
       alert(_l('预览模式下，不能操作'), 3);
       return;
     }
-    if (btn.clickType === CUSTOM_BUTTOM_CLICK_TYPE.IMMEDIATELY) {
-      if (handleBatchOperateCustomBtn) {
-        handleBatchOperateCustomBtn(btn);
+    const run = ({ remark } = {}) => {
+      const trigger = () => {
+        if (_.isFunction(handleBatchOperateCustomBtn)) {
+          handleBatchOperateCustomBtn(btn);
+          return;
+        }
+        _this.triggerImmediately(btn);
+      };
+      if (_.get(btn, 'advancedSetting.enableremark') && remark) {
+        if (_.isFunction(handleUpdateWorksheetRow)) {
+          handleUpdateWorksheetRow({
+            worksheetId,
+            rowId: rowId,
+            newOldControl: [],
+            btnRemark: remark,
+            btnId: btn.btnId,
+            btnWorksheetId: worksheetId,
+            btnRowId: rowId,
+          });
+          return;
+        }
+        worksheetAjax
+          .updateWorksheetRow({
+            worksheetId,
+            rowId: rowId,
+            newOldControl: [],
+            btnRemark: remark,
+            btnId: btn.btnId,
+            btnWorksheetId: worksheetId,
+            btnRowId: rowId,
+          })
+          .then(() => {
+            trigger(btn);
+          });
+      } else {
+        trigger(btn);
+      }
+    };
+    const handleTrigger = () => {
+      const needConfirm = btn.enableConfirm || btn.clickType === CUSTOM_BUTTOM_CLICK_TYPE.CONFIRM;
+      function confirm({ onOk, onClose = () => {} } = {}) {
+        const { confirmcontent, enableremark, remarkname, remarkhint, remarkrequired, remarktype, remarkoptions } =
+          _.get(btn, 'advancedSetting') || {};
+        doubleConfirmFunc({
+          title: btn.confirmMsg,
+          description: confirmcontent,
+          enableRemark: enableremark,
+          remarkName: remarkname,
+          remarkHint: remarkhint,
+          remarkRequired: remarkrequired,
+          remarktype,
+          remarkoptions,
+          verifyPwd: btn.verifyPwd,
+          enableConfirm: btn.enableConfirm,
+          okText: btn.sureName,
+          cancelText: btn.cancelName,
+          btn,
+          onOk: onOk ? onOk : btnInfo => run(btnInfo),
+          onClose,
+        });
+      }
+      if (btn.clickType === CUSTOM_BUTTOM_CLICK_TYPE.FILL_RECORD) {
+        // 填写字段
+        _this.fillRecord({
+          ...btn,
+          confirm: !needConfirm
+            ? () => {}
+            : () =>
+                new Promise((resolve, reject) => {
+                  confirm({
+                    onOk: ({ remark }) => {
+                      _this.remark = remark;
+                      resolve();
+                    },
+                    onClose: reject,
+                  });
+                }),
+        });
         return;
       }
-      // 立即执行
-      this.triggerImmediately(btn);
-    } else if (btn.clickType === CUSTOM_BUTTOM_CLICK_TYPE.CONFIRM) {
-      if (handleBatchOperateCustomBtn) {
-        handleBatchOperateCustomBtn(btn);
-        return;
+      function verifyAndRun() {
+        if (btn.verifyPwd) {
+          verifyPassword({
+            checkNeedAuth: true,
+            closeImageValidation: true,
+            success: run,
+            fail: () => {
+              MobileVertifyPassword.confirm({
+                title: _l('安全认证'),
+                inputName: _l('登录密码验证'),
+                passwordPlaceHolder: _l('输入当前用户（%0）的登录密码', md.global.Account.fullname),
+                onOk: run,
+              });
+            },
+          });
+        } else {
+          run();
+        }
       }
-      // 二次确认
-      Modal.alert(btn.confirmMsg || _l('你确认对记录执行此操作吗？'), '', [
-        { text: btn.cancelName || _l('取消'), onPress: () => {}, style: 'default' },
-        { text: btn.sureName || _l('确定'), onPress: () => this.triggerImmediately(btn) },
+      if (needConfirm) {
+        // 二次确认
+        confirm();
+      } else {
+        verifyAndRun();
+      }
+    };
+    if (batchOptCheckedData.length > 1000) {
+      Modal.alert(_l('最大支持批量执行1000行记录，是否只选中并执行前1000行数据？'), '', [
+        { text: '取消', onPress: () => {} },
+        { text: '确认', onPress: () => handleTrigger() },
       ]);
-    } else if (btn.clickType === CUSTOM_BUTTOM_CLICK_TYPE.FILL_RECORD) {
-      // 填写字段
-      this.fillRecord(btn);
     } else {
-      // 无 clickType 有误
+      handleTrigger();
     }
     this.props.hideRecordActionVisible();
   };
+
   triggerImmediately = btn => {
-    const { batchOptCheckedData = [], isMobileOperate } = this.props;
     this.disableCustomButton(btn.btnId);
-    if (isMobileOperate) {
-      this.setState({ runInfoVisible: true });
-    } else {
-      message.info({
-        className: 'flowToastInfo',
-        content: (
-          <div className="feedbackInfo">
-            <span className="custBtnName">{btn.name}</span>
-            <span className="verticalAlignM">{_l('正在执行...')}</span>
-          </div>
-        ),
-        duration: 1,
-      });
-    }
     const { worksheetId, rowId } = this.props;
     processAjax
       .startProcess({
         appId: worksheetId,
         sources: [rowId],
         triggerId: btn.btnId,
+        pushUniqueId: _.get(window, 'md.global.Config.pushUniqueId'),
       })
       .then(data => {
-        if (!data) {
-          this.setState({ percent: 100, total: 1, num: 1, runInfoVisible: false });
-          clearTimeout(timeout);
-          let durationValue = batchOptCheckedData.length ? 0 : 1000;
-          timeout = setTimeout(() => {
-            Modal.alert(
-              <div className="feedbackInfo">
-                <span className="custBtnName">{btn.name}</span>
-                {_l(' 执行失败!')}
-              </div>,
-              '',
-              [{ text: _l('关闭') }],
-            );
-          }, durationValue);
-        }
+        this.props.loadRow();
         this.props.loadCustomBtns();
         setTimeout(() => {
           this.setState({ btnDisable: {} });
@@ -161,6 +238,7 @@ class RecordAction extends Component {
     this.activeBtn = btn;
     this.masterRecord = {};
     this.fillRecordProps = {};
+    this.customButtonConfirm = btn.confirm;
     switch (caseStr) {
       case '11': // 本记录 - 填写字段
         this.btnRelateWorksheetId = worksheetId;
@@ -291,6 +369,7 @@ class RecordAction extends Component {
           this.btnAddRelateWorksheetId = relationControlrelationControl.dataSource;
           this.setState({
             newRecordVisible: true,
+            rowInfo: data,
           });
         }
       });
@@ -326,7 +405,7 @@ class RecordAction extends Component {
       });
   };
   fillRecordControls = (newControls, targetOptions) => {
-    const { worksheetId, rowId, handleUpdateWorksheetRow, isMobileOperate } = this.props;
+    const { worksheetId, rowId, handleUpdateWorksheetRow } = this.props;
     let { custBtnName } = this.state;
     const args = {
       appId: targetOptions.appId,
@@ -339,6 +418,7 @@ class RecordAction extends Component {
       btnWorksheetId: worksheetId,
       btnRowId: rowId,
       workflowType: this.activeBtn.workflowType,
+      btnRemark: this.remark,
     };
     if (_.isFunction(handleUpdateWorksheetRow)) {
       handleUpdateWorksheetRow(args);
@@ -347,16 +427,16 @@ class RecordAction extends Component {
     }
     worksheetAjax.updateWorksheetRow(args).then(res => {
       if (res && res.data) {
+        this.props.loadRow();
+        this.props.loadCustomBtns();
         if (this.activeBtn.workflowType === 2) {
           alert(_l('修改成功'));
-          this.props.loadRow();
-          this.props.loadCustomBtns();
         } else {
           message.info({
             className: 'flowToastInfo',
             content: (
               <div className="feedbackInfo">
-                <span className="custBtnName">{_l('“%0"', custBtnName)}</span>
+                <span className="custBtnName">“{custBtnName}”</span>
                 <span className="verticalAlignM">{_l('正在执行...')}</span>
               </div>
             ),
@@ -378,16 +458,16 @@ class RecordAction extends Component {
     });
   };
   handleAddRecordCallback = () => {
-    const { isMobileOperate } = this.props;
+    const { isBatchOperate } = this.props;
     if (this.activeBtn.workflowType === 2) {
-      alert(_l('创建成功'), 3);
+      alert(_l('创建成功'));
     }
-    !isMobileOperate && this.props.loadRow();
+    !isBatchOperate && this.props.loadRow();
     this.props.loadCustomBtns();
   };
   renderFillRecord() {
     const { activeBtn = {}, fillRecordId, btnRelateWorksheetId, fillRecordProps } = this;
-    const { sheetRow, viewId, worksheetInfo = {}, isMobileOperate } = this.props;
+    const { sheetRow, viewId, worksheetInfo = {}, isBatchOperate } = this.props;
     const btnTypeStr = activeBtn.writeObject + '' + activeBtn.writeType;
     return (
       <Modal
@@ -403,7 +483,7 @@ class RecordAction extends Component {
           title={activeBtn.name}
           loadWorksheetRecord={btnTypeStr === '21'}
           viewId={viewId}
-          projectId={!isMobileOperate ? sheetRow.projectId : worksheetInfo.projectId}
+          projectId={!isBatchOperate ? sheetRow.projectId : worksheetInfo.projectId}
           recordId={fillRecordId}
           worksheetId={btnRelateWorksheetId}
           writeControls={activeBtn.writeControls}
@@ -414,6 +494,7 @@ class RecordAction extends Component {
             });
           }}
           {...fillRecordProps}
+          customButtonConfirm={this.customButtonConfirm}
         />
       </Modal>
     );
@@ -425,6 +506,7 @@ class RecordAction extends Component {
     return (
       newRecordVisible && (
         <NewRecord
+          isCustomButton
           appId={appId}
           title={activeBtn.name}
           className="worksheetRelateNewRecord"
@@ -437,6 +519,7 @@ class RecordAction extends Component {
             btnId: activeBtn.btnId,
             btnWorksheetId: worksheetId,
             btnRowId: rowId,
+            btnRemark: this.remark,
           }}
           defaultRelatedSheet={{
             worksheetId,
@@ -460,6 +543,7 @@ class RecordAction extends Component {
             });
           }}
           onAdd={this.handleAddRecordCallback}
+          customButtonConfirm={this.customButtonConfirm}
         />
       )
     );
@@ -473,7 +557,7 @@ class RecordAction extends Component {
       viewId,
       appId,
       switchPermit,
-      isMobileOperate,
+      isBatchOperate,
     } = this.props;
     const { btnDisable } = this.state;
     return (
@@ -487,7 +571,7 @@ class RecordAction extends Component {
       >
         <React.Fragment>
           <div className="flexRow header">
-            <span className="Font13">{!isMobileOperate ? _l('更多操作') : _l('对选中记录执行操作')}</span>
+            <span className="Font13">{!isBatchOperate ? _l('更多操作') : _l('对选中记录执行操作')}</span>
             <div className="closeIcon" onClick={hideRecordActionVisible}>
               <Icon icon="close" />
             </div>
@@ -513,12 +597,12 @@ class RecordAction extends Component {
               </div>
             ))}
           </div>
-          {appId && !isMobileOperate ? (
+          {appId && !isBatchOperate ? (
             <div className="extrBtnBox">
               {isOpenPermit(permitList.recordShareSwitch, switchPermit, viewId) && (
                 <div className="flexRow extraBtnItem">
                   <Icon icon="share" className="Font18 delIcon" style={{ color: '#757575' }} />
-                  <div className="flex delTxt Font13 Gray" onClick={this.props.onShare}>
+                  <div className="flex delTxt Font15 Gray" onClick={this.props.onShare}>
                     {_l('分享')}
                   </div>
                 </div>
@@ -526,7 +610,7 @@ class RecordAction extends Component {
               {(sheetRow.allowDelete || (this.isSubList && this.editable)) && (
                 <div className="flexRow extraBtnItem">
                   <Icon icon="delete_12" className="Font18 delIcon" />
-                  <div className="flex delTxt Font13" onClick={this.handleDeleteAlert}>
+                  <div className="flex delTxt Font15" onClick={this.handleDeleteAlert}>
                     {_l('删除')}
                   </div>
                 </div>
@@ -537,56 +621,6 @@ class RecordAction extends Component {
       </Modal>
     );
   }
-  renderFailureRecord = () => {
-    let { showFailureInfoModal, failure = [] } = this.state;
-    const { currentSheetRows = [], view, worksheetInfo, worksheetControls } = this.props;
-    let failureList = [];
-    currentSheetRows.forEach(item => {
-      failure.forEach(it => {
-        if (it.sourceId === item.rowid) {
-          failureList.push(item);
-        }
-      });
-    });
-    return (
-      <Modal
-        className="failureInfoModal"
-        popup
-        visible={showFailureInfoModal}
-        animationType="slide-up"
-        onClose={() => {
-          this.setState({ showFailureInfoModal: false });
-        }}
-        title={
-          <div className="header flexRow">
-            <div className="flex">{_l(`执行失败(${failure.length})`)}</div>
-            <Icon
-              icon="close"
-              className="Font8 closeIcon"
-              onClick={() => {
-                this.setState({ showFailureInfoModal: false });
-              }}
-            />
-          </div>
-        }
-      >
-        {failureList.map(item => {
-          return (
-            <WingBlank size="md" key={item.rowid}>
-              <CustomRecordCard
-                isFailureData={true}
-                key={item.rowid}
-                data={item}
-                view={view}
-                controls={worksheetControls}
-                allowAdd={worksheetInfo.allowAdd}
-              />
-            </WingBlank>
-          );
-        })}
-      </Modal>
-    );
-  };
   renderRecordInfo = () => {
     const { appId, viewId } = this.props;
     const { previewRecord } = this.state;
@@ -607,28 +641,12 @@ class RecordAction extends Component {
     );
   };
   render() {
-    const { batchOptCheckedData, isMobileOperate } = this.props;
-    const { runInfoVisible, btnDisable = {}, custBtnName } = this.state;
-
     return (
       <div ref={this.recef}>
         {this.renderRecordAction()}
         {this.renderFillRecord()}
         {this.renderNewRecord()}
         {this.renderRecordInfo()}
-        {this.props.isMobileOperate && this.renderFailureRecord()}
-        
-        <SoketMessage
-          runInfoVisible={runInfoVisible}
-          viewId={this.props.viewId}
-          custBtnName={custBtnName}
-          batchOptCheckedData={batchOptCheckedData}
-          btnDisable={btnDisable}
-          isMobileOperate={isMobileOperate}
-          loadRow={this.props.loadRow}
-          updateBtnDisabled={this.props.updateBtnDisabled}
-          updateVisible={flag => this.setState({ runInfoVisible: flag })}
-        />
       </div>
     );
   }

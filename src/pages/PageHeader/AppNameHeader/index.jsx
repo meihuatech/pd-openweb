@@ -1,6 +1,5 @@
 import React, { Component } from 'react';
 import api from 'api/homeApp';
-import color from 'color';
 import './index.less';
 import { navigateTo } from '../../../router/navigateTo';
 import SvgIcon from 'src/components/SvgIcon';
@@ -18,7 +17,7 @@ export default class AppNameHeader extends Component {
   }
 
   componentDidMount() {
-    api.getAppDetail({ appId: this.props.match.params.apkId }, { silent: true }).then(data => {
+    api.getApp({ appId: this.props.match.params.apkId }, { silent: true }).then(data => {
       this.setState({
         data: data,
         iconUrl: data.iconUrl,
@@ -38,7 +37,7 @@ export default class AppNameHeader extends Component {
               <span
                 className="appIconWrapIcon"
                 style={{
-                  backgroundColor: color(iconColor),
+                  backgroundColor: iconColor,
                 }}
                 onClick={() => {
                   navigateTo(`/app/${this.props.match.params.apkId}`);

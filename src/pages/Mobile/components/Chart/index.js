@@ -9,6 +9,7 @@ import styled from 'styled-components';
 import { getAppFeaturesPath } from 'src/util';
 import reportApi from 'statistics/api/report';
 import { VIEW_DISPLAY_TYPE } from 'src/pages/worksheet/constants/enum';
+import homeAppApi from 'src/api/homeApp';
 import './index.less';
 import _ from 'lodash';
 
@@ -19,9 +20,9 @@ const Content = styled.div`
   }
 `;
 
-function Chart({ data }) {
-  if (!data.status) {
-    return <Abnormal />;
+function Chart({ data, mobileCount, isHorizontal }) {
+  if (data.status <= 0) {
+    return <Abnormal status={data.status} />;
   }
 
   const isMingdao = navigator.userAgent.toLowerCase().includes('mingdao application');
@@ -42,52 +43,54 @@ function Chart({ data }) {
       reportId: data.reportId
     }).then(result => {
       if (result.id) {
-        const url = `/worksheet/${data.appId}/view/${filter.viewId}?chartId=${result.id}&${getAppFeaturesPath()}`;
-        if (isMingdao || isWeixin || isSafari) {
+        const workSheetId = data.appId;
+        if (isMingdao) {
+          const url = `/worksheet/${workSheetId}/view/${filter.viewId}?chartId=${result.id}&${getAppFeaturesPath()}`;
           window.location.href = url;
         } else {
-          window.open(url);
+          homeAppApi.getAppSimpleInfo({ workSheetId }).then(data => {
+            const url = `/mobile/recordList/${data.appId}/${data.appSectionId}/${workSheetId}/${filter.viewId}?chartId=${result.id}`;
+            window.mobileNavigateTo(url);
+          });
         }
       }
     });
   }
-  const isViewOriginalData = filter.viewId && [VIEW_DISPLAY_TYPE.sheet].includes(filter.viewType.toString());
-  const ChartComponent = <Charts reportData={data} isThumbnail={true} isViewOriginalData={isViewOriginalData} onOpenChartDialog={viewOriginalSheet} />;
+  const isPublicShare = location.href.includes('public/page') || window.shareAuthor || window.share;
+  const isViewOriginalData = filter.viewId && [VIEW_DISPLAY_TYPE.sheet].includes(filter.viewType.toString()) && !isPublicShare;
+  const ChartComponent = <Charts reportData={data} isThumbnail={true} isViewOriginalData={isViewOriginalData} onOpenChartDialog={viewOriginalSheet} mobileCount={mobileCount} isHorizontal={isHorizontal} />;
 
   switch (data.reportType) {
     case reportTypes.BarChart:
-      return isMapEmpty ? WithoutDataComponent : ChartComponent;
-      break;
-    case reportTypes.LineChart:
-      return isMapEmpty && isContrastMapEmpty ? WithoutDataComponent : ChartComponent;
-      break;
     case reportTypes.PieChart:
-      return isMapEmpty ? WithoutDataComponent : ChartComponent;
-      break;
-    case reportTypes.NumberChart:
-      return isMapEmpty && isContrastMapEmpty && isContrastEmpty ? WithoutDataComponent : ChartComponent;
-      break;
     case reportTypes.RadarChart:
-      return isMapEmpty ? WithoutDataComponent : ChartComponent;
-      break;
     case reportTypes.FunnelChart:
+    case reportTypes.CountryLayer:
+    case reportTypes.WordCloudChart:
+    case reportTypes.BidirectionalBarChart:
+    case reportTypes.ScatterChart:
+    case reportTypes.TopChart:
+    case reportTypes.GaugeChart:
+    case reportTypes.ProgressChart:
       return isMapEmpty ? WithoutDataComponent : ChartComponent;
       break;
     case reportTypes.DualAxes:
+    case reportTypes.LineChart:
       return isMapEmpty && isContrastMapEmpty ? WithoutDataComponent : ChartComponent;
+      break;
+    case reportTypes.NumberChart:
+      return ChartComponent;
       break;
     case reportTypes.PivotTable:
       return _.isEmpty(data.data.data) ? WithoutDataComponent : ChartComponent;
       break;
-    case reportTypes.CountryLayer:
-      return isMapEmpty ? WithoutDataComponent : ChartComponent;
-      break;
     default:
+      return ChartComponent;
       break;
   }
 }
 
-function ChartWrapper({ data, loading, onOpenFilterModal, onOpenZoomModal, onLoadBeforeData, onLoadNextData, pageComponents = [], isHorizontal }) {
+function ChartWrapper({ data, loading, mobileCount, onOpenFilterModal, onOpenZoomModal, onLoadBeforeData, onLoadNextData, pageComponents = [], isHorizontal }) {
   const isVertical = window.orientation === 0;
   const isMobileChartPage = location.href.includes('mobileChart');
   const index = _.findIndex(pageComponents, { value: data.reportId });
@@ -124,7 +127,7 @@ function ChartWrapper({ data, loading, onOpenFilterModal, onOpenZoomModal, onLoa
             <ActivityIndicator size="large" />
           </Flex>
         ) : (
-          <Chart data={data} />
+          <Chart data={data} mobileCount={mobileCount} isHorizontal={isHorizontal} />
         )}
       </Content>
     </Fragment>

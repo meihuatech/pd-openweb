@@ -7,7 +7,7 @@ import SvgIcon from 'src/components/SvgIcon';
 import TableCom from '../TableCom';
 import AppAnalytics from '../AppAnalytics';
 import { selectDateList, formatter } from '../../util';
-import { formatFileSize } from 'src/util';
+import { formatFileSize, addBehaviorLog } from 'src/util';
 import { navigateTo } from 'src/router/navigateTo';
 import cx from 'classnames';
 import styled from 'styled-components';
@@ -66,10 +66,10 @@ const ByAppWrap = styled.div`
   .useage {
     padding: 6px 24px 0;
     .width120 {
-      width: 150px;
-    }
-    .width120 {
       width: 120px;
+    }
+    .width130 {
+      width: 130px;
     }
     .width50 {
       width: 50px;
@@ -120,13 +120,11 @@ export default class ByApp extends Component {
       selectedDate: 1,
       list: [],
       loading: false,
-      isMore: false,
       pageIndex: 1,
       sorterInfo: { sortFiled: '', order: '' },
       useageList: [],
       useageLoading: false,
       useagePageIndex: 1,
-      appAnalyticsVisible: false,
       currentAppInfo: {},
       checkAdmin: {
         id: '',
@@ -253,7 +251,14 @@ export default class ByApp extends Component {
       {
         dataIndex: 'addRow',
         title: _l('记录创建次数'),
-        className: 'width120',
+        explain: (
+          <span>
+            {_l('记录创建次数计数说明：')}
+            <br />
+            {_l('通过工作表表单页面创建的记录、不包含Excel导入、工作流创建、API调用的方式')}
+          </span>
+        ),
+        className: 'width130',
         sorter: true,
         render: item => {
           return formatter(item.addRow);
@@ -271,6 +276,15 @@ export default class ByApp extends Component {
       {
         dataIndex: 'appAccess',
         title: _l('访问次数'),
+        explain: (
+          <span>
+            {_l('应用访问次数计数说明：')}
+            <br />
+            {_l('· 通过应用图标点击进入应用')}
+            <br />
+            {_l('· 通过系统消息打开了应用')}
+          </span>
+        ),
         className: 'width120',
         sorter: true,
         render: item => {
@@ -287,9 +301,13 @@ export default class ByApp extends Component {
         },
       },
       {
-        dataIndex: 'addWorkFlow', title: _l('工作流执行数'), className: 'width120', sorter: true, render: (item) => {
+        dataIndex: 'addWorkFlow',
+        title: _l('工作流执行数'),
+        className: 'width120',
+        sorter: true,
+        render: item => {
           return formatter(item.addWorkFlow);
-        }
+        },
       },
       {
         dataIndex: 'attachmentUpload',
@@ -351,13 +369,8 @@ export default class ByApp extends Component {
 
   getList = () => {
     const { projectId } = this.props;
-    const { pageIndex, loading, isMore, sorterInfo = {}, keyword } = this.state;
+    const { pageIndex, sorterInfo = {}, keyword } = this.state;
     const { sortFiled, order } = sorterInfo;
-
-    // 加载更多
-    if (pageIndex > 1 && ((loading && isMore) || !isMore)) {
-      return;
-    }
 
     this.setState({ loading: true });
 
@@ -376,30 +389,22 @@ export default class ByApp extends Component {
     this.ajaxRequst
       .then(({ list, allCount }) => {
         this.setState({
-          list: pageIndex === 1 ? list : this.state.list.concat(list),
-          pageIndex: pageIndex + 1,
+          list,
           total: allCount,
           loading: false,
-          isMore: list.length >= 50,
         });
       })
       .fail(err => {
         this.setState({
           pageIndex: 1,
           loading: false,
-          isMore: false,
         });
       });
   };
   getUseageList = () => {
     const { projectId } = this.props;
-    const { useagePageIndex, useageLoading, isMore, sorterInfo = {}, keyword, selectedDate } = this.state;
+    const { useagePageIndex, sorterInfo = {}, keyword, selectedDate } = this.state;
     const { sortFiled, order } = sorterInfo;
-
-    // 加载更多
-    if (useagePageIndex > 1 && ((useageLoading && isMore) || !isMore)) {
-      return;
-    }
 
     this.setState({ useageLoading: true });
 
@@ -425,13 +430,11 @@ export default class ByApp extends Component {
           useagePageIndex: useagePageIndex + 1,
           total: allCount,
           useageLoading: false,
-          isMore: list.length >= 50,
         });
       })
       .fail(err => {
         this.setState({
           useageLoading: false,
-          isMore: false,
         });
       });
   };
@@ -462,22 +465,25 @@ export default class ByApp extends Component {
       };
     };
     this.setState({ checkAdmin: opts(true) }, () => {
-      appManagementAjax.checkAppAdminForUser({
-        appId,
-      }).then(result => {
-        if (result) {
-          if (isAnalysis) {
-            this.setState({
-              checkAdmin: Object.assign({}, this.state.checkAdmin, { visible: false }),
-              appAnalyticsVisible: true,
-            });
-          } else {
-            navigateTo(`/app/${appId}`);
+      appManagementAjax
+        .checkAppAdminForUser({
+          appId,
+        })
+        .then(result => {
+          if (result) {
+            if (isAnalysis) {
+              this.setState({
+                checkAdmin: Object.assign({}, this.state.checkAdmin, { visible: false }),
+              });
+              window.open(`/app/${appId}/analytics/${this.props.projectId}`, '__blank');
+            } else {
+              addBehaviorLog('app', appId); // 埋点
+              navigateTo(`/app/${appId}`);
+            }
+          } else if (this.state.checkAdmin.visible) {
+            this.setState({ checkAdmin: opts(false) });
           }
-        } else if (this.state.checkAdmin.visible) {
-          this.setState({ checkAdmin: opts(false) });
-        }
-      });
+        });
     });
   }
   addRoleMemberForAppAdmin = () => {
@@ -485,17 +491,21 @@ export default class ByApp extends Component {
       checkAdmin: { id },
       isAnalysis,
     } = this.state;
-    appManagementAjax.addRoleMemberForAppAdmin({
-      appId: id,
-    }).then(result => {
-      if (result) {
-        if (isAnalysis) {
-          this.setState({ appAnalyticsVisible: true, isAnalysis: false });
-        } else {
-          navigateTo(`/app/${id}`);
+    appManagementAjax
+      .addRoleMemberForAppAdmin({
+        appId: id,
+      })
+      .then(result => {
+        if (result) {
+          if (isAnalysis) {
+            this.setState({ isAnalysis: false });
+            window.open(`/app/${id}/analytics/${this.props.projectId}`, '__blank');
+          } else {
+            addBehaviorLog('app', id); // 埋点
+            navigateTo(`/app/${id}`);
+          }
         }
-      }
-    });
+      });
   };
   changeTab = item => {
     const { pageIndex, useagePageIndex } = this.state;
@@ -526,9 +536,9 @@ export default class ByApp extends Component {
       useageLoading,
       useagePageIndex,
       selectedDate,
-      appAnalyticsVisible,
       currentAppInfo = {},
       checkAdmin,
+      total,
     } = this.state;
     return (
       <ByAppWrap>
@@ -549,7 +559,7 @@ export default class ByApp extends Component {
           <div className="searchWrap flexRow">
             {currentTab === 2 && (
               <Select
-                className="mRight10"
+                className="mRight10 mdAntSelect"
                 style={{ width: '200px' }}
                 placeholder={_l('最近30天')}
                 suffixIcon={<Icon icon="arrow-down-border" className="Font18" />}
@@ -577,9 +587,11 @@ export default class ByApp extends Component {
             <TableCom
               dataSource={list}
               columns={this.columns}
-              loadNextPage={this.getList}
-              loading={loading && pageIndex === 1}
+              loading={loading}
               dealSorter={this.dealSorter}
+              total={total}
+              pageIndex={pageIndex}
+              changePage={pageIndex => this.setState({ pageIndex }, this.getList)}
             />
           </div>
         )}
@@ -588,22 +600,14 @@ export default class ByApp extends Component {
             <TableCom
               dataSource={useageList}
               columns={this.useageColumns}
-              loadNextPage={this.getUseageList}
               loading={useageLoading && useagePageIndex === 1}
               defaultSorter={{ sortFiled: 'appAccessNumber', order: 'desc' }}
               dealSorter={this.dealSorter}
+              total={total}
+              pageIndex={useagePageIndex}
+              changePage={useagePageIndex => this.setState({ useagePageIndex }, this.getList)}
             />
           </div>
-        )}
-
-        {appAnalyticsVisible && (
-          <AppAnalytics
-            currentAppInfo={currentAppInfo}
-            projectId={projectId}
-            onCancel={() => {
-              this.setState({ appAnalyticsVisible: false });
-            }}
-          />
         )}
 
         <Dialog
@@ -612,7 +616,7 @@ export default class ByApp extends Component {
           title={_l('管理应用“%0”', checkAdmin.title)}
           description={_l('如果你不是应用的管理员，需要将自己加为管理员以获得权限')}
           cancelText=""
-          okText={checkAdmin.post ? _l('验证权限...') : _l('加为应用管理员')}
+          okText={checkAdmin.post ? _l('验证权限...') : _l('加为此应用管理员')}
           onOk={checkAdmin.post ? () => {} : this.addRoleMemberForAppAdmin}
           onCancel={() => this.setState({ checkAdmin: Object.assign({}, this.state.checkAdmin, { visible: false }) })}
         />

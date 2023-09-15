@@ -1,8 +1,11 @@
 import _ from 'lodash';
+import { WIDGETS_TO_API_TYPE_ENUM } from 'src/pages/widgetConfig/config/widget.js';
+
 export const APP_ROLE_TYPE = {
   CUSTOM_ROLE: 0, // 自定义角色
-  READ_ROLE: 10, // 只读角色
-  GENERAL_ROLE: 50, // 一般（普通成员）
+  DEVELOPERS_ROLE: 1, // 开发者
+  RUNNER_ROLE: 2, // 运营者
+  RUNNER_DEVELOPERS_ROLE: 3, // 运营者+开发者
   ADMIN_ROLE: 100, // 管理员角色
   POSSESS_ROLE: 200, // 应用拥有者
   MAP_OWNER: 300,
@@ -166,12 +169,12 @@ export const VIEW_DISPLAY_TYPE = enumType({
 });
 
 export const VIEW_TYPE_ICON = [
-  { icon: 'view', color: '#ffa515', text: _l('表格'), id: 'sheet' },
-  { icon: 'kanban', color: '#4CAF50', text: _l('看板'), id: 'board' },
-  { icon: 'event', color: '#F64082', text: _l('日历'), id: 'calendar' },
-  { icon: 'gallery_view', color: '#3949ab', text: _l('画廊'), id: 'gallery' },
-  { icon: 'hierarchy', color: '#9C27AF', text: _l('层级'), id: 'structure' },
-  { icon: 'gantt', color: '#01BCD5', text: _l('甘特图'), id: 'gunter' },
+  { icon: 'view', color: '#ffa515', text: _l('表格%05017'), id: 'sheet' },
+  { icon: 'kanban', color: '#4CAF50', text: _l('看板%05016'), id: 'board' },
+  { icon: 'event', color: '#F64082', text: _l('日历%05015'), id: 'calendar' },
+  { icon: 'gallery_view', color: '#3949ab', text: _l('画廊%05014'), id: 'gallery' },
+  { icon: 'hierarchy', color: '#9C27AF', text: _l('层级%05013'), id: 'structure' },
+  { icon: 'gantt', color: '#01BCD5', text: _l('甘特图%05012'), id: 'gunter' },
 ];
 
 export const WORKSHEET_VIEW_PAGE_SIZE = {
@@ -190,7 +193,7 @@ export const CUSTOM_BUTTOM_CLICK_TYPE = {
 };
 
 /** 表格行高 */
-export const ROW_HEIGHT = [34, 58, 84, 137];
+export const ROW_HEIGHT = [34, 62, 88, 142];
 
 /** 单元格渲染类型 */
 export const CELL_RENDER_TYPE = {
@@ -204,6 +207,13 @@ export const RELATE_RECORD_SHOW_TYPE = {
   CARD: 1,
   LIST: 2,
   DROPDOWN: 3,
+};
+
+/** 关联记录显示类型 */
+export const RELATION_SEARCH_SHOW_TYPE = {
+  CARD: 1,
+  LIST: 2,
+  TEXT: 3,
 };
 
 /** 工作表表格位置 */
@@ -224,7 +234,7 @@ export const SYSTEM_CONTROLS = [
   },
   {
     controlId: 'caid',
-    controlName: _l('创建者'),
+    controlName: _l('创建人'),
     controlPermissions: '100',
     type: 26,
     display: true,
@@ -245,12 +255,42 @@ export const SYSTEM_CONTROLS = [
   },
 ];
 
-export const CONTROL_EDITABLE_BLACKLIST = [22, 25, 30, 31, 32, 33, 34, 37, 42, 45, 47];
+export const CONTROL_EDITABLE_WHITELIST = [
+  2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 14, 15, 16, 19, 23, 24, 26, 27, 28, 29, 35, 36, 40, 41, 46, 48,
+];
 
 export const SHEET_VIEW_HIDDEN_TYPES = [
   10010, // REMARK 备注
-  22, // SPLIT_LINE 分段
+  22, // SPLIT_LINE 分割线
   43, // OCR
   45, // EMBED 嵌入
   49, // SEARCH_BTN 查询按钮
+  51, // RELATION_SEARCH 查询记录
+];
+
+// 子表excel导入支持的字段
+export const CHILD_TABLE_ALLOW_IMPORT_CONTROL_TYPES = [
+  WIDGETS_TO_API_TYPE_ENUM.TEXT,
+  WIDGETS_TO_API_TYPE_ENUM.NUMBER,
+  WIDGETS_TO_API_TYPE_ENUM.MONEY,
+  WIDGETS_TO_API_TYPE_ENUM.EMAIL,
+  WIDGETS_TO_API_TYPE_ENUM.DATE,
+  WIDGETS_TO_API_TYPE_ENUM.DATE_TIME,
+  WIDGETS_TO_API_TYPE_ENUM.TIME,
+  WIDGETS_TO_API_TYPE_ENUM.MOBILE_PHONE,
+  WIDGETS_TO_API_TYPE_ENUM.TELEPHONE,
+  WIDGETS_TO_API_TYPE_ENUM.AREA_PROVINCE,
+  WIDGETS_TO_API_TYPE_ENUM.AREA_CITY,
+  WIDGETS_TO_API_TYPE_ENUM.AREA_COUNTY,
+  WIDGETS_TO_API_TYPE_ENUM.DROP_DOWN,
+  WIDGETS_TO_API_TYPE_ENUM.FLAT_MENU,
+  WIDGETS_TO_API_TYPE_ENUM.MULTI_SELECT,
+  WIDGETS_TO_API_TYPE_ENUM.USER_PICKER,
+  WIDGETS_TO_API_TYPE_ENUM.DEPARTMENT,
+  WIDGETS_TO_API_TYPE_ENUM.ORG_ROLE,
+  WIDGETS_TO_API_TYPE_ENUM.SWITCH,
+  WIDGETS_TO_API_TYPE_ENUM.SCORE,
+  WIDGETS_TO_API_TYPE_ENUM.RICH_TEXT,
+  WIDGETS_TO_API_TYPE_ENUM.CRED,
+  WIDGETS_TO_API_TYPE_ENUM.RELATE_SHEET,
 ];

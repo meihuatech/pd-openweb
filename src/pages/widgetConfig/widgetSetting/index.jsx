@@ -44,7 +44,6 @@ const SettingWrap = styled.div`
   overflow-x: hidden;
   flex-shrink: 0;
   background-color: #fff;
-  border-left: 1px solid #ddd;
   .emptyStatus {
     margin-top: 240px;
     text-align: center;
@@ -71,6 +70,7 @@ function WidgetSetting(props) {
   const queryConfig = _.find(queryConfigs, item => item.controlId === controlId) || {};
 
   const onChange = (obj, callback) => {
+    if (isEmpty(obj)) return;
     handleDataChange(controlId, { ...data, ...obj }, callback);
   };
 
@@ -114,7 +114,8 @@ function WidgetSetting(props) {
               {canAdjustWidth(widgets, data) && <WidgetWidth {...allProps} handleClick={handleAdjustWidthClick} />}
               {(HAS_EXPLAIN_CONTROL.includes(type) ||
                 (type === 11 && advancedSetting.showtype !== '2') ||
-                (type === 10 && advancedSetting.checktype === '1')) && <WidgetExplain {...allProps} />}
+                (type === 10 && advancedSetting.checktype === '1') ||
+                (type === 29 && advancedSetting.showtype === '3')) && <WidgetExplain {...allProps} />}
               {includes([9, 10, 11], type) && _.find(options, i => i.key === 'other' && !i.isDeleted) && (
                 <WidgetOtherExplain {...allProps} />
               )}

@@ -42,9 +42,13 @@
 
     .customFormItemControl {
       .customFormControlBox {
+        font-size: 13px;
         &.customFormControlOCR {
           border-color: #e0e0e0 !important;
           max-width: 100%;
+          &:hover {
+            background-color: #fff !important;
+          }
         }
       }
     }
@@ -59,7 +63,9 @@
       &:not(.formBoxNoBorder):not(.relateRecord):not(.customFormControlSwitch):not(.customFormControlScore) {
         padding-right: 12px !important;
       }
-      &:not([type='tel']):not(.formBoxNoBorder):not(.relateRecord):not(.customFormControlSwitch):not(.customFormControlScore) {
+      &:not([type='tel']):not(.formBoxNoBorder):not(.relateRecord):not(.customFormControlSwitch):not(
+          .customFormControlScore
+        ) {
         padding-left: 12px !important;
       }
       &.controlDisabled {
@@ -117,17 +123,22 @@
     float: left;
     width: 100%;
     position: relative;
+    flex-direction: column;
     padding: 6px 12px;
     box-sizing: border-box;
 
-    .RefreshBtn {
+    .formItemHoverShow {
       display: none;
-      i {
-        display: block;
-        &.isLoading {
-          animation: rotate 2s linear infinite;
-          color: #2196f3;
-        }
+    }
+
+    &.customFormItemRow {
+      flex-direction: row;
+      .customFormItemLabel {
+        width: auto;
+        align-items: flex-start;
+      }
+      &::after {
+        display: none;
       }
     }
 
@@ -136,6 +147,12 @@
       display: block;
       width: 100%;
       clear: both;
+    }
+
+    &:hover {
+      .formItemHoverShow {
+        display: inline-block;
+      }
     }
   }
 
@@ -151,7 +168,6 @@
     display: flex;
     align-items: center;
     box-sizing: border-box;
-    z-index: 1;
     position: relative;
     font-weight: bold;
     width: 100%;
@@ -164,12 +180,38 @@
       }
     }
 
+    &.customFormItemLabelRow {
+      padding-top: 8px;
+      .requiredBtn {
+        top: 10px;
+      }
+    }
+
+    .requiredBtn {
+      position: absolute;
+      left: -8px;
+      top: 3px;
+      color: #f44336;
+    }
+
+    .RefreshBtn {
+      display: none;
+      padding-top: 4px;
+      i {
+        display: block;
+        &.isLoading {
+          animation: rotate 2s linear infinite;
+          color: #2196f3;
+        }
+      }
+    }
+
     .hideTitleLabel {
       display: none;
     }
 
     .descBoxInfo {
-      margin-left: 8px;
+      padding-top: 2px;
     }
 
     .customFormItemLoading {
@@ -188,6 +230,8 @@
     width: 100%;
     box-sizing: border-box;
     position: relative;
+    flex: 1;
+    min-width: 0;
 
     .maskIcon {
       position: absolute;
@@ -442,7 +486,7 @@
       }
 
       &.customFormControlOCR {
-        padding: 0 24px;
+        padding: 0 16px;
         display: inline-flex !important;
         align-items: center;
         cursor: pointer;
@@ -615,6 +659,7 @@
       background: #fff !important;
       padding-left: 0 !important;
       padding-right: 0 !important;
+      line-height: 20px;
       &.spacing {
         letter-spacing: 2px;
       }
@@ -634,12 +679,19 @@
 
     .customFormRelationBtn {
       background: transparent;
-      border: none;
-      padding: 0;
       height: 34px;
-      outline: none;
       display: flex;
       align-items: center;
+      outline: none;
+      width: max-content;
+      padding: 0 16px;
+      border: 1px solid #ddd;
+      border-radius: 3px;
+      font-weight: 500;
+      font-size: 13px;
+      &:hover {
+        background-color: #f5f5f5;
+      }
     }
 
     > .ming.Dropdown {
@@ -688,6 +740,7 @@
       }
     }
 
+    .groupRow,
     .groupColumn {
       &.ming.CheckboxGroup {
         flex-direction: column;
@@ -718,6 +771,21 @@
       }
     }
 
+    .groupRow {
+      &.ming.CheckboxGroup {
+        flex-direction: row !important;
+        .Checkbox {
+          margin-right: 20px !important;
+        }
+      }
+      .RadioGroupCon {
+        flex-direction: row !important;
+        .Radio {
+          margin-right: 20px !important;
+        }
+      }
+    }
+
     .ming.RadioGroup2 {
       .RadioGroupCon {
         display: flex;
@@ -727,7 +795,6 @@
           display: flex;
           min-width: 0;
           margin-bottom: 10px;
-          width: 145px;
 
           &--disabled {
             color: #333;
@@ -756,17 +823,27 @@
           }
         }
       }
+      .horizonArrangementRadio {
+        flex-direction: row !important;
+        .Radio {
+          margin-right: 20px !important;
+        }
+      }
     }
 
     .ming.CheckboxGroup {
       display: flex;
       flex-wrap: wrap;
 
+      .flexWidth > span:nth-child(2) {
+        flex: 1;
+        min-width: 0;
+      }
+
       .Checkbox {
         display: flex;
         min-width: 0;
         margin-bottom: 10px;
-        width: 145px;
         margin-right: 20px;
 
         &--disabled {
@@ -964,6 +1041,11 @@
   white-space: nowrap;
   background: #f44336;
   font-size: 12px;
+  margin: 0 12px;
+
+  &.isChildTable {
+    transform: translateY(15px);
+  }
 
   span {
     white-space: normal;
@@ -1014,6 +1096,15 @@
       background-color: #fff !important;
     }
   }
+}
+.horizonArrangementItem {
+  max-width: 100% !important;
+  white-space: normal !important;
+  height: auto !important;
+}
+.showRadioTxtAll {
+  height: auto !important;
+  white-space: pre-wrap;
 }
 
 .ant-cascader-menus {

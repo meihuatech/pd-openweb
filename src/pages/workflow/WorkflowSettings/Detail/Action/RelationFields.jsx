@@ -70,7 +70,7 @@ export default class RelationFields extends Component {
   }
 
   render() {
-    const { data, SelectNodeObjectChange, updateSource } = this.props;
+    const { data, SelectNodeObjectChange, updateSource, isApproval } = this.props;
 
     return (
       <Fragment>
@@ -99,6 +99,7 @@ export default class RelationFields extends Component {
               companyId={this.props.companyId}
               processId={this.props.processId}
               selectNodeId={this.props.selectNodeId}
+              openNewFilter={!data.conditions.length}
               data={Object.assign({}, data, { controls: data.relationControls })}
               updateSource={updateSource}
               showRandom={true}
@@ -108,11 +109,17 @@ export default class RelationFields extends Component {
               sortText={_l(
                 '当查找到多个数据时，将按照以下排序规则获得第一条数据。如果未设置规则，按照字段配置的排序规则返回第一条数据',
               )}
+              filterEncryptCondition={true}
             />
-            <FindResult
-              executeType={data.executeType}
-              switchExecuteType={executeType => updateSource({ executeType })}
-            />
+
+            {!isApproval && (
+              <FindResult
+                executeType={data.executeType}
+                switchExecuteType={executeType => updateSource({ executeType })}
+              />
+            )}
+
+            {isApproval && <div className="mTop20 bold">{_l('未获取到数据时：继续执行')}</div>}
           </Fragment>
         )}
       </Fragment>

@@ -6,7 +6,14 @@ import { LoadDiv, Icon, Checkbox, Tooltip } from 'ming-ui';
 import { Dropdown } from 'antd';
 import EditUser from '../EditUser';
 import classNames from 'classnames';
-import { updateUserOpList, removeUserFromSet, addUserToSet, updateSelectAll } from '../../actions/current';
+import {
+  updateUserOpList,
+  removeUserFromSet,
+  addUserToSet,
+  updateSelectAll,
+  fetchInActive,
+  fetchApproval,
+} from '../../actions/current';
 import { loadUsers, loadInactiveUsers, loadApprovalUsers, loadAllUsers } from '../../actions/entities';
 import cx from 'classnames';
 import './userItem.less';
@@ -58,7 +65,6 @@ class UserTable extends React.Component {
 
   componentWillUnmount() {
     clearActiveDialog(this.props);
-    localStorage.removeItem('columnsInfoData');
   }
 
   shouldComponentUpdate(nextProps, nextState) {
@@ -178,15 +184,16 @@ class UserTable extends React.Component {
   };
 
   renderThead = props => {
-    const {
+    let {
       isThisPageCheck,
       isSelectAll,
       dispatch,
       selectCount,
       typeCursor,
       usersCurrentPage = [],
-      chargeUsers,
       searchId = [],
+      isSearch,
+      searchAccountIds,
     } = props;
     let { columnsInfo, dropDownVisible } = this.state;
     let columnsInfoData = JSON.parse(localStorage.getItem('columnsInfoData')) || [];
@@ -204,6 +211,11 @@ class UserTable extends React.Component {
     });
     let setWidth = $('.listInfo') && totalColWidth > $('.listInfo').width();
     let actWidth = $('.listInfo').height() > 48 * usersCurrentPage.length || searchId.length ? 80 : 90;
+    const selectDatas =
+      isSearch && !!searchId[0] && searchAccountIds.length > 0
+        ? searchAccountIds.filter(user => user.accountId === searchId[0])
+        : usersCurrentPage;
+
     return (
       <thead>
         <tr>
@@ -212,17 +224,15 @@ class UserTable extends React.Component {
               className={classNames('checkBox', {
                 showCheckBox: isCheck || selectCount > 0,
                 hasSelectCount: selectCount > 0,
-                // opacity0: typeCursor === 2 || typeCursor === 3,
-                checkBoxHalf: selectCount > 0 && selectCount !== usersCurrentPage.length,
+                checkBoxHalf: selectCount > 0 && selectCount !== selectDatas.length,
               })}
             >
               <Checkbox
                 ref="example"
                 className="TxtMiddle InlineBlock mRight0 checked_selected"
                 checked={isCheck}
-                // id="1"
                 onClick={(checked, id) => {
-                  let accountIds = _.map(props.usersCurrentPage, user => user.accountId);
+                  let accountIds = _.map(selectDatas, user => user.accountId);
                   if (!isCheck) {
                     dispatch(addUserToSet(accountIds));
                   } else {
@@ -230,19 +240,6 @@ class UserTable extends React.Component {
                   }
                 }}
               ></Checkbox>
-              {/* <DropDownCheck
-              className='Gray_75'
-              chooseThisPage={() => {
-                let accountIds = _.map(props.usersCurrentPage, user => user.accountId);
-                // if (!isCheck) {
-                //   dispatch(addUserToSet(accountIds));
-                // } else {
-                //   dispatch(removeUserFromSet(accountIds));
-                // }
-                dispatch(addUserToSet(accountIds));
-              }} chooseAll={() => {
-                dispatch(updateSelectAll(true))
-              }} /> */}
             </th>
           )}
           {this.isHideCurrentColumn('name') && (
@@ -330,7 +327,16 @@ class UserTable extends React.Component {
           dateNow={Date.now()}
           editCurrentUser={this.state.editCurrentUser}
           clickRow={() => {
-            this.setState({ openChangeUserInfoDrawer: true, editCurrentUser: user });
+            this.setState({
+              openChangeUserInfoDrawer: true,
+              editCurrentUser: {
+                ...user,
+                departmentInfos: (user.departmentInfos || user.departments).map(v => ({
+                  departmentId: v.departmentId || v.id,
+                  departmentName: v.departmentName || v.name,
+                })),
+              },
+            });
           }}
         />
       );
@@ -407,6 +413,8 @@ class UserTable extends React.Component {
             cancelInviteRemove={() => {
               dispatch(loadInactiveUsers(projectId, 1));
             }}
+            fetchInActive={() => dispatch(fetchInActive(projectId))}
+            fetchApproval={() => dispatch(fetchApproval(projectId))}
           />
         )}
       </div>

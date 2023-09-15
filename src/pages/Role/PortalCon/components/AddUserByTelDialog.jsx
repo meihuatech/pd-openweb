@@ -4,7 +4,6 @@ import { connect } from 'react-redux';
 import { bindActionCreators } from 'redux';
 import * as actions from '../redux/actions';
 import { Icon, Dialog, Checkbox, Radio, Dropdown } from 'ming-ui';
-import 'src/components/uploadAttachment/uploadAttachment';
 import cx from 'classnames';
 import externalPortalAjax from 'src/api/externalPortal';
 import Tel from './Tel';
@@ -96,7 +95,7 @@ const Wrap = styled.div`
     }
   }
 `;
-const TYPELIST = ['手机邀请', '邮箱邀请'];
+const TYPELIST = [_l('手机邀请'), _l('邮箱邀请')];
 function AddUserByTelDialog(props) {
   const { appId, show, setAddUserByTelDialog, getUserList, roleList, registerMode = {} } = props;
   const roleId = props.roleId || roleList.find(o => o.isDefault).roleId;
@@ -176,6 +175,13 @@ function AddUserByTelDialog(props) {
             />
           );
         })}
+        {md.global.Config.IsPlatformLocal && (
+          <p className="mTop16">
+            {_l(
+              '短信0.05元/条、邮件0.03/封，自动从企业账户扣费，请保持企业账户余额充足，目前短信邀请外部用户仅支持大陆手机号',
+            )}
+          </p>
+        )}
         <div className="list">
           {list.map((o, i) => {
             return (

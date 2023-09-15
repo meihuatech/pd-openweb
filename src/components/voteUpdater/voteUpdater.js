@@ -1,5 +1,5 @@
 import './voteUpdater.css';
-import doT from '@mdfe/dot';
+import doT from 'dot';
 import 'src/components/uploadAttachment/uploadAttachment';
 import 'src/components/mdDatePicker/mdDatePicker';
 import _ from 'lodash';
@@ -101,7 +101,7 @@ import moment from 'moment';
           $votePicContainer.find('.votePicDesc').show();
           $votePicContainer
             .find('.votePicName')
-            .html(attachment.originalFileName + attachment.fileExt)
+            .text(attachment.originalFileName + attachment.fileExt)
             .attr('title', attachment.originalFileName + attachment.fileExt)
             .show();
           var fullFilePath = attachment.serverName + attachment.filePath + attachment.fileName + attachment.fileExt;

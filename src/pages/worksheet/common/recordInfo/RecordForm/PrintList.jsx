@@ -10,8 +10,10 @@ import webCacheAjax from 'src/api/webCache';
 import { generatePdf } from 'worksheet/common/PrintQrBarCode';
 import { getPrintCardInfoOfTemplate } from 'worksheet/common/PrintQrBarCode/enum';
 import { getFeatureStatus, buriedUpgradeVersionDialog } from 'src/util';
+import { VersionProductType } from 'src/util/enum';
 import { isOpenPermit } from 'src/pages/FormSet/util.js';
 import { permitList } from 'src/pages/FormSet/config.js';
+import { PRINT_TYPE_STYLE, PRINT_TYPE } from 'src/pages/Print/config';
 import _ from 'lodash';
 const MenuItemWrap = styled(MenuItem)`
   &.active,
@@ -34,9 +36,6 @@ const SecTitle = styled.div`
   font-size: 12px;
   margin: 12px 16px 4px;
 `;
-
-const FEATURE_ID = 20;
-
 export default class PrintList extends Component {
   static propTypes = {
     viewId: PropTypes.string,
@@ -66,7 +65,8 @@ export default class PrintList extends Component {
         viewId,
       }).then(tempList => {
         let list = !viewId ? tempList.filter(o => o.range === 1) : tempList;
-        this.setState({ tempList: list.sort((a, b) => a.type - b.type), tempListLoaded: true });
+        const values = _.values(PRINT_TYPE);
+        this.setState({ tempList: list.sort((a, b) => values.indexOf(a.type) - values.indexOf(b.type)), tempListLoaded: true });
       });
     }
   }
@@ -112,7 +112,7 @@ export default class PrintList extends Component {
     } = this.props;
     const { tempList, showPrintGroup } = this.state;
     let attriData = controls.filter(it => it.attribute === 1);
-    const featureType = getFeatureStatus(projectId, FEATURE_ID);
+    const featureType = getFeatureStatus(projectId, VersionProductType.wordPrintTemplate);
     if (tempList.length <= 0) {
       return isOpenPermit(permitList.recordPrintSwitch, sheetSwitchPermit, viewId) ? (
         <MenuItemWrap
@@ -123,7 +123,7 @@ export default class PrintList extends Component {
             this.menuPrint();
           }}
         >
-          <span className="mLeft15">{_l('打印')}</span>
+          <span className="mLeft15">{_l('打印%02002')}</span>
         </MenuItemWrap>
       ) : (
         ''
@@ -149,10 +149,12 @@ export default class PrintList extends Component {
                   })}
                 >
                   {tempList.map(it => {
+                    let isCustom = [2, 5].includes(it.type);
+
                     return (
                       <MenuItemWrap
                         className=""
-                        icon={<Icon icon={getPrintCardInfoOfTemplate(it).icon} className="Font18" />}
+                        icon={isCustom ? <span className={`${PRINT_TYPE_STYLE[it.type].fileIcon} fileIcon`}></span> : <Icon icon={getPrintCardInfoOfTemplate(it).icon} className="Font18" />}
                         onClick={async () => {
                           onItemClick();
                           if (window.isPublicApp) {
@@ -179,7 +181,7 @@ export default class PrintList extends Component {
                             });
                           } else {
                             if (it.type !== 0 && featureType === '2') {
-                              buriedUpgradeVersionDialog(projectId, FEATURE_ID);
+                              buriedUpgradeVersionDialog(projectId, VersionProductType.wordPrintTemplate);
                               return;
                             }
                             let printId = it.id;
@@ -195,6 +197,7 @@ export default class PrintList extends Component {
                               appId,
                               name: it.name,
                               attriData: attriData[0],
+                              fileTypeNum: it.type,
                             };
                             let printKey = Math.random().toString(36).substring(2);
                             webCacheAjax.add({
@@ -241,7 +244,7 @@ export default class PrintList extends Component {
             icon={<Icon icon="print" className="Font17 mLeft5" />}
           >
             <span className="mLeft15">
-              {tempList.filter(o => o.type !== 0).length > 0 ? _l('打印/导出') : _l('打印')}
+              {tempList.filter(o => o.type !== 0).length > 0 ? _l('打印/导出') : _l('打印%02002')}
             </span>
             <Icon icon="arrow-right-tip" style={{ left: 'auto', right: 15 }} className="Font14 mLeft5" />
           </MenuItemWrap>

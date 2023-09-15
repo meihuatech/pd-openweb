@@ -32,6 +32,7 @@ export default function ColumnHead(props) {
     _.get(control, 'advancedSetting.datamask') === '1' && _.get(control, 'advancedSetting.isdecrypt') === '1';
   return (
     <BaseColumnHead
+      canDrag={false}
       className={className}
       style={style}
       control={control}
@@ -59,7 +60,7 @@ export default function ColumnHead(props) {
           {maskData && (
             <MenuItem onClick={onShowFullValue}>
               <i className="icon icon-eye_off"></i>
-              {_l('解密')}
+              {_l('解码')}
             </MenuItem>
           )}
           {canFilter && !selected && !isShowOtherField && (

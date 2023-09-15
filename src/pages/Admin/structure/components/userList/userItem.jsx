@@ -12,7 +12,14 @@ import {
   loadAllUsers,
   updateFullDepartmentInfo,
 } from '../../actions/entities';
-import { updateUserOpList, addUserToSet, removeUserFromSet, emptyUserSet } from '../../actions/current';
+import {
+  updateUserOpList,
+  addUserToSet,
+  removeUserFromSet,
+  emptyUserSet,
+  fetchInActive,
+  fetchApproval,
+} from '../../actions/current';
 import cx from 'classnames';
 import TransferDialog from '../../modules/dialogHandover';
 import RefuseUserJoinDia from '../../modules/refuseUserJoinDia';
@@ -111,6 +118,7 @@ class OpList extends Component {
                           setValue();
                           if (result) {
                             dispatch(loadInactiveUsers(projectId, 1));
+                            dispatch(fetchInActive(projectId));
                           } else {
                             alert(_l('取消失败'), 2);
                           }
@@ -308,6 +316,7 @@ class UserItem extends Component {
             },
             () => {
               if (isOk) {
+                dispatch(fetchApproval());
                 dispatch(loadApprovalUsers(projectId, 1));
               }
             },
@@ -362,7 +371,7 @@ class UserItem extends Component {
           alert(_l('设置成功', 1));
           refreshData(departmentId, typeCursor, projectId, 1, dispatch);
         } else {
-          alert(_l('设置失败', 2));
+          alert(_l('设置失败'), 2);
         }
       });
   };

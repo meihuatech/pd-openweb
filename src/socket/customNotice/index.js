@@ -1,5 +1,6 @@
 import React from 'react';
 import { antNotification, Icon } from 'ming-ui';
+import { renderBtnList } from 'ming-ui/functions/notify';
 import ErrorDialog from 'src/pages/worksheet/common/WorksheetBody/ImportDataFromExcel/ErrorDialog';
 import { downloadFile } from 'src/util';
 import { navigateTo } from 'src/router/navigateTo';
@@ -30,38 +31,47 @@ export default function customNotice() {
         }
         if (href.indexOf('excelerrorpage') > -1) {
           const id = href.slice(href.indexOf('excelbatcherrorpage') + 15).split('/');
-          new ErrorDialog({ fileKey: id[1], isBatch: true});
+          new ErrorDialog({ fileKey: id[1], isBatch: true });
         }
 
-        if (href.indexOf('backup') > -1) {
+        if (href.indexOf('backup') > -1 || href.indexOf('restore') > -1) {
           const currentAppId = location.href.slice(
-            location.href.indexOf('/app/') + 5,
-            location.href.indexOf('/app/') + 41,
+            location.href.indexOf('app/') + 4,
+            location.href.indexOf('app/') + 40,
           );
-          const appId = href.slice(href.indexOf('/app/') + 5, href.indexOf('/app/') + 41);
+          const appId = href.slice(href.indexOf('app/') + 4, href.indexOf('app/') + 40);
 
-          if (currentAppId === appId) {
-            navigateTo(`${location.pathname}?backup`);
+          if (href.indexOf('backup') > -1) {
+            if (currentAppId === appId) {
+              navigateTo(`${location.pathname}?backup`);
+            } else {
+              navigateTo(`/app/${appId}/?backup`);
+            }
           } else {
-            navigateTo(`/app/${appId}/?backup`);
+            if (currentAppId === appId) {
+              location.href = `/app/${appId}`;
+            } else {
+              navigateTo(`/app/${appId}`);
+            }
           }
-        }
-
-        if (href.indexOf('restore') > -1) {
-          const url = location.href.slice(0, location.href.indexOf('/app/') + 41);
-          location.assign(url);
         }
       }
     });
 
     socket.on('custom', data => {
-      const { id, status, title, msg } = data;
+      const { id, status, title, msg, link, color } = data;
       let action = '';
+      const linkBtn = {
+        text: _l('查看详情'),
+        onClick: () => window.open(link),
+      };
 
       if (status === 1) {
         action = 'info';
       } else if (status === 2) {
         action = 'success';
+      } else if(status === 3) {
+        action = 'warning';
       } else {
         action = 'error';
       }
@@ -74,6 +84,8 @@ export default function customNotice() {
         message: title,
         description: <div dangerouslySetInnerHTML={{ __html: msg }} />,
         loading: status === 1,
+        btn: link ? renderBtnList([linkBtn]) : undefined,
+        color,
         onBtnClick: () => {
           antNotification.close(id);
         },

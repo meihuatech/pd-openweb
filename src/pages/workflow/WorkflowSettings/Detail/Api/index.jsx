@@ -50,7 +50,7 @@ export default class Api extends Component {
           .forEach(item => {
             const parentNode = _.find(result.subProcessVariables, o => o.controlId === item.dataSource);
 
-            if (_.includes([10000007, 10000008], parentNode.type)) {
+            if (parentNode && _.includes([10000007, 10000008], parentNode.type)) {
               result.fields.forEach(o => {
                 if (o.fieldId === item.controlId) {
                   o.dataSource = parentNode.controlId;
@@ -180,7 +180,7 @@ export default class Api extends Component {
                   <Icon
                     icon="task-new-detail"
                     className="mLeft10 Font12 ThemeColor3 ThemeHoverColor2 pointer"
-                    onClick={() => window.open(`/integrationApi/${companyId}/${data.appId}`)}
+                    onClick={() => window.open(`/integrationApi/${data.appId}`)}
                   />
                 </div>
                 {(data.app.explain || data.app.describe) && (
@@ -236,7 +236,7 @@ export default class Api extends Component {
           bg="BGBlueAsh"
           updateSource={this.updateSource}
         />
-        <div className="flex mTop20">
+        <div className="flex">
           <ScrollView>
             <div className="workflowDetailBox">{this.renderContent()}</div>
           </ScrollView>

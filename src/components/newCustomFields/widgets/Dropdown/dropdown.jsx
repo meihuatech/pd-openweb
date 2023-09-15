@@ -41,7 +41,7 @@ export default class Widgets extends Component {
         key={item.key}
         className={cx(
           'ellipsis mTop5 mBottom5 mRight5 Font13',
-          { White: enumDefault2 === 1 && !isLightColor(item.color) },
+          { White: enumDefault2 === 1 && !isLightColor(item.color), isEmpty: item.key === 'isEmpty' },
           enumDefault2 === 1 ? 'customAntDropdownTitleWithBG' : 'customAntDropdownTitle',
         )}
         style={{ background: enumDefault2 === 1 ? item.color : '' }}
@@ -57,20 +57,25 @@ export default class Widgets extends Component {
    * 渲染列表
    */
   renderList = item => {
-    const { enumDefault2, value, disabled } = this.props;
+    const { enumDefault2, value, disabled, advancedSetting } = this.props;
     const { otherValue } = getCheckAndOther(value);
     const isMobile = browserIsMobile();
+    const { direction, checktype } = advancedSetting || {};
 
     return (
       <span
         className={cx(
-          'ellipsis customRadioItem',
-          { White: enumDefault2 === 1 && !isLightColor(item.color) },
-          { 'pLeft12 pRight12': enumDefault2 === 1 },
+          'customRadioItem',
+          { White: enumDefault2 === 1 && !isLightColor(item.color), ellipsis: !browserIsMobile() },
+          {
+            'pLeft12 pRight12': enumDefault2 === 1,
+            horizonArrangementItem: checktype === '2' && (direction === '0' || direction === '2') && browserIsMobile(),
+            showRadioTxtAll: browserIsMobile(),
+          },
         )}
         style={{ background: enumDefault2 === 1 ? item.color : '' }}
       >
-        {isMobile && item.key === 'other' ? (otherValue && disabled ? otherValue : _l('其他')) : item.value}
+        {isMobile && item.key === 'other' ? (otherValue && disabled ? otherValue : item.value) : item.value}
       </span>
     );
   };
@@ -113,7 +118,7 @@ export default class Widgets extends Component {
             renderText={this.renderList}
             {...this.props}
           >
-            <div className={cx('w100 customFormControlBox', { controlDisabled: disabled })}>
+            <div className={cx('w100 customFormControlBox', { controlDisabled: disabled })} style={{ height: 'auto' }}>
               <div className="flexRow h100" style={{ alignItems: 'center', minHeight: 34 }}>
                 <div className="flex minWidth0">
                   {checkIds.length ? (
@@ -141,7 +146,11 @@ export default class Widgets extends Component {
 
     // 搜索
     if (keywords.length) {
-      noDelOptions = noDelOptions.filter(item => item.value.indexOf(keywords) > -1);
+      noDelOptions = noDelOptions.filter(
+        item =>
+          (item.value || '').search(new RegExp(keywords.trim().replace(/([,.+?:()*\[\]^$|{}\\-])/g, '\\$1'), 'i')) !==
+          -1,
+      );
     }
     const checkItems = noDelOptions
       .concat(delOptions)
@@ -164,6 +173,7 @@ export default class Widgets extends Component {
           placeholder={hint}
           suffixIcon={<Icon icon="arrow-down-border Font14" />}
           labelInValue={true}
+          optionFilterProp="children"
           filterOption={() => true}
           notFoundContent={<span className="Gray_9e">{_l('无搜索结果')}</span>}
           onSearch={keywords => this.setState({ keywords })}
@@ -194,7 +204,11 @@ export default class Widgets extends Component {
               <Select.Option
                 value={item.key}
                 key={i}
-                className={cx({ 'ant-select-item-option-selected': _.includes(checkIds, item.key) })}
+                text={item.text}
+                className={cx({
+                  'ant-select-item-option-selected': _.includes(checkIds, item.key),
+                  isEmpty: item.key === 'isEmpty',
+                })}
               >
                 {this.renderList(item)}
               </Select.Option>

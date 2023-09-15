@@ -1,8 +1,8 @@
 @font-face {
   font-family: "MD_Icon"; /* Project id 2032949 */
-  src: url('iconfont.woff2?t=1670813516594') format('woff2'),
-       url('iconfont.woff?t=1670813516594') format('woff'),
-       url('iconfont.ttf?t=1670813516594') format('truetype');
+  src: url('iconfont.woff2?t=1692359766973') format('woff2'),
+       url('iconfont.woff?t=1692359766973') format('woff'),
+       url('iconfont.ttf?t=1692359766973') format('truetype');
 }
 
 .MD_Icon {
@@ -11,6 +11,210 @@
   font-style: normal;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+.icon-reader:before {
+  content: "\e663";
+}
+
+.icon-copy_all:before {
+  content: "\e661";
+}
+
+.icon-global_variable:before {
+  content: "\e99a";
+}
+
+.icon-history_edu:before {
+  content: "\e98d";
+}
+
+.icon-thumb_up_alt:before {
+  content: "\e992";
+}
+
+.icon-cloud_sync_black_24dp:before {
+  content: "\e943";
+}
+
+.icon-ai1:before {
+  content: "\e92d";
+}
+
+.icon-history_toggle_off:before {
+  content: "\e98c";
+}
+
+.icon-all_run2:before {
+  content: "\ec20";
+}
+
+.icon-add-member3:before {
+  content: "\ec01";
+}
+
+.icon-a-search_off_black_24dp1:before {
+  content: "\e98a";
+}
+
+.icon-back:before {
+  content: "\e641";
+}
+
+.icon-home:before {
+  content: "\e642";
+}
+
+.icon-wechat_pay:before {
+  content: "\e984";
+}
+
+.icon-cleaning_services:before {
+  content: "\e97c";
+}
+
+.icon-up:before {
+  content: "\e973";
+}
+
+.icon-notifications_off:before {
+  content: "\eaa0";
+}
+
+.icon-unpin:before {
+  content: "\eaa1";
+}
+
+.icon-a-Data_integration1:before {
+  content: "\e939";
+}
+
+.icon-horizontal:before {
+  content: "\e63e";
+}
+
+.icon-mix:before {
+  content: "\e63f";
+}
+
+.icon-vertically:before {
+  content: "\e640";
+}
+
+.icon-add_link:before {
+  content: "\ebf6";
+}
+
+.icon-folder_special_black_24dp:before {
+  content: "\e93a";
+}
+
+.icon-view_agenda:before {
+  content: "\e935";
+}
+
+.icon-wysiwyg:before {
+  content: "\e932";
+}
+
+.icon-add:before {
+  content: "\e923";
+}
+
+.icon-trending:before {
+  content: "\ea98";
+}
+
+.icon-sync1:before {
+  content: "\ea99";
+}
+
+.icon-Worksheet_query:before {
+  content: "\ea9d";
+}
+
+.icon-leftmost:before {
+  content: "\ebd2";
+}
+
+.icon-rightmost:before {
+  content: "\ebe3";
+}
+
+.icon-left:before {
+  content: "\ebed";
+}
+
+.icon-right:before {
+  content: "\ebf3";
+}
+
+.icon-background_color:before {
+  content: "\eb9c";
+}
+
+.icon-data_bar:before {
+  content: "\ebcd";
+}
+
+.icon-switch_access_shortcut_black_24dp:before {
+  content: "\e931";
+}
+
+.icon-add1:before {
+  content: "\e7fe";
+}
+
+.icon-stats_bar_chart1:before {
+  content: "\ebba";
+}
+
+.icon-stats_symmetric_graph_chart:before {
+  content: "\ebc0";
+}
+
+.icon-stats_word_cloud_chart:before {
+  content: "\eba7";
+}
+
+.icon-stats_progress_bar_chart:before {
+  content: "\ebaf";
+}
+
+.icon-stats_instrument_panel_chart:before {
+  content: "\eb99";
+}
+
+.icon-stats_ranking_list_chart:before {
+  content: "\eba1";
+}
+
+.icon-custom_navigation:before {
+  content: "\ea96";
+}
+
+.icon-settings_overscan:before {
+  content: "\ea95";
+}
+
+.icon-ai:before {
+  content: "\e918";
+}
+
+.icon-format_color:before {
+  content: "\e65e";
+}
+
+.icon-gourup_default:before {
+  content: "\e6a2";
+}
+
+.icon-save_as_black_24dp:before {
+  content: "\e6a1";
+}
+
+.icon-group_inactive:before {
+  content: "\e6a0";
 }
 
 .icon-card:before {
@@ -755,10 +959,6 @@
 
 .icon-add_circle:before {
   content: "\ebf2";
-}
-
-.icon-add1:before {
-  content: "\ebf3";
 }
 
 .icon-account_circle:before {
@@ -2511,10 +2711,6 @@
 
 .icon-next-02:before {
   content: "\eafd";
-}
-
-.icon-add:before {
-  content: "\e7fe";
 }
 
 .icon-feed:before {

@@ -3,8 +3,9 @@ import ReactDom from 'react-dom';
 import WorksheetShareHeader from './header';
 import sheetAjax from 'src/api/worksheet';
 import preall from 'src/common/preall';
-import api from 'api/homeApp';
+import api from 'src/api/homeApp';
 import cx from 'classnames';
+import { getFilter } from 'worksheet/common/WorkSheetFilter/util';
 import { SYSTEM_CONTROL } from 'src/pages/widgetConfig/config/widget';
 import { controlState } from 'src/components/newCustomFields/tools/utils';
 import renderCellText from 'src/pages/worksheet/components/CellControls/renderText';
@@ -218,7 +219,27 @@ class WorksheetSahre extends React.Component {
   };
   //获取记录关联记录
   getRowRelationRowsData = (id, pageIndex) => {
-    const { rowRelationRowsData = {} } = this.state;
+    const { cardControls, rowRelationRowsData = {} } = this.state;
+    const control = _.find(cardControls, { controlId: id });
+    let filterControls;
+    if (control && control.type === 51) {
+      filterControls = getFilter({
+        control: { ...control, ignoreFilterControl: true },
+        formData: cardControls,
+        filterKey: 'resultfilters',
+      });
+      if (!filterControls) {
+        this.setState({
+          loading: false,
+          rowRelationRowsData: {
+            ...rowRelationRowsData,
+            rowsList: [],
+            count: 0,
+          },
+        });
+        return;
+      }
+    }
     let index = pageIndex ? pageIndex : 1;
     this.setState({
       controlId: id,
@@ -245,6 +266,7 @@ class WorksheetSahre extends React.Component {
       pageSize: PAGESIZE,
       getWorksheet: true,
       shareId: this.state.shareId,
+      filterControls: filterControls || [],
     });
 
     this.promiseRowRelationRows.then(data => {
@@ -276,7 +298,7 @@ class WorksheetSahre extends React.Component {
 
   getHeaderData = appId => {
     this.abortRequest(this.promiseAppDetail);
-    this.promiseAppDetail = api.getAppDetail({ appId }, { silent: true });
+    this.promiseAppDetail = api.getApp({ appId }, { silent: true });
     this.promiseAppDetail.then(data => {
       this.setState({
         iconUrl: data.iconUrl,
@@ -386,6 +408,7 @@ class WorksheetSahre extends React.Component {
           randStr: querydata.randStr,
           captchaType: querydata.captchaType,
           isGetWorksheet: true,
+          clientId: sessionStorage.getItem(`query_${id}`),
           // sortControls: controlSort,//不排序
         });
       } else {
@@ -413,7 +436,7 @@ class WorksheetSahre extends React.Component {
       this.promiseRowsData = sheetAjax.getPrint(sheetArgs);
     }
     this.promiseRowsData.then(data => {
-      let { resultCode } = data || {};
+      let { resultCode, clientId } = data || {};
       this.setState({
         pageIndex,
       });
@@ -426,40 +449,50 @@ class WorksheetSahre extends React.Component {
             relationRowDetailResultCode: resultCode,
           });
         } else {
-          if (resultCode === 14 && isPublicquery) {
-            //验证码错误
-            this.setState({
-              listLoading: false,
-              error: false,
-              loading: false,
-              step: SHARE_TYPE.PUBLICQUERYINPUT,
-            });
-            alert(_l('验证码错误'));
-            return;
-          }
-          if (resultCode === 4 && isPublicquery) {
-            //无数据
-            this.setState({
-              listLoading: false,
-              error: false,
-              loading: false,
-              step: SHARE_TYPE.WORKSHEET,
-              rowsList: [],
-            });
-            return;
-          }
-          if (resultCode === 8 && isPublicquery) {
-            //查询已关闭 visibleType: 1,
-            this.setState({
-              listLoading: false,
-              loading: false,
-              step: SHARE_TYPE.PUBLICQUERYINPUT,
-              rowsList: [],
-              publicqueryRes: {
-                visibleType: 1,
-              },
-            });
-            return;
+          if (isPublicquery) {
+            if (resultCode === 14) {
+              //需要重新验证
+              this.setState(
+                {
+                  step: SHARE_TYPE.PUBLICQUERYINPUT,
+                  loading: false,
+                  querydata: querydata,
+                },
+                () => {
+                  sessionStorage.getItem(`query_${id}`) && sessionStorage.removeItem(`query_${id}`);
+                  this.child.onSearch(querydata.controls);
+                },
+              );
+              return;
+            } else {
+              this.setState({
+                querydata: {},
+              });
+            }
+            if (resultCode === 4) {
+              //无数据
+              this.setState({
+                listLoading: false,
+                error: false,
+                loading: false,
+                step: SHARE_TYPE.WORKSHEET,
+                rowsList: [],
+              });
+              return;
+            }
+            if (resultCode === 8) {
+              //查询已关闭 visibleType: 1,
+              this.setState({
+                listLoading: false,
+                loading: false,
+                step: SHARE_TYPE.PUBLICQUERYINPUT,
+                rowsList: [],
+                publicqueryRes: {
+                  visibleType: 1,
+                },
+              });
+              return;
+            }
           }
           if (resultCode === 7) {
             this.setState({
@@ -469,6 +502,10 @@ class WorksheetSahre extends React.Component {
               errorMsg: _l('暂无权限查看'),
             });
             return;
+          }
+          if (isPublicquery) {
+            //有效期内
+            clientId && sessionStorage.setItem(`query_${id}`, clientId);
           }
           this.setState(
             {
@@ -613,6 +650,11 @@ class WorksheetSahre extends React.Component {
       return (
         <Publicquery
           publicqueryRes={publicqueryRes}
+          onRef={ref => {
+            this.child = ref;
+          }}
+          querydata={querydata}
+          shareId={shareId}
           searchFn={querydata => {
             this.setState(
               {

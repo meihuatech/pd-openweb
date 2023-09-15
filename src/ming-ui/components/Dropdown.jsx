@@ -7,9 +7,9 @@ import Menu from './Menu';
 import MenuItem from './MenuItem';
 import Icon from './Icon';
 import Trigger from 'rc-trigger';
-import formControl from 'ming-ui/decorators/formControl';
 import './less/Dropdown.less';
 import _ from 'lodash';
+import LoadDiv from './LoadDiv';
 
 const builtinPlacements = {
   left: {
@@ -38,7 +38,6 @@ const builtinPlacements = {
   },
 };
 
-@formControl
 class Dropdown extends Component {
   /* eslint-disable */
   static propTypes = {
@@ -73,10 +72,6 @@ class Dropdown extends Component {
      * 下拉列表最高高度
      */
     maxHeight: PropTypes.number,
-    /**
-     * 给withChildren用
-     */
-    $formDataChange: PropTypes.func,
     className: PropTypes.string,
     hoverTheme: PropTypes.bool, // hover变成主题色
     /**
@@ -178,6 +173,10 @@ class Dropdown extends Component {
      */
     onVisibleChange: PropTypes.func,
     /**
+     * 通过onVisibleChange异步获取下拉列表 loading状态
+     */
+    itemLoading: PropTypes.bool,
+    /**
      * render title
      */
     renderTitle: PropTypes.func,
@@ -191,7 +190,7 @@ class Dropdown extends Component {
   };
   /* eslint-enable */
   static defaultProps = {
-    noData: '无数据',
+    noData: _l('无数据'),
     placeholder: _l('请选择'),
     renderValue: '{{value}}',
     isAppendToBody: false,
@@ -214,9 +213,8 @@ class Dropdown extends Component {
     this.state = {
       value,
       showMenu: false,
-      keywords: '111',
+      keywords: '',
     };
-    this.props.$formDataChange(value);
   }
 
   componentWillReceiveProps(nextProps) {
@@ -225,7 +223,6 @@ class Dropdown extends Component {
       this.setState({
         value: nextProps.value,
       });
-      this.props.$formDataChange(nextProps.value);
     }
     if (_.isBoolean(nextProps.popupVisible)) {
       this.setState({ showMenu: nextProps.popupVisible });
@@ -281,7 +278,6 @@ class Dropdown extends Component {
       this.setState({
         value: item.value,
       });
-      this.props.$formDataChange(item.value);
     }
 
     if (this.props.selectClose) {
@@ -371,8 +367,18 @@ class Dropdown extends Component {
 
   displayMenu = () => {
     const { showMenu, keywords } = this.state;
-    const { data, maxHeight, menuStyle, menuClass, noData, children, isAppendToBody, openSearch, searchNull } =
-      this.props;
+    const {
+      data,
+      maxHeight,
+      menuStyle,
+      menuClass,
+      noData,
+      children,
+      isAppendToBody,
+      openSearch,
+      searchNull,
+      itemLoading,
+    } = this.props;
 
     const searchData = [];
 
@@ -435,6 +441,8 @@ class Dropdown extends Component {
       >
         {searchData && !this.checkIsNull(searchData) ? (
           this.renderListItem(searchData)
+        ) : itemLoading ? (
+          <LoadDiv />
         ) : (
           <MenuItem disabled>
             <div>{keywords ? (searchNull ? searchNull() : _l('暂无搜索结果')) : noData}</div>
@@ -494,7 +502,6 @@ class Dropdown extends Component {
                   this.setState({
                     value: undefined,
                   });
-                  this.props.$formDataChange(undefined);
                 }
                 if (this.props.selectClose) {
                   this.setState({

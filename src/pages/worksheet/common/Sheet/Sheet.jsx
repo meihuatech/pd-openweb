@@ -16,9 +16,10 @@ import GroupFilter from './GroupFilter';
 import { VIEW_DISPLAY_TYPE } from 'worksheet/constants/enum';
 import DragMask from 'worksheet/common/DragMask';
 import { Icon } from 'ming-ui';
-const { sheet, gallery } = VIEW_DISPLAY_TYPE;
+const { sheet, gallery, board, calendar, gunter } = VIEW_DISPLAY_TYPE;
 import './style.less';
 import _ from 'lodash';
+import { setSysWorkflowTimeControlFormat } from 'src/pages/worksheet/views/CalendarView/util.js';
 
 const Con = styled.div`
   flex: 1;
@@ -51,12 +52,21 @@ const Drag = styled.div(
   width: 10px;
   height: 100%;
   cursor: ew-resize;
-  border-left: 1px solid rgba(0,0,0,0.04);
+  border-left: 1px solid #e0e0e0;
   &:hover{
     border-left: 1px solid #2196f3;
   }
 `,
 );
+
+const EmptyStatus = styled.div`
+  color: #9e9e9e;
+  font-size: 17px;
+  display: flex;
+  flex: 1;
+  justify-content: center;
+  align-items: center;
+`;
 
 function Sheet(props) {
   const {
@@ -79,6 +89,7 @@ function Sheet(props) {
     chartId,
     showControlIds,
     showAsSheetView,
+    quickFilter,
     openNewRecord,
   } = props;
   const [viewConfigVisible, setViewConfigVisible] = useState(false);
@@ -91,9 +102,21 @@ function Sheet(props) {
   );
   let { viewId } = props;
   const { loadWorksheet } = props;
-  const view = _.find(views, { viewId }) || (!viewId && !chartId && views[0]) || {};
+  const showViews = views.filter(view => {
+    const showhide = _.get(view, 'advancedSetting.showhide') || '';
+    return !showhide.includes('hpc') && !showhide.includes('hide');
+  });
+  const view = _.find(views, { viewId }) || (!viewId && !chartId && (showViews.length ? showViews : views)[0]) || {};
   const hasGroupFilter =
     !_.isEmpty(view.navGroup) && view.navGroup.length > 0 && _.includes([sheet, gallery], String(view.viewType));
+  const showQuickFilter =
+    !_.isEmpty(view.fastFilters) &&
+    _.includes([sheet, gallery, board, calendar, gunter], String(view.viewType)) &&
+    !chartId;
+  const needClickToSearch =
+    showQuickFilter &&
+    !_.includes([sheet], String(view.viewType)) &&
+    _.get(view, 'advancedSetting.clicksearch') === '1';
   const basePara = {
     type,
     loading,
@@ -109,11 +132,18 @@ function Sheet(props) {
     openNewRecord,
     viewConfigVisible,
     setViewConfigVisible,
+    filtersGroup,
     groupFilterWidth: hasGroupFilter ? groupFilterWidth : 0,
     chartId,
     showControlIds,
     showAsSheetView,
   };
+  const viewComp =
+    needClickToSearch && _.isEmpty(quickFilter) ? (
+      <EmptyStatus>{_l('执行查询后显示结果')}</EmptyStatus>
+    ) : (
+      <View {...basePara} />
+    );
   useEffect(() => {
     if (worksheetId) {
       loadWorksheet(worksheetId);
@@ -131,7 +161,7 @@ function Sheet(props) {
   }, [view.viewId, worksheetId]);
 
   return (
-    <SheetContext.Provider base={basePara} value={{ config }}>
+    <SheetContext.Provider value={{ config, isRequestingRelationControls: worksheetInfo.isRequestingRelationControls }}>
       <Con className="worksheetSheet">
         {type === 'common' && worksheetInfo.name && (
           <DocumentTitle
@@ -158,9 +188,12 @@ function Sheet(props) {
             )}
             {type === 'single' && <SheetHeader {...basePara} onlyBatchOperate />}
             <Con id="worksheetRightContentBox">
-              {!_.isEmpty(view.fastFilters) && _.includes([sheet, gallery], String(view.viewType)) && !chartId && (
+              {showQuickFilter && (
                 <QuickFilterCon>
-                  <QuickFilter {...basePara} filters={view.fastFilters} />
+                  <QuickFilter
+                    {...basePara}
+                    filters={setSysWorkflowTimeControlFormat(view.fastFilters, worksheetInfo.switches)}
+                  />
                 </QuickFilterCon>
               )}
               {hasGroupFilter && !chartId ? (
@@ -193,10 +226,10 @@ function Sheet(props) {
                   {!_.get(window, 'shareState.isPublicView') && isOpenGroup && (
                     <Drag left={groupFilterWidth} onMouseDown={() => setDragMaskVisible(true)} />
                   )}
-                  <View {...basePara} />
+                  {viewComp}
                 </ConView>
               ) : (
-                <View {...basePara} />
+                viewComp
               )}
             </Con>
           </React.Fragment>
@@ -228,12 +261,14 @@ export default connect(
     groupId: state.sheet.base.groupId,
     worksheetId: state.sheet.base.worksheetId,
     viewId: state.sheet.base.viewId,
+    chartId: state.sheet.base.chartId,
     worksheetInfo: state.sheet.worksheetInfo,
     isCharge: state.sheet.isCharge,
     loading: state.sheet.loading,
     error: state.sheet.error,
     views: state.sheet.views,
     activeViewStatus: state.sheet.activeViewStatus,
+    quickFilter: state.sheet.quickFilter,
   }),
   dispatch =>
     bindActionCreators(

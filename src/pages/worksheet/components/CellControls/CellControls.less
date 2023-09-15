@@ -26,7 +26,7 @@
     display: inline-block;
     margin: 0 4px 4px 0;
     padding: 0 12px;
-    line-height: 24px;
+    line-height: 21px;
     vertical-align: middle;
     border-radius: 40px;
     color: #4d4d4d;
@@ -277,6 +277,16 @@
     position: relative;
     top: 2px;
   }
+  &.allowOpenList {
+    cursor: pointer;
+    &:hover {
+      color: #2196f3;
+      .icon {
+        color: #2196f3;
+      }
+      background-color: #dfebfa;
+    }
+  }
 }
 
 .cellSwitch {
@@ -341,16 +351,10 @@
   }
 }
 
-.cell.row-0 {
-  &.hover {
-    background-color: transparent !important;
-  }
-}
-
 .control-10,
 .control-11 {
   &:not(.columnHead) {
-    padding: 4.5px 6px;
+    padding: 6.5px 6px !important;
   }
 }
 .control-14,
@@ -424,7 +428,7 @@
 }
 
 .rowHeight-3 .linelimit {
-  -webkit-line-clamp: 5 !important;
+  -webkit-line-clamp: 6 !important;
 }
 
 .rowHeight-1 .linelimitcomp {
@@ -436,7 +440,7 @@
 }
 
 .rowHeight-3 .linelimitcomp {
-  -webkit-line-clamp: 4 !important;
+  -webkit-line-clamp: 6 !important;
 }
 
 .textControlInput {
@@ -460,7 +464,7 @@
   border: none !important;
   resize: none !important;
   line-height: 1.5em;
-  &.supportShiftEnter {
+  &.isMultipleLine {
     padding-bottom: 24px !important;
   }
 }
@@ -644,8 +648,33 @@
 .cellControlEdittingStatus {
   box-shadow: inset 0 0 0 2px #2d7ff9 !important;
 }
+
 .cellControlErrorStatus {
   box-shadow: inset 0 0 0 2px #f44336 !important;
+}
+
+.cell.cellControlErrorStatus:not(.isediting) {
+  box-shadow: none !important;
+  background-color: #fff0f1 !important;
+  &::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 0;
+    height: 0;
+    border: 4px solid #f44336;
+    border-right-color: transparent;
+    border-bottom-color: transparent;
+  }
+  &.row-0:hover {
+    &::before {
+      top: auto;
+      bottom: 0;
+      border-bottom-color: #f44336;
+      border-top-color: transparent;
+    }
+  }
 }
 
 .subList {
@@ -677,19 +706,17 @@
 .sheetViewTable {
   .cell.focus.editable {
     .guideText {
-      font-size: 13px;;
+      font-size: 13px;
       display: inline-block !important;
     }
   }
 }
-
 
 .workSheetTextCell {
   &.empty {
     text-align: left !important;
   }
 }
-
 
 .editableCellCon.maskHoverTheme {
   cursor: pointer;

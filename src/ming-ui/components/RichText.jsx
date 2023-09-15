@@ -21,6 +21,7 @@ let whiteListClone = Object.assign({}, whiteList, {
   thead: [],
   tr: [],
   figure: [],
+  oembed: ['url'],
   label: [],
   input: [],
   button: [],
@@ -179,13 +180,15 @@ const Wrapper = styled.div(
       border: 0 !important;
       background: none !important;
       padding: 0 !important;
+      min-height: auto !important;
     }
   }
 `,
 );
 class MyUploadAdapter {
-  constructor(loader) {
+  constructor(loader, tokenArgs) {
     this.loader = loader;
+    this.tokenArgs = tokenArgs;
   }
 
   // Starts the upload process.
@@ -249,7 +252,7 @@ class MyUploadAdapter {
       let fileExt = `.${File.GetExt(result.name)}`;
       let isPic = File.isPicture(fileExt);
       this.url = '';
-      getToken([{ bucket: isPic ? 4 : 2, ext: fileExt }]).then(res => {
+      getToken([{ bucket: isPic ? 4 : 2, ext: fileExt }], 9, this.tokenArgs).then(res => {
         data.append('token', res[0].uptoken);
         data.append('file', result);
         data.append('key', res[0].key);
@@ -285,6 +288,9 @@ class MyUploadAdapter {
 }
 
 export default ({
+  projectId,
+  appId,
+  worksheetId,
   data,
   disabled,
   onSave,
@@ -319,6 +325,11 @@ export default ({
       return 'en';
     }
   };
+  const tokenArgs = {
+    projectId,
+    appId,
+    worksheetId,
+  };
 
   function initEditor() {
     import('@mdfe/ckeditor5-custom-build').then(component => {
@@ -326,10 +337,13 @@ export default ({
       setTimeout(() => {
         if (!disabled && editorDom && editorDom.current && editorDom.current.editor) {
           editorDom.current.editor.plugins.get('FileRepository').createUploadAdapter = loader => {
-            return new MyUploadAdapter(loader);
+            return new MyUploadAdapter(loader, tokenArgs);
           };
           if (clickInit || autoFocus) {
             editorDom.current.editor.focus();
+            editorDom.current.editor.model.change(writer => {
+              writer.setSelection(writer.createPositionAt(editorDom.current.editor.model.document.getRoot(), 'end'));
+            });
           }
         }
       }, 20);
@@ -357,7 +371,6 @@ export default ({
             contenteditable="false"
             dangerouslySetInnerHTML={{
               __html: filterXSS(data || placeholder, {
-                stripIgnoreTag: true,
                 whiteList: newWhiteList,
                 css: false,
               }),
@@ -514,7 +527,7 @@ export default ({
         onReady={editor => {
           if (editor && editor.plugins) {
             editor.plugins.get('FileRepository').createUploadAdapter = loader => {
-              return new MyUploadAdapter(loader);
+              return new MyUploadAdapter(loader, tokenArgs);
             };
           }
         }}

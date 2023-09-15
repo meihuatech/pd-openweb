@@ -8,7 +8,7 @@ import { getItem } from '../../util';
 import { getPosition } from '../util';
 import SVG from 'svg.js';
 import DraggableRecord from './DraggableRecord';
-import { browserIsMobile } from 'src/util';
+import { browserIsMobile, addBehaviorLog } from 'src/util';
 
 const isMobile = browserIsMobile();
 
@@ -62,15 +62,16 @@ export default class SortableRecordItem extends Component {
   };
 
   // 获取连接线位置
-  getConnectLinePos = ({ stateTree, pid, data, scale }) => {
+  getConnectLinePos = ({ stateTree, pid, data, scale, view = {}, isStraightLine = false }) => {
     const { path = [], rowId } = data;
+    const { advancedSetting = {} } = view;
     const $ele = _.get(this.$itemWrap, ['current']);
     if ($ele && pid) {
       const getParent = this.getNode(stateTree, path.slice(0, -1));
       if (!getParent || _.isEmpty(getParent)) return {};
       const childrenCount = (_.get(getParent, 'children') || {}).length;
       if (!childrenCount) return {};
-      const $parent = document.getElementById(`${getParent.pathId.join('-')}`);
+      const $parent = $(`#${view.viewId}`).find(`#${getParent.pathId.join('-')}`)[0];
       if ($parent === $ele) return {};
       const currentIndex =
         _.findIndex(getParent.children, item => item === rowId || item.rowId === rowId || item.rowid === rowId) || 0;
@@ -80,22 +81,26 @@ export default class SortableRecordItem extends Component {
        */
 
       const controlPointX = ((childrenCount - currentIndex) / childrenCount) * 60;
-      return { controlPointX, ...getPosition($parent, $ele, scale) };
+      return {
+        controlPointX,
+        ...getPosition($parent, $ele, scale, isStraightLine || advancedSetting.hierarchyViewConnectLine === '1'),
+      };
     }
     return {};
   };
 
   // 绘制连接线
   drawConnector = () => {
-    const { data } = this.props;
+    const { data, view = {}, isStraightLine } = this.props;
     const { pathId } = data;
-    const $svgWrap = document.getElementById(`svg-${pathId.join('-')}`);
+    const { advancedSetting = {} } = view;
+    const $svgWrap = document.getElementById(`svg-${view.viewId}${pathId.join('-')}`);
 
     const position = this.getConnectLinePos(this.props);
 
     if (isEmpty(position)) return;
 
-    const { height = 0, top = 0, start = [], end = [], controlPointX } = position;
+    const { height = 0, top = 0, start = [], end = [], controlPointX, straightLineInflection = [] } = position;
     $($svgWrap).height(height).css({ top: -top });
 
     // 获取控制点
@@ -103,9 +108,14 @@ export default class SortableRecordItem extends Component {
     if ($svgWrap.childElementCount > 0) {
       $svgWrap.childNodes.forEach(child => $svgWrap.removeChild(child));
     }
-    const draw = SVG(`svg-${pathId.join('-')}`).size('100%', '100%');
-    const linePath = ['M', ...start, 'Q', ...controlPoint, ...end].join(' ');
-    draw.path(linePath).stroke({ width: 2, color: '#d3d3d3' }).fill('none');
+    const draw = SVG(`svg-${view.viewId}${pathId.join('-')}`).size('100%', '100%');
+
+    if (advancedSetting.hierarchyViewConnectLine === '1' || isStraightLine) {
+      draw.polyline([start, straightLineInflection, end]).stroke({ width: 2, color: '#d3d3d3' }).fill('none');
+    } else {
+      const linePath = ['M', ...start, 'Q', ...controlPoint, ...end].join(' ');
+      draw.path(linePath).stroke({ width: 2, color: '#d3d3d3' }).fill('none');
+    }
   };
   handleRecordVisible = rowId => {
     const isMingdao = navigator.userAgent.toLowerCase().indexOf('mingdao application') >= 0;
@@ -138,13 +148,46 @@ export default class SortableRecordItem extends Component {
     }
     return { worksheetId, viewId };
   };
+  getCurrentSheetRows = () => {
+    const { stateTree = [] } = this.props;
+
+    const getLayerRows = (arr = [], rows = []) => {
+      const { data = {}, treeData = {} } = this.props;
+      if (arr.length) {
+        arr.map(item => {
+          if (_.get(item, 'pathId.length') === _.get(data, 'pathId.length')) {
+            rows.push({
+              index: (_.get(item, 'path') || [])[_.get(item, 'pathId.length') - 1],
+              row: treeData[item.rowId],
+            });
+          }
+          if (_.get(item, 'children.length')) {
+            getLayerRows(item.children, rows);
+          }
+        });
+      }
+      return rows;
+    };
+    const newRows = getLayerRows(stateTree);
+    return _.sortBy(newRows, 'index').map(i => i.row);
+  };
   render() {
-    const { appId, data, updateHierarchyData, deleteHierarchyRecord, sheetSwitchPermit, view, worksheetInfo } =
-      this.props;
+    const {
+      appId,
+      data,
+      updateHierarchyData,
+      deleteHierarchyRecord,
+      hideHierarchyRecord,
+      sheetSwitchPermit,
+      view = {},
+      worksheetInfo,
+      isStraightLine,
+    } = this.props;
     const { recordInfoRowId, recordInfoVisible } = this.state;
     const { rowId, path = [], pathId = [] } = data;
     const { rowId: draggingId } = getItem('draggingHierarchyItem') || '';
     const recordInfoPara = this.getRecordInfoPara();
+    const { advancedSetting = {} } = view;
     if (recordInfoPara.worksheetId === worksheetInfo.worksheetId) {
       recordInfoPara.rules = worksheetInfo.rules;
     }
@@ -154,9 +197,13 @@ export default class SortableRecordItem extends Component {
           className={cx('sortableTreeNodeWrap', { isDragging: draggingId === rowId })}
           id={pathId.join('-')}
           ref={this.$itemWrap}
-          onClick={() => this.handleRecordVisible(rowId)}
         >
-          <div id={`svg-${pathId.join('-')}`} className="svgWrap" />
+          <div
+            id={`svg-${view.viewId}${pathId.join('-')}`}
+            className={
+              isStraightLine || advancedSetting.hierarchyViewConnectLine === '1' ? 'svgStraightWrap' : 'svgWrap'
+            }
+          />
           <DraggableRecord
             {...this.props}
             viewParaOfRecord={recordInfoPara}
@@ -164,10 +211,16 @@ export default class SortableRecordItem extends Component {
             onUpdate={(value, relateSheet) =>
               updateHierarchyData({ path, pathId, recordId: rowId, value, relateSheet })
             }
+            onClick={() => {
+              this.handleRecordVisible(rowId);
+              if (location.pathname.indexOf('public') === -1) {
+                addBehaviorLog('worksheetRecord', worksheetInfo.worksheetId, { rowId }); // 埋点
+              }
+            }}
           />
         </div>
-        {recordInfoVisible && (
-          isMobile ? (
+        {recordInfoVisible &&
+          (isMobile ? (
             <RecordInfoModal
               className="full"
               visible
@@ -181,24 +234,29 @@ export default class SortableRecordItem extends Component {
             />
           ) : (
             <RecordInfoWrapper
+              showPrevNext
               sheetSwitchPermit={sheetSwitchPermit}
               allowAdd={view.allowAdd}
               from={2}
               visible
               recordId={recordInfoRowId}
               projectId={worksheetInfo.projectId}
+              currentSheetRows={this.getCurrentSheetRows()}
               hideRecordInfo={() => {
                 this.setState({ recordInfoVisible: false });
               }}
-              updateSuccess={(recordIds, value, relateSheet) =>
-                updateHierarchyData({ path, pathId, recordId: recordIds[0], value, relateSheet })
-              }
+              updateSuccess={(recordIds, value, relateSheet) => {
+                if (!relateSheet.isviewdata) {
+                  return;
+                }
+                updateHierarchyData({ path, pathId, recordId: recordIds[0], value, relateSheet });
+              }}
               appId={appId}
               deleteRows={(_, rows) => deleteHierarchyRecord({ rows, path, pathId })}
+              hideRows={rowIds => hideHierarchyRecord(rowIds[0], path, pathId)}
               {...recordInfoPara}
             />
-          )
-        )}
+          ))}
       </Fragment>
     );
   }

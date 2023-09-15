@@ -30,7 +30,7 @@ function ViewComp(props) {
   const { showHeader, headerLeft, headerRight } = props;
   const { base, workSheetLoading, worksheetInfo, sheetSwitchPermit, filtersGroup = [] } = props;
   const { loadWorksheet, updateFilters, updateFiltersGroup } = props;
-  const { views = [], allowAdd } = worksheetInfo;
+  const { views = [], allowAdd, advancedSetting } = worksheetInfo;
   const { viewId, appId, worksheetId } = base;
   
   const view = _.find(views, { viewId }) || (!viewId && views[0]) || {};
@@ -99,6 +99,8 @@ function ViewComp(props) {
                       addType: 2,
                       entityName: worksheetInfo.entityName,
                       onAdd: addRecord,
+                      showDraftsEntry: true,
+                      sheetSwitchPermit,
                     });
                   }
                 }}

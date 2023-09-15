@@ -1,16 +1,29 @@
 import React, { Fragment, useState, useEffect } from 'react';
-import { Dropdown, Checkbox, Dialog } from 'ming-ui';
+import { Dropdown, Checkbox, Dialog, Icon } from 'ming-ui';
 import { Input, Tooltip } from 'antd';
 import { SettingItem } from '../../styled';
 import Components from '../components';
 import WidgetVerify from '../components/WidgetVerify';
 import { updateConfig } from '../../util/setting';
-import { handleAdvancedSettingChange } from 'src/pages/widgetConfig/util/setting';
+import { getAdvanceSetting, handleAdvancedSettingChange } from 'src/pages/widgetConfig/util/setting';
 import _ from 'lodash';
 
 const SORT_TYPE = [
   { value: 1, text: _l('新的在前') },
   { value: 2, text: _l('旧的在前') },
+  { value: 3, text: _l('自定义') },
+];
+
+const FILL_TYPE = [
+  { value: '0', text: _l('填满') },
+  { value: '1', text: _l('完整显示') },
+];
+
+const DISPLAY_TYPE = [
+  { value: '1', text: _l('缩略图'), img: 'thumbnail', subText: _l('以缩略图预览图片和文档内容') },
+  { value: '2', text: _l('卡片'), img: 'card', subText: _l('紧凑式文件展示') },
+  { value: '3', text: _l('列表'), img: 'list1', subText: _l('以列表显示附件详细信息') },
+  { value: '4', text: _l('平铺'), img: 'tiling', subText: _l('大图平铺显示，只支持图片类型') },
 ];
 
 const FILE_TYPE = [
@@ -18,13 +31,13 @@ const FILE_TYPE = [
   {
     value: '1',
     text: _l('图片'),
-    desc: _l('支持上传JPG、JPEG、PNG、Gif、WebP、Tiff、bmp格式的文件（在附件中支持预览）'),
+    desc: _l('支持上传JPG、JPEG、PNG、Gif、WebP、Tiff、bmp、HEIC格式的文件（在附件中支持预览）'),
   },
   { value: '2', text: _l('文档'), desc: _l('支持除图片、音频、视频以外的文件') },
   {
     value: '3',
     text: _l('音频'),
-    desc: _l('支持WAV、FLAC、APE、ALAC、WavPack、MP3、AAC、Ogg Vorbis、Opus、Au、MMF、AIF格式的文件'),
+    desc: _l('支持WAV、FLAC、APE、ALAC、WavPack、MP3、M4a、AAC、Ogg Vorbis、Opus、Au、MMF、AIF格式的文件'),
   },
   { value: '4', text: _l('视频'), desc: _l('支持MP4、AVI、MOV、WMV、MKV、FLV、F4V、SWF、RMVB、MPG格式的文件') },
   {
@@ -44,6 +57,7 @@ const WATERMARK_TYPE = [
 export default function Attachment({ from, data, onChange }) {
   const { enumDefault, enumDefault2, strDefault, advancedSetting = {} } = data;
   const [disableAlbum, onlyAllowMobileInput] = (strDefault || '00').split('');
+  const { covertype = '0', showtype = '1', webcompress = '1' } = getAdvanceSetting(data);
   const { type = '', values = [] } = JSON.parse(advancedSetting.filetype || '{}');
   const originWatermark = JSON.parse(advancedSetting.watermark || '[]');
   const [visible, setVisible] = useState(false);
@@ -62,7 +76,6 @@ export default function Attachment({ from, data, onChange }) {
       onChange({
         ...handleAdvancedSettingChange(data, {
           watermark: '',
-          compress: '0',
           getsave: '0',
           getinput: '0',
         }),
@@ -73,11 +86,57 @@ export default function Attachment({ from, data, onChange }) {
 
   return (
     <Fragment>
+      <SettingItem className="settingItem flexCenter">
+        <div className="mRight10 flex">
+          <div className="settingItemTitle">{_l('显示方式')}</div>
+          <Dropdown
+            border
+            data={DISPLAY_TYPE}
+            value={showtype}
+            menuClass="attachmentDisplayType"
+            renderItem={item => {
+              return (
+                <div className="flexCenter pTop10 pBottom10">
+                  <Icon icon={item.img} className="Font28 mRight16" />
+                  <span className="flex ellipsis flexColumn">
+                    <span className="Bold mBottom5">{item.text}</span>
+                    <span>{item.subText}</span>
+                  </span>
+                </div>
+              );
+            }}
+            onChange={value => {
+              let resProps = {};
+              if (value === '2') {
+                resProps.covertype = '1';
+              } else if (value === '4') {
+                resProps.covertype = '1';
+                resProps.filetype = JSON.stringify({ type: '1', values: [] });
+              } else {
+                resProps.covertype = '0';
+              }
+              onChange(handleAdvancedSettingChange(data, { showtype: value, ...resProps }));
+            }}
+          />
+        </div>
+        {showtype === '1' && (
+          <div className="flex">
+            <div className="settingItemTitle">{_l('填充方式')}</div>
+            <Dropdown
+              border
+              data={FILL_TYPE}
+              value={covertype}
+              onChange={value => onChange(handleAdvancedSettingChange(data, { covertype: value }))}
+            />
+          </div>
+        )}
+      </SettingItem>
       <SettingItem>
         <div className="settingItemTitle">{_l('文件类型')}</div>
         <Dropdown
           border
           data={FILE_TYPE}
+          disabled={type === '1' && showtype === '4'}
           value={type}
           onChange={value => {
             onChange({
@@ -109,7 +168,7 @@ export default function Attachment({ from, data, onChange }) {
         <Dropdown
           border
           data={SORT_TYPE}
-          value={enumDefault || 1}
+          value={enumDefault || 3}
           onChange={value => onChange({ enumDefault: value })}
         />
       </SettingItem>
@@ -118,7 +177,8 @@ export default function Attachment({ from, data, onChange }) {
       </SettingItem>
       {from !== 'subList' && (_.includes(['1', '4'], type) || !type) && (
         <SettingItem className="settingItem withSplitLine">
-          <div className="settingItemTitle">{_l('限制移动端输入')}</div>
+          <div className="settingItemTitle">{_l('移动端设置')}</div>
+          <div className="settingItemTitle Normal mTop16">{_l('限制移动端输入')}</div>
           <div className="labelWrap">
             <Checkbox
               size="small"
@@ -166,83 +226,97 @@ export default function Attachment({ from, data, onChange }) {
                   text={_l('禁用相册')}
                 />
               </div>
-              {!_.includes([2, 3], enumDefault2) && (
-                <Fragment>
-                  <div className="labelWrap labelBetween">
-                    <Checkbox
-                      size="small"
-                      checked={originWatermark.length > 0}
-                      onClick={checked => {
-                        if (checked) {
-                          setVisible(false);
-                          setWatermark([]);
-                          onChange({
-                            ...handleAdvancedSettingChange(data, {
-                              watermark: '',
-                            }),
-                          });
-                        } else {
-                          setVisible(true);
-                          if (!watermark.length) {
-                            setWatermark(['user', 'time']);
-                            onChange({
-                              ...handleAdvancedSettingChange(data, {
-                                watermark: JSON.stringify(['user', 'time']),
-                              }),
-                            });
-                          }
-                        }
-                      }}
-                    >
-                      <span style={{ marginRight: '4px' }}>{_l('为照片添加水印（仅APP支持）')}</span>
-                      <Tooltip
-                        placement="bottom"
-                        title={_l('添加水印设置只对App有效，勾选后 不支持在App拍摄照片时修改水印')}
-                      >
-                        <i className="icon-help Gray_9e Font16 Hand"></i>
-                      </Tooltip>
-                    </Checkbox>
-                    {originWatermark.length > 0 && (
-                      <Tooltip placement="bottom" title={_l('设置水印内容')}>
-                        <i
-                          className="icon-settings Gray_9e Font16 Hand Right ThemeHoverColor3"
-                          onClick={() => setVisible(true)}
-                        ></i>
-                      </Tooltip>
-                    )}
-                  </div>
-                </Fragment>
-              )}
-              {enumDefault2 !== 2 && (
+              <Fragment>
                 <div className="labelWrap labelBetween">
                   <Checkbox
                     size="small"
-                    checked={advancedSetting.compress === '1'}
+                    checked={originWatermark.length > 0}
                     onClick={checked => {
-                      onChange({
-                        ...handleAdvancedSettingChange(data, {
-                          compress: checked ? '0' : '1',
-                        }),
-                      });
+                      if (checked) {
+                        setVisible(false);
+                        setWatermark([]);
+                        onChange({
+                          ...handleAdvancedSettingChange(data, {
+                            watermark: '',
+                          }),
+                        });
+                      } else {
+                        setVisible(true);
+                        if (!watermark.length) {
+                          setWatermark(['user', 'time']);
+                          onChange({
+                            ...handleAdvancedSettingChange(data, {
+                              watermark: JSON.stringify(['user', 'time']),
+                            }),
+                          });
+                        }
+                      }
                     }}
                   >
-                    <span style={{ marginRight: '4px' }}>{_l('压缩照片')}</span>
+                    <span style={{ marginRight: '4px' }}>{_l('为照片添加水印（仅手机App支持）')}</span>
                     <Tooltip
                       placement="bottom"
-                      title={
-                        <span className="WordBreak">
-                          {_l('压缩照片只对App有效，勾选后在App拍摄照片时不上传原图')}
-                        </span>
-                      }
+                      title={_l('添加水印设置只对App有效，勾选后 不支持在App拍摄照片时修改水印')}
                     >
                       <i className="icon-help Gray_9e Font16 Hand"></i>
                     </Tooltip>
                   </Checkbox>
+                  {originWatermark.length > 0 && (
+                    <Tooltip placement="bottom" title={_l('设置水印内容')}>
+                      <i
+                        className="icon-settings Gray_9e Font16 Hand Right ThemeHoverColor3"
+                        onClick={() => setVisible(true)}
+                      ></i>
+                    </Tooltip>
+                  )}
                 </div>
-              )}
+              </Fragment>
               <Components.SheetDealDataType data={data} onChange={onChange} />
             </SettingItem>
           )}
+          <div className="settingItemTitle Normal mBottom0 mTop16">{_l('自动压缩图片')}</div>
+          <div className="flexRow">
+            <div className="labelWrap flex">
+              <Checkbox
+                size="small"
+                checked={advancedSetting.compress === '1'}
+                onClick={checked => onChange(handleAdvancedSettingChange(data, { compress: checked ? '0' : '1' }))}
+              >
+                <span style={{ marginRight: '4px' }}>{_l('手机App')}</span>
+                <Tooltip
+                  placement="bottom"
+                  title={
+                    <span className="WordBreak">
+                      {_l('勾选后，将对图片压缩后再进行上传。未勾选时，用户可自行选择是否上传原图。')}
+                    </span>
+                  }
+                >
+                  <i className="icon-help Gray_9e Font16 Hand"></i>
+                </Tooltip>
+              </Checkbox>
+            </div>
+            <div className="labelWrap flex">
+              <Checkbox
+                size="small"
+                checked={webcompress === '1'}
+                onClick={checked => onChange(handleAdvancedSettingChange(data, { webcompress: checked ? '0' : '1' }))}
+              >
+                <span style={{ marginRight: '4px' }}>{_l('Web移动端（H5）')}</span>
+                <Tooltip
+                  placement="bottom"
+                  title={
+                    <span className="WordBreak">
+                      {_l(
+                        'Web移动端通常建议勾选此配置，可以加快图片上传速度并节省流量。未勾选时，将始终按照原图上传。（此配置影响：原生H5、公开表单、外部门户，以及钉钉、企业微信等第三方平台的移动App）',
+                      )}
+                    </span>
+                  }
+                >
+                  <i className="icon-help Gray_9e Font16 Hand"></i>
+                </Tooltip>
+              </Checkbox>
+            </div>
+          </div>
         </SettingItem>
       )}
       <Dialog

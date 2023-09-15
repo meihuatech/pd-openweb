@@ -28,6 +28,7 @@ export default class RecordCard extends Component {
     disabled: PropTypes.bool,
     selected: PropTypes.bool,
     coverCid: PropTypes.string,
+    projectId: PropTypes.string,
     showControls: PropTypes.arrayOf(PropTypes.string),
     controls: PropTypes.arrayOf(PropTypes.shape({})),
     data: PropTypes.shape({}),
@@ -68,7 +69,7 @@ export default class RecordCard extends Component {
     const { controls, showControls } = this.props;
     const allControls = [
       { controlId: 'ownerid', controlName: _l('拥有者'), type: 26 },
-      { controlId: 'caid', controlName: _l('创建者'), type: 26 },
+      { controlId: 'caid', controlName: _l('创建人'), type: 26 },
       { controlId: 'ctime', controlName: _l('创建时间'), type: 16 },
       { controlId: 'utime', controlName: _l('最近修改时间'), type: 16 },
     ].concat(controls);
@@ -78,15 +79,18 @@ export default class RecordCard extends Component {
     const {
       from = 1,
       disabled,
+      focused,
       selected,
       controls,
       data,
       onDelete,
       onClick,
       coverCid,
+      projectId,
       sourceEntityName,
       viewId,
       isCharge,
+      disabledLink,
     } = this.props;
     const { cover, cardControls } = this;
     const { forceShowFullValue } = this.state;
@@ -109,8 +113,10 @@ export default class RecordCard extends Component {
       <div
         className={cx('worksheetRecordCard', getKeyOfFrom(from).toLowerCase(), {
           selected,
+          focused,
           noControls: !cardControls.length,
           withoutCover: !coverCid,
+          disabledLink,
         })}
         onClick={onClick}
       >
@@ -154,6 +160,7 @@ export default class RecordCard extends Component {
                     cell={Object.assign({}, visibleControl, { value: data[visibleControl.controlId] })}
                     from={4}
                     viewId={viewId}
+                    projectId={projectId}
                     isCharge={isCharge}
                   />
                 ) : (

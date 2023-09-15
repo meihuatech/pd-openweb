@@ -8,7 +8,8 @@ import { find, head, includes, isEmpty } from 'lodash';
 import { SelectOtherField, OtherField, DynamicInput } from '../components';
 import { getOptions } from '../../../../util/setting';
 
-const DefaultOptionSetting = styled(SettingItem)`
+export const DefaultOptionSetting = styled(SettingItem)`
+  margin-top: 12px !important;
   .holder {
     height: 34px;
   }
@@ -51,7 +52,7 @@ const DefaultOptionSetting = styled(SettingItem)`
   }
 `;
 
-const DefaultOptionsMenu = styled(DropdownContent)`
+export const DefaultOptionsMenu = styled(DropdownContent)`
   max-height: 500px;
   overflow: auto;
   .clearDefault {

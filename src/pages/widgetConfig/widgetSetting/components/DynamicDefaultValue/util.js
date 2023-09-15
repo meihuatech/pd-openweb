@@ -21,9 +21,35 @@ import {
   CHECKBOX_TYPES,
   EMEBD_FIELDS,
   CUR_TIME_TYPES,
+  CURRENT_TYPES,
 } from './config';
 import { SYS } from 'src/pages/widgetConfig/config/widget';
 import _ from 'lodash';
+
+// 新建子表并配置成员、部门等默认值，后端relationControls不处理，没有补全配置返回
+export const dealIds = (type, dynamicValue) => {
+  if (_.isEmpty(dynamicValue)) return dynamicValue;
+  return dynamicValue.map(item => {
+    if (
+      _.includes([26, 27, 48], type) &&
+      _.includes(['user-self', 'user-departments', 'user-role'], item.staticValue)
+    ) {
+      const name = _.get(
+        _.find(CURRENT_TYPES, i => i.id === item.staticValue),
+        'text',
+      );
+      const id =
+        item.staticValue === 'user-self'
+          ? 'accountId'
+          : item.staticValue === 'user-departments'
+          ? 'departmentId'
+          : 'organizeId';
+      return { ...item, staticValue: JSON.stringify({ [id]: item.staticValue, name }) };
+    } else {
+      return item;
+    }
+  });
+};
 
 const filterSys = (list = []) => {
   return list.filter(item => !_.includes(SYS, item.controlId));
@@ -42,8 +68,8 @@ export const showClear = (data = {}, dynamicValue) => {
   const { staticValue } = dynamicValue[0] || {};
   if (_.includes(CAN_SHOW_CLEAR_FIELD, data.type) && staticValue) return true;
   if (data.type === 26) {
-    const transferValue = typeof staticValue === 'string' ? JSON.parse(staticValue || '{}') : staticValue;
-    return (transferValue || {}).accountId === 'user-self';
+    const transferValue = typeof staticValue === 'string' ? safeParse(staticValue || '{}') : staticValue;
+    return _.includes(['user-self'], (transferValue || {}).accountId);
   }
   return false;
 };
@@ -163,7 +189,7 @@ export const filterControls = (data = {}, controls = []) => {
   );
 };
 
-export const getControls = ({ data = {}, controls, isCurrent, fromSearch = false }) => {
+export const getControls = ({ data = {}, controls, isCurrent, needFilter = false }) => {
   const { type, enumDefault, dataSource, advancedSetting: { usertype } = {} } = data;
   const filterFn = FILTER[type];
   //文本字段值可选 关联记录自动编号，不能是当前表单
@@ -183,11 +209,13 @@ export const getControls = ({ data = {}, controls, isCurrent, fromSearch = false
   if (_.includes([10], type)) return _.filter(controls, item => item.dataSource && item.dataSource === dataSource);
 
   if (_.includes([26], type)) {
+    // 默认值不支持部门、组织角色，人员选择范围动态值支持
+    controls = needFilter ? controls : _.filter(controls, item => !_.includes([27, 48], item.type));
     return _.filter(controls, item => filterFn(item, enumDefault) && isSameUser(item, usertype));
   }
   // 默认值部门可选成员字段、查询配置中不可选成员字段
   if (_.includes([27], type)) {
-    return fromSearch ? _.filter(controls, item => _.includes([27], item.type)) : _.filter(controls, filterFn);
+    return needFilter ? _.filter(controls, item => _.includes([27], item.type)) : _.filter(controls, filterFn);
   }
   if (_.includes([29], type)) {
     const newControls = filterControls(data, controls);
@@ -224,7 +252,7 @@ export const getTypeList = (data = {}) => {
     ];
   } else if (showtype === '2') {
     return [
-      { id: '1', text: _l('是') },
+      { id: '1', text: _l('是%04015') },
       { id: '0', text: _l('否') },
     ];
   } else {

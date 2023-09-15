@@ -1,23 +1,15 @@
 import React, { Component, Fragment } from 'react';
 import ReactDom from 'react-dom';
 import preall from 'src/common/preall';
-import { Provider } from 'react-redux';
-import store from 'src/redux/configureStore';
 import { Input } from 'antd';
 import { LoadDiv, Button, Checkbox, RichText } from 'ming-ui';
-import captcha from 'src/components/captcha';
-import { encrypt, browserIsMobile, mdAppResponse } from 'src/util';
-import accountController from 'src/api/account';
+import { browserIsMobile, mdAppResponse, verifyPassword } from 'src/util';
 import cx from 'classnames';
 import './cancellation.less';
 import moment from 'moment';
 import privateDeclareAjax from 'src/api/privateDeclare';
 import accountAjax from 'src/api/account';
 
-const errorMsg = {
-  6: _l('密码错误'),
-  8: _l('验证码错误'),
-};
 const actionMsg = {
   0: _l('操作失败'),
   1: _l('操作成功'),
@@ -62,7 +54,8 @@ export default class Cancellation extends Component {
       return;
     }
     this.setState({ loading: true });
-    accountAjax.getApplyLogOffAccount({ state })
+    accountAjax
+      .getApplyLogOffAccount({ state })
       .then(res => {
         if (res === 0 || res === 5) {
           location.href = '/login';
@@ -72,7 +65,9 @@ export default class Cancellation extends Component {
               step: 3,
               createTime: res.createTime,
               createStateTime,
-              overdueDiff: moment(createStateTime).add(5, 'm').diff(moment(), 's'),
+              overdueDiff: moment(createStateTime)
+                .add(5, 'm')
+                .diff(moment(), 's'),
               loading: false,
             },
             () => {
@@ -91,30 +86,14 @@ export default class Cancellation extends Component {
       alert(_l('请输入登录密码'), 3);
       return;
     }
-    let throttled = res => {
-      if (res.ret === 0) {
-        accountController
-          .checkAccount({
-            ticket: res.ticket,
-            randStr: res.randstr,
-            captchaType: md.staticglobal.getCaptchaType(),
-            password: encrypt(password.trim()),
-          })
-          .then(result => {
-            if (result === 1) {
-              this.setState({ step: 2 });
-              this.getCountDown();
-            } else {
-              alert(errorMsg[result] || _l('操作失败'), 2);
-            }
-          });
-      }
-    };
-    if (md.staticglobal.getCaptchaType() === 1) {
-      new captcha(throttled);
-    } else {
-      new TencentCaptcha(md.global.Config.CaptchaAppId.toString(), throttled).show();
-    }
+    const _this = this;
+    verifyPassword({
+      password: password.trim(),
+      success: () => {
+        _this.setState({ step: 2 });
+        _this.getCountDown();
+      },
+    });
   };
   renderInputPassword = () => {
     return (
@@ -170,7 +149,7 @@ export default class Cancellation extends Component {
           </div>
         </div>
         <div className="protocol TxtLeft flexRow alignItemsCenter mTop24">
-          <Checkbox checked={checkedAgree} onClick={checked => this.setState({ checkedAgree: !checked })}></Checkbox>
+          <Checkbox checked={checkedAgree} onClick={checked => this.setState({ checkedAgree: !checked })} />
           <div>
             <spam className="Font20">{_l('同意（注销后15天内可撤销操作）')}</spam>
           </div>
@@ -279,7 +258,12 @@ export default class Cancellation extends Component {
       </Fragment>
     );
   };
-  renderPage() {
+  renderPage() {}
+  render() {
+    const { loading } = this.state;
+    if (loading) {
+      return <LoadDiv />;
+    }
     const { step } = this.state;
     const isMobile = browserIsMobile();
 
@@ -296,10 +280,6 @@ export default class Cancellation extends Component {
         </div>
       </div>
     );
-  }
-  render() {
-    const { loading } = this.state;
-    return <Provider store={store}>{loading ? <LoadDiv /> : this.renderPage()}</Provider>;
   }
 }
 

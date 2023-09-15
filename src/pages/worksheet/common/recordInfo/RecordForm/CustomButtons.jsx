@@ -1,9 +1,11 @@
-import React from 'react';
+import React, { Fragment, useRef } from 'react';
 import PropTypes from 'prop-types';
 import { autobind } from 'core-decorators';
 import cx from 'classnames';
 import styled from 'styled-components';
-import { Button, MenuItem, Icon, Tooltip, Dialog } from 'ming-ui';
+import { Button, MenuItem, Icon, Tooltip, Dialog, VerifyPasswordConfirm } from 'ming-ui';
+import mdNotification from 'ming-ui/functions/notify';
+import { verifyPassword } from 'src/util';
 import IconText from 'worksheet/components/IconText';
 import NewRecord from 'src/pages/worksheet/common/newRecord/NewRecord';
 import FillRecordControls from '../FillRecordControls';
@@ -12,8 +14,14 @@ import worksheetAjax from 'src/api/worksheet';
 import { getRowDetail } from 'worksheet/api';
 import processAjax from 'src/pages/workflow/api/process';
 import _ from 'lodash';
+import FunctionWrap from 'ming-ui/components/FunctionWrap';
+import CustomButtonConfirm from './CustomButtonConfirm';
 
 const MenuItemWrap = styled(MenuItem)`
+  .btnName {
+    max-width: calc(100% - 34px);
+    display: inline-block;
+  }
   &.disabled {
     cursor: not-allowed !important;
     opacity: 0.5;
@@ -24,6 +32,8 @@ const MenuItemWrap = styled(MenuItem)`
     }
   }
 `;
+
+const confirmClick = props => FunctionWrap(CustomButtonConfirm, props);
 export default class CustomButtons extends React.Component {
   static propTypes = {
     iseditting: PropTypes.bool,
@@ -61,6 +71,8 @@ export default class CustomButtons extends React.Component {
 
   @autobind
   triggerCustomBtn(btn) {
+    const { worksheetId, recordId, handleUpdateWorksheetRow } = this.props;
+    this.remark = undefined;
     if (window.isPublicApp) {
       alert(_l('预览模式下，不能操作'), 3);
       return;
@@ -71,37 +83,103 @@ export default class CustomButtons extends React.Component {
       alert(_l('正在编辑记录，无法触发自定义按钮'), 3);
       return;
     }
-    function handleTrigger() {
-      if (btn.clickType === CUSTOM_BUTTOM_CLICK_TYPE.IMMEDIATELY) {
-        // 立即执行
+    function run({ remark } = {}) {
+      function trigger(btn) {
         if (handleTriggerCustomBtn) {
           handleTriggerCustomBtn(btn);
           return;
         }
-        _this.triggerImmediately(btn.btnId);
+        _this.triggerImmediately(btn.btnId, btn);
         triggerCallback();
-      } else if (btn.clickType === CUSTOM_BUTTOM_CLICK_TYPE.CONFIRM) {
-        // 立即执行
-        if (handleTriggerCustomBtn) {
-          handleTriggerCustomBtn(btn);
+      }
+      if (_.get(btn, 'advancedSetting.enableremark') && remark) {
+        if (_.isFunction(handleUpdateWorksheetRow)) {
+          handleUpdateWorksheetRow({
+            worksheetId,
+            rowId: recordId,
+            newOldControl: [],
+            btnRemark: remark,
+            btnId: btn.btnId,
+            btnWorksheetId: worksheetId,
+            btnRowId: recordId,
+          });
           return;
         }
-        // 二次确认
-        Dialog.confirm({
-          className: 'customButtonConfirm',
+        worksheetAjax.updateWorksheetRow({
+          worksheetId,
+          rowId: recordId,
+          newOldControl: [],
+          btnRemark: remark,
+          btnId: btn.btnId,
+          btnWorksheetId: worksheetId,
+          btnRowId: recordId,
+        });
+      } else {
+        trigger(btn);
+      }
+    }
+    function verifyConform() {
+      VerifyPasswordConfirm.confirm({
+        title: _l('安全认证'),
+        inputName: _l('登录密码验证'),
+        passwordPlaceHolder: _l('输入当前用户（%0）的登录密码', md.global.Account.fullname),
+        allowNoVerify: true,
+        onOk: run,
+      });
+    }
+    function handleTrigger() {
+      const needConfirm = btn.enableConfirm || btn.clickType === CUSTOM_BUTTOM_CLICK_TYPE.CONFIRM;
+      function confirm({ onOk, onClose = () => {} } = {}) {
+        confirmClick({
           title: btn.confirmMsg,
+          description: _.get(btn, 'advancedSetting.confirmcontent'),
+          enableRemark: _.get(btn, 'advancedSetting.enableremark'),
+          remarkName: _.get(btn, 'advancedSetting.remarkname'),
+          remarkHint: _.get(btn, 'advancedSetting.remarkhint'),
+          remarkRequired: _.get(btn, 'advancedSetting.remarkrequired'),
+          remarkoptions: _.get(btn, 'advancedSetting.remarkoptions'),
+          remarktype: _.get(btn, 'advancedSetting.remarktype'),
+          verifyPwd: btn.verifyPwd,
           okText: btn.sureName,
           cancelText: btn.cancelName,
-          onOk: () => {
-            _this.triggerImmediately(btn.btnId);
-            triggerCallback();
-          },
+          onOk: onOk || run,
+          onClose,
         });
-      } else if (btn.clickType === CUSTOM_BUTTOM_CLICK_TYPE.FILL_RECORD) {
-        // 填写字段
-        _this.fillRecord(btn);
+      }
+      if (btn.clickType === CUSTOM_BUTTOM_CLICK_TYPE.FILL_RECORD) {
+        _this.fillRecord({
+          ...btn,
+          confirm: needConfirm
+            ? () =>
+                new Promise((resolve, reject) => {
+                  confirm({
+                    onOk: ({ remark }) => {
+                      _this.remark = remark;
+                      resolve(remark);
+                    },
+                    onClose: reject,
+                  });
+                })
+            : undefined,
+        });
+        return;
+      }
+      function verifyAndRun() {
+        if (btn.verifyPwd) {
+          verifyPassword({
+            checkNeedAuth: true,
+            success: run,
+            fail: () => verifyConform(),
+          });
+        } else {
+          run();
+        }
+      }
+      if (needConfirm) {
+        // 二次确认
+        confirm();
       } else {
-        // 无 clickType 有误
+        verifyAndRun();
       }
     }
     if (count > md.global.SysSettings.worktableBatchOperateDataLimitCount) {
@@ -122,7 +200,7 @@ export default class CustomButtons extends React.Component {
   }
 
   @autobind
-  triggerImmediately(btnId) {
+  triggerImmediately(btnId, btn) {
     const { worksheetId, recordId, loadBtns, onButtonClick } = this.props;
     onButtonClick(btnId);
     processAjax
@@ -130,10 +208,18 @@ export default class CustomButtons extends React.Component {
         appId: worksheetId,
         sources: [recordId],
         triggerId: btnId,
-        pushUniqueId: md.global.Config.pushUniqueId,
+        pushUniqueId: _.get(window, 'md.global.Config.pushUniqueId'),
       })
       .then(data => {
-        loadBtns();
+        if (!data) {
+          mdNotification.error({
+            title: _l('批量操作"%0"', btn.name),
+            description: _l('失败，记录不满足执行条件或流程尚未启用'),
+            duration: 3,
+          });
+        } else {
+          loadBtns();
+        }
       });
   }
 
@@ -144,7 +230,7 @@ export default class CustomButtons extends React.Component {
     const btnTypeStr = activeBtn.writeObject + '' + activeBtn.writeType;
     // 新建记录成功回掉
     if (this.activeBtn.workflowType === 2) {
-      alert(_l('添加成功'));
+      alert(_l('操作成功'));
     }
     loadBtns();
     if (btnTypeStr === '12') {
@@ -180,6 +266,7 @@ export default class CustomButtons extends React.Component {
       btnWorksheetId: worksheetId,
       btnRowId: recordId,
       pushUniqueId: md.global.Config.pushUniqueId,
+      btnRemark: this.remark,
     };
     // if (isFromBatchEdit) {
     //   delete args.btnRowId;
@@ -207,7 +294,7 @@ export default class CustomButtons extends React.Component {
         loadBtns();
         onUpdateRow(res.data);
         if (this.activeBtn.workflowType === 2) {
-          alert(_l('保存成功'));
+          alert(_l('操作成功'));
         }
         if (targetOptions.recordId === recordId) {
           onUpdate(_.pick(res.data, newControls.map(c => c.controlId).concat('isviewdata')), res.data, newControls);
@@ -258,6 +345,7 @@ export default class CustomButtons extends React.Component {
       });
       rowInfo = {
         formData: worksheetInfo.template.controls,
+        advancedSetting: worksheetInfo.advancedSetting,
       };
     }
     this.setStateFn({ rowInfo });
@@ -266,12 +354,14 @@ export default class CustomButtons extends React.Component {
     const addRelationControl = _.find(rowInfo.formData || [], c => c.controlId === btn.addRelationControl);
     this.activeBtn = btn;
     this.fillRecordProps = {};
+    this.customButtonConfirm = btn.confirm;
     switch (caseStr) {
       case '11': // 本记录 - 填写字段
         this.btnRelateWorksheetId = worksheetId;
         this.fillRecordId = recordId;
         this.fillRecordProps = {
           formData: rowInfo.formData,
+          widgetStyle: rowInfo.advancedSetting,
         };
         this.setStateFn({
           fillRecordControlsVisible: true,
@@ -322,6 +412,7 @@ export default class CustomButtons extends React.Component {
             rowId: this.fillRecordId,
             viewId: relationControl.viewId,
             masterFormData: rowInfo.formData,
+            widgetStyle: rowInfo.advancedSetting,
           };
         } catch (err) {
           Dialog.confirm({
@@ -420,7 +511,7 @@ export default class CustomButtons extends React.Component {
   }
 
   renderDialogs() {
-    const { worksheetId, viewId, appId, recordId, projectId, isBatchOperate, triggerCallback } = this.props;
+    const { isCharge, worksheetId, viewId, appId, recordId, projectId, isBatchOperate, triggerCallback } = this.props;
     const { rowInfo, fillRecordControlsVisible, newRecordVisible } = this.state;
     const { activeBtn = {}, fillRecordId, btnRelateWorksheetId, fillRecordProps } = this;
     const btnTypeStr = activeBtn.writeObject + '' + activeBtn.writeType;
@@ -428,6 +519,7 @@ export default class CustomButtons extends React.Component {
       <React.Fragment key="dialogs">
         {fillRecordControlsVisible && (
           <FillRecordControls
+            isCharge={isCharge}
             isBatchOperate={isBatchOperate}
             className="recordOperateDialog"
             title={activeBtn.name}
@@ -447,6 +539,7 @@ export default class CustomButtons extends React.Component {
               triggerCallback();
             }}
             {...fillRecordProps}
+            customButtonConfirm={this.customButtonConfirm}
           />
         )}
         {newRecordVisible && (
@@ -465,6 +558,7 @@ export default class CustomButtons extends React.Component {
               btnWorksheetId: worksheetId,
               btnRowId: recordId,
             }}
+            customButtonConfirm={this.customButtonConfirm}
             defaultRelatedSheet={{
               worksheetId,
               relateSheetControlId: activeBtn.addRelationControl,
@@ -495,6 +589,9 @@ export default class CustomButtons extends React.Component {
     if (hideDisabled) {
       buttons = buttons.filter(button => !(btnDisable[button.btnId] || button.disabled));
     }
+    if (md.global.Account.isPortal) {
+      buttons = buttons.map(b => ({ ...b, verifyPwd: false }));
+    }
     let buttonComponents = [];
     if (type === 'button') {
       buttonComponents = buttons.map((button, i) => {
@@ -521,14 +618,14 @@ export default class CustomButtons extends React.Component {
               }}
             >
               <div className="content ellipsis">
-                {button.icon && <i className={`icon icon-${button.icon}`}></i>}
+                {button.icon && <i className={`icon icon-${button.icon}`} />}
                 <span className="breakAll overflow_ellipsis">{button.name}</span>
               </div>
             </Button>
           </span>
         );
         return button.desc && type === 'button' ? (
-          <Tooltip popupPlacement="bottom" text={<span>{button.desc}</span>}>
+          <Tooltip popupPlacement="bottom" tooltipStyle={{ maxWidth: 350 }} text={<span>{button.desc}</span>}>
             {buttonComponent}
           </Tooltip>
         ) : (
@@ -571,7 +668,12 @@ export default class CustomButtons extends React.Component {
             this.triggerCustomBtn(button);
           }}
         >
-          <span className="mLeft15">{button.name}</span>
+          <span className="btnName mLeft15 ellipsis">{button.name}</span>
+          {button.desc && (
+            <Tooltip popupPlacement="bottom" tooltipStyle={{ maxWidth: 350 }} text={<span>{button.desc}</span>}>
+              <i className="icon icon-info_outline Font17 mTop9 Right" />
+            </Tooltip>
+          )}
         </MenuItemWrap>
       ));
     }

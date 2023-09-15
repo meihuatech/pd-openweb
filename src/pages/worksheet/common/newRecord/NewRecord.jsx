@@ -23,6 +23,7 @@ function NewRecord(props) {
     showFillNext,
     showContinueAdd = true,
     hideNewRecord,
+    onCloseDialog = () => {},
     showShare,
     advancedSetting = {},
   } = props;
@@ -77,11 +78,15 @@ function NewRecord(props) {
         )}
       </span>
       <div className="flex" />
-      {advancedSetting.draftVisible && (
+      {advancedSetting.closedrafts !== '1' && (
         <button
           type="button"
           className="ming Button--medium Button saveAndContinueBtn ellipsis mRight12"
           onClick={() => {
+            if (window.isPublicApp) {
+              alert(_l('预览模式下，不能操作'), 3);
+              return;
+            }
             newRecordContent.current.newRecord({
               autoFill,
               rowStatus: 21,
@@ -102,7 +107,7 @@ function NewRecord(props) {
             }
             newRecordContent.current.newRecord({
               isContinue: true,
-              autoFill,
+              autoFill: autoFill && advancedSetting.autoFillVisible,
               actionType: advancedSetting.continueEndAction,
               rowStatus: 1,
             });
@@ -135,8 +140,9 @@ function NewRecord(props) {
     className: cx('workSheetNewRecord', className, modalClassName),
     type: 'fixed',
     verticalAlign: 'bottom',
-    width: browserIsMobile() ? window.innerWidth - 20 : 900,
+    width: browserIsMobile() ? window.innerWidth - 20 : 960,
     onCancel: () => {
+      onCloseDialog();
       hideNewRecord();
       removeFromLocal('tempNewRecord', viewId);
     },

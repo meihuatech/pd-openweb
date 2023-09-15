@@ -3,7 +3,7 @@ import styled from 'styled-components';
 import cx from 'classnames';
 import { Icon, Support, LoadDiv } from 'ming-ui';
 import { useSetState } from 'react-use';
-import { CardTopWrap } from '../containers/style';
+import { CardTopWrap } from '../apiIntegration/style';
 import Detail from 'src/pages/workflow/WorkflowSettings/Detail';
 import flowNodeAjax from 'src/pages/workflow/api/flowNode';
 import { TYPELIST } from 'src/pages/integration/config';
@@ -73,6 +73,9 @@ function ConnectAuth(props) {
   }, []);
   // 获取连接详情
   const getInfo = () => {
+    if (!node || !node.id) {
+      return;
+    }
     axios
       .all([
         flowNodeAjax.get(
@@ -91,28 +94,30 @@ function ConnectAuth(props) {
         ),
       ])
       .then(res => {
+        //更新鉴权认证节点
+        const list = _.toArray((res[0] || {}).flowNodeMap || {});
         setState({
           node: {
             ...node,
-            ...(res[0].flowNodeMap && res[0].startEventId
-              ? res[0].flowNodeMap[res[0].flowNodeMap[res[0].startEventId].nextId]
-              : null),
+            ...(list.find(o => o.typeId === 22) || {}),
             ...res[1],
           },
         });
       });
   };
   const getNodeInfo = () => {
-    flowNodeAjax.getNodeDetail(
-      {
-        processId: props.id,
-        nodeId: node.id,
-        flowNodeType: node.typeId,
-      },
-      { isIntegration: true },
-    ).then(res => {
-      setState({ node: { ...node, ...res }, loading: false });
-    });
+    flowNodeAjax
+      .getNodeDetail(
+        {
+          processId: props.id,
+          nodeId: node.id,
+          flowNodeType: node.typeId,
+        },
+        { isIntegration: true },
+      )
+      .then(res => {
+        setState({ node: { ...node, ...res }, loading: false });
+      });
   };
 
   const renderList = fields => {
@@ -218,28 +223,6 @@ function ConnectAuth(props) {
       </div>
     );
   };
-  const getWebHookTestRequest = () => {
-    const { webHookNodes = [{}] } = node;
-    const { method, url, params, testMap, body, headers, formControls, contentType } = webHookNodes[0] || {};
-    flowNodeAjax.webHookTestRequest(
-      {
-        processId: props.id,
-        nodeId: node.id,
-        method,
-        url,
-        params: !params ? [] : JSON.parse(formatParameters(JSON.stringify(params.filter(item => item.name)), testMap)),
-        headers: !headers
-          ? []
-          : JSON.parse(formatParameters(JSON.stringify(headers.filter(item => item.name)), testMap)),
-        body: formatParameters(body, testMap),
-        formControls: formControls.filter(item => item.name),
-        contentType,
-      },
-      { isIntegration: true },
-    ).then(res => {
-      console.log(res);
-    });
-  };
   if (loading) {
     return <LoadDiv />;
   }
@@ -300,8 +283,8 @@ function ConnectAuth(props) {
             <Support
               href={
                 node.appType === 31
-                  ? 'https://help.mingdao.com/integration.html#basic-auth-认证'
-                  : 'https://help.mingdao.com/integration.html#oauth-鉴权认证'
+                  ? 'https://help.mingdao.com/integration#basic-auth-认证'
+                  : 'https://help.mingdao.com/integration#oauth-鉴权认证'
               }
               type={3}
               text={_l('使用帮助')}

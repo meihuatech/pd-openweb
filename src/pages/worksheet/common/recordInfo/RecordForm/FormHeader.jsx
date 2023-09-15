@@ -48,7 +48,8 @@ export default function FormHeader(props) {
     ownerControl &&
     controlState(ownerControl).editable &&
     !isLock &&
-    from !== RECORD_INFO_FROM.DRAFT;
+    from !== RECORD_INFO_FROM.DRAFT &&
+    !window.isPublicApp;
   let isOpenLogs = true;
   if (!isOpenPermit(permitList.recordLogSwitch, sheetSwitchPermit, viewId)) {
     isOpenLogs = false;
@@ -98,7 +99,7 @@ export default function FormHeader(props) {
                             updateRecordDialogOwner(account, record);
                             alert(_l('修改成功'));
                           } catch (err) {
-                            alert(_l('修改失败'));
+                            alert(_l('修改失败'), 2);
                           }
                         },
                       });

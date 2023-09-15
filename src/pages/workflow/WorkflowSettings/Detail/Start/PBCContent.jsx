@@ -1,10 +1,29 @@
 import React, { Fragment } from 'react';
-import { Dropdown, Checkbox, Textarea } from 'ming-ui';
+import { Dropdown, Checkbox, Textarea, Dialog } from 'ming-ui';
 import homeAppAjax from 'src/api/homeApp';
 import { FIELD_TYPE_LIST } from '../../enum';
 import { v4 as uuidv4, validate } from 'uuid';
 import cx from 'classnames';
 import _ from 'lodash';
+import styled from 'styled-components';
+import flowNode from '../../../api/flowNode';
+import { checkJSON } from '../../utils';
+
+const FIELD_TYPE = FIELD_TYPE_LIST.concat([{ text: _l('对象'), value: 10000006, en: 'object' }]);
+
+const GenerateJSONBox = styled.textarea`
+  padding: 12px;
+  border-radius: 4px;
+  height: 340px;
+  overflow: auto;
+  width: 100%;
+  border: 1px solid #ddd;
+  resize: none;
+  margin-bottom: -22px;
+  &:focus {
+    border-color: #2196f3;
+  }
+`;
 
 const getDefaultParameters = () => {
   return {
@@ -14,6 +33,8 @@ const getDefaultParameters = () => {
     alias: '',
     required: false,
     desc: '',
+    workflowDefaultValue: '',
+    attribute: 0,
   };
 };
 
@@ -117,7 +138,7 @@ export default ({ data, updateSource, isIntegration }) => {
               type="text"
               className="ThemeBorderColor3 actionControlBox pTop0 pBottom0 pLeft10 pRight10"
               style={{ width: 180 }}
-              placeholder={_l('参数名')}
+              placeholder={_l('参数名（必填）')}
               value={item.controlName}
               maxLength={64}
               onChange={e => updateControls('controlName', e.target.value, item)}
@@ -133,7 +154,7 @@ export default ({ data, updateSource, isIntegration }) => {
                   (!item.dataSource || (item.dataSource && !_.includes([14, 10000008], o.value))),
               )}
               value={item.type}
-              renderTitle={() => <span>{FIELD_TYPE_LIST.find(o => o.value === item.type).text}</span>}
+              renderTitle={() => <span>{FIELD_TYPE.find(o => o.value === item.type).text}</span>}
               border
               disabled={!validate(item.controlId)}
               onChange={type => {
@@ -144,7 +165,7 @@ export default ({ data, updateSource, isIntegration }) => {
             <input
               type="text"
               className="ThemeBorderColor3 actionControlBox pTop0 pBottom0 pLeft10 pRight10 flex mLeft10"
-              placeholder={_l('别名')}
+              placeholder={item.dataSource ? _l('别名（必填）') : _l('别名')}
               value={item.alias}
               onChange={e => updateControls('alias', e.target.value.replace(/[^a-z\d-_]/gi, ''), item)}
               onBlur={e => {
@@ -164,6 +185,30 @@ export default ({ data, updateSource, isIntegration }) => {
               checked={item.required}
               onClick={checked => updateControls('required', !checked, item)}
             />
+            {item.type < 10000000 && !item.dataSource && (
+              <span
+                className="mLeft10"
+                data-tip={item.attribute === 0 ? _l('设为标题') : _l('取消设为标题')}
+                style={{ height: 16 }}
+              >
+                <i
+                  className={cx(
+                    'Font16 Gray_9e ThemeHoverColor3 pointer',
+                    item.attribute === 0 ? 'icon-title' : 'icon-ic_title ThemeColor3',
+                  )}
+                  onClick={() => {
+                    let controls = [].concat(data.controls).map(o => {
+                      o.attribute = o.controlId === item.controlId ? (item.attribute ? 0 : 1) : 0;
+
+                      return o;
+                    });
+
+                    updateSource({ controls });
+                  }}
+                />
+              </span>
+            )}
+
             <i
               className="icon-delete2 Font16 Gray_9e ThemeHoverColor3 mLeft10 pointer"
               onClick={() => {
@@ -174,7 +219,7 @@ export default ({ data, updateSource, isIntegration }) => {
               }}
             />
             <i
-              className="icon-add Font20 pointer Gray_9e ThemeHoverColor3 mLeft10 pointer"
+              className="icon-add Font16 pointer Gray_9e ThemeHoverColor3 mLeft10 pointer"
               onClick={() => addParameters(item)}
             />
           </div>
@@ -219,6 +264,81 @@ export default ({ data, updateSource, isIntegration }) => {
       );
     });
   };
+  const generateJSON = () => {
+    Dialog.confirm({
+      width: 640,
+      title: _l('从JSON示例生成'),
+      description: <GenerateJSONBox id="generateJSON" />,
+      okText: _l('导入'),
+      onOk: () => {
+        return new Promise((resolve, reject) => {
+          const json = document.getElementById('generateJSON').value.trim();
+
+          if (checkJSON(json)) {
+            flowNode.jsonToControls({ json }).then(controls => {
+              const newControls = _.cloneDeep(data.controls);
+              const generationOptions = ({ item, dataSource = '' }) => {
+                return {
+                  controlId: uuidv4(),
+                  dataSource,
+                  jsonPath: item.jsonPath,
+                  controlName:
+                    !dataSource && _.find(newControls, o => o.controlName === item.controlName)
+                      ? item.controlName +
+                        Math.floor(Math.random() * 10000)
+                          .toString()
+                          .padStart(4, '0')
+                      : item.controlName,
+                  type: item.type,
+                  alias: item.controlName,
+                  required: item.required,
+                  desc: '',
+                  workflowDefaultValue: '',
+                  attribute: 0,
+                };
+              };
+
+              controls
+                .filter(item => item.type === 10000007)
+                .map(item => {
+                  controls.push({
+                    ...item,
+                    type: 2,
+                    controlName: 'string',
+                    value: '',
+                    jsonPath: '@',
+                    dataSource: item.jsonPath,
+                  });
+                });
+
+              controls
+                .filter(item => !item.dataSource)
+                .forEach(item => {
+                  newControls.push(generationOptions({ item }));
+                });
+
+              controls
+                .filter(item => item.dataSource)
+                .forEach(item => {
+                  newControls.push(
+                    generationOptions({
+                      item,
+                      dataSource: _.find(newControls, o => o.jsonPath === item.dataSource).controlId,
+                    }),
+                  );
+                });
+
+              updateSource({ controls: newControls });
+              resolve();
+            });
+          } else {
+            alert(_l('JSON格式有错误'), 2);
+            reject(true);
+          }
+        });
+      },
+    });
+  };
 
   return (
     <Fragment>
@@ -239,11 +359,15 @@ export default ({ data, updateSource, isIntegration }) => {
 
         {renderList(data.controls.filter(o => !o.dataSource))}
 
-        <div className="addActionBtn mTop25">
+        <div className="addActionBtn mTop25 flexRow alignItemsCenter">
           <span className="ThemeBorderColor3" onClick={addParameters}>
             <i className="icon-add Font16" />
             {_l('添加参数')}
           </span>
+          <div className="ThemeHoverColor3 pointer Gray_75" onClick={generateJSON}>
+            <i className="Font14 icon-knowledge-upload" />
+            {_l('从json示例生成')}
+          </div>
         </div>
 
         {!isIntegration && (

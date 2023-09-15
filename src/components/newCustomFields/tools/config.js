@@ -23,7 +23,23 @@ export const FORM_ERROR_TYPE = {
 };
 
 export const FORM_ERROR_TYPE_TEXT = {
-  REQUIRED: ({ controlName: label }) => {
+  REQUIRED: ({ controlName: label, advancedSetting, type }) => {
+    if (type === 36) {
+      if (advancedSetting.showtype === '1') {
+        return _l('请开启此项');
+      } else if (advancedSetting.showtype === '2') {
+        const itemNames = safeParse((advancedSetting || {}).itemnames || '[]');
+        return _l(
+          '请选择%0',
+          _.get(
+            _.find(itemNames, i => i.key === '1'),
+            'value',
+          ),
+        );
+      } else {
+        return _l('请勾选此项');
+      }
+    }
     return `${_l('请填写%0', label)}`;
   },
   REQUIRED_SELECT: ({ controlName: label }) => {
@@ -125,11 +141,12 @@ export const FROM = {
   SHARE: 1,
   NEWRECORD: 2,
   RECORDINFO: 3,
-  PUBLIC: 4, // 公开表单
+  PUBLIC_ADD: 4, // 公开表单新增
   H5_ADD: 5,
   H5_EDIT: 6,
   WORKFLOW: 7, // 工作流
   CUSTOM_BUTTON: 8, // 自定义动作
+  PUBLIC_EDIT: 9, // 公开表单编辑
   DRAFT: 21,
 };
 
@@ -139,10 +156,11 @@ export const TIME_UNIT = {
   3: 'd',
   4: 'M',
   5: 'y',
+  6: 's',
 };
 
 //非文本类控件
-export const UN_TEXT_TYPE = [9, 10, 11, 15, 16, 19, 23, 24, 26, 27, 28, 29, 34, 35, 36, 45, 47, 48];
+export const UN_TEXT_TYPE = [9, 10, 11, 15, 16, 19, 23, 24, 26, 27, 28, 29, 34, 35, 36, 45, 46, 47, 48];
 
 // 系统字段
 export const SYSTEM_ENUM = [
@@ -159,4 +177,5 @@ export const SYSTEM_ENUM = [
   'caid',
   'ctime',
   'utime',
+  'daid',
 ];

@@ -1,4 +1,5 @@
 export { default as WorkSheetLeft } from './WorkSheetLeft';
+export { default as WorkSheetPortal } from './WorkSheetPortal';
 export { default as BatchOperate } from './BatchOperate';
 export { default as ChangeColumn } from './ChangeColumn';
 export { default as WorkSheetFilter } from './WorkSheetFilter';
@@ -17,7 +18,6 @@ export { openResetAutoNumber } from './ResetAutoNumber';
 export { default as SheetMove } from './SheetMove';
 export { default as WorksheetEmpty } from './WorksheetEmpty';
 export { default as SaveWorksheetFilter } from './SaveWorksheetFilter';
-export { default as PrintQrCode } from './PrintQrCode';
 export { default as ViewConfig } from './ViewConfig';
 export { default as Discussion } from './Discussion';
 export { default as SheetDesc } from './SheetDesc';

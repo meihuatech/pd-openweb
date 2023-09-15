@@ -13,6 +13,7 @@ import { fieldCanSort } from 'src/pages/worksheet/util';
 import { getFilter } from 'src/pages/worksheet/common/WorkSheetFilter/util';
 import { FROM } from 'src/components/newCustomFields/tools/config';
 import { getIsScanQR } from 'src/components/newCustomFields/components/ScanQRCode';
+import RegExp from 'src/util/expression';
 import './mobile.less';
 import _ from 'lodash';
 
@@ -67,10 +68,18 @@ export default class RecordCardListDialog extends Component {
     this.lazyLoadRecorcd = _.debounce(this.loadRecorcd, 500);
   }
   componentDidMount() {
-    const { control, keyWords } = this.props;
+    const { control, keyWords, parentWorksheetId, staticRecords = [] } = this.props;
+    if (!_.isEmpty(staticRecords)) {
+      this.setState({ list: staticRecords, loading: false });
+      return;
+    }
     if (control) {
       (window.isPublicWorksheet ? publicWorksheetAjax : sheetAjax)
-        .getWorksheetInfo({ worksheetId: control.dataSource, getTemplate: true })
+        .getWorksheetInfo({
+          worksheetId: control.dataSource,
+          getTemplate: true,
+          relationWorksheetId: parentWorksheetId,
+        })
         .then(data => {
           window.worksheetControlsCache = {};
           data.template.controls.forEach(c => {
@@ -119,6 +128,7 @@ export default class RecordCardListDialog extends Component {
       formData,
       getDataType,
       relationRowIds = [],
+      isScan,
     } = this.props;
     const { pageIndex, keyWords, list, sortControls, worksheetInfo } = this.state;
     if (!keyWords && this.clickSearch) {
@@ -138,7 +148,16 @@ export default class RecordCardListDialog extends Component {
       return;
     }
 
-    if (from !== FROM.PUBLIC && !window.isPublicWorksheet) {
+    const { scanlink, scancontrol, scancontrolid } = _.get(control, 'advancedSetting') || {};
+
+    if (isScan && ((scanlink !== '1' && RegExp.isUrl(keyWords)) || (scancontrol !== '1' && !RegExp.isUrl(keyWords)))) {
+      this.setState({ loading: false });
+      return;
+    }
+
+    const scanControl = _.find(worksheetInfo.template.controls || [], it => it.controlId === scancontrolid);
+
+    if (from !== FROM.PUBLIC_ADD && !window.isPublicWorksheet) {
       getFilterRowsPromise = sheetAjax.getFilterRows;
       args = {
         worksheetId: relateSheetId,
@@ -148,11 +167,27 @@ export default class RecordCardListDialog extends Component {
         pageSize: 20,
         pageIndex,
         status: 1,
-        keyWords,
+        keyWords: scancontrol === '1' && scancontrolid ? '' : keyWords,
         isGetWorksheet: true,
         getType: 7,
         sortControls,
         filterControls,
+        fastFilters:
+          scancontrol === '1' && scancontrolid
+            ? [
+                {
+                  controlId: scancontrolid,
+                  dataType: scanControl.type,
+                  spliceType: 1,
+                  filterType: 1,
+                  dateRange: 0,
+                  minValue: '',
+                  maxValue: '',
+                  value: '',
+                  values: [keyWords],
+                },
+              ]
+            : [],
       };
     } else {
       getFilterRowsPromise = publicWorksheetAjax.getRelationRows;
@@ -169,7 +204,7 @@ export default class RecordCardListDialog extends Component {
         getType: 7,
         sortControls,
         filterControls,
-        formId: window.publicWorksheetShareId,
+        shareId: window.publicWorksheetShareId,
       };
       if (window.recordShareLinkId) {
         args.linkId = window.recordShareLinkId;
@@ -245,9 +280,13 @@ export default class RecordCardListDialog extends Component {
   }
   @autobind
   handleSelect(record, selected) {
-    const { multiple, onOk, onClose } = this.props;
+    const { multiple, onOk, onClose, maxCount, selectedCount } = this.props;
     const { selectedRecords } = this.state;
+
     if (multiple) {
+      if (selectedCount + selectedRecords.length >= maxCount) {
+        return alert(_l('最多关联%0条', maxCount), 3);
+      }
       this.setState({
         selectedRecords: selected
           ? _.uniqBy(selectedRecords.concat(record))
@@ -303,12 +342,13 @@ export default class RecordCardListDialog extends Component {
     return sortedControl && sortedControl.isAsc;
   }
   get cardControls() {
-    const { showControls } = this.props;
+    const { control = {} } = this.props;
+    const showControls = control.showControls || this.props.showControls;
     const { controls } = this.state;
     const titleControl = _.find(controls, c => c.attribute === 1);
     const allControls = [
       { controlId: 'ownerid', controlName: _l('拥有者'), type: 26 },
-      { controlId: 'caid', controlName: _l('创建者'), type: 26 },
+      { controlId: 'caid', controlName: _l('创建人'), type: 26 },
       { controlId: 'ctime', controlName: _l('创建时间'), type: 16 },
       { controlId: 'utime', controlName: _l('最近修改时间'), type: 16 },
     ].concat(controls);
@@ -354,12 +394,21 @@ export default class RecordCardListDialog extends Component {
               worksheetId={relateSheetId}
               filterControls={filterControls}
               parentWorksheetId={parentWorksheetId}
+              control={control}
               onChange={data => {
                 onOk([data]);
                 onClose();
               }}
               onOpenRecordCardListDialog={keyWords => {
+                const { scanlink, scancontrol } = _.get(control, 'advancedSetting') || {};
                 setTimeout(() => {
+                  if (
+                    (scanlink !== '1' && RegExp.isUrl(keyWords)) ||
+                    (scancontrol !== '1' && !RegExp.isUrl(keyWords))
+                  ) {
+                    this.setState({ pageIndex: 1, list: [] });
+                    return;
+                  }
                   this.handleSearch(keyWords);
                 }, 200);
               }}
@@ -385,9 +434,10 @@ export default class RecordCardListDialog extends Component {
       allowNewRecord,
       disabledManualWrite,
       showControls,
-      coverCid,
       onOk,
       onClose,
+      control,
+      staticRecords = [],
     } = this.props;
     const {
       loading,
@@ -401,6 +451,7 @@ export default class RecordCardListDialog extends Component {
       worksheetInfo,
       showNewRecord,
     } = this.state;
+    const { advancedSetting = {} } = worksheetInfo || {};
     const { cardControls } = this;
     const formData = this.props.formData.filter(_.identity);
     const titleControl = formData.filter(c => c && c.attribute === 1);
@@ -414,6 +465,7 @@ export default class RecordCardListDialog extends Component {
         rowid: recordId,
       }),
     };
+    const coverCid = this.props.coverCid || (control && control.coverCid);
     return (
       <ScrollView
         className="recordCardList mTop10 flex"
@@ -452,6 +504,8 @@ export default class RecordCardListDialog extends Component {
             value: defaultRelatedSheetValue,
           }}
           visible={showNewRecord}
+          showDraftsEntry={true}
+          sheetSwitchPermit={control.sheetSwitchPermit}
           hideNewRecord={() => {
             this.setState({ showNewRecord: false });
           }}
@@ -473,13 +527,23 @@ export default class RecordCardListDialog extends Component {
         />
         {list.length
           ? list.map((record, i) => {
+              if (!_.isEmpty(staticRecords)) {
+                return (
+                  <div
+                    className="worksheetRecordCard mobile noControls withoutCover"
+                    onClick={() => this.handleSelect(record, !selected)}
+                  >
+                    <p className="titleText ellipsis">{record.name}</p>
+                  </div>
+                );
+              }
               const selected = !!_.find(selectedRecords, r => r.rowid === record.rowid);
               return (
                 <WingBlank key={i} size="md">
                   <RecordCard
                     from={3}
                     coverCid={coverCid}
-                    showControls={showControls}
+                    showControls={cardControls.map(c => c.controlId)}
                     controls={controls}
                     data={record}
                     selected={selected}

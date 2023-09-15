@@ -6,16 +6,17 @@ import { Tooltip, Icon, Dialog, Input } from 'ming-ui';
 import Trigger from 'rc-trigger';
 import 'rc-trigger/assets/index.css';
 import sheetAjax from 'src/api/worksheet';
-import { VIEW_DISPLAY_TYPE } from 'worksheet/constants/enum';
+import { VIEW_DISPLAY_TYPE, VIEW_TYPE_ICON } from 'worksheet/constants/enum';
 import { getDefaultViewSet } from 'worksheet/constants/common';
 import ViewDisplayMenu from './viewDisplayMenu';
 import './ViewItems.less';
 import Item from './Item';
-import { formatValuesOfOriginConditions } from 'src/pages/worksheet/common/WorkSheetFilter/util';
 import { Drawer } from 'antd';
 import { withRouter } from 'react-router-dom';
 import HideItem from './HideItem';
 import styled from 'styled-components';
+import { navigateTo } from 'src/router/navigateTo';
+import { formatAdvancedSettingByNavfilters } from 'src/pages/worksheet/common/ViewConfig/util.js';
 
 const EmptyData = styled.div`
   font-size: 12px;
@@ -35,7 +36,7 @@ const SortableList = SortableContainer(({ list, onScroll, ...other }) => {
     <div className="viewsScroll" onScroll={onScroll}>
       <div className="stance" />
       {list.map((item, index) => (
-        <SortableItem key={index} index={index} item={item} {...other} />
+        <SortableItem key={index} index={index} item={item} list={list} {...other} />
       ))}
       <div className="stance" />
     </div>
@@ -63,9 +64,9 @@ export default class ViewItems extends Component {
       setWorksheetHidden: false,
       searchWorksheetListValue: undefined,
       sideMenuVisible: false,
-    }
+    };
     this.searchRef = React.createRef();
-    this.containerWrapper = document.getElementById("containerWrapper");
+    this.containerWrapper = document.getElementById('containerWrapper');
     this.containerWrapper.addEventListener('click', this.clickDrawerArea);
   }
   componentWillReceiveProps(nextProps) {
@@ -86,20 +87,20 @@ export default class ViewItems extends Component {
     }
   }
   componentWillUnmount() {
-    this.containerWrapper.removeEventListener('click', this.clickDrawerArea)
+    this.containerWrapper.removeEventListener('click', this.clickDrawerArea);
   }
-  clickDrawerArea = (e) => {
-    const {setWorksheetHidden} = this.state;
-    if(!setWorksheetHidden) return ;
-    let rect = document.querySelector('.drawerWorksheetHidden',1).getBoundingClientRect();
-    if(rect.right > e.clientX && e.clientX > rect.left && rect.bottom > e.clientY && e.clientY > rect.top) {
+  clickDrawerArea = e => {
+    const { setWorksheetHidden } = this.state;
+    if (!setWorksheetHidden) return;
+    let rect = document.querySelector('.drawerWorksheetHidden', 1).getBoundingClientRect();
+    if (rect.right > e.clientX && e.clientX > rect.left && rect.bottom > e.clientY && e.clientY > rect.top) {
       return;
-    }else {
+    } else {
       this.setState({
-        setWorksheetHidden: false
-      })
+        setWorksheetHidden: false,
+      });
     }
-  }
+  };
   getWorksheetViews(worksheetId) {
     const { appId } = this.props;
     sheetAjax
@@ -112,11 +113,11 @@ export default class ViewItems extends Component {
         this.computeDirectionVisible();
       })
       .fail(err => {
-        alert(_l('获取视图列表失败'));
+        alert(_l('获取视图列表失败'), 2);
       });
   }
-  handleAddView = (viewType = 'sheet') => {
-    const { worksheetId, viewList, appId, worksheetControls } = this.props;
+  handleAddView = (id = 'sheet') => {
+    const { worksheetId, viewList, appId, worksheetControls, worksheetInfo } = this.props;
     const titleControl = _.get(
       _.find(worksheetControls, item => item.attribute === 1),
       'controlId',
@@ -124,14 +125,22 @@ export default class ViewItems extends Component {
     const defaultDisplayControls = worksheetControls
       .filter(item => item.controlId !== titleControl && !_.includes([22, 10010, 45], item.type))
       .map(item => item.controlId);
-    const coverCid = _.get(
+    const coverId = _.get(
       _.find(worksheetControls, item => item.type === 14),
       'controlId',
     );
+    const coverCid =
+      id === 'gallery'
+        ? _.get(worksheetInfo, ['advancedSetting', 'coverid']) || //默认取表单设置里的封面
+          coverId
+        : coverId;
+    const viewType = VIEW_DISPLAY_TYPE[id];
+    const view = _.find(VIEW_TYPE_ICON, { id }) || {};
+    const viewTypeCount = viewList.filter(n => n.viewType == viewType).length;
     let params = {
       viewId: '',
       appId,
-      viewType: VIEW_DISPLAY_TYPE[viewType],
+      viewType,
       displayControls: _.slice(defaultDisplayControls, 0, 2),
       // showControls: worksheetControls
       //   .filter(
@@ -140,7 +149,7 @@ export default class ViewItems extends Component {
       //   )
       //   .map(item => item.controlId),
       coverCid,
-      name: viewList.length ? _l('视图%0', viewList.length) : _l('视图'),
+      name: viewList.length ? `${view.text}${viewTypeCount ? viewTypeCount : ''}` : _l('视图'),
       sortType: 0,
       coverType: 0,
       worksheetId,
@@ -160,13 +169,13 @@ export default class ViewItems extends Component {
         this.handleScrollPosition(0);
       })
       .fail(err => {
-        alert(_l('新建视图失败'));
+        alert(_l('新建视图失败'), 2);
       });
   };
   handleRemoveView = view => {
     const { viewList, appId, worksheetId } = this.props;
     if (viewList.length === 1) {
-      alert(_l('必须保留一个视图'));
+      alert(_l('必须保留一个视图'), 3);
       return;
     }
     confirm({
@@ -188,7 +197,7 @@ export default class ViewItems extends Component {
             this.handleScrollPosition(0);
           })
           .fail(err => {
-            alert(_l('删除视图失败'));
+            alert(_l('删除视图失败'), 2);
           });
       },
     });
@@ -204,12 +213,25 @@ export default class ViewItems extends Component {
         viewId: view.viewId,
       })
       .then(result => {
-        const newViewList = viewList.concat(result);
-        this.props.onAddView(newViewList, result);
+        const list = viewList.slice();
+        const newIndex = _.findIndex(list, { viewId: view.viewId });
+        list.splice(newIndex + 1, 0, result);
+        this.handleSortViews(list);
+        this.props.onAddView(list, result);
       })
       .fail(err => {
-        alert(_l('复制视图失败'));
+        alert(_l('复制视图失败'), 2);
       });
+  };
+  handleSortViews = views => {
+    const { appId, worksheetId } = this.props;
+    sheetAjax
+      .sortWorksheetViews({
+        appId,
+        worksheetId,
+        viewIds: views.map(view => view.viewId),
+      })
+      .then(result => {});
   };
   computeDirectionVisible() {
     if (!this.scrollWraperEl) return;
@@ -266,7 +288,7 @@ export default class ViewItems extends Component {
       })
       .then(result => {})
       .fail(err => {
-        alert(_l('退拽排序视图失败'));
+        alert(_l('退拽排序视图失败'), 2);
       });
   };
   updateViewName = view => {
@@ -285,13 +307,16 @@ export default class ViewItems extends Component {
     this.setState({ addMenuVisible: false });
   };
   updateAdvancedSetting = view => {
+    let advancedSetting = formatAdvancedSettingByNavfilters(
+      view,
+      { ..._.omit(view.advancedSetting, ['navfilters']) },
+      true,
+    );
     this.props.updateCurrentView(
       {
         appId: this.props.appId,
         ...view,
-        advancedSetting: {
-          ...view.advancedSetting,
-        },
+        advancedSetting,
         editAttrs: ['advancedSetting'],
       },
       false,
@@ -299,112 +324,126 @@ export default class ViewItems extends Component {
   };
 
   handleAutoFocus = () => {
-    setTimeout(()=>{
+    setTimeout(() => {
       this.searchRef.current.focus();
-    },0)
-  }
+    }, 0);
+  };
 
   render() {
     const { directionVisible, hideDirection, addMenuVisible, setWorksheetHidden, searchWorksheetListValue } =
       this.state;
-    const { viewList, currentViewId, isCharge, changeViewDisplayType, sheetSwitchPermit, getNavigateUrl } = this.props;
+    const { viewList, currentViewId, isCharge, changeViewDisplayType, sheetSwitchPermit, getNavigateUrl, isLock } =
+      this.props;
     const isEmpty =
-      searchWorksheetListValue && _.isEmpty(viewList.filter(l => l.name.includes(_.trim(searchWorksheetListValue))));
-    if(setWorksheetHidden) {
+      searchWorksheetListValue &&
+      _.isEmpty(
+        viewList
+          .filter(
+            l =>
+              isCharge ||
+              (!(l.advancedSetting.showhide || '').includes('hpc') &&
+                !(l.advancedSetting.showhide || '').includes('hide')),
+          )
+          .filter(l => l.name.includes(_.trim(searchWorksheetListValue))),
+      );
+    if (setWorksheetHidden) {
       this.handleAutoFocus();
     }
     return (
       <div className="valignWrapper flex">
-        {isCharge ? (
-          <div>
-            <Tooltip popupPlacement="bottom" text={<span>{_l('全部视图')}</span>}>
-              <Icon
-                icon="menu-02"
-                className="Font14 mLeft10 pointer allVieListwIcon hoverGray"
-                onClick={() => this.setState(({ setWorksheetHidden }) => ({ setWorksheetHidden: !setWorksheetHidden }))}
-                style={setWorksheetHidden ? { color: '#2196f3' } : { color: '#757575' }}
+        <div>
+          <Tooltip popupPlacement="bottom" text={<span>{_l('全部视图%05005')}</span>}>
+            <Icon
+              icon="menu-02"
+              className="Font14 mLeft10 pointer allVieListwIcon hoverGray"
+              onClick={() => this.setState(({ setWorksheetHidden }) => ({ setWorksheetHidden: !setWorksheetHidden }))}
+              style={setWorksheetHidden ? { color: '#2196f3' } : { color: '#757575' }}
+            />
+          </Tooltip>
+          <Drawer
+            title=""
+            width={280}
+            className="drawerWorksheetHidden"
+            placement="left"
+            mask={false}
+            closable={false}
+            getContainer={() => document.querySelector('#worksheetRightContentBox')}
+            style={{ position: 'absolute' }}
+            onClose={() => this.setState({ setWorksheetHidden: false })}
+            visible={setWorksheetHidden}
+          >
+            <div className="searchBox">
+              <i className="icon icon-search Gray_9e Font20"></i>
+              <Input
+                value={searchWorksheetListValue}
+                onChange={value => this.setState({ searchWorksheetListValue: value })}
+                placeholder={_l('%0个视图', viewList.length)}
+                type="text"
+                className="drawerWorksheetHiddenSearch flex a"
+                manualRef={this.searchRef}
               />
-            </Tooltip>
-            <Drawer
-              title=""
-              width={280}
-              className="drawerWorksheetHidden"
-              placement="left"
-              mask={false}
-              closable={false}
-              getContainer={() => document.querySelector('#worksheetRightContentBox')}
-              style={{ position: 'absolute' }}
-              onClose={() => this.setState({ setWorksheetHidden: false })}
-              visible={setWorksheetHidden}
-            >
-              <div className="searchBox">
-                <i className="icon icon-search Gray_9e Font20"></i>
-                <Input
-                  value={searchWorksheetListValue}
-                  onChange={value => this.setState({ searchWorksheetListValue: value })}
-                  placeholder={_l('%0个视图', viewList.length)}
-                  type="text"
-                  className="drawerWorksheetHiddenSearch flex a"
-                  manualRef={this.searchRef}
+              {!!searchWorksheetListValue && (
+                <Icon
+                  icon="closeelement-bg-circle"
+                  className="Font16 Hand Gray_9e mRight10"
+                  onClick={() => {
+                    this.setState({ searchWorksheetListValue: '' });
+                  }}
                 />
-                {!!searchWorksheetListValue && (
-                  <Icon
-                    icon="closeelement-bg-circle"
-                    className="Font16 Hand Gray_9e mRight10"
-                    onClick={() => {
-                      this.setState({ searchWorksheetListValue: '' });
-                    }}
-                  />
-                )}
-              </div>
-              {isEmpty ? (
-                <EmptyData>{_l('没有搜索到相关视图')}</EmptyData>
-              ) : (
-                <Fragment>
-                  <SortHiddenListContainer
-                    disabled={!isCharge}
-                    distance={10}
-                    onSortEnd={prop => {
-                      const { newIndex, oldIndex } = prop;
-                      if (newIndex === oldIndex) {
-                        return;
-                      }
-                      let _newList = viewList.filter(l => l.advancedSetting.showhide !== 'hide');
-                      let _prop = {};
-                      _prop.newIndex = _.findIndex(viewList, l => l.viewId === _newList[newIndex].viewId);
-                      _prop.oldIndex = _.findIndex(viewList, l => l.viewId === _newList[oldIndex].viewId);
-                      this.handleSortEnd(_prop);
-                    }}
-                    type="drawerWorksheetShowList"
-                    helperClass="drawerWorksheetShowListItem"
-                  >
-                    {viewList
-                      .filter(l => l.advancedSetting.showhide !== 'hide')
-                      .filter(l => !searchWorksheetListValue || l.name.includes(_.trim(searchWorksheetListValue)))
-                      .map((item, index) => (
-                        <SortHiddenListItem
-                          lockAxis={'y'}
-                          currentViewId={currentViewId}
-                          item={item}
-                          key={`drawerWorksheetShowList-${item.viewId}`}
-                          index={index}
-                          style={{ zIndex: 999999 }}
-                          type="drawerWorksheetShowList"
-                          toView={() => this.props.history.push(getNavigateUrl(item))}
-                          isCharge={isCharge}
-                          onCopyView={this.handleCopyView}
-                          updateAdvancedSetting={this.updateAdvancedSetting}
-                          onRemoveView={this.handleRemoveView}
-                          updateViewName={this.updateViewName}
-                          handleSortEnd={this.handleSortEnd}
-                          viewList={viewList}
-                        />
-                      ))}
-                  </SortHiddenListContainer>
-                  {!!viewList
+              )}
+            </div>
+            {isEmpty ? (
+              <EmptyData>{_l('没有搜索到相关视图')}</EmptyData>
+            ) : (
+              <Fragment>
+                <SortHiddenListContainer
+                  distance={10}
+                  onSortEnd={prop => {
+                    if (!isCharge) return;
+                    const { newIndex, oldIndex } = prop;
+                    if (newIndex === oldIndex) {
+                      return;
+                    }
+                    let _newList = viewList.filter(l => l.advancedSetting.showhide !== 'hide');
+                    let _prop = {};
+                    _prop.newIndex = _.findIndex(viewList, l => l.viewId === _newList[newIndex].viewId);
+                    _prop.oldIndex = _.findIndex(viewList, l => l.viewId === _newList[oldIndex].viewId);
+                    this.handleSortEnd(_prop);
+                  }}
+                  type="drawerWorksheetShowList"
+                  helperClass="drawerWorksheetShowListItem"
+                >
+                  {viewList
+                    .filter(l => l.advancedSetting.showhide !== 'hide')
+                    .filter(l => isCharge || !(l.advancedSetting.showhide || '').includes('hpc'))
+                    .filter(l => !searchWorksheetListValue || l.name.includes(_.trim(searchWorksheetListValue)))
+                    .map((item, index) => (
+                      <SortHiddenListItem
+                        disabled={!isCharge}
+                        lockAxis={'y'}
+                        currentViewId={currentViewId}
+                        item={item}
+                        key={`drawerWorksheetShowList-${item.viewId}`}
+                        index={index}
+                        style={{ zIndex: 999999 }}
+                        type="drawerWorksheetShowList"
+                        toView={() => navigateTo(getNavigateUrl(item))}
+                        isCharge={isCharge}
+                        onCopyView={this.handleCopyView}
+                        updateAdvancedSetting={this.updateAdvancedSetting}
+                        onRemoveView={this.handleRemoveView}
+                        updateViewName={this.updateViewName}
+                        handleSortEnd={this.handleSortEnd}
+                        viewList={viewList}
+                      />
+                    ))}
+                </SortHiddenListContainer>
+                {isCharge &&
+                  !!viewList
                     .filter(l => l.advancedSetting.showhide === 'hide')
                     .filter(l => !searchWorksheetListValue || l.name.includes(_.trim(searchWorksheetListValue)))
                     .length && <div className="drawerWorksheetHiddenListTitle Gray_9e">{_l('隐藏的视图')}</div>}
+                {isCharge && (
                   <SortHiddenListContainer
                     disabled={!isCharge}
                     distance={10}
@@ -426,6 +465,7 @@ export default class ViewItems extends Component {
                       .filter(l => !searchWorksheetListValue || l.name.includes(searchWorksheetListValue))
                       .map((item, index) => (
                         <SortHiddenListItem
+                          disabled={!isCharge}
                           lockAxis={'y'}
                           currentViewId={currentViewId}
                           item={item}
@@ -433,7 +473,7 @@ export default class ViewItems extends Component {
                           index={index}
                           style={{ zIndex: 999999 }}
                           type="drawerWorksheetHiddenList"
-                          toView={() => this.props.history.push(getNavigateUrl(item))}
+                          toView={() => navigateTo(getNavigateUrl(item))}
                           isCharge={isCharge}
                           onCopyView={this.handleCopyView}
                           updateAdvancedSetting={this.updateAdvancedSetting}
@@ -444,28 +484,24 @@ export default class ViewItems extends Component {
                         />
                       ))}
                   </SortHiddenListContainer>
-                </Fragment>
-              )}
-            </Drawer>
-          </div>
-        ) : null}
-        {isCharge ? (
+                )}
+              </Fragment>
+            )}
+          </Drawer>
+        </div>
+        {isCharge && !isLock && (
           <Trigger
+            action={['click']}
             popupAlign={{ points: ['tl', 'bl'], offset: [-10, 8] }}
             popupVisible={addMenuVisible}
-            popup={
-              <ViewDisplayMenu onClickAway={() => this.setState({ addMenuVisible: false })} onClick={this.handleAdd} />
-            }
+            onPopupVisibleChange={visible => this.setState({ addMenuVisible: visible })}
+            popup={<ViewDisplayMenu onClick={this.handleAdd} />}
           >
             <Tooltip popupPlacement="bottom" text={<span>{_l('添加视图')}</span>}>
-              <Icon
-                icon="add"
-                className="Font20 Gray_75 pointer addViewIcon mLeft8 hoverGray"
-                onClick={() => this.setState(({ addMenuVisible }) => ({ addMenuVisible: !addMenuVisible }))}
-              />
+              <Icon icon="add" className="Font20 Gray_75 pointer addViewIcon mLeft8 hoverGray" />
             </Tooltip>
           </Trigger>
-        ) : null}
+        )}
         <div
           className="valignWrapper flex workSheetViewsWrapper"
           ref={scrollWraperEl => {
@@ -489,11 +525,16 @@ export default class ViewItems extends Component {
             onCopyView={this.handleCopyView}
             onShare={this.props.onShare}
             onExport={this.props.onExport}
+            onExportAttachment={this.props.onExportAttachment}
             onScroll={this.updateScrollBtnState}
             updateViewName={this.updateViewName}
             isCharge={isCharge}
             sheetSwitchPermit={sheetSwitchPermit}
             updateAdvancedSetting={this.updateAdvancedSetting}
+            isLock={this.props.isLock}
+            appId={this.props.appId}
+            controls={this.props.worksheetControls}
+            projectId={_.get(this.props, 'worksheetInfo.projectId')}
           />
         </div>
         {directionVisible ? (

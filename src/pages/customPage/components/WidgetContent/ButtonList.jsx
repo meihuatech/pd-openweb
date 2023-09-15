@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import styled from 'styled-components';
 import NewRecord from 'worksheet/common/newRecord/NewRecord';
 import MobileNewRecord from 'worksheet/common/newRecord/MobileNewRecord';
@@ -16,8 +16,10 @@ import { hrefReg } from 'src/pages/customPage/components/previewContent';
 import { RecordInfoModal } from 'mobile/Record';
 import { genUrl } from '../../util';
 import { connect } from 'react-redux';
-import { browserIsMobile, mdAppResponse } from 'src/util';
+import { browserIsMobile, mdAppResponse, addBehaviorLog } from 'src/util';
 import { getRequest } from 'src/util';
+import customBtnWorkflow from 'mobile/Record/socket/customBtnWorkflow';
+import { navigateTo } from 'src/router/navigateTo';
 import _ from 'lodash';
 import moment from 'moment';
 
@@ -54,6 +56,12 @@ export function ButtonList({ button = {}, editable, layoutType, addRecord, info 
   const includeScanQRCode = _.find(button.buttonList, { action: 5 });
   const isMingdao = navigator.userAgent.toLowerCase().indexOf('mingdao application') >= 0;
   const projectId = info.projectId || _.get(info, 'apk.projectId');
+
+  useEffect(() => {
+    if (isMobile) {
+      customBtnWorkflow();
+    }
+  });
 
   async function runStartProcessByPBC(item, scanQRCodeResult) {
     const { id, processId, name, config } = item;
@@ -102,16 +110,13 @@ export function ButtonList({ button = {}, editable, layoutType, addRecord, info 
         }
       })
     }).then(data => {
-      if (isMobile && data) {
-        Toast.info(_l('操作成功'));
-      }
+      
     });
   }
 
   async function handleClick(item) {
     if (editable) return;
     const { param, action, value, viewId, openMode = 1, name } = item;
-    const isOpenNewWindow = isMingdao ? false : openMode === 2;
 
     if (isPublicShare && action !== 4) {
       alert(_l('无权操作'), 3);
@@ -153,10 +158,16 @@ export function ButtonList({ button = {}, editable, layoutType, addRecord, info 
         return url;
       };
       const url = getUrl();
-      if (isOpenNewWindow) {
+      if (isMingdao) {
+        window.location.href = url;
+      } else if (openMode === 2) {
         window.open(url);
       } else {
-        window.location.href = url;
+        navigateTo(url);
+      }
+
+      if (!viewId) {
+        addBehaviorLog('customPage', value); //浏览自定义页面埋点
       }
     }
     if (action === 4 && value) {
@@ -230,19 +241,34 @@ export function ButtonList({ button = {}, editable, layoutType, addRecord, info 
 
     // 链接
     if (hrefReg.test(result)) {
-      if (config.recordLink && (result.includes('worksheetshare') || result.includes('public/record'))) {
-        const shareId = (result.match(/\/worksheetshare\/(.*)/) || result.match(/\/public\/record\/(.*)/))[1];
-        Toast.loading(_l('加载中，请稍后'));
-        const shareData = await worksheetAjax.getShareInfoByShareId({ shareId }).data || {};
-        Toast.hide();
-        if (shareData.rowId) {
-          if (isMingdao) {
-            window.location.href = `/mobile/record/${shareData.appId}/${shareData.worksheetId}/${shareData.viewId}/${shareData.rowId}`;
+      if (config.recordLink) {
+        const run = (shareData = {}) => {
+          if (shareData.rowId) {
+            if (isMingdao) {
+              window.location.href = `/mobile/record/${shareData.appId}/${shareData.worksheetId}/${shareData.viewId}/${shareData.rowId}`;
+            } else {
+              setPreviewRecord(shareData);
+            }
           } else {
-            setPreviewRecord(shareData);
+            window.open(result);
           }
+        }
+        if (result.includes('worksheetshare') || result.includes('public/record')) {
+          const shareId = (result.match(/\/worksheetshare\/(.*)/) || result.match(/\/public\/record\/(.*)/))[1];
+          Toast.loading(_l('加载中，请稍后'));
+          const { data } = await worksheetAjax.getShareInfoByShareId({ shareId });
+          Toast.hide();
+          run(data);
         } else {
-          window.open(result);
+          const data = result.match(/app\/(.*)\/(.*)\/(.*)\/row\/(.*)/) || [];
+          const [url, appId, worksheetId, viewId, rowId] = data;
+          if (appId && worksheetId && viewId && rowId) {
+            run({
+              appId, worksheetId, viewId, rowId
+            });
+          } else {
+            run();
+          }
         }
         return;
       }
@@ -269,7 +295,7 @@ export function ButtonList({ button = {}, editable, layoutType, addRecord, info 
       const searchId = scanBtn.searchId ? scanBtn.searchId : '';
       window.mobileNavigateTo(`/mobile/searchRecord/${appId}/${value}/${viewId}?keyWords=${encodeURIComponent(result)}&filterId=${filterId}&searchId=${searchId}`);
     }
-    // 文本，调用业务流程
+    // 文本，调用封装业务流程
     if (config.text === 2) {
       runStartProcessByPBC(scanBtn, result);
     }
@@ -294,6 +320,7 @@ export function ButtonList({ button = {}, editable, layoutType, addRecord, info 
           worksheetId={worksheetId}
           viewId={viewId}
           writeControls={writeControls}
+          showDraftsEntry={isMobile ? true : false}
           openRecord={isMobile ? (recordId, viewId) => {
             setPreviewRecord({
               appId,

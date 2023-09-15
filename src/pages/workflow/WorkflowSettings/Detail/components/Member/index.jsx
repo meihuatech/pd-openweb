@@ -3,7 +3,7 @@ import './index.less';
 import cx from 'classnames';
 import { Dropdown } from 'ming-ui';
 import UserHead from 'src/pages/feed/components/userHead';
-import { USER_TYPE, NODE_TYPE, USER_ORGANIZE, DEPARTMENT_ORGANIZE } from '../../../enum';
+import { USER_TYPE, USER_ORGANIZE, DEPARTMENT_ORGANIZE } from '../../../enum';
 import Tag from '../Tag';
 import _ from 'lodash';
 
@@ -97,6 +97,8 @@ export default class Member extends Component {
               className={cx('flowDetailOrganize', { organizeTransform: item.roleTypeId })}
               data={list}
               value={item.roleTypeId}
+              isAppendToBody
+              menuStyle={{ width: 'auto !important' }}
               border
               renderTitle={() => this.renderOrganize(item.controlType, item.roleTypeId)}
               onChange={roleTypeId => this.onChange(roleTypeId, index)}
@@ -169,8 +171,45 @@ export default class Member extends Component {
     );
   }
 
+  /**
+   * 渲染部门
+   */
+  renderDepartment(item, index) {
+    const { removeOrganization } = this.props;
+
+    const list = [
+      [
+        { text: DEPARTMENT_ORGANIZE[12], value: 12 },
+        { text: DEPARTMENT_ORGANIZE[13], value: 13 },
+      ],
+      [{ text: _l('移除'), value: 0 }],
+    ];
+
+    if (!item.roleTypeId) {
+      _.remove(list, (o, i) => i === 1);
+    }
+
+    return (
+      <Fragment>
+        {this.renderTags(item)}
+        {!!item.entityName && !removeOrganization && (
+          <Dropdown
+            className={cx('flowDetailOrganize', { organizeTransform: item.roleTypeId })}
+            data={list}
+            value={item.roleTypeId || ''}
+            isAppendToBody
+            menuStyle={{ width: 'auto !important' }}
+            border
+            renderTitle={() => this.renderOrganize(27, item.roleTypeId)}
+            onChange={roleTypeId => this.onChange(roleTypeId, index)}
+          />
+        )}
+      </Fragment>
+    );
+  }
+
   render() {
-    const { accounts, from, isSingle } = this.props;
+    const { accounts, leastOne, inline } = this.props;
     const nullText = {
       [USER_TYPE.ROLE]: _l('角色下未设置人员'),
       [USER_TYPE.DEPARTMENT]: _l('部门下未设置人员'),
@@ -181,20 +220,26 @@ export default class Member extends Component {
       <ul className="flowDetailMembers">
         {(accounts || []).map((item, i) => {
           return (
-            <li key={i} className={isSingle ? 'inlineFlexRow' : 'flexRow'} style={{ zIndex: accounts.length - i }}>
+            <li
+              key={i}
+              className={cx(inline ? 'inlineFlexRow' : 'flexRow', {
+                noDel: leastOne && accounts.length <= 1,
+              })}
+              style={{ zIndex: accounts.length - i }}
+            >
               {item.type === USER_TYPE.USER && this.renderUser(item)}
               {item.type === USER_TYPE.ROLE && this.renderRole(item)}
               {item.type === USER_TYPE.CONTROL && this.renderControl(item, i)}
               {item.type === USER_TYPE.TEXT && this.renderText(item)}
-              {_.includes([USER_TYPE.DEPARTMENT, USER_TYPE.JOB, USER_TYPE.ORGANIZE_ROLE], item.type) &&
-                this.renderTags(item)}
+              {item.type === USER_TYPE.DEPARTMENT && this.renderDepartment(item, i)}
+              {_.includes([USER_TYPE.JOB, USER_TYPE.ORGANIZE_ROLE], item.type) && this.renderTags(item)}
 
-              {!(from === 'integration' && accounts.length <= 1) && (
+              {!(leastOne && accounts.length <= 1) && (
                 <span className="mLeft5 flowDetailMemberDel" data-tip={_l('刪除')} onClick={() => this.removeMember(i)}>
-                  <i className={cx('icon-delete', isSingle ? 'Font14' : 'Font18')} />
+                  <i className={cx('icon-delete', inline ? 'Font14' : 'Font18')} />
                 </span>
               )}
-              {!isSingle &&
+              {!inline &&
                 _.includes([USER_TYPE.ROLE, USER_TYPE.DEPARTMENT, USER_TYPE.JOB], item.type) &&
                 !item.count && (
                   <div className="flowDetailMemberError flex">
@@ -202,7 +247,7 @@ export default class Member extends Component {
                     {nullText[item.type]}
                   </div>
                 )}
-              {!isSingle && _.includes([USER_TYPE.ROLE], item.type) && item.count === -1 && (
+              {!inline && _.includes([USER_TYPE.ROLE], item.type) && item.count === -1 && (
                 <div className="flowDetailMemberError flex">
                   <i className="mRight5 Font16 icon-workflow_error" />
                   {_l('不支持包含全组织的角色')}

@@ -4,7 +4,7 @@ import { Button, Icon } from 'ming-ui';
 import styled from 'styled-components';
 import cx from 'classnames';
 import { computeWidth } from '../../../util';
-import color from 'color';
+import tinycolor from '@ctrl/tinycolor';
 import SvgIcon from 'src/components/SvgIcon';
 import { ButtonListWrap, GraphWrap } from './styled';
 import _ from 'lodash';
@@ -13,7 +13,7 @@ const ButtonDisplayWrap = styled.div`
   display: flex;
   flex-direction: column;
   width: 100%;
-  padding: 24px 0;
+  padding: 20px 0;
   text-align: center;
   background-color: #fff;
   .explain {
@@ -24,7 +24,7 @@ const ButtonDisplayWrap = styled.div`
 
 const BtnWrap = styled.div`
   margin: 4px 0;
-  padding: 0 18px;
+  padding: 0 8px;
   cursor: pointer;
   transition: border 0.25s;
   border: 1px solid transparent;
@@ -53,9 +53,9 @@ const BtnWrap = styled.div`
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.26);
     &:hover {
       background-color: ${props =>
-        color(props.color)
-          .darken(0.2)
-          .string()};
+        tinycolor(props.color)
+          .darken(20)
+          .toString()};
     }
     .icon {
       font-size: 20px;
@@ -69,9 +69,9 @@ const BtnWrap = styled.div`
     &.active {
       border: 1px solid
         ${props =>
-          color(props.color)
-            .darken(0.2)
-            .string()};
+          tinycolor(props.color)
+            .darken(20)
+            .toString()};
     }
   }
   &.adjustText {
@@ -80,9 +80,9 @@ const BtnWrap = styled.div`
       color: ${props => props.color};
       box-shadow: none;
       &:hover {
-        background-color: ${color('#f8f8f8')
-          .darken(0.03)
-          .string()};
+        background-color: ${tinycolor('#f8f8f8')
+          .darken(3)
+          .toString()};
       }
     }
     .iconWrap {
@@ -122,8 +122,8 @@ export default function ButtonDisplay({
             <div className={cx('chunkListWrap', { center: isMobile ? false : !isFullWidth })} key={index}>
               {list.map((item, i) => {
                 const { icon, color, name, config } = item;
-                const defaultConfig = btnType === 2 ? { iconUrl: `${md.global.FileStoreConfig.pubHost}/customIcon/custom_actions.svg` } : {};
-                const { iconUrl } = config || defaultConfig;
+                const defaultIconUrl = btnType === 2 ? `${md.global.FileStoreConfig.pubHost}/customIcon/custom_actions.svg` : null;
+                const iconUrl = _.get(config, 'iconUrl') || defaultIconUrl;
                 return (
                   <BtnWrap
                     key={i}

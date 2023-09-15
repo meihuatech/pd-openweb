@@ -13,9 +13,8 @@ const Con = styled.div`
   p {
     margin: 0;
   }
-  max-width: 720px;
-  width: 100%;
-  margin-left: 40px;
+  max-width: 800px;
+  margin: 0 40px;
   padding-bottom: 100px;
   h5,
   h6 {
@@ -123,7 +122,6 @@ const Con = styled.div`
   }
   .moreActionCon {
     border-top: 1px solid #eaeaea;
-    border-bottom: 1px solid #eaeaea;
     padding-bottom: 20px;
     align-items: center;
     justify-content: center;
@@ -133,6 +131,9 @@ const Con = styled.div`
       width: 48px;
       height: 24px;
       cursor: not-allowed;
+    }
+    &.borderB {
+      border-bottom: 1px solid #eaeaea;
     }
   }
 `;
@@ -195,6 +196,7 @@ function SubmitFormSetting(props) {
         closedrafts = '',
       } = advancedSetting;
       const data = {
+        ...advancedSetting,
         title,
         subview, //提交按钮 打开刚刚创建的记录对应的视图id
         sub, //创建按钮文案
@@ -291,7 +293,7 @@ function SubmitFormSetting(props) {
     }
     const { appId } = worksheetInfo;
     sheetAjax
-      .updateFormSubmissionSettings({
+      .editWorksheetSetting({
         workSheetId: worksheetId,
         appId: appId,
         advancedSetting: options,
@@ -355,7 +357,7 @@ function SubmitFormSetting(props) {
           <span className="after flex">
             <span className="Gray_75 TxtMiddle">{_l('提交后：')}</span>
             <Dropdown
-              menuStyle={{ width: 150 }}
+              menuStyle={{ minWidth: 150, width: 'auto' }}
               currentItemClass="currentMenu"
               data={SUBMIT_NEXT_ACTION_LIST}
               value={data.after}
@@ -376,7 +378,10 @@ function SubmitFormSetting(props) {
                   data={views.map(item => {
                     return { text: item.name, value: item.viewId };
                   })}
-                  value={data.viewId || defaultId}
+                  value={
+                    data.viewId ? (!views.find(o => o.viewId === data.viewId) ? undefined : data.viewId) : defaultId
+                  }
+                  placeholder={data.viewId ? <span className="Red">{_l('视图已删除')}</span> : _l('选择视图')}
                   className={cx('flex InlineBlock')}
                   onChange={newValue => {
                     if (newValue === data.viewId) {
@@ -441,7 +446,7 @@ function SubmitFormSetting(props) {
             />
           </div>
         </div>
-        <div className="moreActionCon flexRow mTop12">
+        <div className="moreActionCon flexRow borderB">
           <div className="flex">
             <h6 className="mTop20">{_l('显示“继续创建时，保留上次提交内容”选项')}</h6>
             <p className="Gray_9e">

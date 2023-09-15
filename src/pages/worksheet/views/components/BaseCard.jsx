@@ -180,6 +180,7 @@ const BaseCard = props => {
     onUpdate = noop,
     onDelete = noop,
     onCopySuccess = noop,
+    showNull = false,
   } = props;
   let { rowId, coverImage, allowEdit, allowDelete, abstractValue } = data;
   const isShowWorkflowSys = isOpenPermit(permitList.sysControlSwitch, sheetSwitchPermit);
@@ -216,11 +217,15 @@ const BaseCard = props => {
   if (isEmpty(data)) return null;
 
   const isGalleryView = String(viewType) === '3';
+  const isVerticalHierarchy = String(viewType) === '2' && ['1', '2'].includes(_.get(para, 'advancedSetting.hierarchyViewType'));
+
   abstractValue = abstract ? abstractValue : '';
 
   const otherFields = update(fields, { $splice: [[titleIndex, 1]] });
   const titleMasked =
     ((isCharge || _.get(titleField, 'advancedSetting.isdecrypt') === '1') &&
+      _.get(titleField, 'advancedSetting.datamask') === '1' &&
+      !forceShowFullValue &&
       titleField.type === 2 &&
       titleField.enumDefault === 2) ||
     _.includes([6, 8, 3, 5, 7], titleField.type);
@@ -260,7 +265,7 @@ const BaseCard = props => {
           haveOtherField: !isEmpty(otherFields),
           overflow_ellipsis: titleField.type === 2,
           isGalleryView,
-          maskHoverTheme: titleMasked && !forceShowFullValue,
+          maskHoverTheme: titleMasked,
         })}
         title={content}
         onClick={e => {
@@ -270,7 +275,7 @@ const BaseCard = props => {
         }}
       >
         {content}
-        {titleMasked && titleValue && !forceShowFullValue && (
+        {titleMasked && titleValue && (
           <i
             className="icon icon-eye_off Hand maskData Font16 Gray_bd mLeft4 mTop4 hoverShow"
             style={{ verticalAlign: 'middle' }}
@@ -311,7 +316,7 @@ const BaseCard = props => {
 
   const renderAbstract = () => {
     return abstract ? (
-      <div className={cx('abstractWrap', { galleryViewAbstract: isGalleryView })}>
+      <div className={cx('abstractWrap', { galleryViewAbstract: isGalleryView || isVerticalHierarchy })}>
         {abstractValue || <div className="emptyHolder"></div>}
       </div>
     ) : null;
@@ -326,8 +331,8 @@ const BaseCard = props => {
        */
       if (window.innerWidth - 208 < right) {
         return {
-          points: ['tr', 'tl'],
-          offset: [-256, -8],
+          points: ['tr', 'tr'],
+          offset: [8, 30],
         };
       }
     }
@@ -355,13 +360,16 @@ const BaseCard = props => {
             {otherFields
               // .filter(o => controlState(o).visible)//排除无查看权限的字段
               .map(item => {
-                if (checkCellIsEmpty(item.value) && !isGalleryView) return null;
+                if (checkCellIsEmpty(item.value) && !isGalleryView && !showNull) return null;
                 const content = (
                   <CellControl
                     from={4}
-                    cell={item}
+                    cell={_.find(data.formData, c => c.controlId === item.controlId) || item}
+                    rowFormData={() => data.formData || []}
                     sheetSwitchPermit={sheetSwitchPermit}
+                    worksheetId={worksheetId}
                     viewId={viewId}
+                    row={{ rowid: rowId }}
                     isCharge={isCharge}
                   />
                 );

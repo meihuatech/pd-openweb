@@ -247,9 +247,7 @@ export default function Steps(props) {
   const [width, setWidth] = useState(0);
 
   useEffect(() => {
-    if (value) {
-      setCurrentValue(getCurrent(value));
-    }
+    setCurrentValue(getCurrent(value));
   }, [value]);
 
   useEffect(() => {
@@ -377,10 +375,20 @@ export default function Steps(props) {
       <VerticalCon>
         <Bar ref={barRef}>
           <Content style={{ width: `${width}%`, backgroundColor: currentColor }} />
-          {(!disabled || from === 'recordInfo') && (
+          {(!disabled || from === 'recordInfo') && !_.isUndefined(currentValue) && (
             <Drag
               className={`${tipDirection ? 'tip-' + tipDirection : 'tip-top'}`}
               color={currentColor}
+              onClick={() => {
+                // 选项第一个无法选中，点击元素被覆盖
+                if (!value && !disabled) {
+                  const tempVal = (filterOptions[0] || {}).key || '';
+                  if (tempVal) {
+                    setCurrentValue(0);
+                    onChange(tempVal);
+                  }
+                }
+              }}
               style={{ left: `calc(${width}% - 7px)` }}
               {...(showTip && !_.isUndefined(currentValue)
                 ? { 'data-tip': _.get(filterOptions[currentValue], 'value') }

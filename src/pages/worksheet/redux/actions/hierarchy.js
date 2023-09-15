@@ -1,11 +1,23 @@
 import sheetAjax from 'src/api/worksheet';
 import update from 'immutability-helper';
 import { dealData, getParaIds, getHierarchyViewIds, getItemByRowId } from './util';
-import { get, filter, flatten, isEmpty, isFunction } from 'lodash';
+import _, { get, filter, flatten, isEmpty, isFunction } from 'lodash';
 import { getCurrentView } from '../util';
 import { getItem } from '../../views/util';
 
 const MULTI_RELATE_MAX_PAGE_SIZE = 500;
+
+const getTotalData = (hierarchyViewData = {}, total = 0) => {
+  Object.values(hierarchyViewData).map(item => {
+    if (item) {
+      total += 1;
+    }
+    if (get(item, 'childrenids.length') > 0) {
+      total = getTotalData(item.childrenids, total);
+    }
+  });
+  return total;
+};
 
 // 展开多级数据
 export function expandedMultiLevelHierarchyData(args) {
@@ -24,19 +36,31 @@ export function expandedMultiLevelHierarchyData(args) {
       .then(({ data, count, resultCode }) => {
         if (resultCode === 1) {
           const treeData = dealData(data);
+          const totalDataOver = getTotalData(data);
           // 第一次调用少于1000条，加载全量数据
           const needGetOne =
-            ((count < 1000 && pageSize === 50) || (count > 1000 && pageSize === 1000)) &&
+            ((totalDataOver < 1000 && pageSize === 50) || (totalDataOver > 1000 && pageSize === 1000)) &&
             sheet.hierarchyView.hierarchyTopLevelDataCount === 0;
           dispatch({ type: 'INIT_HIERARCHY_VIEW_DATA', data: treeData });
-          dispatch({ type: 'CHANGE_HIERARCHY_DATA_STATUS', data: { loading: needGetOne, pageIndex: 1 } });
+          dispatch({
+            type: 'CHANGE_HIERARCHY_DATA_STATUS',
+            data: {
+              loading: needGetOne,
+              pageIndex: 1,
+              ...(needGetOne ? { pageSize: totalDataOver > 1000 ? 50 : 1000 } : {}),
+            },
+          });
           dispatch({
             type: 'CHANGE_HIERARCHY_TOP_LEVEL_DATA_COUNT',
             count: count,
           });
           dispatch({
             type: 'EXPAND_HIERARCHY_VIEW_STATE',
-            data: { treeData, data, level: +args.layer },
+            data: {
+              treeData,
+              data,
+              level: needGetOne ? (totalDataOver > 1000 ? '1' : '5') : +args.layer,
+            },
           });
 
           if (needGetOne) {
@@ -53,7 +77,11 @@ function genKanbanKeyByData(data) {
 
 // 递归获取多级关联的层级视图数据
 function getHierarchyDataRecursion({ worksheet, records, kanbanKey, index, para }) {
-  const { dispatch, viewControls, level, ...rest } = para;
+  const { dispatch, getState, viewControls, level, filters, ...rest } = para;
+  // 筛选条件异步加载，重新获取数据时暂停上一次递归请求
+  const { sheet } = getState();
+  if (!_.isEqual(_.get(filters, 'filtersGroup') || [], _.get(sheet, 'filters.filtersGroup') || [])) return;
+
   if (records.length >= 1000 || index > level || index > viewControls.length) {
     const treeData = dealData(records);
     dispatch({ type: 'INIT_HIERARCHY_VIEW_DATA', data: treeData });
@@ -64,10 +92,12 @@ function getHierarchyDataRecursion({ worksheet, records, kanbanKey, index, para 
     dispatch({ type: 'CHANGE_HIERARCHY_DATA_STATUS', data: { loading: false } });
     return;
   }
+
   const { worksheetId: relationWorksheetId, controlId } = viewControls[index - 1];
   sheetAjax
     .getFilterRows({
       ...rest,
+      ...filters,
       relationWorksheetId,
       controlId,
       kanbanKey,
@@ -113,7 +143,7 @@ export const expandMultiLevelHierarchyDataOfMultiRelate = level => {
           type: 'CHANGE_HIERARCHY_TOP_LEVEL_DATA_COUNT',
           count: count,
         });
-        dispatch({ type: 'CHANGE_HIERARCHY_DATA_STATUS', data: { loading: false, pageIndex: 1 } });
+        dispatch({ type: 'CHANGE_HIERARCHY_DATA_STATUS', data: { pageIndex: 1 } });
         if (!kanbanKey || level <= 1) {
           const treeData = dealData(data);
           dispatch({
@@ -121,6 +151,7 @@ export const expandMultiLevelHierarchyDataOfMultiRelate = level => {
             data: { treeData, data, level: 1 },
           });
           dispatch({ type: 'INIT_HIERARCHY_VIEW_DATA', data: treeData });
+          dispatch({ type: 'CHANGE_HIERARCHY_DATA_STATUS', data: { loading: false } });
           return;
         }
         const para = {
@@ -128,7 +159,9 @@ export const expandMultiLevelHierarchyDataOfMultiRelate = level => {
           level,
           viewId,
           dispatch,
+          getState,
           worksheetId,
+          filters,
         };
         getHierarchyDataRecursion({
           worksheet: sheet,
@@ -214,6 +247,32 @@ export function deleteHierarchyRecord({ rows, path, pathId, ...rest }) {
     });
   };
 }
+
+export const hideHierarchyRecord = (id, path, pathId) => (dispatch, getState) => {
+  const { sheet } = getState();
+  const { hierarchyView } = sheet;
+  let { hierarchyViewData } = hierarchyView;
+  const pathLen = pathId.length;
+  if (pathLen === 1) {
+    dispatch(expandedMultiLevelHierarchyData({ layer: 3 }));
+  } else {
+    dispatch(
+      getAssignChildren(
+        {
+          path: path.slice(0, -1),
+          pathId: pathId.slice(0, -1),
+          kanbanKey: pathId[pathLen - 2],
+        },
+        true,
+      ),
+    );
+  }
+  dispatch({
+    type: 'CHANGE_HIERARCHY_VIEW_DATA',
+    data: update(hierarchyViewData, { $unset: [id] }),
+  });
+};
+
 // 判断是否是祖先元素
 const isAncestor = (src, target) => {
   for (let i = 0; i < target.length; i++) {
@@ -338,7 +397,7 @@ export function moveMultiSheetRecord(args) {
             }),
           );
         } else {
-          alert(_l('调整关联关系失败! 请稍后重试'));
+          alert(_l('调整关联关系失败! 请稍后重试'), 2);
         }
       });
   };
@@ -571,24 +630,30 @@ export function initHierarchyRelateSheetControls(payload) {
 export function getDefaultHierarchyData(view) {
   return (dispatch, getState) => {
     const { sheet } = getState();
-    const count = sheet.hierarchyView.hierarchyTopLevelDataCount || 0;
+    const pageSize =
+      Number(childType) === 2
+        ? 50
+        : _.get(sheet, 'hierarchyView.hierarchyTopLevelDataCount')
+        ? _.get(sheet, 'hierarchyView.hierarchyDataStatus.pageSize')
+        : 1000;
     const { viewId, viewControl, viewControls, childType } = isEmpty(view) ? getCurrentView(sheet) : view;
     if (!viewControl && isEmpty(viewControls)) return;
     // 层级视图刷新(本表小于1000条加载全量数据)
     dispatch({
       type: 'CHANGE_HIERARCHY_DATA_STATUS',
-      data: { loading: true, pageSize: count > 1000 || Number(childType) === 2 ? 50 : 1000 },
+      data: { loading: true, pageSize: pageSize },
     });
     if (_.includes(['1', '0'], String(childType))) {
       const { level } = getItem(`hierarchyConfig-${viewId}`) || {};
       dispatch(
         expandedMultiLevelHierarchyData({
-          layer: level || (count > 1000 ? '1' : '5'),
+          layer: level || (pageSize === 1000 ? '5' : '1'),
         }),
       );
     } else {
+      const { level } = getItem(`hierarchyConfig-${viewId}`) || {};
       // 多表关联层级视图获取多级数据 默认加载3级
-      dispatch(expandMultiLevelHierarchyDataOfMultiRelate(3));
+      dispatch(expandMultiLevelHierarchyDataOfMultiRelate(level || 3));
     }
   };
 }

@@ -18,7 +18,7 @@ const DeleteBothWayRelateWrap = styled.div`
 const OperationWrap = styled.div`
   position: absolute;
   right: 12px;
-  top: -4px;
+  top: -6px;
   z-index: 2;
 
   .operationWrap {
@@ -62,7 +62,17 @@ const OperationWrap = styled.div`
 `;
 
 export default function WidgetOperation(props) {
-  const { isActive, fromType, data = {}, parentRef, handleOperate, queryConfig, globalSheetInfo = {}, ...rest } = props;
+  const {
+    isActive,
+    fromType,
+    data = {},
+    parentRef,
+    handleOperate,
+    queryConfig,
+    globalSheetInfo = {},
+    hasChild,
+    ...rest
+  } = props;
   const { type, controlId, attribute, showControls = [], dataSource, sourceControl } = data;
 
   const getActualControls = () => {
@@ -109,11 +119,17 @@ export default function WidgetOperation(props) {
     /* 未保存控件不需要二次确认 */
     if (includes(NOT_NEED_DELETE_CONFIRM, type) || includes(controlId, '-')) {
       return (
-        <Tooltip placement="bottom" trigger={['hover']} title={_l('删除')}>
+        <Tooltip
+          placement="bottom"
+          trigger={['hover']}
+          title={type === 52 ? _l('请先删除分段内的字段后删除') : _l('删除')}
+        >
           <div
             className="delWidget operationIconWrap"
             onClick={e => {
               e.stopPropagation();
+
+              if (hasChild) return;
               handleOperate('delete', queryConfig);
             }}
           >
@@ -130,10 +146,12 @@ export default function WidgetOperation(props) {
 
     const deleteRelateControl = e => {
       e.stopPropagation();
-      worksheetAjax.editWorksheetControls({
-        worksheetId: dataSource,
-        controls: [handleAdvancedSettingChange(sourceControl, { hide: '1' })],
-      }).then(res => {});
+      worksheetAjax
+        .editWorksheetControls({
+          worksheetId: dataSource,
+          controls: [handleAdvancedSettingChange(sourceControl, { hide: '1' })],
+        })
+        .then(res => {});
       handleDelete();
     };
     // 关联记录类型 且双向关联了其他表  删除需要异化为选择删除单个控件和删除双向控件
@@ -176,7 +194,7 @@ export default function WidgetOperation(props) {
         visible={deleteConfirmVisible}
         onVisibleChange={visible => setVisible({ deleteConfirmVisible: visible })}
         // getPopupContainer={() => parentRef.current}
-        hint={isFree ? _l('删除后可在字段回收站保留60天（免费版删除后无法恢复）') : _l('删除后可在字段回收站保留60天')}
+        hint={isFree ? _l('删除后可在字段回收站保留%0天（免费版删除后无法恢复）', md.global.SysSettings.worksheetRowRecycleDays) : _l('删除后可在字段回收站保留%0天', md.global.SysSettings.worksheetRowRecycleDays)}
         onCancel={() => setVisible({ deleteConfirmVisible: false })}
         onOk={handleDelete}
       >
@@ -210,19 +228,17 @@ export default function WidgetOperation(props) {
             </div>
           </Tooltip>
         )}
-        {!includes([34], type) && (
-          <Tooltip placement="bottom" trigger={['hover']} title={_l('复制控件')}>
-            <div
-              className="copyControl operationIconWrap"
-              onClick={e => {
-                e.stopPropagation();
-                handleOperate('copy', queryConfig);
-              }}
-            >
-              <i className="icon-copy" />
-            </div>
-          </Tooltip>
-        )}
+        <Tooltip placement="bottom" trigger={['hover']} title={_l('复制')}>
+          <div
+            className="copyControl operationIconWrap"
+            onClick={e => {
+              e.stopPropagation();
+              handleOperate('copy', queryConfig);
+            }}
+          >
+            <i className="icon-copy" />
+          </div>
+        </Tooltip>
         {renderDelete()}
       </div>
       {resizeWidthVisible && (

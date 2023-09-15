@@ -10,11 +10,12 @@ import { RichText } from 'ming-ui';
 import FiltersGroupPreview from '../editWidget/filter/FiltersGroupPreview';
 import CarouselPreview from '../editWidget/carousel/Carousel';
 import MobileFilter from 'src/pages/Mobile/CustomPage/FilterContent';
+import { reportTypes } from 'statistics/Charts/common';
 
 const WidgetContent = styled.div`
   flex: 1;
   box-sizing: border-box;
-  padding: 8px 15px 16px;
+  padding: 15px 16px;
   background-color: #fff;
   height: 100%;
   &.button {
@@ -22,6 +23,10 @@ const WidgetContent = styled.div`
   }
   &.embedUrl, &.view {
     padding: 0 !important;
+  }
+  &.analysis .header {
+    height: 20px;
+    margin-bottom: 12px;
   }
   img {
     max-width: 100%;
@@ -66,16 +71,21 @@ const WidgetDisplay = forwardRef((props, $cardRef) => {
       return (
         <ChartDisplay
           widget={widget}
-          ref={$cardRef}
+          $cardRef={$cardRef}
           needEnlarge={!(isFullscreen || editable || layoutType === 'mobile')}
           needRefresh={!editable}
           isCharge={isCharge}
+          className={cx({ disableChart: editable && widget.reportType === reportTypes.NumberChart })}
+          permissionType={rest.permissionType}
+          isLock={rest.isLock}
           appId={ids.appId}
           report={{ id: value, name }}
           sourceType={1}
           needUpdate={needUpdate}
           worksheetId={ids.worksheetId}
           projectId={projectId}
+          layoutType={layoutType}
+          mobileCount={_.get(widget, 'config.mobileCount')}
         />
       );
     }

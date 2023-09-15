@@ -92,9 +92,11 @@ const Operate = styled.div`
 
 const ExpandBtn = styled.div(
   ({ showQueryBtn }) => `
-  position: absolute;
-  top: 6px;
-  right: -${showQueryBtn ? 64 : 43}px;
+  // position: absolute;
+  // top: 6px;
+  // right: -${showQueryBtn ? 64 : 43}px;
+  display: inline-block;
+  margin-left: 20px;
   cursor: pointer;
   color: #2196f3;
   font-size: 13px;
@@ -174,10 +176,14 @@ export default function Conditions(props) {
             ...filter,
             dataType: newControl ? newControl.type : filter.dataType,
             control: newControl,
+            filterType: newControl && newControl.encryId ? 2 : filter.filterType,
           };
         })
-        .filter(c => c.control),
-    [JSON.stringify(filters), JSON.stringify(controls.map(c => _.pick(c, ['controlName', 'options'])))],
+        .filter(c => c.control && !(window.shareState.shareId && _.includes([26, 27, 48], c.control.type))), // 分享状态快速筛选不应该显示 成员 部门 角色
+    [
+      JSON.stringify(filters),
+      JSON.stringify(controls.map(c => _.pick(c, ['controlName', 'options', 'relationControls']))),
+    ],
   );
   function update(newValues) {
     didMount.current = true;
@@ -192,10 +198,17 @@ export default function Conditions(props) {
       .filter(validate)
       .map(conditionAdapter);
     if (quickFilter.length) {
-      const formattedFilter = quickFilter.map(c => ({
-        ...c,
-        values: formatFilterValuesToServer(c.dataType, c.values),
-      }));
+      const formattedFilter = quickFilter.map(c => {
+        let values = formatFilterValuesToServer(c.dataType, c.values);
+        if (values[0] === 'isEmpty') {
+          c.filterType = 7;
+          values = [];
+        }
+        return {
+          ...c,
+          values,
+        };
+      });
       if (_.includes(TextTypes.concat(NumberTypes), store.current.activeType)) {
         debounceUpdateQuickFilter.current(formattedFilter, view);
       } else {
@@ -220,15 +233,12 @@ export default function Conditions(props) {
       update();
     }
   }, []);
+  const visibleItems = items.slice(0, _.isNumber(hideStartIndex) ? hideStartIndex : undefined);
   return (
     <Con className={className} isConfigMode={isConfigMode} style={items.length ? { marginTop: 8 } : {}}>
-      {items.slice(0, _.isNumber(hideStartIndex) ? hideStartIndex : undefined).map((item, i) => (
+      {visibleItems.map((item, i) => (
         <Item
           isConfigMode={isConfigMode}
-          isLastLine={
-            isFilterComp &&
-            Math.ceil((i + 1) / colNum) === Math.ceil((items.length + (showQueryBtn || showExpand ? 1 : 0)) / colNum)
-          }
           highlight={activeFilterId === item.fid}
           key={i}
           className={cx(
@@ -274,7 +284,7 @@ export default function Conditions(props) {
           </Content>
         </Item>
       ))}
-      {(showQueryBtn || showExpand) && (
+      {(showQueryBtn || showExpand) && !!visibleItems.length && (
         <Operate
           className={cx('buttons', operateIsNewLine ? 'operateIsNewLine' : '')}
           isConfigMode={isConfigMode}

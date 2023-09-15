@@ -31,6 +31,7 @@ const PoweredBy = styled.div`
 
 export default function InfoHeader(props) {
   const {
+    isCharge,
     loading,
     sheetSwitchPermit,
     sideVisible,
@@ -56,6 +57,7 @@ export default function InfoHeader(props) {
     from,
     // allowExAccountDiscuss = false, //允许外部用户讨论
     // exAccountDiscussEnum = 0, //外部用户的讨论类型 0：所有讨论 1：不可见内部讨论
+    // approved: false, //允许外部用户允许查看审批流转详情
   } = props;
   let { header } = props;
   const { isSmall, worksheetId, recordId, notDialog } = recordbase;
@@ -65,10 +67,18 @@ export default function InfoHeader(props) {
   const logVisible = isOpenPermit(permitList.recordLogSwitch, sheetSwitchPermit, viewId);
   const workflowVisible = isOpenPermit(permitList.approveDetailsSwitch, sheetSwitchPermit, viewId);
   const portalNotHasDiscuss = md.global.Account.isPortal && !props.allowExAccountDiscuss; //外部用户且未开启讨论
-  const isPublicShare = _.get(window, 'shareState.isPublicRecord') || _.get(window, 'shareState.isPublicView');
+  const isPublicShare =
+    _.get(window, 'shareState.isPublicRecord') ||
+    _.get(window, 'shareState.isPublicView') ||
+    _.get(window, 'shareState.isPublicQuery') ||
+    _.get(window, 'shareState.isPublicForm') ||
+    _.get(window, 'shareState.isPublicWorkflowRecord');
+  const isPublicRecordLand = isPublicShare && notDialog;
   const showSideBar =
     (!isPublicShare && !md.global.Account.isPortal && (workflowVisible || discussVisible || logVisible)) ||
-    (md.global.Account.isPortal && props.allowExAccountDiscuss && discussVisible);
+    (md.global.Account.isPortal && props.allowExAccountDiscuss && discussVisible) ||
+    (md.global.Account.isPortal && props.approved && workflowVisible) ||
+    from === RECORD_INFO_FROM.WORKFLOW;
   function loadDiscussionsCount() {
     if (sideVisible || !discussVisible || portalNotHasDiscuss) {
       return;
@@ -168,6 +178,7 @@ export default function InfoHeader(props) {
           </span>
           {!isPublicShare && !iseditting ? (
             <Operates
+              isCharge={isCharge}
               addRefreshEvents={addRefreshEvents}
               iseditting={iseditting}
               sideVisible={sideVisible}

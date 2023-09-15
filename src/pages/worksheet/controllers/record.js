@@ -7,7 +7,7 @@ import { FORM_HIDDEN_CONTROL_IDS } from 'src/pages/widgetConfig/config/widget';
 import { updateOptionsOfControls, checkCellIsEmpty } from 'worksheet/util';
 import _ from 'lodash';
 
-export async function downloadAttachmentById({ fileId, refId }) {
+export async function downloadAttachmentById({ fileId, refId, worksheetId = undefined }) {
   try {
     if (!fileId && !refId) {
       throw new Error();
@@ -17,16 +17,18 @@ export async function downloadAttachmentById({ fileId, refId }) {
       data = await kcAjax.getNodeDetail({
         actionType: 14,
         id: refId,
+        worksheetId,
       });
     } else {
       data = await attachmentAjax.getAttachmentDetail({
         fileId,
+        worksheetId,
       });
     }
     window.open(data.downloadUrl);
   } catch (err) {
     console.error(err);
-    alert(_l('下载附件失败', 3));
+    alert(_l('下载附件失败'), 3);
   }
 }
 
@@ -45,9 +47,6 @@ export function getFormDataForNewRecord({
         controls = controls
           .filter(c => !_.includes(FORM_HIDDEN_CONTROL_IDS, c.controlId))
           .map(control => {
-            if (isCustomButton && _.get(control, 'controlPermissions.2') === '0') {
-              control.controlPermissions = control.controlPermissions.slice(0, 2) + '1';
-            }
             if (
               control.type === 29 &&
               Number(control.advancedSetting.showtype) !== RELATE_RECORD_SHOW_TYPE.LIST &&
@@ -176,8 +175,8 @@ export function submitNewRecord(props) {
     rowStatus,
   } = props;
   const receiveControls = formdata
-    .filter(item => item.type !== 30 && item.type !== 31 && item.type !== 32)
-    .map(formatControlToServer)
+    .filter(item => item.type !== 30 && item.type !== 31 && item.type !== 32 && item.type !== 51)
+    .map(c => formatControlToServer(c, { isNewRecord: true }))
     .filter(item => !checkCellIsEmpty(item.value));
   const args = {
     silent: true,
@@ -210,7 +209,7 @@ export function submitNewRecord(props) {
           onSubmitEnd();
           setRequesting(false);
         } else {
-          alert(_l('保存草稿失败'));
+          alert(_l('保存草稿失败'), 2);
         }
         return;
       }
@@ -299,6 +298,6 @@ export async function openControlAttachmentInNewTab({
     getType,
   });
   if (shareId) {
-    window.open(`${window.subPath ? window.subPath : ''}/recordfile/${shareId}/${getType}`);
+    window.open(`${window.subPath ? window.subPath : ''}/recordfile/${shareId}/${getType || ''}`);
   }
 }

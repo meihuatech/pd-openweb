@@ -3,9 +3,7 @@ import { Radio, Input } from 'antd';
 import { Icon, LoadDiv } from 'ming-ui';
 import Config from '../../config';
 import projectController from 'src/api/project';
-import accountController from 'src/api/account';
-import { encrypt } from 'src/util';
-import captcha from 'src/components/captcha';
+import { verifyPassword } from 'src/util';
 import _ from 'lodash';
 import moment from 'moment';
 const { TextArea } = Input;
@@ -18,11 +16,6 @@ const reasons = [
   _l('我找到了其他替代产品了'),
   _l('其他原因'),
 ];
-
-const errorMsg = {
-  6: _l('密码错误'),
-  8: _l('验证码错误'),
-};
 export default class CloseNet extends Component {
   constructor() {
     super();
@@ -88,59 +81,36 @@ export default class CloseNet extends Component {
 
   handlePostPassword() {
     const { password, licenseType } = this.state;
-    if (password) {
-      this.setState({ disabled: true });
-
-      var throttled = _.throttle(
-        res => {
-          if (res.ret === 0) {
-            accountController
-              .checkAccount({
-                ticket: res.ticket,
-                randStr: res.randstr,
-                captchaType: md.staticglobal.getCaptchaType(),
-                password: encrypt(password),
-              })
-              .then(data => {
-                if (data === 1) {
-                  if (_.includes([0, 1], licenseType)) {
-                    //付费、免费
-                    this.setState({
-                      step: 2,
-                      disabled: false,
-                    });
-                  } else if (licenseType == 2) {
-                    //试用
-                    this.removeProjectTrialLicense(data => {
-                      if (data) {
-                        alert(_l('退出付费版试用成功'), 1, 2000, function () {
-                          window.location.href = '/personal?type=enterprise';
-                        });
-                      } else {
-                        this.setState({ disabled: false });
-                        alert(_l('退出付费版试用失败'), 3);
-                      }
-                    });
-                  }
-                } else {
-                  this.setState({ disabled: false });
-                  alert(errorMsg[data] || _l('操作失败'), 3);
-                }
-              });
-          }
-        },
-        10000,
-        { leading: true },
-      );
-
-      if (md.staticglobal.getCaptchaType() === 1) {
-        new captcha(throttled);
-      } else {
-        new TencentCaptcha(md.global.Config.CaptchaAppId.toString(), throttled).show();
-      }
-    } else {
-      alert(_l('请输入登录密码'), 3, 1000);
+    if (!password) {
+      return alert(_l('请输入登录密码'), 3, 1000);
     }
+
+    this.setState({ disabled: true });
+    const _this = this;
+    verifyPassword({
+      password,
+      success: () => {
+        if (_.includes([0, 1], licenseType)) {
+          //付费、免费
+          this.setState({
+            step: 2,
+            disabled: false,
+          });
+        } else if (licenseType == 2) {
+          //试用
+          this.removeProjectTrialLicense(data => {
+            if (data) {
+              alert(_l('退出付费版试用成功'), 1, 2000, function() {
+                window.location.href = '/personal?type=enterprise';
+              });
+            } else {
+              this.setState({ disabled: false });
+              alert(_l('退出付费版试用失败'), 3);
+            }
+          });
+        }
+      },
+    });
   }
 
   //移除网络试用授权
@@ -149,7 +119,7 @@ export default class CloseNet extends Component {
       .removeProjectTrialLicense({
         projectId: Config.projectId,
       })
-      .then(function (data) {
+      .then(function(data) {
         callback(data);
       });
   };
@@ -237,8 +207,8 @@ export default class CloseNet extends Component {
       isLoading,
     } = this.state;
     return (
-      <div className="system-set-box">
-        <div className="system-set-header">
+      <div className="orgManagementWrap">
+        <div className="orgManagementHeader justifyContentLeft">
           <Icon
             icon="backspace"
             className="Hand mRight18 TxtMiddle Font24"
@@ -249,7 +219,7 @@ export default class CloseNet extends Component {
                     step: this.state.step - 1,
                   });
             }}
-          ></Icon>
+          />
           <span className="Font17">{_l('注销组织')}</span>
         </div>
         <div className="system-set-content">
@@ -259,7 +229,7 @@ export default class CloseNet extends Component {
             <div className="closeNet">
               <div id="stepOne" className={`${step === 1 ? '' : 'Hidden'}`}>
                 <div className="Bold Font24 title">
-                  <i className="icon-error error Font28 mRight8"></i>
+                  <i className="icon-error error Font28 mRight8" />
                   {licenseType === 2 ? _l('退出付费版试用') : _l('申请注销')}
                 </div>
                 <div className="mTop16 Font13 subTitle">
@@ -288,7 +258,7 @@ export default class CloseNet extends Component {
               </div>
               <div id="stepTwo" className={`${step === 2 ? '' : 'Hidden'}`}>
                 <div className="Bold Font24 title">
-                  <i className="icon-error error Font28 mRight8"></i>
+                  <i className="icon-error error Font28 mRight8" />
                   {_l('申请注销')}
                 </div>
                 <div className="mTop16 Font13 subTitle">{_l('提交申请后部署顾问将尽快与您联系办理注销手续')}</div>
@@ -353,7 +323,7 @@ export default class CloseNet extends Component {
                 <div className="mTop20 ThemeColor3">
                   <span className="Hand" onClick={this.showList.bind(this)}>
                     {_l('申请记录')}
-                    <i className={`${isShow ? 'icon-arrow-down' : 'icon-arrow-up'} font8`}></i>
+                    <i className={`${isShow ? 'icon-arrow-down' : 'icon-arrow-up'} font8`} />
                   </span>
                 </div>
                 <div className={`tableViewContent mTop10 ${isShow ? '' : 'hidden'}`}>

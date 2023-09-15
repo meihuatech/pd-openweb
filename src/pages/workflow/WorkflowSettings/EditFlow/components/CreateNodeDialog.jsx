@@ -1,27 +1,35 @@
 import React, { Component, Fragment } from 'react';
 import ReactCSSTransitionGroup from 'react-addons-css-transition-group';
 import withClickAway from 'ming-ui/decorators/withClickAway';
-import { Dialog, Radio, ScrollView, Support, Icon } from 'ming-ui';
+import { Dialog, Radio, ScrollView, Support, Icon, Tooltip } from 'ming-ui';
 import createDecoratedComponent from 'ming-ui/decorators/createDecoratedComponent';
 import { NODE_TYPE, ACTION_ID, APP_TYPE, TRIGGER_ID } from '../../enum';
-import { getFeatureStatus, buriedUpgradeVersionDialog } from 'src/util';
+import { getFeatureStatus, buriedUpgradeVersionDialog, getCurrentProject } from 'src/util';
+import { VersionProductType } from 'src/util/enum';
 import SelectApprovalProcess from '../../../components/SelectApprovalProcess';
 import _ from 'lodash';
+import CodeSnippet from '../../../components/CodeSnippet';
+import { Base64 } from 'js-base64';
+import cx from 'classnames';
 
 const ClickAwayable = createDecoratedComponent(withClickAway);
 
 export default class CreateNodeDialog extends Component {
   constructor(props) {
     super(props);
+
+    const currentProject = getCurrentProject(props.flowInfo.companyId);
+    const isDisabled = !currentProject.isProjectAdmin && !currentProject.isSuperAdmin;
+
     this.state = {
       list: [
         {
           id: 'data',
-          name: _l('数据处理'),
+          name: _l('数据处理%03017'),
           items: [
             {
               type: 6,
-              name: _l('新增记录'),
+              name: _l('新增记录%03018'),
               appType: 1,
               actionId: '1',
               iconColor: '#FFA340',
@@ -29,7 +37,7 @@ export default class CreateNodeDialog extends Component {
             },
             {
               type: 6,
-              name: _l('更新记录'),
+              name: _l('更新记录%03019'),
               appType: 1,
               actionId: '2',
               iconColor: '#FFA340',
@@ -37,7 +45,7 @@ export default class CreateNodeDialog extends Component {
             },
             {
               type: 6,
-              name: _l('删除记录'),
+              name: _l('删除记录%03020'),
               appType: 1,
               actionId: '3',
               iconColor: '#FFA340',
@@ -45,7 +53,7 @@ export default class CreateNodeDialog extends Component {
             },
             {
               type: 7,
-              name: _l('获取单条数据'),
+              name: _l('获取单条数据%03021'),
               iconColor: '#FFA340',
               iconName: 'icon-search',
               typeText: _l('获取方式'),
@@ -82,7 +90,7 @@ export default class CreateNodeDialog extends Component {
             },
             {
               type: 13,
-              name: _l('获取多条数据'),
+              name: _l('获取多条数据%03022'),
               iconColor: '#FFA340',
               iconName: 'icon-transport',
               typeText: _l('获取方式'),
@@ -125,7 +133,7 @@ export default class CreateNodeDialog extends Component {
             },
             {
               type: 6,
-              name: _l('更新流程参数'),
+              name: _l('更新流程参数%03023'),
               appType: 102,
               actionId: '2',
               iconColor: '#FFA340',
@@ -139,7 +147,7 @@ export default class CreateNodeDialog extends Component {
           items: [
             {
               type: 26,
-              name: _l('发起审批流程'),
+              name: _l('发起审批流程%03024'),
               iconColor: '#4158DB',
               iconName: 'icon-approval',
               typeText: _l('执行流程'),
@@ -162,19 +170,19 @@ export default class CreateNodeDialog extends Component {
               ],
             },
             { type: 4, name: _l('审批'), iconColor: '#7E57C2', iconName: 'icon-workflow_ea' },
-            { type: 3, name: _l('填写'), iconColor: '#00BCD4', iconName: 'icon-workflow_write' },
-            { type: 5, name: _l('抄送'), iconColor: '#2196f3', iconName: 'icon-workflow_notice' },
+            { type: 3, name: _l('填写%03025'), iconColor: '#00BCD4', iconName: 'icon-workflow_write' },
+            { type: 5, name: _l('抄送%03026'), iconColor: '#2196f3', iconName: 'icon-workflow_notice' },
           ],
         },
         {
           id: 'notice',
-          name: _l('通知'),
+          name: _l('通知%03027'),
           items: [
-            { type: 27, name: _l('发送站内通知'), iconColor: '#2196f3', iconName: 'icon-hr_message_reminder' },
-            { type: 10, name: _l('发送短信'), iconColor: '#2196f3', iconName: 'icon-workflow_sms' },
+            { type: 27, name: _l('发送站内通知%03028'), iconColor: '#2196f3', iconName: 'icon-hr_message_reminder' },
+            { type: 10, name: _l('发送短信%03029'), iconColor: '#2196f3', iconName: 'icon-workflow_sms' },
             {
               type: 11,
-              name: _l('发送邮件'),
+              name: _l('发送邮件%03030'),
               appType: 3,
               actionId: '202',
               iconColor: '#2196f3',
@@ -182,14 +190,14 @@ export default class CreateNodeDialog extends Component {
             },
             {
               type: 17,
-              featureId: 14,
+              featureId: VersionProductType.interfacePush,
               name: _l('界面推送'),
               iconColor: '#2196f3',
               iconName: 'icon-interface_push',
             },
             {
               type: 19,
-              name: _l('发送服务号消息'),
+              name: _l('发送服务号信息%03031'),
               appType: 22,
               actionId: '203',
               iconColor: '#2196f3',
@@ -199,12 +207,12 @@ export default class CreateNodeDialog extends Component {
         },
         {
           id: 'component',
-          name: _l('构件'),
+          name: _l('构件%03032'),
           items: [
-            { type: 1, name: _l('分支'), iconColor: '#4C7D9E', iconName: 'icon-workflow_branch' },
+            { type: 1, name: _l('分支%03033'), iconColor: '#4C7D9E', iconName: 'icon-workflow_branch' },
             {
               type: 12,
-              name: _l('延时'),
+              name: _l('延时%03034'),
               iconColor: '#4C7D9E',
               iconName: 'icon-workflow_delayed',
               typeText: _l('延时方式'),
@@ -219,13 +227,13 @@ export default class CreateNodeDialog extends Component {
                   type: 12,
                   name: _l('延时一段时间'),
                   actionId: '301',
-                  describe: _l('在上一个节点完成后，延时一段时间再继续执行流程'),
+                  describe: _l('上一节点完成后，延时一段时间再继续执行流程'),
                 },
               ],
             },
             {
               type: 9,
-              name: _l('运算'),
+              name: _l('运算%03035'),
               iconColor: '#4C7D9E',
               iconName: 'icon-workflow_function',
               typeText: _l('运算对象'),
@@ -244,9 +252,9 @@ export default class CreateNodeDialog extends Component {
                 },
                 {
                   type: 9,
-                  name: _l('两个日期间的时长'),
+                  name: _l('时长'),
                   actionId: '104',
-                  describe: _l('计算两个日期间的时长，并精确到年、月、天、小时、分'),
+                  describe: _l('计算两个日期/时间之间的时长，并精确到年、月、天、时、分、秒'),
                 },
                 {
                   type: 9,
@@ -264,28 +272,28 @@ export default class CreateNodeDialog extends Component {
             },
             {
               type: 15,
-              name: _l('获取链接'),
+              name: _l('获取链接%03036'),
               appType: 13,
               iconColor: '#4C7D9E',
               iconName: 'icon-link2',
             },
             {
               type: 18,
-              featureId: 13,
-              name: _l('获取记录打印文件'),
+              featureId: VersionProductType.getPrintFileNode,
+              name: _l('获取记录打印文件%03037'),
               appType: 14,
               iconColor: '#4C7D9E',
               iconName: 'icon-print',
             },
             {
               type: 16,
-              name: _l('子流程'),
+              name: _l('子流程%03038'),
               iconColor: '#4C7D9E',
               iconName: 'icon-subprocess',
             },
             {
               type: 20,
-              name: _l('调用业务流程'),
+              name: _l('调用封装业务流程%03039'),
               appType: 17,
               actionId: '500',
               iconColor: '#4C7D9E',
@@ -293,8 +301,8 @@ export default class CreateNodeDialog extends Component {
             },
             {
               type: 25,
-              featureId: 4,
-              name: _l('调用已集成 API'),
+              featureId: VersionProductType.apiIntergrationNode,
+              name: _l('调用已集成 API%03040'),
               appType: 42,
               iconColor: '#4C7D9E',
               iconName: 'icon-api',
@@ -303,19 +311,19 @@ export default class CreateNodeDialog extends Component {
         },
         {
           id: 'developer',
-          name: '开发者',
+          name: _l('开发者%03041'),
           items: [
             {
               type: 24,
-              featureId: 4,
-              name: _l('API 连接与认证'),
+              featureId: VersionProductType.apiIntergrationNode,
+              name: _l('API 连接与认证%03042'),
               appType: 41,
               iconColor: '#4C7D9E',
               iconName: 'icon-connect',
             },
             {
               type: 8,
-              name: _l('发送 API 请求'),
+              name: _l('发送 API 请求%03043'),
               iconColor: '#4C7D9E',
               iconName: 'icon-workflow_webhook',
               typeText: _l('发送对象'),
@@ -336,11 +344,11 @@ export default class CreateNodeDialog extends Component {
             },
             {
               type: 14,
-              featureId: 8,
-              name: _l('代码块'),
+              featureId: VersionProductType.codeBlockNode,
+              name: _l('代码块%03044'),
               iconColor: '#4C7D9E',
               iconName: 'icon-url',
-              typeText: _l('选择代码块语言'),
+              typeText: _l('新建或选择已有代码片段'),
               secondList: [
                 {
                   type: 14,
@@ -354,11 +362,17 @@ export default class CreateNodeDialog extends Component {
                   actionId: '103',
                   describe: _l('使用Python语言'),
                 },
+                {
+                  type: 14,
+                  name: _l('从代码片段库中选择'),
+                  describe: _l('直接选择已有的代码片段'),
+                  isCustom: true,
+                },
               ],
             },
             {
               type: 21,
-              name: _l('JSON 解析'),
+              name: _l('JSON 解析%03045'),
               appType: 18,
               actionId: '510',
               iconColor: '#4C7D9E',
@@ -368,113 +382,148 @@ export default class CreateNodeDialog extends Component {
         },
         {
           id: 'message',
-          name: _l('组织/部门/协作'),
+          name: _l('组织/部门/协作%03046'),
           items: [
             {
               type: 1000,
-              name: _l('获取单条人员/部门/组织角色数据'),
+              name: _l('获取单条人员/部门/组织角色数据%03047'),
               iconColor: '#2196f3',
               iconName: 'icon-person_search',
-              typeText: _l('获取方式'),
+              isGroupList: true,
               secondList: [
                 {
-                  type: 1000,
-                  appType: 20,
-                  actionId: '20',
-                  name: _l('从人员字段获取'),
-                  describe: _l('从人员字段获取一名指定人员的相关信息'),
+                  typeText: _l('获取单条人员信息'),
+                  describe: _l(
+                    '获取一名人员的相关信息，包含个人信息（姓名、性别、生日、手机、邮箱）和组织信息（部门、职位、工号、上下级（可选））',
+                  ),
+                  source: [
+                    {
+                      type: 1000,
+                      appType: 20,
+                      actionId: '20',
+                      name: _l('从成员字段获取'),
+                    },
+                    {
+                      type: 1000,
+                      appType: 20,
+                      actionId: '406',
+                      name: _l('从所有组织成员中查找'),
+                      disabled: isDisabled,
+                    },
+                  ],
                 },
                 {
-                  type: 1000,
-                  appType: 21,
-                  actionId: '20',
-                  name: _l('从部门字段获取'),
-                  describe: _l('从部门字段获取一个指定部门的相关信息'),
+                  typeText: _l('获取单条部门信息'),
+                  describe: _l('获取一个部门的相关信息，包含部门名称、部门负责人、部门人员及上下级部门'),
+                  source: [
+                    {
+                      type: 1000,
+                      appType: 21,
+                      actionId: '20',
+                      name: _l('从部门字段获取'),
+                    },
+                    {
+                      type: 1000,
+                      appType: 21,
+                      actionId: '406',
+                      name: _l('从所有组织部门中查找'),
+                      disabled: isDisabled,
+                    },
+                  ],
                 },
                 {
-                  type: 1000,
-                  appType: 24,
-                  actionId: '20',
-                  name: _l('从组织角色字段获取'),
-                  describe: _l('从组织角色字段获取一个指定角色的相关信息'),
-                },
-                {
-                  type: 1000,
-                  appType: 20,
-                  actionId: '406',
-                  name: _l('从组织人员中获取'),
-                  describe: _l('从当前组织的所有人员中获取一名指定人员的相关信息'),
-                },
-                {
-                  type: 1000,
-                  appType: 21,
-                  actionId: '406',
-                  name: _l('从组织部门中获取'),
-                  describe: _l('从当前组织的所有部门中获取一个指定部门的相关信息'),
-                },
-                {
-                  type: 1000,
-                  appType: 24,
-                  actionId: '406',
-                  name: _l('从组织角色中获取'),
-                  describe: _l('从当前组织的所有组织角色中获取一个指定角色的相关信息'),
+                  typeText: _l('获取单条组织角色信息'),
+                  describe: _l('获取一个组织角色的相关信息，包含角色名称、备注、角色下人员'),
+                  source: [
+                    {
+                      type: 1000,
+                      appType: 24,
+                      actionId: '20',
+                      name: _l('从组织角色字段获取'),
+                    },
+                    {
+                      type: 1000,
+                      appType: 24,
+                      actionId: '406',
+                      name: _l('从所有组织角色中查找'),
+                      disabled: isDisabled,
+                    },
+                  ],
                 },
               ],
             },
             {
               type: 1001,
-              name: _l('获取多条人员/部门/组织角色数据'),
+              name: _l('获取多条人员/部门/组织角色数据%03048'),
               iconColor: '#2196f3',
               iconName: 'icon-group-members',
-              typeText: _l('获取方式'),
+              isGroupList: true,
               secondList: [
                 {
-                  type: 1001,
-                  appType: 20,
-                  actionId: '401',
-                  name: _l('从人员字段获取'),
-                  describe: _l('从人员字段获取批量人员的相关信息'),
+                  typeText: _l('获取多条人员信息'),
+                  describe: _l(
+                    '获取多名人员的相关信息，包含个人信息（姓名、性别、生日、手机、邮箱）和组织信息（部门、职位、工号、上下级（可选））',
+                  ),
+                  source: [
+                    {
+                      type: 1001,
+                      appType: 20,
+                      actionId: '401',
+                      name: _l('从成员字段获取'),
+                    },
+                    {
+                      type: 1001,
+                      appType: 20,
+                      actionId: '400',
+                      name: _l('从所有组织成员中查找'),
+                      disabled: isDisabled,
+                    },
+                  ],
                 },
                 {
-                  type: 1001,
-                  appType: 21,
-                  actionId: '401',
-                  name: _l('从部门字段获取'),
-                  describe: _l('从部门字段获取批量部门的相关信息'),
+                  typeText: _l('获取多条部门信息'),
+                  describe: _l('获取多个部门的相关信息，包含部门名称、部门负责人、部门人员及上下级部门'),
+                  source: [
+                    {
+                      type: 1001,
+                      appType: 21,
+                      actionId: '401',
+                      name: _l('从部门字段获取'),
+                    },
+                    {
+                      type: 1001,
+                      appType: 21,
+                      actionId: '400',
+                      name: _l('从所有组织部门中查找'),
+                      disabled: isDisabled,
+                    },
+                  ],
                 },
                 {
-                  type: 1001,
-                  appType: 24,
-                  actionId: '401',
-                  name: _l('从组织角色字段获取'),
-                  describe: _l('从组织角色字段获取批量角色的相关信息'),
-                },
-                {
-                  type: 1001,
-                  appType: 20,
-                  actionId: '400',
-                  name: _l('从组织人员中获取'),
-                  describe: _l('从当前组织的所有人员中获取批量人员的相关信息'),
-                },
-                {
-                  type: 1001,
-                  appType: 21,
-                  actionId: '400',
-                  name: _l('从组织部门中获取'),
-                  describe: _l('从当前组织的所有部门中获取批量部门的相关信息'),
-                },
-                {
-                  type: 1001,
-                  appType: 24,
-                  actionId: '400',
-                  name: _l('从组织角色中获取'),
-                  describe: _l('从当前组织的所有组织角色中获取批量角色的相关信息'),
+                  typeText: _l('获取多条组织角色信息'),
+                  describe: _l('获取多个组织角色的相关信息，包含角色名称、备注、角色下人员'),
+                  source: [
+                    {
+                      type: 1001,
+                      appType: 24,
+                      actionId: '401',
+                      name: _l('从组织角色字段获取'),
+                    },
+
+                    {
+                      type: 1001,
+                      appType: 24,
+                      actionId: '400',
+                      name: _l('从所有组织角色中查找'),
+                      disabled: isDisabled,
+                    },
+                  ],
                 },
               ],
             },
             {
               type: 6,
-              name: _l('创建任务'),
+              name: _l('创建任务%03049'),
               appType: 2,
               actionId: '1',
               iconColor: '#01CA83',
@@ -484,11 +533,11 @@ export default class CreateNodeDialog extends Component {
         },
         {
           id: 'external',
-          name: _l('外部用户'),
+          name: _l('外部用户%03050'),
           items: [
             {
               type: 6,
-              name: _l('更新外部用户信息'),
+              name: _l('更新外部用户信息%03051'),
               appType: 23,
               actionId: '2',
               iconColor: '#FFA340',
@@ -496,7 +545,7 @@ export default class CreateNodeDialog extends Component {
             },
             {
               type: 6,
-              name: _l('邀请外部用户'),
+              name: _l('邀请外部用户%03052'),
               appType: 23,
               actionId: '1',
               iconColor: '#FFA340',
@@ -504,7 +553,7 @@ export default class CreateNodeDialog extends Component {
             },
             {
               type: 1000,
-              name: _l('获取单条外部人员数据'),
+              name: _l('获取单条外部人员数据%03053'),
               iconColor: '#2196f3',
               iconName: 'icon-external_users',
               typeText: _l('获取方式'),
@@ -527,7 +576,7 @@ export default class CreateNodeDialog extends Component {
             },
             {
               type: 1001,
-              name: _l('获取多条外部人员数据'),
+              name: _l('获取多条外部人员数据%03054'),
               iconColor: '#2196f3',
               iconName: 'icon-folder-public',
               typeText: _l('获取方式'),
@@ -559,6 +608,7 @@ export default class CreateNodeDialog extends Component {
       moveType: 1,
       foldFeatures: safeParse(localStorage.getItem(`workflowFoldFeatures-${md.global.Account.accountId}`)) || {},
       showApprovalDialog: false,
+      showCodeSnippetDialog: false,
     };
 
     if (!_.includes([APP_TYPE.CUSTOM_ACTION, APP_TYPE.PBC], props.flowInfo.startAppType) || props.flowInfo.child) {
@@ -584,10 +634,10 @@ export default class CreateNodeDialog extends Component {
 
     // 埋点授权过滤： API集成工作流节点、代码块节点、获取打印文件节点、界面推送
     [
-      { featureId: 4, type: [NODE_TYPE.API_PACKAGE, NODE_TYPE.API] },
-      { featureId: 8, type: [NODE_TYPE.CODE] },
-      { featureId: 13, type: [NODE_TYPE.FILE] },
-      { featureId: 14, type: [NODE_TYPE.PUSH] },
+      { featureId: VersionProductType.apiIntergrationNode, type: [NODE_TYPE.API_PACKAGE, NODE_TYPE.API] },
+      { featureId: VersionProductType.codeBlockNode, type: [NODE_TYPE.CODE] },
+      { featureId: VersionProductType.getPrintFileNode, type: [NODE_TYPE.FILE] },
+      { featureId: VersionProductType.interfacePush, type: [NODE_TYPE.PUSH] },
     ].forEach(obj => {
       if (!_.includes(['1', '2'], getFeatureStatus(props.flowInfo.companyId, obj.featureId))) {
         this.state.list.forEach(o => {
@@ -595,7 +645,12 @@ export default class CreateNodeDialog extends Component {
         });
       }
     });
+
+    this.cacheList = _.cloneDeep(this.state.list);
   }
+
+  // 缓存节点数据
+  cacheList = [];
 
   componentWillReceiveProps(nextProps, nextState) {
     if (nextProps.nodeId && nextProps.nodeId !== this.props.nodeId) {
@@ -609,90 +664,179 @@ export default class CreateNodeDialog extends Component {
         showApprovalDialog: false,
       });
     }
+
+    // 审批流程过滤节点
+    if ((nextProps.selectProcessId && nextProps.flowInfo.id !== nextProps.selectProcessId) || nextProps.isApproval) {
+      _.remove(this.state.list, o => _.includes(['notice', 'artificial', 'external'], o.id));
+      this.state.list.forEach(o => {
+        _.remove(
+          o.items,
+          item =>
+            !_.includes(
+              [
+                NODE_TYPE.SEARCH,
+                NODE_TYPE.GET_MORE_RECORD,
+                NODE_TYPE.DELAY,
+                NODE_TYPE.FORMULA,
+                NODE_TYPE.API,
+                NODE_TYPE.API_PACKAGE,
+                NODE_TYPE.WEBHOOK,
+                NODE_TYPE.CODE,
+                NODE_TYPE.JSON_PARSE,
+                NODE_TYPE.FIND_SINGLE_MESSAGE,
+                NODE_TYPE.FIND_MORE_MESSAGE,
+              ],
+              item.type,
+            ),
+        );
+
+        // 去除多条新增
+        o.items.forEach(obj => {
+          _.remove(obj.secondList || [], item => item.actionId === ACTION_ID.FROM_ADD);
+        });
+      });
+    }
+
+    if (!nextProps.selectProcessId) {
+      this.setState({ list: _.cloneDeep(this.cacheList) });
+    }
   }
 
   /**
    * 内容
    */
   renderContent() {
+    const { flowInfo, selectProcessId, isApproval } = this.props;
     const { list, selectItem, selectSecond, foldFeatures } = this.state;
 
     // 渲染二级数据
     if (selectSecond) {
       return (
-        <div className="pTop20 pBottom15 pLeft12 pRight12">
-          {selectItem.typeText && <div className="bold pLeft10">{selectItem.typeText}</div>}
-          {selectItem.type === NODE_TYPE.CODE && (
-            <div className="Gray_75 mTop10 pLeft10">
+        <div className="pTop20 pBottom15 pLeft20 pRight15">
+          {selectItem.typeText && <div className="bold pLeft10 Font14">{selectItem.typeText}</div>}
+          {selectItem.type === NODE_TYPE.CODE && !md.global.SysSettings.hideHelpTip && (
+            <div className="Gray_75 mTop10 pLeft10 InlineFlex">
               {_l('查看当前代码脚本的')}
-              <a
-                href="https://help.mingdao.com/flow34.html#%E4%BB%A3%E7%A0%81%E8%84%9A%E6%9C%AC%E8%BF%90%E8%A1%8C%E7%8E%AF%E5%A2%83"
-                className="ThemeColor3 ThemeHoverColor2 mLeft3"
-                target="_blank"
-              >
-                {_l('运行版本')}
-              </a>
+              <Support
+                type={3}
+                text={_l('运行版本')}
+                className="ThemeColor3 ThemeHoverColor2"
+                href="https://help.mingdao.com/flow34#%E4%BB%A3%E7%A0%81%E8%84%9A%E6%9C%AC%E8%BF%90%E8%A1%8C%E7%8E%AF%E5%A2%83"
+              />
             </div>
           )}
 
-          <ul className="secondNodeList">
-            {(selectItem.secondList || []).map((item, i) => {
-              return (
-                <li key={i} onClick={() => this.createNodeClick(item)}>
-                  <Radio className="Font15" text={item.name} disabled />
-                  <div className="Gray_75 Font13 mLeft30 mTop5">{item.describe}</div>
-                </li>
-              );
-            })}
-          </ul>
+          {selectItem.isGroupList ? (
+            (selectItem.secondList || []).map((item, i) => (
+              <Fragment key={i}>
+                <div className="bold pLeft10 Font14">{item.typeText}</div>
+                <div className="Gray_75 pLeft10 mTop5">{item.describe}</div>
+                <ul className="secondNodeList mBottom25 mTop10">
+                  {(item.source || []).map((o, j) => {
+                    return (
+                      <li
+                        key={j}
+                        className={cx('mTop0', { disabled: o.disabled })}
+                        onClick={() => {
+                          if (o.disabled) {
+                            alert(_l('仅组织管理员可以添加'), 3);
+                            return;
+                          }
+
+                          this.createNodeClick(Object.assign({}, o, { name: item.typeText }));
+                        }}
+                      >
+                        <Radio className="Font15" text={o.name} disabled />
+                      </li>
+                    );
+                  })}
+                </ul>
+              </Fragment>
+            ))
+          ) : (
+            <ul className="secondNodeList">
+              {(selectItem.secondList || []).map((item, i) => {
+                return (
+                  <li key={i} onClick={() => this.createNodeClick(item)}>
+                    <Radio className="Font15" text={item.name} disabled />
+                    <div className="Gray_75 mLeft30 mTop5">{item.describe}</div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </div>
       );
     }
 
     return (
-      <div className="pBottom15 pLeft10 pRight10">
-        {list.map((data, i) => {
-          return (
-            <div className="mTop15 nodeListContainer" key={i}>
-              <div
-                className="Font16 bold pTop5 pBottom5 pointer"
-                onClick={() => {
-                  const newFold = Object.assign({}, foldFeatures, { [data.id]: !foldFeatures[data.id] });
+      <Fragment>
+        {((selectProcessId && flowInfo.id !== selectProcessId) || isApproval) && (
+          <div className="createNodeMessageBox mBottom30 mLeft32 mRight32 mTop16 LineHeight20">
+            {_l('在审批过程中添加数据处理节点。处理结果用于分支判断、更新审批中的数据。')}（
+            {_l('可在审批步骤节点中配置更新数据')}
+            <Support
+              type={3}
+              text={_l('如何设置？')}
+              href="https://help.mingdao.com/flow19/#112%E6%95%B0%E6%8D%AE%E6%9B%B4%E6%96%B0"
+            />
+            ）
+          </div>
+        )}
 
-                  this.setState({ foldFeatures: newFold });
-                  safeLocalStorageSetItem(
-                    `workflowFoldFeatures-${md.global.Account.accountId}`,
-                    JSON.stringify(newFold),
-                  );
-                }}
-              >
-                <Icon
-                  icon={foldFeatures[data.id] ? 'arrow-right-tip' : 'arrow-down'}
-                  className="mRight13 Gray_9e Font13 nodeFoldIcon"
-                />
-                {data.name}
-              </div>
-              {!foldFeatures[data.id] && (
-                <ul className="nodeList clearfix">
-                  {data.items.map((item, j) => {
-                    return (
-                      <li key={j} onClick={() => this.createNodeClick(item)}>
-                        <span className="nodeListIcon" style={{ backgroundColor: item.iconColor }}>
-                          <i className={item.iconName} />
-                        </span>
-                        <div className="Font14">{item.name}</div>
-                        {item.type === NODE_TYPE.APPROVAL_PROCESS && (
-                          <div className="Font12 nodeListNew">{_l('Beta')}</div>
-                        )}
-                      </li>
+        <div className="pBottom15 pLeft10 pRight10">
+          {list.map((data, i) => {
+            return (
+              <div className="mTop15 nodeListContainer" key={i}>
+                <div
+                  className="Font16 bold pTop5 pBottom5 pointer"
+                  onClick={() => {
+                    const newFold = Object.assign({}, foldFeatures, { [data.id]: !foldFeatures[data.id] });
+
+                    this.setState({ foldFeatures: newFold });
+                    safeLocalStorageSetItem(
+                      `workflowFoldFeatures-${md.global.Account.accountId}`,
+                      JSON.stringify(newFold),
                     );
-                  })}
-                </ul>
-              )}
-            </div>
-          );
-        })}
-      </div>
+                  }}
+                >
+                  <Icon
+                    icon={foldFeatures[data.id] ? 'arrow-right-tip' : 'arrow-down'}
+                    className="mRight13 Gray_9e Font13"
+                  />
+                  {data.name}
+                </div>
+                {!foldFeatures[data.id] && (
+                  <ul className="nodeList clearfix">
+                    {data.items
+                      .filter(data => !(data.type === 25 && md.global.SysSettings.hideIntegration))
+                      .map((item, j) => {
+                        return (
+                          <li key={j} onClick={() => this.createNodeClick(item)}>
+                            <span className="nodeListIcon" style={{ backgroundColor: item.iconColor }}>
+                              <i className={item.iconName} />
+                            </span>
+                            <div className="Font14">{item.name}</div>
+                            {item.type === NODE_TYPE.APPROVAL && (
+                              <Tooltip
+                                popupPlacement="bottom"
+                                text={_l(
+                                  '使用「发起审批流程」节点可提供更完整的审批能力，旧「审批」节点即将被下线。流程中已添加的审批节点不受影响，仍可以继续使用。',
+                                )}
+                              >
+                                <div className="Font12 nodeListOverdue">{_l('旧%03089')}</div>
+                              </Tooltip>
+                            )}
+                          </li>
+                        );
+                      })}
+                  </ul>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </Fragment>
     );
   }
 
@@ -700,15 +844,16 @@ export default class CreateNodeDialog extends Component {
    * 渲染结果分支
    */
   renderResultBranch() {
-    const { isLast, nodeType, flowNodeMap, nodeId } = this.props;
+    const { isLast, flowNodeMap, nodeId } = this.props;
     const { isOrdinary } = this.state;
+    const { typeId } = flowNodeMap[nodeId] || {};
 
     return (
       <Dialog
         visible
         width={560}
         title={
-          nodeType === NODE_TYPE.APPROVAL
+          typeId === NODE_TYPE.APPROVAL
             ? _l('在审批节点下添加分支有两种选择：')
             : _l('在查找指定数据节点下添加分支有两种选择：')
         }
@@ -726,18 +871,18 @@ export default class CreateNodeDialog extends Component {
           onClick={() => this.setState({ isOrdinary: true })}
         />
         <div className="Gray_75 Font13 pLeft30 mTop5 mBottom15">
-          {nodeType === NODE_TYPE.APPROVAL
+          {typeId === NODE_TYPE.APPROVAL
             ? _l('只对“通过”审批的数据进行分支处理')
             : _l('对查找到的数据进行分支处理。未查找到数据时，流程中止')}
         </div>
         <Radio
           className="Font15"
-          text={nodeType === NODE_TYPE.APPROVAL ? _l('添加审批结果分支') : _l('添加查找结果分支')}
+          text={typeId === NODE_TYPE.APPROVAL ? _l('添加审批结果分支') : _l('添加查找结果分支')}
           checked={!isOrdinary}
           onClick={() => this.setState({ isOrdinary: false })}
         />
         <div className="Gray_75 Font13 pLeft30 mTop5">
-          {nodeType === NODE_TYPE.APPROVAL
+          {typeId === NODE_TYPE.APPROVAL
             ? _l('分支固定为“通过”和“否决”。如果你同时需要对“否决”审批的数据进行处理时选择此分支')
             : _l(
                 '分支固定为“查找到数据”和“未查找到数据”。如果你需要在“未查找到”数据的情况下继续执行流程，请选择此分支',
@@ -751,14 +896,18 @@ export default class CreateNodeDialog extends Component {
    * 渲染分支
    */
   renderBranch() {
-    const { nodeType, actionId } = this.props;
+    const { nodeId, flowNodeMap } = this.props;
     const { isOrdinary, moveType } = this.state;
+    const { typeId, actionId } = flowNodeMap[nodeId] || {};
     const MOVE_TYPE = () => {
       if (isOrdinary) {
-        return [{ text: _l('左侧'), value: 1 }, { text: _l('不移动'), value: 0 }];
+        return [
+          { text: _l('左侧'), value: 1 },
+          { text: _l('不移动'), value: 0 },
+        ];
       }
 
-      if (nodeType === NODE_TYPE.APPROVAL) {
+      if (typeId === NODE_TYPE.APPROVAL) {
         return [
           { text: _l('左侧（通过分支）'), value: 1 },
           { text: _l('右侧（否决分支）'), value: 2 },
@@ -767,8 +916,8 @@ export default class CreateNodeDialog extends Component {
       }
 
       if (
-        _.includes([NODE_TYPE.SEARCH, NODE_TYPE.FIND_SINGLE_MESSAGE], nodeType) ||
-        (nodeType === NODE_TYPE.ACTION && actionId === ACTION_ID.RELATION)
+        _.includes([NODE_TYPE.SEARCH, NODE_TYPE.FIND_SINGLE_MESSAGE], typeId) ||
+        (typeId === NODE_TYPE.ACTION && actionId === ACTION_ID.RELATION)
       ) {
         return [
           { text: _l('左侧（有数据分支）'), value: 1 },
@@ -807,11 +956,12 @@ export default class CreateNodeDialog extends Component {
    * 判断是否是条件分支
    */
   isConditionalBranch() {
-    const { nodeType, actionId } = this.props;
+    const { nodeId, flowNodeMap } = this.props;
+    const { typeId, actionId } = flowNodeMap[nodeId] || {};
 
     return (
-      _.includes([NODE_TYPE.APPROVAL, NODE_TYPE.SEARCH, NODE_TYPE.FIND_SINGLE_MESSAGE], nodeType) ||
-      (nodeType === NODE_TYPE.ACTION && actionId === '20')
+      _.includes([NODE_TYPE.APPROVAL, NODE_TYPE.SEARCH, NODE_TYPE.FIND_SINGLE_MESSAGE], typeId) ||
+      (typeId === NODE_TYPE.ACTION && actionId === '20')
     );
   }
 
@@ -851,6 +1001,8 @@ export default class CreateNodeDialog extends Component {
       buriedUpgradeVersionDialog(flowInfo.companyId, featureId);
     } else if (item.type === NODE_TYPE.APPROVAL_PROCESS && !item.isNew) {
       this.setState({ showApprovalDialog: true });
+    } else if (item.type === NODE_TYPE.CODE && item.isCustom) {
+      this.setState({ showCodeSnippetDialog: true });
     } else {
       this.addFlowNode({
         actionId: item.actionId,
@@ -893,15 +1045,16 @@ export default class CreateNodeDialog extends Component {
    * 添加节点
    */
   addFlowNode = args => {
-    const { flowInfo, addFlowNode, selectAddNodeId } = this.props;
+    const { flowInfo, addFlowNode, selectAddNodeId, selectProcessId } = this.props;
 
-    addFlowNode(flowInfo.id, args);
+    addFlowNode(selectProcessId || flowInfo.id, args);
     selectAddNodeId('');
   };
 
   render() {
-    const { nodeId, selectAddNodeId, flowInfo } = this.props;
-    const { selectItem, selectSecond, showDialog, showBranchDialog, showApprovalDialog } = this.state;
+    const { nodeId, selectAddNodeId, flowInfo, selectProcessId, isApproval, selectCopy } = this.props;
+    const { selectItem, selectSecond, showDialog, showBranchDialog, showApprovalDialog, showCodeSnippetDialog } =
+      this.state;
 
     return (
       <ReactCSSTransitionGroup
@@ -916,6 +1069,7 @@ export default class CreateNodeDialog extends Component {
               '.workflowLineBtn .icon-custom_add_circle',
               '.mui-dialog-container',
               '.workflowCopyBtn',
+              '.ming.List',
             ]}
             onClickAway={() => selectAddNodeId('')}
           >
@@ -933,13 +1087,20 @@ export default class CreateNodeDialog extends Component {
                 </div>
               ) : (
                 <Fragment>
-                  <div className="flex Font18">{_l('选择一个动作')}</div>
+                  <div className="Font18">{_l('选择一个动作')}</div>
                   <Support
-                    className="createNodeExplain"
-                    type={2}
+                    className="createNodeExplain mLeft5"
+                    type={1}
                     text={_l('了解这些动作')}
-                    href="https://help.mingdao.com/flow51.html"
+                    href="https://help.mingdao.com/flow51"
                   />
+                  <div className="flex" />
+                  {!((selectProcessId && flowInfo.id !== selectProcessId) || isApproval) && (
+                    <div className="copyNodeBtn" onClick={() => selectCopy(flowInfo.id)}>
+                      <i className="icon-copy Font18 mRight5" />
+                      {_l('复制已有节点')}
+                    </div>
+                  )}
                 </Fragment>
               )}
 
@@ -963,10 +1124,28 @@ export default class CreateNodeDialog extends Component {
                     name: _l('发起审批'),
                     prveId: nodeId,
                     typeId: NODE_TYPE.APPROVAL_PROCESS,
-                    approvalId: processId,
+                    appId: processId,
                   })
                 }
                 onCancel={() => this.setState({ showApprovalDialog: false })}
+              />
+            )}
+
+            {showCodeSnippetDialog && (
+              <CodeSnippet
+                projectId={flowInfo.companyId}
+                type={0}
+                onSave={({ actionId, inputData, code }) => {
+                  this.setState({ showCodeSnippetDialog: false });
+                  this.addFlowNode({
+                    actionId,
+                    name: actionId === ACTION_ID.JAVASCRIPT ? _l('JavaScript') : _l('Python'),
+                    prveId: nodeId,
+                    typeId: NODE_TYPE.CODE,
+                    appId: JSON.stringify({ inputData, code: Base64.encode(code) }),
+                  });
+                }}
+                onClose={() => this.setState({ showCodeSnippetDialog: false })}
               />
             )}
           </ClickAwayable>

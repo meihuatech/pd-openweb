@@ -12,9 +12,14 @@ import { Dropdown, Menu } from 'antd';
 import { formatSummaryName, isFormatNumber } from 'statistics/common';
 import _ from 'lodash';
 
-const formatChartData = (data, yaxisList, splitControlId) => {
-  const result = [];
+const formatChartData = (data, yaxisList, splitControlId, xaxesControlId, minValue, maxValue) => {
+  let result = [];
   const { value } = data[0];
+  const formatValue = value => {
+    if (_.isNumber(minValue) && value < minValue) return minValue;
+    if (_.isNumber(maxValue) && value > maxValue) return maxValue;
+    return value;
+  }
   value.forEach(item => {
     const name = item.x;
     data.forEach((element, index) => {
@@ -23,17 +28,42 @@ const formatChartData = (data, yaxisList, splitControlId) => {
         const { rename, emptyShowType } = element.c_id ? (_.find(yaxisList, { controlId: element.c_id }) || {}) : yaxisList[0];
         const hideEmptyValue = !emptyShowType && !target[0].v;
         if (!hideEmptyValue) {
+          const value = target[0].v;
           result.push({
             groupName: `${splitControlId ? element.key : (rename || element.key)}-md-${reportTypes.RadarChart}-chart-${element.c_id || index}`,
             groupKey: element.originalKey,
-            value: target[0].v,
-            name,
-            originalId: item.originalX || name
+            value: formatValue(value),
+            originalValue: value,
+            name: name || (!splitControlId && !xaxesControlId ? element.originalKey : undefined),
+            originalId: item.originalX || name || element.originalKey
         });
         }
       }
     });
   });
+  if (!xaxesControlId && splitControlId && yaxisList.length) {
+    if (yaxisList.length === 1) {
+      result.forEach(data => {
+        data.name = yaxisList[0].controlName;
+        data.originalId = '';
+      });
+    } else {
+      result = [];
+      yaxisList.forEach(yaxis => {
+        data.forEach(data => {
+          const value = data.value[0];
+          result.push({
+            groupName: data.key,
+            groupKey: data.originalKey,
+            value: formatValue(value.m[yaxis.controlId]),
+            originalValue: value.m[yaxis.controlId],
+            name: yaxis.controlName,
+            originalId: yaxis.controlName,
+          });
+        });
+      });
+    }
+  }
   return result;
 };
 
@@ -68,7 +98,9 @@ export default class extends Component {
       displaySetup.showLegend !== oldDisplaySetup.showLegend ||
       displaySetup.legendType !== oldDisplaySetup.legendType ||
       displaySetup.showNumber !== oldDisplaySetup.showNumber ||
-      displaySetup.magnitudeUpdateFlag !== oldDisplaySetup.magnitudeUpdateFlag
+      displaySetup.magnitudeUpdateFlag !== oldDisplaySetup.magnitudeUpdateFlag ||
+      displaySetup.ydisplay.minValue !== oldDisplaySetup.ydisplay.minValue ||
+      displaySetup.ydisplay.maxValue !== oldDisplaySetup.ydisplay.maxValue
     ) {
       const config = this.getComponentConfig(nextProps);
       this.RadarChart.update(config);
@@ -87,14 +119,16 @@ export default class extends Component {
   handleClick = ({ data, gEvent }) => {
     const { xaxes, split } = this.props.reportData;
     const currentData = data.data;
-    const isNumber = isFormatNumber(xaxes.controlType);
     const param = {};
     if (xaxes.cid) {
-      param[xaxes.cid] = isNumber ? Number(currentData.originalId) : currentData.originalId;
+      const isNumber = isFormatNumber(xaxes.controlType);
+      const value = currentData.originalId;
+      param[xaxes.cid] = isNumber && value ? Number(value) : value;
     }
     if (split.controlId) {
       const isNumber = isFormatNumber(split.controlType);
-      param[split.cid] = isNumber ? Number(currentData.groupKey) : currentData.groupKey;
+      const value = currentData.groupKey;
+      param[split.cid] = isNumber && value ? Number(value) : value;
     }
     this.setState({
       dropdownVisible: true,
@@ -121,27 +155,31 @@ export default class extends Component {
     }
   }
   getComponentConfig(props) {
-    const { map, displaySetup, yaxisList, style, split } = props.reportData;
-    const data = formatChartData(map, yaxisList, split.controlId);
+    const { map, displaySetup, yaxisList, style, split, xaxes } = props.reportData;
     const { position } = getLegendType(displaySetup.legendType);
+    const { ydisplay } = displaySetup;
+    const data = formatChartData(map, yaxisList, split.controlId, xaxes.controlId, ydisplay.minValue, ydisplay.maxValue);
     const newYaxisList = formatYaxisList(data, yaxisList);
     const colors = getChartColors(style);
     const baseConfig = {
       data,
       appendPadding: [5, 0, 5, 0],
-      xField: 'name',
+      xField: 'originalId',
       yField: 'value',
       seriesField: 'groupName',
       meta: {
-        name: {
+        originalId: {
           type: 'cat',
-          formatter: value => value || _l('空')
+          formatter: value => {
+            const item = _.find(data, { originalId: value });
+            return item ? item.name || _l('空') : value;
+          }
         },
         groupName: {
           formatter: value => formatControlInfo(value).name,
         },
         value: {
-          min: 0,
+          min: 0
         },
       },
       xAxis: {
@@ -178,6 +216,8 @@ export default class extends Component {
             return formatrChartAxisValue(Number(value), false, newYaxisList);
           },
         },
+        minLimit: ydisplay.minValue || null,
+        maxLimit: ydisplay.maxValue || null
       },
       limitInPlot: true,
       area: {},
@@ -186,14 +226,15 @@ export default class extends Component {
         shared: true,
         showCrosshairs: false,
         showMarkers: true,
-        formatter: ({ value, groupName }) => {
+        formatter: ({ originalId, groupName }) => {
           const { name, id } = formatControlInfo(groupName);
           const { dot } = _.find(yaxisList, { controlId: id }) || {};
+          const { originalValue } = _.find(data, { originalId, groupName }) || {};
           return {
             name,
-            // 图表tooltip强制保留1位小数
-            value: _.isNumber(value) ? value.toLocaleString('zh', { maximumFractionDigits: 1, minimumFractionDigits: 1 }) : '--'
-            // value: _.isNumber(value) ? value.toLocaleString('zh', { minimumFractionDigits: dot }) : '--',
+            // value: _.isNumber(value) ? value.toLocaleString('zh', { maximumFractionDigits: 1, minimumFractionDigits: 1 }) : '--'
+            value: _.isNumber(originalValue) ? originalValue.toLocaleString('zh', { maximumFractionDigits: 1, minimumFractionDigits: 1 }) : '--',
+            // value: _.isNumber(originalValue) ? originalValue.toLocaleString('zh', { minimumFractionDigits: dot }) : '--',
           };
         },
       },
@@ -213,9 +254,9 @@ export default class extends Component {
         : false,
       label: displaySetup.showNumber
         ? {
-            content: ({ value, controlId }) => {
+            content: ({ originalValue, controlId }) => {
               const id = split.controlId ? newYaxisList[0].controlId : controlId;
-              return formatrChartValue(value, false, newYaxisList, value ? undefined : id);
+              return formatrChartValue(originalValue, false, newYaxisList, originalValue ? undefined : id);
             },
           }
         : false,
@@ -247,8 +288,9 @@ export default class extends Component {
                 onClick={() => {
                   const { xaxes, split } = this.props.reportData;
                   const isNumber = isFormatNumber(xaxes.controlType);
-                  const param = {
-                    [xaxes.cid]: isNumber ? Number(item.originalId) : item.originalId
+                  const param = {};
+                  if (xaxes.cid) {
+                    param[xaxes.cid] = isNumber ? Number(item.originalId) : item.originalId;
                   }
                   if (split.controlId) {
                     param[split.controlId] = item.groupKey;

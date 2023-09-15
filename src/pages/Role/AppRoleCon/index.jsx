@@ -5,13 +5,17 @@ import { bindActionCreators } from 'redux';
 import * as actions from 'src/pages/Role/AppRoleCon/redux/actions';
 import { WrapCon, WrapHeader, WrapContext } from 'src/pages/Role/style';
 import AppAjax from 'src/api/appManagement';
-import { ROLE_TYPES, ROLE_CONFIG } from 'src/pages/Role/config';
+import { ROLE_CONFIG } from 'src/pages/Role/config';
 import UserCon from './UserCon';
 import RoleCon from './RoleCon';
 import { Checkbox, Tooltip } from 'ming-ui';
 import DropOption from 'src/pages/Role/PortalCon/components/DropOption';
 import LoadDiv from 'ming-ui/components/LoadDiv';
 import _ from 'lodash';
+import OthersCon from './OthersCon';
+import { navigateTo } from 'src/router/navigateTo';
+import { getFeatureStatus } from 'src/util';
+import { VersionProductType } from 'src/util/enum';
 
 const conList = [
   {
@@ -19,13 +23,23 @@ const conList = [
     key: 'user',
     txt: _l('用户'),
   },
-  { url: '/roleSet', key: 'roleSet', txt: _l('角色权限') },
-  // {
-  //   url: '/others',
-  //   key: 'others',
-  //   txt: _l('用户扩展信息'),
-  // },
+  { url: '/roleSet', key: 'roleSet', txt: _l('角色') },
 ];
+
+const getTabList = () => {
+  const currentProjectId =
+    localStorage.getItem('currentProjectId') || ((_.get(md, 'global.Account.projects') || [])[0] || {}).projectId;
+  const FEATURE_STATUS = getFeatureStatus(currentProjectId, VersionProductType.userExtensionInformation);
+  if (FEATURE_STATUS) {
+    return conList.concat({
+      url: '/others',
+      key: 'others',
+      txt: _l('扩展'),
+    });
+  }
+  return conList;
+};
+
 class Con extends React.Component {
   constructor(props) {
     super(props);
@@ -43,11 +57,11 @@ class Con extends React.Component {
         params: { appId },
       },
     } = this.props;
-    const { isAdmin, getRoleSummary, fetchAllNavCount, setSelectedIds } = this.props;
+    const { isAdmin, fetchAllNavCount, setSelectedIds, canEditUser, canEditApp } = this.props;
     setSelectedIds([]);
-    isAdmin && this.getSet();
+    (canEditUser || canEditApp) && this.getSet();
     fetchAllNavCount({
-      isAdmin,
+      canEditUser,
       appId,
     });
     if (!isAdmin) {
@@ -65,13 +79,19 @@ class Con extends React.Component {
     }
   }
 
+  componentWillUnmount() {
+    const { setAppRoleSummary, setUserList, SetAppRolePagingModel } = this.props;
+    setUserList([]);
+    setAppRoleSummary([]);
+    SetAppRolePagingModel(null);
+  }
+
   getSet = () => {
     const {
       match: {
         params: { appId },
       },
     } = this.props;
-
     AppAjax.getAppRoleSetting({ appId }).then(data => {
       this.setState({ rolesVisibleConfig: String(data.appSettingsEnum), notify: data.notify });
     });
@@ -108,8 +128,10 @@ class Con extends React.Component {
     switch (tab) {
       case 'roleSet':
         return <RoleCon {...this.props} tab={tab} />;
+      case 'others':
+        return <OthersCon {...this.props} tab={tab} />;
       default:
-        return <UserCon {...this.props} tab={tab} />;
+        return <UserCon {...this.props} tab={tab} transferApp={() => this.transferApp()} />;
     }
   };
   /**
@@ -122,8 +144,8 @@ class Con extends React.Component {
         params: { appId },
       },
     } = this.props;
-    import('src/components/dialogSelectUser/dialogSelectUser').then(() => {
-      $({}).dialogSelectUser({
+    import('src/components/dialogSelectUser/dialogSelectUser').then(dialogSelectUser => {
+      dialogSelectUser.default({
         showMoreInvite: false,
         SelectUserSettings: {
           projectId,
@@ -149,98 +171,118 @@ class Con extends React.Component {
     });
   };
   render() {
-    const { isAdmin, appRole = {}, setQuickTag, isOwner } = this.props;
+    const {
+      canEditApp,
+      canEditUser,
+      appRole = {},
+      isOwner,
+      match: {
+        params: { appId },
+      },
+      setQuickTag,
+      SetAppRolePagingModel,
+    } = this.props;
     const { notify, rolesVisibleConfig } = this.state;
-    const { pageLoading } = appRole;
+    const { pageLoading, appRolePagingModel } = appRole;
     if (pageLoading) {
       return <LoadDiv />;
     }
     return (
       <WrapCon className="flexColumn overflowHidden">
-        <WrapHeader>
-          <div className="tabCon InlineBlock pLeft26">
-            {conList
-              .filter(o => (isAdmin ? true : o.key === 'user'))
-              .map(o => {
-                return (
-                  <span
-                    className={cx('tab Hand Font14 Bold', { cur: this.state.tab === o.key })}
-                    onClick={() => {
-                      this.props.handleChangePage(() => {
-                        setQuickTag();
-                        this.setState({
-                          tab: o.key,
+        {(canEditApp || canEditUser) && (
+          <WrapHeader>
+            <div className="tabCon InlineBlock pLeft26">
+              {getTabList()
+                .filter(o => (canEditApp ? true : o.key === 'user')) //是否有编辑权限
+                .map(o => {
+                  return (
+                    <span
+                      className={cx('tab Hand Font14 Bold', { cur: this.state.tab === o.key })}
+                      id={`tab_${o.key}`}
+                      onClick={() => {
+                        this.props.handleChangePage(() => {
+                          SetAppRolePagingModel({
+                            ...appRolePagingModel,
+                            pageIndex: 1,
+                            keywords: '',
+                          });
+                          setQuickTag({ ...appRole.quickTag, tab: o.key });
+                          navigateTo(`/app/${appId}/role`);
+                          this.setState({
+                            tab: o.key,
+                          });
                         });
-                      });
-                    }}
+                      }}
+                    >
+                      {o.txt}
+                    </span>
+                  );
+                })}
+            </div>
+            <div className="flexRow alignItemsCenter" style={{ 'justify-content': 'flex-end' }}>
+              {(canEditApp || canEditUser) && (
+                <div className="flexRow pRight20 actCheckCon">
+                  <Tooltip
+                    text={
+                      <span>
+                        {_l('开启时，当用户被添加、移除、变更角色时会收到系统通知，关闭时，以上操作不通知用户。')}
+                      </span>
+                    }
+                    popupPlacement={'top'}
                   >
-                    {o.txt}
-                  </span>
-                );
-              })}
-          </div>
-          {isAdmin && (
-            <div className="Right flexRow pTop20 pRight20">
-              <Tooltip
-                text={
-                  <span>
-                    {_l('开启时，当用户被添加、移除、变更角色时会收到系统通知，关闭时，以上操作不通知用户。')}
-                  </span>
-                }
-                popupPlacement={'top'}
-              >
-                <span className="">
-                  <Checkbox
-                    className=""
-                    size="small"
-                    checked={notify}
-                    onClick={this.updateAppRoleNotify}
-                    text={_l('发送通知')}
+                    <span>
+                      <Checkbox
+                        className=""
+                        size="small"
+                        checked={notify}
+                        onClick={this.updateAppRoleNotify}
+                        text={_l('发送通知')}
+                      />
+                    </span>
+                  </Tooltip>
+                  <Tooltip
+                    text={
+                      <span>
+                        {_l('勾选时，普通角色可以查看应用下所有角色和人员。未勾选时，对普通角色直接隐藏用户入口')}
+                      </span>
+                    }
+                    popupPlacement={'top'}
+                  >
+                    <span>
+                      <Checkbox
+                        className="mLeft25"
+                        size="small"
+                        checked={rolesVisibleConfig !== ROLE_CONFIG.REFUSE}
+                        onClick={this.handleSwitchRolesDisplay}
+                        text={_l('允许查看')}
+                      />
+                    </span>
+                  </Tooltip>
+                </div>
+              )}
+              {isOwner && (
+                <div className="pRight20">
+                  <DropOption
+                    dataList={[
+                      {
+                        value: 0,
+                        text: _l('转交应用'),
+                      },
+                    ]}
+                    onAction={o => {
+                      this.transferApp();
+                    }}
+                    popupAlign={{
+                      points: ['tr', 'br'],
+                      offset: [-180, 0],
+                    }}
                   />
-                </span>
-              </Tooltip>
-              <Tooltip
-                text={
-                  <span>
-                    {_l(
-                      '开启时，普通用户（非管理员）可以查看应用下所有角色和人员。关闭后，普通用户将只能看到应用管理员。',
-                    )}
-                  </span>
-                }
-                popupPlacement={'top'}
-              >
-                <span>
-                  <Checkbox
-                    className="mLeft25"
-                    size="small"
-                    checked={rolesVisibleConfig !== ROLE_CONFIG.REFUSE}
-                    onClick={this.handleSwitchRolesDisplay}
-                    text={_l('允许查看')}
-                  />
-                </span>
-              </Tooltip>
+                </div>
+              )}
             </div>
-          )}
-          {isOwner && (
-            <div className="Right pTop20 pRight20">
-              <DropOption
-                dataList={[
-                  {
-                    value: 0,
-                    text: _l('转交应用'),
-                  },
-                ]}
-                onAction={o => {
-                  this.transferApp();
-                }}
-                popupAlign={{
-                  points: ['tr', 'br'],
-                  offset: [-180, 0],
-                }}
-              />
-            </div>
-          )}
-        </WrapHeader>
+          </WrapHeader>
+        )}
+
         <WrapContext className={cx('flex')}>{this.renderCon()}</WrapContext>
       </WrapCon>
     );

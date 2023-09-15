@@ -1,6 +1,7 @@
 import React, { Fragment, useState } from 'react';
 import { Icon } from 'ming-ui';
 import { Input, Button, ConfigProvider } from 'antd';
+import Trigger from 'rc-trigger';
 import styled from 'styled-components';
 import SelectIcon from 'src/pages/AppHomepage/components/SelectIcon';
 import SvgIcon from 'src/components/SvgIcon';
@@ -42,7 +43,7 @@ const ButtonWrap = styled.div`
 export default function BtnName(props) {
   const { pageId, projectId, btnSetting, btnConfig, setBtnSetting } = props;
   const { name, color, config } = btnSetting;
-  const { btnType } = btnConfig || {};
+  const { btnType = 1  } = btnConfig || {};
   const defaultConfig = btnType === 2 ? { iconUrl: `${md.global.FileStoreConfig.pubHost}/customIcon/custom_actions.svg` } : {};
   const { icon, iconUrl } = config || defaultConfig;
 
@@ -64,51 +65,57 @@ export default function BtnName(props) {
             setBtnSetting({ ...btnSetting, name });
           }}
         />
-        <ButtonWrap color={color}>
-          <Button type="primary" onClick={() => { setVisible(true); }}>
-            <SvgIcon url={iconUrl} fill="#fff" size={22} />
-            <div className="arrowWrap valignWrapper"><Icon icon="arrow-down-border"/></div>
-          </Button>
-        </ButtonWrap>
-      </Input.Group>
-      {visible && (
-        <SelectIcon
-          name=""
-          iconColor={color}
-          workSheetId={pageId}
-          projectId={projectId}
-          icon={icon}
-          className="customPageBtnSelectIcon"
-          onModify={(data) => {
-            const { iconColor, icon, iconUrl } = data;
-            if (iconColor) {
-              setBtnSetting({ ...btnSetting, color: iconColor });
-            }
-            if (icon || iconUrl) {
-              setBtnSetting({
-                ...btnSetting,
-                config: {
-                  ...config,
-                  icon,
-                  iconUrl,
+        <Trigger
+          action={['click']}
+          zIndex={1000}
+          popupAlign={{ points: ['tl', 'bl'], offset: [-570, 5], overflow: { adjustX: true, adjustY: true } }}
+          popup={(
+            <SelectIcon
+              hideInput={true}
+              iconColor={color}
+              workSheetId={pageId}
+              projectId={projectId}
+              icon={icon}
+              className="customPageBtnSelectIcon"
+              onModify={(data) => {
+                const { iconColor, icon, iconUrl } = data;
+                if (iconColor) {
+                  setBtnSetting({ ...btnSetting, color: iconColor });
                 }
-              });
-            }
-          }}
-          onClearIcon={btnType === 1 ? () => {
-            setBtnSetting({
-              ...btnSetting,
-              config: {
-                ...config,
-                icon: '',
-                iconUrl: '',
-              }
-            });
-          } : undefined}
-          onClickAway={onCancel}
-          onClose={onCancel}
-        />
-      )}
+                if (icon || iconUrl) {
+                  setBtnSetting({
+                    ...btnSetting,
+                    config: {
+                      ...config,
+                      icon,
+                      iconUrl,
+                    }
+                  });
+                }
+              }}
+              onClearIcon={btnType === 1 ? () => {
+                setBtnSetting({
+                  ...btnSetting,
+                  config: {
+                    ...config,
+                    icon: '',
+                    iconUrl: '',
+                  }
+                });
+              } : undefined}
+              onClickAway={onCancel}
+              onClose={onCancel}
+            />
+          )}
+        >
+          <ButtonWrap color={color}>
+            <Button type="primary" onClick={() => { setVisible(true); }}>
+              <SvgIcon url={iconUrl} fill="#fff" size={22} />
+              <div className="arrowWrap valignWrapper"><Icon icon="arrow-down-border"/></div>
+            </Button>
+          </ButtonWrap>
+        </Trigger>
+      </Input.Group>
     </div>
   );
 }

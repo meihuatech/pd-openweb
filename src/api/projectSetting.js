@@ -12,7 +12,7 @@ export default {
      return $.api('ProjectSetting', 'GetProjectIdentity', args, options);
    },
   /**
-  * 界面定制（人事审批打印功能有调用这个接口，所以不能限制管理员权限）
+  * 界面定制
   * @param {Object} args 请求参数
   * @param {string} args.projectId 网络id
   * @param {Object} options 配置参数
@@ -142,6 +142,18 @@ export default {
    getAutoPurchaseWorkflowExtPack: function (args, options = {}) {
      
      return $.api('ProjectSetting', 'GetAutoPurchaseWorkflowExtPack', args, options);
+   },
+  /**
+  * 获取 是否自动订购数据集成升级包
+  * @param {Object} args 请求参数
+  * @param {string} args.projectId 网络id
+  * @param {Object} options 配置参数
+  * @param {Boolean} options.silent 是否禁止错误弹层
+  * @returns {Promise<Boolean, ErrorModel>}
+  **/
+   getAutoPurchaseDataPipelineExtPack: function (args, options = {}) {
+     
+     return $.api('ProjectSetting', 'GetAutoPurchaseDataPipelineExtPack', args, options);
    },
   /**
   * 企业标识
@@ -360,6 +372,19 @@ export default {
    setAutoPurchaseWorkflowExtPack: function (args, options = {}) {
      
      return $.api('ProjectSetting', 'SetAutoPurchaseWorkflowExtPack', args, options);
+   },
+  /**
+  * 设置 是否 自动订购数据集成升级包
+  * @param {Object} args 请求参数
+  * @param {string} args.projectId 网络id
+  * @param {boolean} args.autoPurchaseDataPipelineExtPack 是否 自动订购数据集成升级包
+  * @param {Object} options 配置参数
+  * @param {Boolean} options.silent 是否禁止错误弹层
+  * @returns {Promise<Boolean, ErrorModel>}
+  **/
+   setAutoPurchaseDataPipelineExtPack: function (args, options = {}) {
+     
+     return $.api('ProjectSetting', 'SetAutoPurchaseDataPipelineExtPack', args, options);
    },
   /**
   * 设置 是否允许申请后台组织管理员权限

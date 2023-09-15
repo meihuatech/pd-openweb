@@ -72,9 +72,9 @@ export default function SplitDropdown(props) {
               dropIcon="task_custom_btn_unfold"
               defaultValue={type}
               isAppendToBody
-              menuStyle={{ width: 46 }}
+              menuStyle={{ width: 'auto' }}
               data={[
-                { text: _l('且'), value: FILTER_RELATION_TYPE.AND },
+                { text: _l('且%25000'), value: FILTER_RELATION_TYPE.AND },
                 { text: _l('或'), value: FILTER_RELATION_TYPE.OR },
               ]}
               onChange={value => {
@@ -83,7 +83,7 @@ export default function SplitDropdown(props) {
             />
           </DropdownCon>
         ) : (
-          <span className="text">{['', _l('且'), _l('或')][type]}</span>
+          <span className="text">{['', _l('且%25000'), _l('或')][type]}</span>
         )}
         <FlexCenter className="removeGroup ThemeHoverColor3" onClick={onDelete}>
           <i className="icon icon-close"></i>

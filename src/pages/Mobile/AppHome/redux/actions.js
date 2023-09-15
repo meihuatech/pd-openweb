@@ -20,7 +20,7 @@ export const getMyApp = projectId => dispatch => {
   dispatch({
     type: 'MOBILE_FETCHHOMELIST_START',
   });
-  homeAppAjax.getMyApp({ projectId }).then(res => {
+  homeAppAjax.getMyApp({ projectId, containsLinks: true }).then(res => {
     const { markedGroupIds = [], personalGroups = [], projectGroups = [], apps = [] } = res;
     let markedGroup = markedGroupIds
       .map(id => _.find([...personalGroups, ...projectGroups], { id }))
@@ -81,7 +81,7 @@ export const markedGroup =
         });
         isMarked ? alert(_l('星标成功')) : alert(_l('取消星标成功'));
       } else {
-        isMarked ? alert(_l('星标失败')) : alert(_l('取消星标失败'));
+        isMarked ? alert(_l('星标失败'), 2) : alert(_l('取消星标失败'), 2);
       }
     });
   };

@@ -11,6 +11,7 @@ import { getCurrentProject } from 'src/util';
 import InstallDialog from './installDialog';
 import { Support, Tooltip, Icon } from 'ming-ui';
 import addFriends from 'src/components/addFriends/addFriends';
+import { purchaseMethodFunc } from 'src/components/upgrade/choose/PurchaseMethodModal';
 import _ from 'lodash';
 
 export default function HomePage({ match, location: routerLocation }) {
@@ -75,7 +76,7 @@ export default function HomePage({ match, location: routerLocation }) {
     }
   };
   const handleClick = type => {
-    if (_.includes(['user', 'workflow', 'storage', 'portaluser', 'portalupgrade'], type)) {
+    if (_.includes(['user', 'workflow', 'storage', 'portaluser', 'portalupgrade', 'dataSync'], type)) {
       location.assign(`/admin/expansionservice/${projectId}/${type}`);
     }
     if (type === 'recharge') {
@@ -85,7 +86,7 @@ export default function HomePage({ match, location: routerLocation }) {
       location.assign(`/admin/upgradeservice/${projectId}`);
     }
     if (type === 'renew') {
-      location.assign(`/upgrade/choose?projectId=${projectId}`);
+      purchaseMethodFunc({ projectId });
     }
     if (type === 'toast') {
       alert(_l('单应用版暂不支持线上续费，请联系顾问进行续费'), 3);
@@ -99,29 +100,53 @@ export default function HomePage({ match, location: routerLocation }) {
   const getValue = value => (loading ? '-' : value);
 
   const getCountText = (key, limit) => {
-    if (key === 'useExecCount') {
+    if (key === 'useExecCount' || key === 'effectiveDataPipelineRowCount') {
+      let percent1 =
+        data[key] / data[limit] > 0 && (data[key] / data[limit]) * 10000 <= 1
+          ? 0.01
+          : ((data[key] / data[limit]) * 100).toFixed(2);
+
+      const unit = key === 'effectiveDataPipelineRowCount' ? _l('行') : _l('次');
+
       return (
-        <Fragment>
+        <div className="flex TxtLeft">
           {_l('已用')}
-          <span className="mLeft4">
-            {data[key] >= 1000 ? getValue(data[key] / 10000) + ' ' + _l('万次') : getValue(data[key]) + ' ' + _l('次')}
+          <span className="Gray mLeft4">{`${percent1 === 'NaN' ? '-' : percent1}%，`}</span>
+          <span>
+            {data[key] >= 1000 ? getValue(data[key] / 10000) + ' ' + _l('万') + unit : getValue(data[key]) + ' ' + unit}
           </span>
           <span className="mLeft4">/</span>
           <span className="mLeft4">
             {data[limit] >= 10000
-              ? getValue(data[limit] / 10000) + ' ' + _l('万次')
-              : getValue(data[limit] || 0) + ' ' + _l('次')}
+              ? getValue(data[limit] / 10000) + ' ' + _l('万') + unit
+              : getValue(data[limit] || 0) + ' ' + unit}
           </span>
           <span className="flex" />
-        </Fragment>
+        </div>
       );
     } else {
-      return _l('已用 %0 / %1 GB', formatFileSize(data[key]), getValue(data[limit] || 0));
+      let percent2 = ((data[key] / (getValue(data[limit]) * Math.pow(1024, 3))) * 100).toFixed(2);
+
+      return (
+        <div className="flex TxtLeft">
+          {_l('已用')}
+          <span className="Gray mLeft4">{`${percent2 === 'NaN' ? '-' : percent2}%，`}</span>
+          {`${formatFileSize(data[key])}/${getValue(data[limit])}GB`}
+        </div>
+      );
     }
   };
   const getCountProcess = (key, limit) => {
-    const value = key === 'useExecCount' ? data[key] : data[key] / (1000 * 1000 * 1000);
-    return (value * 100) / data[limit];
+    let percent = 0;
+    if (key === 'useExecCount' || key === 'effectiveDataPipelineRowCount') {
+      percent =
+        data[key] / data[limit] > 0 && (data[key] / data[limit]) * 10000 <= 1
+          ? 0.01
+          : ((data[key] / data[limit]) * 100).toFixed(2);
+    } else {
+      percent = ((data[key] / (getValue(data[limit]) * Math.pow(1024, 3))) * 100).toFixed(2);
+    }
+    return percent;
   };
   const getOperation = () => {
     return null;
@@ -170,23 +195,25 @@ export default function HomePage({ match, location: routerLocation }) {
               {/*<div className="computeMethod">
                 <Support
                   type={3}
-                  href="https://help.mingdao.com/Prices4.html"
+                  href="https://help.mingdao.com/prices4"
                   text={<span className="Gray_9e Hover_21">{_l('计算方法')}</span>}
                 />
               </div>*/}
               <ul>
                 {USER_COUNT.map(({ key, text, link }) => (
                   <li
-                    className="pointer"
+                    className={cx('pointer', {})}
                     key={key}
                     onClick={() => linkHref(link, key === 'notActiveUserCount' ? 'uncursor' : null)}
                   >
                     <div className="name">{text}</div>
                     <div className="count">{formatValue(getValue(data[key] || 0))}</div>
-                    { key === 'effectiveUserCount' && (
+                    {key === 'effectiveUserCount' && (
                       <Fragment onClick={e => e.stopPropagation()}>
                         <div className="limitUser">
-                          <span className="nowrap">{_l('上限 %0 人', getValue(data.limitUserCount || 0))}</span>
+                          <span className="nowrap" data-tip={!md.global.Config.IsPlatformLocal ? _l('多组织共享') : ''}>
+                            {_l('上限 %0 人', getValue(data.limitUserCount || 0))}
+                          </span>
                           {/* {!isFree && !loading && (
                             <span
                               className="ThemeColor3 hoverColor mLeft10 nowrap "
@@ -203,9 +230,7 @@ export default function HomePage({ match, location: routerLocation }) {
                     )}
                     {key === 'effectiveExternalUserCount' && (
                       <Fragment>
-                        <div className="limitUser">
-                          {_l('上限 %0 人', getValue(data.limitExternalUserCount || 0))}
-                        </div>
+                        <div className="limitUser">{_l('上限 %0 人', getValue(data.limitExternalUserCount || 0))}</div>
                         {/* {!isFree && !isTrial && !loading && (
                           <div>
                             {data.allowUpgradeExternalPortal && (
@@ -294,12 +319,14 @@ export default function HomePage({ match, location: routerLocation }) {
                 )}
                 {getOperation()}
               </div>
-              {md.global.Config.IsPlatformLocal && <div className="accountInfo">
-                <i className="icon-sp_account_balance_wallet_white" />
-                <span>{_l('当前账户余额 (￥)')}</span>
-                <span className="balance">{getValue(data.balance || 0).toLocaleString()}</span>
-              </div>}
-              {/* {!isFree && (
+              {md.global.Config.IsPlatformLocal && (
+                <div className="accountInfo">
+                  <i className="icon-sp_account_balance_wallet_white" />
+                  <span>{_l('当前账户余额 (￥)')}</span>
+                  <span className="balance">{getValue(data.balance || 0).toLocaleString()}</span>
+                </div>
+              )}
+              {/* {!isFree && !isTrial && (
                 <div className="recharge" onClick={() => handleClick('recharge')}>
                   {_l('充值')}
                 </div>
@@ -329,9 +356,19 @@ export default function HomePage({ match, location: routerLocation }) {
                   <li
                     key={key}
                     className={cx('useAnalysis', {
-                      useAnalysisHover: key === 'effectiveApkCount' || key === 'useProcessCount',
+                      useAnalysisHover:
+                        key === 'effectiveApkCount' ||
+                        key === 'useProcessCount' ||
+                        key === 'effectiveDataPipelineJobCount',
                     })}
-                    onClick={() => (key === 'effectiveApkCount' || key === 'useProcessCount') && linkHref(link)}
+                    onClick={() => {
+                      if (key === 'effectiveDataPipelineJobCount') {
+                        localStorage.setItem('currentProjectId', projectId);
+                        return location.assign('/integration/task');
+                      } else if (key === 'effectiveApkCount' || key === 'useProcessCount') {
+                        linkHref(link);
+                      }
+                    }}
                   >
                     <div className="name">
                       {text}
@@ -360,49 +397,63 @@ export default function HomePage({ match, location: routerLocation }) {
               <ul>
                 {UPLOAD_COUNT.filter(item =>
                   md.global.Config.IsPlatformLocal ? item : item.key === 'useExecCount',
-                ).map(({ key, limit, text, link, click, unit }) => (
-                  <li className="pLeft10 pRight10 Hand" onClick={() => linkHref(link)}>
-                    <div className="workflowTitle">
-                      {text}
-                      <span className="Gray_9e">{unit}</span>
-                      {key === 'effectiveApkStorageCount' && (
-                        <Tooltip
-                          popupPlacement="top"
-                          text={<span>{_l('应用中本年的附件上传量，上传即占用，删除不会恢复')}</span>}
-                        >
-                          <span className="icon-help1 Font13 Gray_9e" />
-                        </Tooltip>
-                      )}
-                    </div>
-                    <Progress
-                      showInfo={false}
-                      style={{ margin: '7px 0', textAlign: 'left' }}
-                      trailColor="#eaeaea"
-                      strokeColor={
-                        getCountProcess(key, limit) > 90
-                          ? { from: '#F51744 ', to: '  #FF5779' }
-                          : { from: '#2196f3 ', to: '  #4bb2ff' }
-                      }
-                      strokeWidth={4}
-                      percent={getCountProcess(key, limit)}
-                    />
-                    <div className="useCount pointer">
-                      {getCountText(key, limit)}
-                      {/* {!isTrial && !isFree ? (
-                        <span
-                          className="dilatation"
-                          onClick={e => {
-                            e.stopPropagation();
-                            e.nativeEvent.stopImmediatePropagation();
-                            handleClick(click);
-                          }}
-                        >
-                          {_l('扩容')}
-                        </span>
-                      ) : null} */}
-                    </div>
-                  </li>
-                ))}
+                ).map(({ key, limit, text, link, click, unit }) => {
+                  const percentValue = getCountProcess(key, limit);
+                  return (
+                    <li
+                      className="pLeft10 pRight10 Hand"
+                      onClick={() => {
+                        if (key == 'effectiveDataPipelineRowCount') {
+                          localStorage.setItem('currentProjectId', projectId);
+                          return location.assign('/integration/task');
+                        }
+                        linkHref(link);
+                      }}
+                    >
+                      <div className="workflowTitle">
+                        {text}
+                        <span className="Gray_9e">{unit}</span>
+                        {key === 'effectiveApkStorageCount' && (
+                          <Tooltip
+                            popupPlacement="top"
+                            text={<span>{_l('应用中本年的附件上传量，上传即占用，删除不会恢复')}</span>}
+                          >
+                            <span className="icon-help1 Font13 Gray_9e" />
+                          </Tooltip>
+                        )}
+                      </div>
+                      <Progress
+                        showInfo={false}
+                        style={{ margin: '7px 0', textAlign: 'left' }}
+                        trailColor="#eaeaea"
+                        strokeColor={
+                          _.isNaN(Number(percentValue))
+                            ? '#eaeaea'
+                            : percentValue > 90
+                            ? { from: '#F51744 ', to: '#FF5779' }
+                            : { from: '#2196f3 ', to: '#4bb2ff' }
+                        }
+                        strokeWidth={4}
+                        percent={percentValue}
+                      />
+                      <div className="useCount pointer">
+                        {getCountText(key, limit, unit)}
+                        {/* !isTrial && !isFree ? (
+                          <span
+                            className="dilatation"
+                            onClick={e => {
+                              e.stopPropagation();
+                              e.nativeEvent.stopImmediatePropagation();
+                              handleClick(click);
+                            }}
+                          >
+                            {_l('扩容')}
+                          </span>
+                        ) : null */}
+                      </div>
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           </div>

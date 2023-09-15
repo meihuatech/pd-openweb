@@ -145,7 +145,7 @@ export default function RowHead(props) {
     handleAddSheetRow = () => {},
     onReverseSelect = () => {},
     saveSheetLayout,
-    resetSehetLayout,
+    resetSheetLayout,
     setHighLight = () => {},
     refreshWorksheetControls = () => {},
     onOpenRecord = () => {},
@@ -193,7 +193,7 @@ export default function RowHead(props) {
               {...{ appId, viewId, worksheetId, recordId: row.rowid, projectId, isCharge }}
               formdata={controls.map(c => ({ ...c, value: row[c.controlId] }))}
               shows={['share', 'print', 'copy', 'openinnew']}
-              allowCopy={allowAdd}
+              allowCopy={allowAdd && row.allowedit}
               defaultCustomButtons={customButtons}
               allowDelete={row.allowdelete}
               sheetSwitchPermit={sheetSwitchPermit}
@@ -254,7 +254,7 @@ export default function RowHead(props) {
       )}
       {!readonly && rowIndex === -1 && (
         <Fragment>
-          {layoutChangeVisible && <ChangeSheetLayout onSave={saveSheetLayout} onCancel={resetSehetLayout} />}
+          {layoutChangeVisible && <ChangeSheetLayout onSave={saveSheetLayout} onCancel={resetSheetLayout} />}
           <div className="topCheckbox" style={{ right: tableType === 'classic' ? 38 : 22, width: numberWidth }}>
             {hasBatch && (
               <div className="checkboxCon mTop3">
@@ -292,7 +292,7 @@ export default function RowHead(props) {
                             setSelectAllPanelVisible(false);
                           }}
                         >
-                          {_l('选择本页记录')}
+                          {_l('选择本页记录%02053')}
                         </MenuItem>
                         <MenuItem
                           onClick={e => {
@@ -301,7 +301,7 @@ export default function RowHead(props) {
                             onSelectAllWorksheet(true);
                           }}
                         >
-                          {_l('选择所有记录')}
+                          {_l('选择所有记录%02054')}
                         </MenuItem>
                         {(selectedIds.length || allWorksheetIsSelected) && (
                           <MenuItem
@@ -311,7 +311,7 @@ export default function RowHead(props) {
                               onReverseSelect();
                             }}
                           >
-                            {_l('反选')}
+                            {_l('反选%02055')}
                           </MenuItem>
                         )}
                       </Menu>

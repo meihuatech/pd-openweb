@@ -6,6 +6,7 @@ import { LoadDiv, Button, Icon, ScrollView } from 'ming-ui';
 import { getSubListError, filterHidedSubList } from 'worksheet/util';
 import worksheetAjax from 'src/api/worksheet';
 import './index.less';
+import { getFilter } from 'worksheet/common/WorkSheetFilter/util';
 import renderCellText from 'src/pages/worksheet/components/CellControls/renderText';
 import CustomFields from 'src/components/newCustomFields';
 import { VerificationPass, SHARE_STATE } from 'worksheet/components/ShareState';
@@ -38,6 +39,7 @@ class WorksheetRowEdit extends Component {
     pageSize: 50,
     controlId: '',
     count: 0,
+    formFlag: undefined,
   };
 
   componentDidMount() {
@@ -46,14 +48,6 @@ class WorksheetRowEdit extends Component {
     window.isPublicWorksheet = true;
     this.getLinkDetail();
     $('body,html').scrollTop(0);
-    $(document).on('scroll', e => {
-      var scrollTop = $(e.target).scrollTop();
-      var clientHeight = $(e.target).innerHeight();
-      if (scrollTop >= clientHeight - 16 - document.documentElement.clientHeight) {
-        console.log('s');
-        this.handleScroll();
-      }
-    });
   }
 
   componentWillUnmount() {
@@ -63,17 +57,29 @@ class WorksheetRowEdit extends Component {
   customwidget = React.createRef();
   cellObjs = {};
 
+  bindScroll() {
+    const scrollElement = document.querySelector('.worksheetRowEdit');
+    scrollElement.addEventListener('scroll', e => {
+      var scrollTop = scrollElement.scrollTop;
+      var scrollHeight = scrollElement.scrollHeight;
+      if (scrollTop >= scrollHeight - 16 - scrollElement.clientHeight) {
+        this.handleScroll();
+      }
+    });
+  }
+
   /**
    * 获取记录详情
    */
   getLinkDetail() {
     const id = location.pathname.match(/.*\/public\/workflow\/(.*)/)[1];
+    const clientId = sessionStorage.getItem(id);
 
     window.recordShareLinkId = id;
 
-    this.requestLinkDetail()
+    this.requestLinkDetail({ clientId })
       .then(data => {
-        this.setState({ loading: false, data });
+        this.setState({ loading: false, data, cardControls: data.receiveControls }, this.bindScroll);
       })
       .catch(data => {
         this.setState({ loading: false, data, isError: true });
@@ -93,6 +99,7 @@ class WorksheetRowEdit extends Component {
               item.fieldPermission = '111';
             });
             data.shareAuthor && (window.shareAuthor = data.shareAuthor);
+            data.clientId && sessionStorage.setItem(window.recordShareLinkId, data.clientId);
             return resolve(data);
           } else {
             return reject(data);
@@ -105,9 +112,23 @@ class WorksheetRowEdit extends Component {
    * 获得关联多条记录
    */
   getRowRelationRowsData = id => {
-    const { data, pageIndex, rowRelationRowsData = {}, pageSize } = this.state;
+    const { data, pageIndex, rowRelationRowsData = {}, pageSize, cardControls = [] } = this.state;
     const { controlName, coverCid, showControls } = _.find(data.receiveControls, item => item.controlId === id);
     const shareId = location.pathname.match(/.*\/public\/workflow\/(.*)/)[1];
+
+    const control = _.find(cardControls, { controlId: id });
+    let filterControls;
+    if (control && control.type === 51) {
+      filterControls = getFilter({
+        control: { ...control, ignoreFilterControl: true },
+        formData: cardControls,
+        filterKey: 'resultfilters',
+      });
+      if (!filterControls) {
+        this.setState({ loading: false, rowRelationRowsData: { data: [] }, count: 0 });
+        return;
+      }
+    }
 
     this.setState({ controlName, coverCid, showControls, loading: true });
 
@@ -120,6 +141,7 @@ class WorksheetRowEdit extends Component {
         pageSize,
         getWorksheet: true,
         shareId,
+        filterControls: filterControls || [],
       })
       .then(data => {
         this.setState(
@@ -296,7 +318,7 @@ class WorksheetRowEdit extends Component {
   }
 
   renderContent() {
-    const { showError, data, submitLoading } = this.state;
+    const { showError, data, submitLoading, formFlag } = this.state;
 
     return (
       <div className="worksheetRowEditBox">
@@ -305,8 +327,26 @@ class WorksheetRowEdit extends Component {
 
         <CustomFields
           ref={this.customwidget}
+          flag={formFlag}
           from={7}
           data={data.receiveControls}
+          controlProps={{
+            updateRelationControls: (worksheetIdOfControl, newControls) => {
+              this.setState(oldState => ({
+                formFlag: Math.random(),
+                data: {
+                  ...oldState.data,
+                  receiveControls: oldState.data.receiveControls.map(item => {
+                    if (item.type === 34 && item.dataSource === worksheetIdOfControl) {
+                      return { ...item, relationControls: newControls };
+                    } else {
+                      return item;
+                    }
+                  }),
+                },
+              }));
+            },
+          }}
           projectId={data.projectId}
           worksheetId={data.worksheetId}
           recordId={data.rowId}
@@ -320,7 +360,7 @@ class WorksheetRowEdit extends Component {
         {data.type === 2 && (
           <div className="mTop50 TxtCenter">
             <Button style={{ height: '36px', lineHeight: '36px' }} loading={submitLoading} onClick={this.onSubmit}>
-              <span className="InlineBlock">{_l('提交')}</span>
+              <span className="InlineBlock">{data.submitBtnName || _l('提交')}</span>
             </Button>
           </div>
         )}
@@ -353,13 +393,9 @@ class WorksheetRowEdit extends Component {
               className="Font18 ThemeHoverColor3 Gray pointer"
               onClick={() => this.setState({ rowRelationRowsData: null, pageIndex: 1, controlId: '', count: 0 })}
             />
-            <div className='Font16 ellipsis WordBreak mLeft5'>
-              {controlName}
-            </div>
-            <div className='Font16 Gray_75 mLeft5 mRight30'>
-              ({rowRelationRowsData.data.length})
-            </div>
-            <div className='flex' />
+            <div className="Font16 ellipsis WordBreak mLeft5">{controlName}</div>
+            <div className="Font16 Gray_75 mLeft5 mRight30">({rowRelationRowsData.data.length})</div>
+            <div className="flex" />
           </div>
         </div>
 
@@ -408,7 +444,7 @@ class WorksheetRowEdit extends Component {
     }
 
     return (
-      <div className="worksheetRowEdit flexColumn">
+      <div className="worksheetRowEdit">
         {isError
           ? this.renderError()
           : isComplete || data.writeCount > 0

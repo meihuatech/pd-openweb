@@ -1,10 +1,18 @@
 import React, { Component, Fragment } from 'react';
 import { ScrollView, LoadDiv, Dialog, Checkbox, Dropdown, Icon } from 'ming-ui';
 import flowNode from '../../../api/flowNode';
-import { DetailHeader, DetailFooter, SelectNodeObject, Member, SelectUserDropDown } from '../components';
+import {
+  DetailHeader,
+  DetailFooter,
+  SelectNodeObject,
+  Member,
+  SelectUserDropDown,
+  ApprovalProcessSettings,
+} from '../components';
 import cx from 'classnames';
 import { Tooltip } from 'antd';
 import _ from 'lodash';
+import { OPERATION_TYPE } from '../../enum';
 
 export default class ApprovalProcess extends Component {
   constructor(props) {
@@ -38,12 +46,28 @@ export default class ApprovalProcess extends Component {
   /**
    * 获取节点详情
    */
-  getNodeDetail(props) {
+  getNodeDetail(props, { sId, fields } = {}) {
     const { processId, selectNodeId, selectNodeType } = props;
 
-    flowNode.getNodeDetail({ processId, nodeId: selectNodeId, flowNodeType: selectNodeType }).then(result => {
-      this.setState({ data: result });
-    });
+    flowNode
+      .getNodeDetail({ processId, nodeId: selectNodeId, flowNodeType: selectNodeType, selectNodeId: sId, fields })
+      .then(result => {
+        if (sId && !fields) {
+          result.fields = [];
+          result.flowNodeMap = Object.assign({ [OPERATION_TYPE.BEFORE]: result.flowNodeMap[OPERATION_TYPE.BEFORE] });
+        }
+
+        if (fields) {
+          result = Object.assign(this.state.data, { fields: result.fields, flowNodeMap: result.flowNodeMap });
+        }
+
+        if (!result.processConfig.userTaskNullMaps || result.processConfig.userTaskNullMaps[0]) {
+          result.processConfig.userTaskNullMaps = { [result.processConfig.userTaskNullPass ? 1 : 3]: [] };
+          result.processConfig.userTaskNullPass = false;
+        }
+
+        this.setState({ data: result });
+      });
   }
 
   /**
@@ -59,7 +83,7 @@ export default class ApprovalProcess extends Component {
    */
   onSave = () => {
     const { data, saveRequest } = this.state;
-    const { appId, name, selectNodeId, accounts, processConfig } = data;
+    const { appId, name, selectNodeId, accounts, processConfig, fields, flowNodeMap } = data;
 
     if (!selectNodeId) {
       alert(_l('必须先选择一个数据对象'), 2);
@@ -68,6 +92,14 @@ export default class ApprovalProcess extends Component {
 
     if (!accounts.length) {
       alert(_l('必须指定发起人'), 2);
+      return;
+    }
+
+    if (
+      (processConfig.initiatorMaps[5] && !processConfig.initiatorMaps[5].length) ||
+      (processConfig.userTaskNullMaps[5] && !processConfig.userTaskNullMaps[5].length)
+    ) {
+      alert(_l('必须指定代理人'), 2);
       return;
     }
 
@@ -85,6 +117,8 @@ export default class ApprovalProcess extends Component {
         selectNodeId,
         accounts,
         processConfig,
+        fields,
+        flowNodeMap,
       })
       .then(result => {
         this.props.updateNodeData(result);
@@ -102,11 +136,6 @@ export default class ApprovalProcess extends Component {
     const InitiatorAction = [
       { text: _l('允许发起人撤回'), key: 'allowRevoke' },
       { text: _l('允许发起人催办'), key: 'allowUrge' },
-    ];
-    const AutoPass = [
-      { text: _l('发起人无需审批自动通过'), key: 'startEventPass' },
-      { text: _l('审批人为空时自动通过'), key: 'userTaskNullPass' },
-      { text: _l('已审批过的审批人自动通过'), key: 'userTaskPass' },
     ];
 
     return (
@@ -163,20 +192,14 @@ export default class ApprovalProcess extends Component {
               </Fragment>
             ))}
 
-            <div className="Font13 mTop20 bold">{_l('自动通过')}</div>
-            {AutoPass.map((item, i) => (
-              <Checkbox
-                key={i}
-                className="mTop15 flexRow"
-                text={item.text}
-                checked={data.processConfig[item.key]}
-                onClick={checked =>
-                  this.updateSource({
-                    processConfig: Object.assign({}, data.processConfig, { [item.key]: !checked }),
-                  })
-                }
-              />
-            ))}
+            <ApprovalProcessSettings
+              {...this.props}
+              processId={data.appId}
+              selectNodeId={data.startNodeId}
+              data={data}
+              getNodeDetail={({ fields }) => this.getNodeDetail(this.props, { sId: data.selectNodeId, fields })}
+              updateSource={this.updateSource}
+            />
           </Fragment>
         )}
       </Fragment>
@@ -188,7 +211,6 @@ export default class ApprovalProcess extends Component {
    */
   switchDataSource = selectNodeId => {
     const { data } = this.state;
-    const selectNodeObj = _.find(data.flowNodeList, item => item.nodeId === selectNodeId);
 
     if (data.selectNodeId) {
       Dialog.confirm({
@@ -198,11 +220,11 @@ export default class ApprovalProcess extends Component {
         ),
         okText: _l('确认更改'),
         onOk: () => {
-          this.updateSource({ selectNodeId, selectNodeObj });
+          this.getNodeDetail(this.props, { sId: selectNodeId });
         },
       });
     } else {
-      this.updateSource({ selectNodeId, selectNodeObj });
+      this.getNodeDetail(this.props, { sId: selectNodeId });
     }
   };
 
@@ -288,7 +310,6 @@ export default class ApprovalProcess extends Component {
           data={{ ...data }}
           icon="icon-approval"
           bg="BGDarkBlue"
-          showDelete
           updateSource={this.updateSource}
         />
         <div className="flex">

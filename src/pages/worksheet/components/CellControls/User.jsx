@@ -3,9 +3,9 @@ import PropTypes from 'prop-types';
 import { autobind } from 'core-decorators';
 import Trigger from 'rc-trigger';
 import cx from 'classnames';
-import 'src/components/dialogSelectUser/dialogSelectUser';
-import 'src/components/quickSelectUser/quickSelectUser';
 import UserHead from 'src/pages/feed/components/userHead';
+import quickSelectUser from 'ming-ui/functions/quickSelectUser';
+import { dealUserRange } from 'src/components/newCustomFields/tools/utils';
 import withClickAway from 'ming-ui/decorators/withClickAway';
 import createDecoratedComponent from 'ming-ui/decorators/createDecoratedComponent';
 import { isKeyBoardInputChar } from 'worksheet/util';
@@ -72,7 +72,13 @@ export default class User extends React.Component {
           />
           <span className="userName flex ellipsis">{user.fullname || user.name}</span>
           {isediting && (
-            <i className="Font14 Gray_9e icon-close Hand mLeft4" onClick={() => this.deleteUser(user.accountId)}></i>
+            <i
+              className="Font14 Gray_9e icon-close Hand mLeft4"
+              onClick={e => {
+                e.stopPropagation();
+                this.deleteUser(user.accountId);
+              }}
+            ></i>
           )}
         </div>
       </div>
@@ -128,7 +134,7 @@ export default class User extends React.Component {
 
   @autobind
   pickUser(event) {
-    const { isSubList, worksheetId, cell, projectId, updateEditingStatus, appId } = this.props;
+    const { isSubList, worksheetId, cell, projectId, updateEditingStatus, appId, rowFormData } = this.props;
     const { value } = this.state;
     const target = (this.cell && this.cell.current) || (event || {}).target;
     const tabType = getTabTypeBySelectUser(cell);
@@ -154,7 +160,7 @@ export default class User extends React.Component {
             valueChanged: true,
           },
           () => {
-            this.handleChange(forceUpdate);
+            this.handleChange(true);
             updateEditingStatus(false);
           },
         );
@@ -173,30 +179,24 @@ export default class User extends React.Component {
       }
       this.isPicking = false;
     };
-    $(target).quickSelectUser({
-      isRangeData: !!(cell.advancedSetting && cell.advancedSetting.userrange),
-      filterWorksheetId: worksheetId,
-      filterWorksheetControlId: cell.controlId,
-      rect: target.getBoundingClientRect(),
-      showQuickInvite: false,
+    const selectRangeOptions = dealUserRange(cell, rowFormData());
+    const hasUserRange = Object.values(selectRangeOptions).some(i => !_.isEmpty(i));
+    quickSelectUser(target, {
+      selectRangeOptions,
       tabType,
       appId,
       showMoreInvite: false,
-      isTask: false,
-      prefixAccounts: !_.includes(filterAccountIds, md.global.Account.accountId)
-        ? [
-            {
-              accountId: md.global.Account.accountId,
-              fullname: _l('我自己'),
-              avatar: md.global.Account.avatar,
-            },
-          ]
-        : [],
+      prefixAccounts:
+        !_.includes(filterAccountIds, md.global.Account.accountId) && !hasUserRange
+          ? [
+              {
+                accountId: md.global.Account.accountId,
+                fullname: md.global.Account.fullname,
+                avatar: md.global.Account.avatar,
+              },
+            ]
+          : [],
       filterAccountIds,
-      offset: {
-        top: 0,
-        left: 40,
-      },
       zIndex: 10001,
       isDynamic: cell.enumDefault === 1,
       SelectUserSettings: {
@@ -235,7 +235,7 @@ export default class User extends React.Component {
       {
         value: value.filter(account => account.accountId !== accountId),
       },
-      this.handleChange,
+      () => this.handleChange(true),
     );
   }
 

@@ -6,8 +6,16 @@ export default {
   * @param {string} args.name 名称
   * @param {string} args.icon 图标
   * @param {string} args.iconColor 图标颜色
+  * @param {string} args.navColor 导航颜色
+  * @param {string} args.lightColor 背景色
   * @param {string} args.groupId 分组id
   * @param {} args.groupType 分组类型 0 = 个人，1= 网络
+  * @param {string} args.urlTemplate url链接模板
+  * @param {object} args.configuratiuon 链接配置
+  * @param {} args.createType 创建类型 0-表示默认类型, 1表示链接类型
+  * @param {boolean} args.pcDisplay Pc端显示,
+  * @param {boolean} args.webMobileDisplay web移动端显示
+  * @param {boolean} args.appDisplay app端显示
   * @param {Object} options 配置参数
   * @param {Boolean} options.silent 是否禁止错误弹层
   * @returns {Promise<Boolean, ErrorModel>}
@@ -97,7 +105,19 @@ export default {
   * @param {string} args.description 描述
   * @param {string} args.icon 图标
   * @param {string} args.iconColor 图标颜色
-  * @param {integer} args.appNaviStyle 0 = 列表 ，1= 九宫格，2= 导航
+  * @param {integer} args.appNaviStyle 移动端:0 = 列表 ，1= 九宫格，2= 导航
+  * @param {integer} args.pcNavistyle PC端:0-经典 1-左侧列表 2-卡片模式
+  * @param {boolean} args.viewHideNavi 查看影藏导航项
+  * @param {string} args.navColor 导航栏颜色
+  * @param {string} args.lightColor 淡色色值
+  * @param {integer} args.gridDisplayMode 宫格显示模式
+  * @param {integer} args.appNavDisplayType 导航列表显示类型
+  * @param {string} args.urlTemplate 外部链接url
+  * @param {object} args.configuration 链接配置
+  * @param {boolean} args.pcDisplay Pc端显示,
+  * @param {boolean} args.webMobileDisplay web移动端显示
+  * @param {boolean} args.appDisplay app端显示
+  * @param {integer} args.selectAppItmeType 导航应用项默认是否选中
   * @param {Object} options 配置参数
   * @param {Boolean} options.silent 是否禁止错误弹层
   * @returns {Promise<Boolean, ErrorModel>}
@@ -105,6 +125,18 @@ export default {
    editAppInfo: function (args, options = {}) {
      
      return $.api('HomeApp', 'EditAppInfo', args, options);
+   },
+  /**
+  * 获取应用导航信息
+  * @param {Object} args 请求参数
+  * @param {string} args.appId 应用id
+  * @param {Object} options 配置参数
+  * @param {Boolean} options.silent 是否禁止错误弹层
+  * @returns {Promise<Boolean, ErrorModel>}
+  **/
+   getNavigationInfo: function (args, options = {}) {
+     
+     return $.api('HomeApp', 'GetNavigationInfo', args, options);
    },
   /**
   * 更新首页应用排序
@@ -196,6 +228,7 @@ export default {
   /**
   * 获取首页所有应用信息
   * @param {Object} args 请求参数
+  * @param {boolean} args.containsLinks
   * @param {Object} options 配置参数
   * @param {Boolean} options.silent 是否禁止错误弹层
   * @returns {Promise<Boolean, ErrorModel>}
@@ -203,19 +236,6 @@ export default {
    getAllHomeApp: function (args, options = {}) {
      
      return $.api('HomeApp', 'GetAllHomeApp', args, options);
-   },
-  /**
-  * 获取应用分组的详情（包含导航头和工作表基础信息）
-  * @param {Object} args 请求参数
-  * @param {string} args.appId 应用id
-  * @param {Object} options 配置参数
-  * @param {Boolean} options.silent 是否禁止错误弹层
-  * @returns {Promise<Boolean, ErrorModel>}
-  **/
-   getAppInfo: function (args, options = {}) {
-    //  console.log('getAppInfo', args, options)
-    //  return $.api('HomeApp', 'GetAppInfo', args, options);
-     return $.api('HomeApp', 'GetApp', {...args, getManager: true, getSection: true,}, options);
    },
   /**
   * 获取应用下所有工作表信息
@@ -237,6 +257,7 @@ export default {
   * @param {string} args.viewId 视图id
   * @param {string} args.attachementControlId 控件id
   * @param {integer} args.imageLimitCount 图片上限数量
+  * @param {integer} args.displayMode 展示方式（默认值为0） 0-all 1-每条记录第一张
   * @param {array} args.filedIds 工作表字段控件id数组
   * @param {Object} options 配置参数
   * @param {Boolean} options.silent 是否禁止错误弹层
@@ -260,7 +281,7 @@ export default {
      return $.api('HomeApp', 'GetPageInfo', args, options);
    },
   /**
-  * 
+  * 批量获取应用项信息
   * @param {Object} args 请求参数
   * @param {Object} options 配置参数
   * @param {Boolean} options.silent 是否禁止错误弹层
@@ -271,17 +292,24 @@ export default {
      return $.api('HomeApp', 'GetAppItemDetail', args, options);
    },
   /**
-  * 获取应用详细信息
+  * 获取应用详情（包含分组信息，请求参数可选）
   * @param {Object} args 请求参数
   * @param {string} args.appId 应用id
+  * @param {boolean} args.getSection 是否获取分组信息
+  * @param {boolean} args.getManager 是否获取管理员列表信息
+  * @param {boolean} args.getProject 获取组织信息
+  * @param {string} args.clientId 客户端标识
+记录输入密码之后，页面刷新不用重复输入密码操作
+滑动过期
+  * @param {string} args.ticket 验证码返票据
+  * @param {string} args.randStr 票据随机字符串
+  * @param {} args.captchaType 验证码类型（默认腾讯云）
   * @param {Object} options 配置参数
   * @param {Boolean} options.silent 是否禁止错误弹层
   * @returns {Promise<Boolean, ErrorModel>}
   **/
-   getAppDetail: function (args, options = {}) {
-     
-    //  return $.api('HomeApp', 'GetAppDetail', args, options);
-     return $.api('HomeApp', 'GetApp', {...args, getManager: true, getSection: true,}, options);
+   getApp: function (args, options = {}) {
+     return $.api('HomeApp', 'GetApp', args, options);
    },
   /**
   * 验证应用有效性
@@ -349,8 +377,12 @@ export default {
   * 添加应用分组
   * @param {Object} args 请求参数
   * @param {string} args.appId 应用id
-  * @param {string} args.name 名称
+  * @param {string} args.name 分组名称
+  * @param {string} args.icon 分组图标
+  * @param {string} args.iconColor 分组图标颜色
   * @param {string} args.sourceAppSectionId 来源应用分组id（在此后添加应用分组）
+  * @param {string} args.parentId 父级分组id（除了创建一级分组外不需要传，其他都需要传）
+  * @param {string} args.rootId 根分组id（除了创建一级分组外不需要传,其他都需要传,参数值为一级分组的id）
   * @param {Object} options 配置参数
   * @param {Boolean} options.silent 是否禁止错误弹层
   * @returns {Promise<Boolean, ErrorModel>}
@@ -372,6 +404,22 @@ export default {
    updateAppSectionName: function (args, options = {}) {
      
      return $.api('HomeApp', 'UpdateAppSectionName', args, options);
+   },
+  /**
+  * 修改分组基础信息信息
+  * @param {Object} args 请求参数
+  * @param {string} args.appId 应用id
+  * @param {string} args.appSectionId 分组id
+  * @param {string} args.appSectionName 分组名称
+  * @param {string} args.icon 图标
+  * @param {string} args.iconColor 图标颜色
+  * @param {Object} options 配置参数
+  * @param {Boolean} options.silent 是否禁止错误弹层
+  * @returns {Promise<Boolean, ErrorModel>}
+  **/
+   updateAppSection: function (args, options = {}) {
+     
+     return $.api('HomeApp', 'UpdateAppSection', args, options);
    },
   /**
   * 删除应用分组（并移动该项下工作表到其他应用分组）
@@ -444,6 +492,7 @@ export default {
   * 获取我的应用
   * @param {Object} args 请求参数
   * @param {string} args.projectId 网络id
+  * @param {boolean} args.containsLinks 是否包含外部链接
   * @param {Object} options 配置参数
   * @param {Boolean} options.silent 是否禁止错误弹层
   * @returns {Promise<Boolean, ErrorModel>}
@@ -458,6 +507,7 @@ export default {
   * @param {string} args.id 首页分组id
   * @param {} args.groupType 分组类型 0 = 个人，1= 网络
   * @param {string} args.projectId 网络id
+  * @param {boolean} args.containsLinks 是否包含外部链接
   * @param {Object} options 配置参数
   * @param {Boolean} options.silent 是否禁止错误弹层
   * @returns {Promise<Boolean, ErrorModel>}
@@ -576,6 +626,9 @@ export default {
   * @param {} args.displayType 显示方式  0 = 平铺，1= 选项卡
   * @param {} args.markedAppDisplay 标星应用显示 0 =当前网络，1= 全部
   * @param {boolean} args.exDisplay 是否显示外部应用
+  * @param {boolean} args.displayCommonApp 是否显示常用应用
+  * @param {boolean} args.isAllAndProject 是否开启全部和组织分组
+  * @param {boolean} args.displayMark 是否显示星标应用
   * @param {Object} options 配置参数
   * @param {Boolean} options.silent 是否禁止错误弹层
   * @returns {Promise<Boolean, ErrorModel>}

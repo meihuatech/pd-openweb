@@ -1,7 +1,7 @@
 import React, { Component, Fragment } from 'react';
 import { ScrollView, LoadDiv, Icon, Dialog } from 'ming-ui';
 import flowNode from '../../../api/flowNode';
-import { DetailHeader, DetailFooter, ParameterList, KeyPairs } from '../components';
+import { DetailHeader, DetailFooter, ParameterList, KeyPairs, TestParameter, ChatGPT } from '../components';
 import { ACTION_ID } from '../../enum';
 import Editor from 'react-simple-code-editor';
 import { highlight, languages } from 'prismjs/components/prism-core';
@@ -10,6 +10,25 @@ import 'prismjs/components/prism-javascript';
 import 'prismjs/themes/prism.css';
 import { Base64 } from 'js-base64';
 import _ from 'lodash';
+import cx from 'classnames';
+import CodeSnippet, { CodeSnippetEdit } from '../../../components/CodeSnippet';
+import styled from 'styled-components';
+
+const CodeSnippetButton = styled.div`
+  padding: 0 8px;
+  height: 36px;
+  background: #fff;
+  border-radius: 5px;
+  color: #757575;
+  cursor: pointer;
+  &:hover {
+    background: #f5f5f5;
+  }
+  i {
+    color: #00bcd7;
+    margin-right: 3px;
+  }
+`;
 
 export default class Code extends Component {
   constructor(props) {
@@ -20,6 +39,10 @@ export default class Code extends Component {
       sendRequest: false,
       msg: '',
       isFullCode: false,
+      showSaveCodeDialog: false,
+      showCodeSnippetDialog: false,
+      showTestDialog: false,
+      showChatGPTDialog: false,
     };
   }
 
@@ -74,7 +97,7 @@ export default class Code extends Component {
    */
   onSave = () => {
     const { data, saveRequest } = this.state;
-    const { name, actionId, inputDatas, code } = data;
+    const { name, actionId, inputDatas, code, testMap } = data;
 
     if (!code) {
       alert(_l('代码块必填'), 2);
@@ -95,6 +118,7 @@ export default class Code extends Component {
           name: name.trim(),
           inputDatas: inputDatas.filter(item => item.name),
           code: Base64.encode(code),
+          testMap,
         },
         { isIntegration: this.props.isIntegration },
       )
@@ -110,7 +134,8 @@ export default class Code extends Component {
    * Output对象参数列表
    */
   renderParameterList() {
-    const { data } = this.state;
+    const { companyId } = this.props;
+    const { data, sendRequest, showSaveCodeDialog } = this.state;
 
     return (
       <Fragment>
@@ -119,9 +144,53 @@ export default class Code extends Component {
         <ParameterList controls={data.controls} />
 
         <div className="mTop20 Gray_9e">{_l('请运行代码块以获得output对象; input对象将采用测试数据')}</div>
-        <div className="mTop15 webhookBtn InlineBlock" onClick={this.send}>
-          {_l('测试')}
+        <div className="flexRow mTop15">
+          <div
+            className={cx('webhookBtn InlineBlock', { disabled: sendRequest })}
+            onClick={() => {
+              if (!data.code) {
+                alert(_l('代码块必填'), 2);
+                return;
+              }
+
+              if (data.inputDatas.filter(o => !!o.name).length) {
+                this.setState({ showTestDialog: true });
+              } else {
+                this.send();
+              }
+            }}
+          >
+            {_l('测试')}
+          </div>
+          <div
+            className="webhookBtn InlineBlock mLeft15"
+            onClick={() => {
+              if (!data.code.trim()) {
+                alert(_l('代码片段不允许为空'), 2);
+                return;
+              }
+
+              this.setState({ showSaveCodeDialog: true });
+            }}
+          >
+            {_l('保存到代码片段库')}
+          </div>
         </div>
+
+        {showSaveCodeDialog && (
+          <CodeSnippetEdit
+            projectId={companyId}
+            codeName={_.includes(['JavaScript', 'Python'], data.name) ? '' : data.name}
+            code={Base64.encode(data.code)}
+            inputDatas={data.inputDatas}
+            type={data.actionId}
+            onSave={() => {
+              alert(_l('保存成功'));
+              this.setState({ showSaveCodeDialog: false });
+            }}
+            onClose={() => this.setState({ showSaveCodeDialog: false })}
+          />
+        )}
       </Fragment>
     );
   }
@@ -129,15 +198,10 @@ export default class Code extends Component {
   /**
    * 发送
    */
-  send = () => {
+  send = (testMap = {}) => {
     const { processId, selectNodeId, isIntegration } = this.props;
     const { data, sendRequest } = this.state;
     const { actionId, code, inputDatas } = data;
-
-    if (!code) {
-      alert(_l('代码块必填'), 2);
-      return;
-    }
 
     if (sendRequest) {
       return;
@@ -150,7 +214,14 @@ export default class Code extends Component {
           nodeId: selectNodeId,
           actionId,
           code: Base64.encode(code),
-          inputDatas: inputDatas.filter(item => item.name),
+          inputDatas: inputDatas
+            .filter(item => item.name)
+            .map(item => {
+              return {
+                ...item,
+                value: testMap[item.name] || '',
+              };
+            }),
         },
         { isIntegration },
       )
@@ -170,6 +241,11 @@ export default class Code extends Component {
 
     this.setState({ sendRequest: true });
   };
+
+  /**
+   * 保存模板
+   */
+  saveTemplate = () => {};
 
   /**
    * 渲染代码块
@@ -192,8 +268,32 @@ export default class Code extends Component {
     );
   }
 
+  /**
+   * 选择代码回调
+   */
+  selectCodeCallback = ({ clearParams, inputData, code }) => {
+    const { data } = this.state;
+    const newInputData = [];
+
+    Object.keys(inputData).forEach(name => {
+      newInputData.push({ name, value: '' });
+    });
+
+    if (clearParams) {
+      this.updateSource({ inputDatas: newInputData, code });
+    } else {
+      this.updateSource({
+        inputDatas: _.uniqBy(data.inputDatas.concat(newInputData), o => o.name),
+        code: `${data.code}\n\n${code}`,
+      });
+    }
+
+    this.setState({ showCodeSnippetDialog: false, showChatGPTDialog: false });
+  };
+
   render() {
-    const { data, msg, isFullCode } = this.state;
+    const { data, msg, isFullCode, showCodeSnippetDialog, showTestDialog, showChatGPTDialog } = this.state;
+    const testMapList = (data.inputDatas || []).filter(item => item.name && item.value && !/\$.*?\$/.test(item.value));
 
     if (_.isEmpty(data)) {
       return <LoadDiv className="mTop15" />;
@@ -208,7 +308,7 @@ export default class Code extends Component {
           bg="BGBlueAsh"
           updateSource={this.updateSource}
         />
-        <div className="flex mTop20">
+        <div className="flex">
           <ScrollView>
             <div className="workflowDetailBox">
               <div className="Font14 Gray_75 workflowDetailDesc">
@@ -223,18 +323,37 @@ export default class Code extends Component {
                 isIntegration={this.props.isIntegration}
                 source={data.inputDatas}
                 sourceKey="inputDatas"
+                flowNodeList={data.flowNodeList}
                 formulaMap={data.formulaMap}
                 updateSource={this.updateSource}
               />
 
               <div className="Font13 bold mTop20">{_l('代码块')}</div>
-              <div className="mTop5 Gray_9e">
-                {data.actionId === ACTION_ID.JAVASCRIPT
-                  ? _l('Output 示例：output = {output: "hello world" };')
-                  : _l("Output 示例：output = {'hello': 'world!'}")}
+              <div className="mTop5 flexRow alignItemsCenter">
+                <div className="flex Gray_9e">
+                  {data.actionId === ACTION_ID.JAVASCRIPT
+                    ? _l('Output 示例：output = {output: "hello world" };')
+                    : _l("Output 示例：output = {'hello': 'world!'}")}
+                </div>
+                <CodeSnippetButton
+                  className="flexRow alignItemsCenter"
+                  onClick={() => this.setState({ showCodeSnippetDialog: true })}
+                >
+                  <i className="icon-custom-description Font16" />
+                  {_l('代码片段库')}
+                </CodeSnippetButton>
+                {!md.global.Config.IsLocal && (
+                  <CodeSnippetButton
+                    className="flexRow alignItemsCenter mLeft15"
+                    onClick={() => this.setState({ showChatGPTDialog: true })}
+                  >
+                    <i className="icon-ai1 Font16" style={{ color: '#FF9A00' }} />
+                    {_l('生成代码')}
+                  </CodeSnippetButton>
+                )}
               </div>
 
-              <div className="mTop15 relative">
+              <div className="mTop5 relative">
                 {this.renderCode()}
                 <span
                   data-tip={_l('放大')}
@@ -282,6 +401,50 @@ export default class Code extends Component {
           >
             {this.renderCode({ minHeight: '100%' })}
           </Dialog>
+        )}
+
+        {showCodeSnippetDialog && (
+          <CodeSnippet
+            projectId={this.props.companyId}
+            type={data.actionId === ACTION_ID.JAVASCRIPT ? 1 : 2}
+            onSave={this.selectCodeCallback}
+            onClose={() => this.setState({ showCodeSnippetDialog: false })}
+          />
+        )}
+
+        {showTestDialog && (
+          <TestParameter
+            title={_l('编辑测试数据')}
+            onOk={testMap => {
+              this.updateSource({ testMap: Object.assign({}, data.testMap, testMap) });
+              this.send(testMap);
+              this.setState({ showTestDialog: false });
+            }}
+            onClose={() => this.setState({ showTestDialog: false })}
+            testArray={data.inputDatas.filter(item => item.name).map(item => item.name)}
+            formulaMap={_.keyBy(
+              data.inputDatas.filter(item => item.name),
+              'name',
+            )}
+            testMap={Object.assign(
+              {},
+              data.testMap,
+              _.zipObject(
+                testMapList.map(o => o.name),
+                testMapList.map(o => o.value),
+              ),
+            )}
+          />
+        )}
+
+        {showChatGPTDialog && (
+          <ChatGPT
+            processId={this.props.processId}
+            nodeId={this.props.selectNodeId}
+            codeType={data.actionId === ACTION_ID.JAVASCRIPT ? 1 : 2}
+            onSave={this.selectCodeCallback}
+            onClose={() => this.setState({ showChatGPTDialog: false })}
+          />
         )}
       </Fragment>
     );

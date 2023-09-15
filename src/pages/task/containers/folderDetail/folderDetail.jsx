@@ -1,10 +1,10 @@
-﻿import React, { Component } from 'react';
+﻿import React, { Component, Fragment } from 'react';
 import { connect } from 'react-redux';
 import { errorMessage, checkIsProject } from '../../utils/utils';
 import { clearFolderTip } from '../../redux/actions';
 import './folderDetail.less';
-import 'src/components/quickSelectUser/quickSelectUser';
-import 'src/components/dialogSelectUser/dialogSelectUser';
+import dialogSelectUser from 'src/components/dialogSelectUser/dialogSelectUser';
+import quickSelectUser from 'ming-ui/functions/quickSelectUser';
 import cx from 'classnames';
 import LoadDiv from 'ming-ui/components/LoadDiv';
 import Icon from 'ming-ui/components/Icon';
@@ -18,6 +18,8 @@ import RichText from 'ming-ui/components/RichText';
 import Editor from 'src/pages/PageHeader/AppPkgHeader/AppDetail/EditorDiaLogContent';
 import Dialog from 'ming-ui/components/Dialog/Dialog';
 import _ from 'lodash';
+import { Tooltip } from 'antd';
+
 class FolderDetail extends Component {
   constructor(props) {
     super(props);
@@ -38,23 +40,6 @@ class FolderDetail extends Component {
   componentDidMount() {
     this.mounted = true;
     this.getFolderDetail();
-
-    // tips
-    $('#tasks').on('mouseover', '.folderDetailHead .icon-help', function() {
-      const _this = $(this);
-      if (_this.data('bindtip')) {
-        return;
-      }
-      _this.MD_UI_Tooltip({
-        arrowLeft: 0, // tip箭头的左位移，可以负数
-        offsetLeft: -10, // tip的左位移，可以负数
-        offsetTop: 0, // tip的上位移，可以负数
-        location: 'down', // tip在上面还是下面 选项："up","down"
-        checkHeight: true,
-        width: 240, // tip的宽度
-      });
-      _this.data('bindtip', true).mouseenter();
-    });
   }
 
   componentWillReceiveProps(nextProps) {
@@ -218,7 +203,7 @@ class FolderDetail extends Component {
     const { data } = this.state;
 
     evt.find('.updateFolderCharge').on('click', function() {
-      $(this).dialogSelectUser({
+      dialogSelectUser({
         sourceId: data.folderID,
         title: _l('选择负责人'),
         showMoreInvite: false,
@@ -441,7 +426,7 @@ class FolderDetail extends Component {
       existsIds = existsIds.concat(data.ordinaryMembers.map(item => item.accountID));
     }
 
-    $(evt.target).quickSelectUser({
+    quickSelectUser(evt.target, {
       sourceId: folderId,
       projectId,
       fromType: 6,
@@ -953,16 +938,19 @@ class FolderDetail extends Component {
           <div className="folderDetailMembers boderRadAll_3 mTop10">
             <div className="folderDetailHead">
               {_l('项目所有成员')} ({data.admins.length + data.ordinaryMembers.length + 1})
-              <i
-                className="icon-help Font16"
-                tip={
-                  _l('负责人：可以设置管理员来协助管理项目') +
-                  '<br>' +
-                  _l('管理员：可以修改项目和项目下的任务') +
-                  '<br>' +
-                  _l('成员：可以查看项目及项目下全部任务')
-                }
-              />
+              <Tooltip
+                title={() => {
+                  return (
+                    <Fragment>
+                      <div>{_l('负责人：可以设置管理员来协助管理项目')}</div>
+                      <div>{_l('管理员：可以修改项目和项目下的任务')}</div>
+                      <div>{_l('成员：可以查看项目及项目下全部任务')}</div>
+                    </Fragment>
+                  );
+                }}
+              >
+                <i className="icon-help Font16" />
+              </Tooltip>
             </div>
             <ul className="folderDetailMemberList">
               {this.renderFolderCharge()}

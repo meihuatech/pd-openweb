@@ -56,7 +56,7 @@ export default class PBC extends Component {
         result.fields = [{ fieldName: '', desc: '', type: 2, fieldId: uuidv4() }];
       }
 
-      if (appId && result.name === _l('调用业务流程')) {
+      if (appId && result.name === _l('调用封装业务流程')) {
         result.name = result.appList.find(item => item.id === appId).name;
       }
 
@@ -215,7 +215,7 @@ export default class PBC extends Component {
               type="text"
               className="ThemeBorderColor3 actionControlBox pTop0 pBottom0 pLeft10 pRight10 mTop8"
               style={{ width: 150 }}
-              placeholder={_l('参数名')}
+              placeholder={_l('参数名（必填）')}
               value={item.fieldName}
               maxLength={64}
               onChange={e => this.updateExportFields('fieldName', e.target.value, item)}
@@ -269,7 +269,7 @@ export default class PBC extends Component {
               }}
             />
             <i
-              className="icon-add Font20 pointer Gray_9e ThemeHoverColor3 mLeft10 pointer mTop8"
+              className="icon-add Font16 pointer Gray_9e ThemeHoverColor3 mLeft10 pointer mTop8"
               style={{ visibility: item.type === 10000008 && item.fieldValueId ? 'hidden' : 'visible' }}
               onClick={() => this.addParameters(item)}
             />
@@ -386,7 +386,10 @@ export default class PBC extends Component {
    */
   renderContent() {
     const { data } = this.state;
-    const MODES = [{ text: _l('执行单次'), value: 0 }, { text: _l('执行多次'), value: 1 }];
+    const MODES = [
+      { text: _l('执行单次'), value: 0 },
+      { text: _l('执行多次'), value: 1 },
+    ];
     const executeTypes = [
       {
         text: _l('并行'),
@@ -522,7 +525,10 @@ export default class PBC extends Component {
    */
   renderExecCount() {
     const { data, execCountType } = this.state;
-    const EXEC_COUNT = [{ text: _l('依据字段值'), value: 1 }, { text: _l('依据多条数据对象的数据量'), value: 2 }];
+    const EXEC_COUNT = [
+      { text: _l('依据字段值'), value: 1 },
+      { text: _l('依据多条数据对象的数据量'), value: 2 },
+    ];
 
     return (
       <Fragment>
@@ -531,7 +537,10 @@ export default class PBC extends Component {
           data={EXEC_COUNT}
           value={execCountType}
           border
-          onChange={execCountType => this.setState({ execCountType })}
+          onChange={execCountType => {
+            this.updateSource({ selectNodeId: '' });
+            this.setState({ execCountType });
+          }}
         />
         {execCountType === 1 ? (
           <div className="mTop10">
@@ -579,7 +588,7 @@ export default class PBC extends Component {
           bg="BGBlueAsh"
           updateSource={this.updateSource}
         />
-        <div className="flex mTop20">
+        <div className="flex">
           <ScrollView>
             <div className="workflowDetailBox">{isPBCOut ? this.renderExportContent() : this.renderContent()}</div>
           </ScrollView>

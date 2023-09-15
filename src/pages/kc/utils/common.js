@@ -527,15 +527,22 @@ export function handleMoveOrCopy(options) {
       ajax = kcService.copyNode(args);
     }
   }
-
-  alert(_l('操作中…'), 3, 0);
+  const key = Math.random().toString();
+  alert({
+    key,
+    msg: _l('操作中…'),
+    type: 3,
+    timeout: 0,
+  });
   ajax
     .then(data => {
       const successIds = data[EXECUTE_RESULT.SUCCESS];
       const noRightIds = data[EXECUTE_RESULT.NO_RIGHT];
 
       /* 操作提示*/
+      window.destroyAlert(key);
       const operationTips = returnOperationTips(data, message);
+      window.destroyAlert(key);
       if (ids.length === noRightIds.length) {
         alert(_l('操作成功（部分文件您无权操作）'), 3);
       } else if (operationTips.type === EXECUTE_RESULT.SUCCESS || operationTips.type === EXECUTE_RESULT.NO_RIGHT) {

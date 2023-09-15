@@ -7,16 +7,70 @@ import { LoadDiv } from 'ming-ui';
 import { getPssId, setPssId } from 'src/util/pssId';
 import _ from 'lodash';
 import moment from 'moment';
+import accountSetting from 'src/api/accountSetting';
 
-function getGlobalMeta({ allownotlogin, transfertoken } = {}, cb = () => {}) {
+/** 存储分发类入口 状态 和 分享id */
+function parseShareId() {
+  window.shareState = {};
+  if (/\/worksheetshare/.test(location.pathname)) {
+    window.shareState.isRecordShare = true;
+    window.shareState.shareId = (location.pathname.match(/.*\/worksheetshare\/(\w{24})/) || '')[1];
+  }
+  if (/\/public\/print/.test(location.pathname)) {
+    window.shareState.isPrintShare = true;
+    window.shareState.shareId = (location.pathname.match(/.*\/public\/print\/(\w{24})/) || '')[1];
+  }
+  if (/\/public\/query/.test(location.pathname)) {
+    window.shareState.isPublicQuery = true;
+    window.shareState.shareId = (location.pathname.match(/.*\/public\/query\/(\w{24})/) || '')[1];
+  }
+  if (/\/public\/form/.test(location.pathname)) {
+    window.shareState.isPublicForm = true;
+    window.shareState.shareId = (location.pathname.match(/.*\/public\/form\/(\w{32})/) || '')[1];
+  }
+  if (/\/worksheet\/form\/preview/.test(location.pathname)) {
+    window.shareState.isPublicFormPreview = true;
+  }
+  if (/\/public\/view/.test(location.pathname)) {
+    window.shareState.isPublicView = true;
+    window.shareState.shareId = (location.pathname.match(/.*\/public\/view\/(\w{24})/) || '')[1];
+  }
+  if (/\/public\/record/.test(location.pathname)) {
+    window.shareState.isPublicRecord = true;
+    window.shareState.shareId = (location.pathname.match(/.*\/public\/record\/(\w{24})/) || '')[1];
+  }
+  if (/\/public\/workflow/.test(location.pathname)) {
+    window.shareState.isPublicWorkflowRecord = true;
+    window.shareState.shareId = (location.pathname.match(/.*\/public\/workflow\/(\w{24})/) || '')[1];
+  }
+}
+
+function clearLocalStorage() {
+  try {
+    Object.keys(localStorage)
+      .map(key => ({ key, size: Math.floor(new Blob([localStorage[key]]).size / 1024) }))
+      .filter(item => item.size > 200 || item.key.startsWith('_AMap_'))
+      .forEach(item => {
+        localStorage.removeItem(item.key);
+      });
+  } catch (err) {}
+}
+
+function getGlobalMeta({ allownotlogin } = {}, cb = () => {}) {
+  const lang = getCookie('i18n_langtag') || getNavigatorLang();
   const urlparams = qs.parse(unescape(unescape(window.location.search.slice(1))));
   let args = {};
   const urlObj = new URL(decodeURIComponent(location.href));
+
+  // 设置语言
+  $('body').attr('id', lang);
+
   if (/^#publicapp/.test(urlObj.hash)) {
     window.isPublicApp = true;
     window.publicAppAuthorization = urlObj.hash.slice(10).replace('#isPrivateBuild', '');
   }
-  if (transfertoken && urlparams.token) {
+
+  if (urlparams.token) {
     args.token = urlparams.token;
   }
   if (urlparams.access_token) {
@@ -42,10 +96,22 @@ function getGlobalMeta({ allownotlogin, transfertoken } = {}, cb = () => {}) {
       cb();
       return;
     }
+
     if (!data['md.global'].Account) {
       const host = location.host;
       const url = `?ReturnUrl=${encodeURIComponent(location.href)}&v=${+new Date()}`;
       location.href = `${window.subPath || ''}/network${url}`;
+      return;
+    }
+
+    if (
+      window.navigator.userAgent.toLowerCase().match(/MicroMessenger/i) == 'micromessenger' &&
+      ((window.subPath && !data['md.global'].Account.isPortal) ||
+        (!window.subPath && data['md.global'].Account.isPortal))
+    ) {
+      location.href = `${
+        data['md.global'].Account.isPortal ? '' : window.subPath || ''
+      }/logout?ReturnUrl=${encodeURIComponent(location.href)}`;
       return;
     }
 
@@ -62,9 +128,19 @@ function getGlobalMeta({ allownotlogin, transfertoken } = {}, cb = () => {}) {
       md.global.Config.ForbidSuites = md.global.SysSettings.forbidSuites.split('|').map(item => Number(item));
     }
 
-    const lang = getCookie('i18n_langtag') || getNavigatorLang();
-    if (lang) {
-      moment.locale(getMomentLocale(lang));
+    // 检测语言是否一致
+    if (md.global.Account.lang && md.global.Account.lang !== lang && !md.global.Account.isPortal) {
+      if (md.global.Account.defaultLang === lang) {
+        setCookie('i18n_langtag', md.global.Account.lang);
+        window.location.reload();
+      } else {
+        const settingValue = { 'zh-Hans': '0', en: '1', ja: '2', 'zh-Hant': '3' };
+        accountSetting.editAccountSetting({ settingType: '6', settingValue: settingValue[lang] }).then(res => {
+          if (res) {
+            setCookie('i18n_langtag', lang);
+          }
+        });
+      }
     }
 
     setPssId(getPssId());
@@ -75,7 +151,7 @@ function getGlobalMeta({ allownotlogin, transfertoken } = {}, cb = () => {}) {
   });
 }
 
-const wrapComponent = function(Comp, { allownotlogin, hideloading, transfertoken } = {}) {
+const wrapComponent = function (Comp, { allownotlogin } = {}) {
   class Pre extends React.Component {
     constructor(props) {
       super(props);
@@ -84,7 +160,7 @@ const wrapComponent = function(Comp, { allownotlogin, hideloading, transfertoken
       };
     }
     componentDidMount() {
-      getGlobalMeta({ allownotlogin, transfertoken }, () => {
+      getGlobalMeta({ allownotlogin }, () => {
         this.setState({
           loading: false,
         });
@@ -101,76 +177,17 @@ const wrapComponent = function(Comp, { allownotlogin, hideloading, transfertoken
         document.title = _l('应用');
       }
 
-      return loading ? !hideloading && <LoadDiv size="big" className="pre" /> : <Comp {...this.props} />;
+      return loading ? <LoadDiv size="big" className="pre" /> : <Comp {...this.props} />;
     }
   }
 
   return Pre;
 };
 
-function getMomentLocale(lang) {
-  if (lang === 'en') {
-    return 'en';
-  } else if (lang === 'zh-Hant') {
-    return 'zh-tw';
-  } else if (lang === 'ja') {
-    return 'ja';
-  } else {
-    return 'zh-cn';
-  }
-}
-
-export default function(Comp, { allownotlogin, preloadcb, hideloading, transfertoken } = {}) {
+export default function (Comp, { allownotlogin, preloadcb } = {}) {
   if (_.isObject(Comp) && Comp.type === 'function') {
-    getGlobalMeta({ allownotlogin, transfertoken }, preloadcb);
+    getGlobalMeta({ allownotlogin }, preloadcb);
   } else {
-    return wrapComponent(Comp, { allownotlogin, hideloading, transfertoken });
+    return wrapComponent(Comp, { allownotlogin });
   }
-}
-
-/** 存储分发类入口 状态 和 分享id */
-function parseShareId() {
-  window.shareState = {};
-  if (/\/worksheetshare/.test(location.pathname)) {
-    window.shareState.isRecordShare = true;
-    window.shareState.shareId = (location.pathname.match(/.*\/worksheetshare\/(\w{24})/) || '')[1];
-  }
-  if (/\/printshare/.test(location.pathname)) {
-    window.shareState.isPrintShare = true;
-    window.shareState.shareId = (location.pathname.match(/.*\/printshare\/(\w{24})/) || '')[1];
-  }
-  if (/\/public\/query/.test(location.pathname)) {
-    window.shareState.isPublicQuery = true;
-    window.shareState.shareId = (location.pathname.match(/.*\/public\/query\/(\w{24})/) || '')[1];
-  }
-  if (/\/recordshare/.test(location.pathname)) {
-    window.shareState.isUpdateRecordShare = true;
-    window.shareState.shareId = (location.pathname.match(/.*\/recordshare\/(\w{24})/) || '')[1];
-  }
-  if (/\/form/.test(location.pathname)) {
-    window.shareState.isPublicQuery = true;
-    window.shareState.shareId = (location.pathname.match(/.*\/form\/(\w{32})/) || '')[1];
-  }
-  if (/\/public\/view/.test(location.pathname)) {
-    window.shareState.isPublicView = true;
-    window.shareState.shareId = (location.pathname.match(/.*\/public\/view\/(\w{24})/) || '')[1];
-  }
-  if (/\/public\/record/.test(location.pathname)) {
-    window.shareState.isPublicRecord = true;
-    window.shareState.shareId = (location.pathname.match(/.*\/public\/record\/(\w{24})/) || '')[1];
-  }
-  if (/\/public\/workflow/.test(location.pathname)) {
-    window.shareState.shareId = (location.pathname.match(/.*\/public\/workflow\/(\w{24})/) || '')[1];
-  }
-}
-
-function clearLocalStorage() {
-  try {
-    Object.keys(localStorage)
-      .map(key => ({ key, size: Math.floor(new Blob([localStorage[key]]).size / 1024) }))
-      .filter(item => item.size > 200 || item.key.startsWith('_AMap_'))
-      .forEach(item => {
-        localStorage.removeItem(item.key);
-      });
-  } catch (err) {}
 }

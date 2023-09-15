@@ -1,20 +1,9 @@
 .appManagementList {
-  margin: 16px;
-  border-radius: 4px;
-  background: #fff;
-
   .columnWidth {
     width: 150px;
     @media (max-width: 1280px) {
       width: 120px;
     }
-  }
-
-  .appManagementHeader {
-    padding: 0 24px;
-    align-items: center;
-    height: 57px;
-    border-bottom: 1px solid #eaeaea;
   }
   .manageListSearch {
     padding: 16px 24px 0;
@@ -36,8 +25,10 @@
         visibility: visible;
       }
       .chartIcon {
-        visibility: visible;
-        color: #2196f3;
+        &.isShow {
+          visibility: visible;
+          color: #2196f3;
+        }
       }
     }
     &.manageListHeader {
@@ -77,9 +68,27 @@
       display: flex;
       align-items: center;
       justify-content: center;
+      position: relative;
       .icon {
         font-size: 24px;
         color: #fff;
+      }
+      .linkIcon {
+        position: absolute;
+        left: -8px;
+        top: -8px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        width: 18px;
+        height: 18px;
+        background: #fff;
+        border: 1px solid #EFEFEF;
+        border-radius: 50%;
+        i {
+          font-size: 12px;
+          color: #2196f3;
+        }
       }
     }
     .name {
@@ -92,7 +101,7 @@
         left: 0;
         right: 0;
         bottom: 0;
-        justify-content: center;
+        justify-content: start;
         text-decoration: none;
         &.unable:not(:hover) {
           color: #757575 !important;
@@ -152,19 +161,8 @@
       white-space: normal;
     }
   }
-  .appManagementUploadBtn {
-    height: 30px;
-    display: flex;
-    align-items: center;
-    padding: 0 14px 0 10px;
-    border-radius: 16px;
-    font-size: 12px;
-  }
   .hoverRed:hover {
     color: #f44336 !important;
-  }
-  .appManagementCustom {
-    margin: 16px 14px 0;
   }
   .appManagementCustomItem {
     width: 60px;

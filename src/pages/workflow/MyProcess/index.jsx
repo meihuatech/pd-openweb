@@ -11,6 +11,8 @@ import FilterConTent from './Filter';
 import './index.less';
 import _ from 'lodash';
 import TodoEntrust from './TodoEntrust';
+import { verifyPassword } from 'src/util';
+import VerifyPassword from '../components/ExecDialog/components/VerifyPassword';
 
 const dateScope = getDateScope();
 
@@ -195,8 +197,10 @@ export default class MyProcess extends Component {
       isResetFilter: false,
       countData: {},
       approveType: null,
+      encryptType: null,
       rejectVisible: false,
       passVisible: false,
+      showPassword: false
     };
   }
   componentDidMount() {
@@ -205,6 +209,12 @@ export default class MyProcess extends Component {
       this.updateCountData(countData);
     });
     this.removeEscEvent = this.bindEscEvent();
+    verifyPassword({
+      checkNeedAuth: true,
+      fail: () => {
+        this.setState({ showPassword: true });
+      },
+    });
   }
   componentWillUnmount() {
     this.removeEscEvent();
@@ -340,7 +350,7 @@ export default class MyProcess extends Component {
     const { list, visible } = this.state;
     const countData = _.isEmpty(this.props.countData) ? this.state.countData : this.props.countData;
     const { waitingExamine, myProcessCount } = countData;
-    const newList = list.filter(n => n.id !== item.id);
+    const newList = list.filter(n => n.workId !== item.workId);
     this.setState({
       list: newList,
       visible: newList.length ? visible : false,
@@ -351,21 +361,31 @@ export default class MyProcess extends Component {
       myProcessCount: myProcessCount - 1,
     });
   };
-  hanndleApprove = (type, batchType) => {
-    const { approveCards } = this.state;
-    const signatureCard = _.find(approveCards, { flowNode: { [batchType]: 1 } });
-    if (signatureCard) {
-      this.setState({ approveType: type });
+  hanndleApprove = (approveType, batchType) => {
+    const { approveCards, showPassword } = this.state;
+    const rejectCards = approveCards.filter(c => _.get(c, 'flowNode.btnMap')[5]);
+    const cards = approveType === 5 ? rejectCards : approveCards;
+    const signatureCard = cards.filter(card => (_.get(card.flowNode, batchType) || []).includes(1));
+    const encryptCard = cards.filter(card => _.get(card.flowNode, 'encrypt'));
+    if (signatureCard.length || (encryptCard.length && showPassword)) {
+      if (signatureCard.length) {
+        this.setState({ approveType: approveType });
+      }
+      if (encryptCard.length && showPassword) {
+        this.setState({ encryptType: approveType });
+      }
     } else {
-      this.handleBatchApprove(null, type);
+      this.handleBatchApprove(null, approveType);
     }
   };
   handleBatchApprove = (signature, approveType) => {
-    const batchType = approveType === 4 ? 'passBatchType' : 'overruleBatchType';
+    const batchType = approveType === 4 ? 'auth.passTypeList' : 'auth.overruleTypeList';
     const { approveCards } = this.state;
-    const selects = approveCards.map(({ id, workId, flowNode }) => {
+    const rejectCards = approveCards.filter(c => _.get(c, 'flowNode.btnMap')[5]);
+    const cards = approveType === 5 ? rejectCards : approveCards;
+    const selects = cards.map(({ id, workId, flowNode }) => {
       const data = { id, workId, opinion: _l('批量处理') };
-      if (flowNode[batchType] === 1) {
+      if ((_.get(flowNode, batchType) || []).includes(1)) {
         return {
           ...data,
           signature,
@@ -395,7 +415,7 @@ export default class MyProcess extends Component {
     const { list } = this.state;
     const countData = _.isEmpty(this.props.countData) ? this.state.countData : this.props.countData;
     const { waitingWrite, waitingApproval, waitingDispose, myProcessCount } = countData;
-    const newList = list.filter(n => n.id !== item.id);
+    const newList = list.filter(n => n.workId !== item.workId);
 
     this.setState({
       list: newList,
@@ -430,7 +450,7 @@ export default class MyProcess extends Component {
     return (
       <div className="header card">
         <div className="valignWrapper flex title">
-          <Icon icon="knowledge_file" />
+          <Icon icon="task_alt" />
           <span className="bold">{_l('流程待办')}</span>
         </div>
         <div className="statesTab">
@@ -442,7 +462,7 @@ export default class MyProcess extends Component {
             }}
           >
             <span>{_l('待审批')}</span>
-            {waitingApproval > 0 ? <span className="count red">{waitingApproval}</span> : null}
+            {waitingApproval > 0 ? <span className="processCount red">{waitingApproval}</span> : null}
           </div>
           <div
             className={cx('item', { active: stateTab === TABS.WAITING_FILL })}
@@ -451,7 +471,7 @@ export default class MyProcess extends Component {
             }}
           >
             <span>{_l('待填写')}</span>
-            {waitingWrite > 0 ? <span className="count red">{waitingWrite}</span> : null}
+            {waitingWrite > 0 ? <span className="processCount red">{waitingWrite}</span> : null}
           </div>
           <div
             className={cx('item', { active: stateTab === TABS.WAITING_EXAMINE })}
@@ -460,7 +480,7 @@ export default class MyProcess extends Component {
             }}
           >
             <span>{_l('待查看')}</span>
-            {waitingExamine > 0 ? <span className="count red">{waitingExamine}</span> : null}
+            {waitingExamine > 0 ? <span className="processCount red">{waitingExamine}</span> : null}
           </div>
           <div
             className={cx('item', { active: stateTab === TABS.MY_SPONSOR })}
@@ -469,9 +489,9 @@ export default class MyProcess extends Component {
             }}
           >
             <span>{_l('我发起的')}</span>
-            {mySponsor > 0 ? <span className="count">{mySponsor}</span> : null}
+            {mySponsor > 0 ? <span className="processCount">{mySponsor}</span> : null}
           </div>
-          <div className="cuttingLine"></div>
+          <div className="cuttingLine" />
           <div
             className={cx('item', { active: stateTab === TABS.COMPLETE })}
             onClick={() => {
@@ -534,7 +554,8 @@ export default class MyProcess extends Component {
       const isApprove = TABS.WAITING_APPROVE === stateTab;
       const count = isApprove ? waitingApproval : waitingWrite;
       const { passVisible, rejectVisible } = this.state;
-      const allowApproveList = list.filter(c => ![-1, -2].includes(_.get(c, 'flowNode.batchType')));
+      const allowApproveList = list.filter(c => _.get(c, 'flowNode.batch'));
+      const rejectList = approveCards.filter(c => _.get(c, 'flowNode.btnMap')[5]);
       return (
         <div className={cx('filterWrapper', { hide: count <= 0 })}>
           <div className="valignWrapper flex">
@@ -552,6 +573,7 @@ export default class MyProcess extends Component {
               <div className="valignWrapper mTop2">
                 <Checkbox
                   checked={allowApproveList.length && allowApproveList.length === approveCards.length}
+                  disabled={!allowApproveList.length}
                   onChange={e => {
                     const { checked } = e.target;
                     if (checked) {
@@ -602,7 +624,7 @@ export default class MyProcess extends Component {
                             alert(_l('请先勾选需要处理的审批'), 3);
                             return;
                           }
-                          this.hanndleApprove(4, 'passBatchType');
+                          this.hanndleApprove(4, 'auth.passTypeList');
                           $('.passApprove').click();
                         }}
                       >
@@ -614,63 +636,29 @@ export default class MyProcess extends Component {
                 visible={passVisible}
                 onVisibleChange={passVisible => {
                   if (_.isEmpty(approveCards)) {
-                    alert(_l('请先勾选需要处理的审批'), 3);
+                    alert(_l('请先勾选需要处理的审批'), 2);
                   } else {
                     this.setState({ passVisible });
                   }
                 }}
               >
-                <div className={cx('passApprove bold pointer', { active: passVisible })}>{_l('通过')}</div>
+                <div className={cx('passApprove bold pointer', { active: passVisible, all: approveCards.length })}>{_l('通过')}</div>
               </Tooltip>
-              <Tooltip
-                overlayClassName="myProcessApproveOverlay"
-                overlayStyle={{ width: 320, maxWidth: 320 }}
-                align={{ offset: [40, -5] }}
-                placement="bottomRight"
-                arrowPointAtCenter={true}
-                trigger={['click']}
-                color="#FFF"
-                title={
-                  <div className="pAll10 flexColumn">
-                    <span className="Gray Font15">{_l('您将否决选择的%0个审批事项', approveCards.length)}</span>
-                    <div className="flexRow mTop10" style={{ justifyContent: 'flex-end' }}>
-                      <Button
-                        type="link"
-                        size="small"
-                        onClick={() => {
-                          $('.rejectApprove').click();
-                        }}
-                      >
-                        {_l('取消')}
-                      </Button>
-                      <Button
-                        type="danger"
-                        size="small"
-                        onClick={() => {
-                          if (_.isEmpty(approveCards)) {
-                            alert(_l('请先勾选需要处理的审批'), 3);
-                            return;
-                          }
-                          this.hanndleApprove(5, 'overruleBatchType');
-                          $('.rejectApprove').click();
-                        }}
-                      >
-                        {_l('否决')}
-                      </Button>
-                    </div>
-                  </div>
-                }
-                visible={_.isEmpty(approveCards) ? false : rejectVisible}
-                onVisibleChange={rejectVisible => {
+              <div
+                className={cx('rejectApprove bold pointer', { active: rejectVisible, select: rejectList.length, all: approveCards.length && rejectList.length === approveCards.length })}
+                onClick={() => {
                   if (_.isEmpty(approveCards)) {
-                    alert(_l('请先勾选需要处理的审批'), 3);
+                    alert(_l('请先勾选需要处理的审批'), 2);
+                  } else if (_.isEmpty(rejectList)) {
+                    alert(_l('没有可否决的审批事项'), 2);
                   } else {
-                    this.setState({ rejectVisible });
+                    this.setState({ rejectVisible: true });
                   }
                 }}
               >
-                <div className={cx('rejectApprove bold pointer', { active: rejectVisible })}>{_l('否决')}</div>
-              </Tooltip>
+                {_l('否决')}
+                {!(approveCards.length && rejectList.length === approveCards.length) && !!rejectList.length && rejectList.length}
+              </div>
             </div>
           )}
         </div>
@@ -751,37 +739,134 @@ export default class MyProcess extends Component {
     }
   }
   renderSignatureDialog() {
-    const { approveCards, approveType } = this.state;
-    const batchType = approveType === 4 ? 'passBatchType' : 'overruleBatchType';
-    const signatureApproveCards = approveCards.filter(item => item.flowNode[batchType] === 1);
+    const { approveType, encryptType, showPassword } = this.state;
+    const type = approveType || encryptType;
+    const batchType = type === 4 ? 'auth.passTypeList' : 'auth.overruleTypeList';
+    const approveCards = type === 4 ? this.state.approveCards : this.state.approveCards.filter(c => _.get(c, 'flowNode.btnMap')[5]);
+    const signatureApproveCards = approveCards.filter(card => (_.get(card.flowNode, batchType) || []).includes(1));
+    const encryptCard = approveCards.filter(card => _.get(card.flowNode, 'encrypt'));
     return (
       <Dialog
         visible
         width={650}
-        title={_l('输入签名')}
+        title={type === 4 ? _l('通过审批') : _l('否决审批')}
         onOk={() => {
-          if (this.signature.checkContentIsEmpty()) {
-            alert(_l('请填写签名', 2));
+          if (signatureApproveCards.length && this.signature.checkContentIsEmpty()) {
+            alert(_l('请填写签名'), 2);
             return;
           }
-          this.signature.saveSignature(signature => {
-            this.handleBatchApprove(signature, this.state.approveType);
-            this.setState({ approveType: null });
-          });
+          const submitFun = () => {
+            if (signatureApproveCards.length) {
+              this.signature.saveSignature(signature => {
+                this.handleBatchApprove(signature, this.state.approveType);
+                this.setState({ approveType: null, encryptType: null });
+              });
+            } else {
+              this.handleBatchApprove(null, this.state.encryptType);
+              this.setState({ approveType: null, encryptType: null });
+            }
+          };
+          if (encryptCard.length) {
+            verifyPassword({
+              password: this.password,
+              closeImageValidation: true,
+              isNoneVerification: this.isNoneVerification,
+              checkNeedAuth: !showPassword,
+              success: submitFun,
+              fail: () => {
+                this.setState({ showPassword: true });
+              }
+            });
+          } else {
+            submitFun();
+          }
         }}
         onCancel={() => {
-          this.setState({ approveType: null });
+          this.setState({ approveType: null, encryptType: null });
+          this.password = undefined;
         }}
       >
         <div className="Gray_75 Font14 mBottom10">
-          {_l('包含需要%0个需要签名的审批事项', signatureApproveCards.length)}
+          {_l('其中')}
+          {!!signatureApproveCards.length && _l('%0个事项需要签名', signatureApproveCards.length)}
+          {!!(signatureApproveCards.length && encryptCard.length) && '，'}
+          {!!encryptCard.length && _l('%0个事项需要验证登录密码', encryptCard.length)}
         </div>
-        <Signature
-          ref={signature => {
-            this.signature = signature;
-          }}
-        />
-        <div className="mTop20 BorderBottom borderColor_ef"></div>
+        {!!signatureApproveCards.length && (
+          <Fragment>
+            <div className="mBottom5">{_l('签名')}</div>
+            <Signature
+              ref={signature => {
+                this.signature = signature;
+              }}
+            />
+            <div className="mTop20 BorderBottom borderColor_ef" />
+          </Fragment>
+        )}
+        {encryptType && (
+          <div className="mTop20">
+            <VerifyPassword
+              onChange={({ password, isNoneVerification }) => {
+                if (password !== undefined) this.password = password;
+                if (isNoneVerification !== undefined) this.isNoneVerification = isNoneVerification;
+              }}
+            />
+          </div>
+        )}
+      </Dialog>
+    );
+  }
+  renderRejectDialog() {
+    const { approveCards, filter, stateTab } = this.state;
+    const rejectCards = approveCards.filter(c => _.get(c, 'flowNode.btnMap')[5]);
+    const noRejectCards = approveCards.filter(c => !_.get(c, 'flowNode.btnMap')[5]);
+    return (
+      <Dialog
+        visible
+        width={860}
+        title={_l('有%0个可否决的审批事项', rejectCards.length)}
+        onOk={() => {
+          this.hanndleApprove(5, 'auth.overruleTypeList');
+          this.setState({ rejectVisible: false });
+        }}
+        okText={_l('否决')}
+        buttonType="danger"
+        onCancel={() => this.setState({ rejectVisible: false })}
+      >
+        <div className="mTop10" />
+        {rejectCards.map(item => (
+          <Card
+            key={item.workId}
+            item={item}
+            type={filter ? filter.type : null}
+            stateTab={stateTab}
+            showApproveChecked={false}
+            onClick={() => {
+              this.setState({
+                selectCard: item,
+              });
+            }}
+          />
+        ))}
+        {!!noRejectCards.length && (
+          <Fragment>
+            <div className="mBottom10 Gray_75">{_l('不能否决事项')} {noRejectCards.length}</div>
+            {noRejectCards.map(item => (
+              <Card
+                key={item.workId}
+                item={item}
+                type={filter ? filter.type : null}
+                stateTab={stateTab}
+                showApproveChecked={false}
+                onClick={() => {
+                  this.setState({
+                    selectCard: item,
+                  });
+                }}
+              />
+            ))}
+          </Fragment>
+        )}
       </Dialog>
     );
   }
@@ -797,11 +882,11 @@ export default class MyProcess extends Component {
         <div className="content">
           {list.map(item => (
             <Card
-              key={item.id}
+              key={item.workId}
               item={item}
               type={filter ? filter.type : null}
               stateTab={stateTab}
-              approveChecked={!_.isEmpty(_.find(approveCards, { id: item.id }))}
+              approveChecked={!_.isEmpty(_.find(approveCards, { workId: item.workId }))}
               onAlreadyRead={this.handleAlreadyRead}
               onClick={() => {
                 this.setState({
@@ -814,10 +899,10 @@ export default class MyProcess extends Component {
                   approveCards: approveCards.concat(item),
                 });
               }}
-              onRemoveApproveRecord={id => {
+              onRemoveApproveRecord={workId => {
                 const { approveCards } = this.state;
                 this.setState({
-                  approveCards: approveCards.filter(item => item.id !== id),
+                  approveCards: approveCards.filter(item => item.workId !== workId),
                 });
               }}
             />
@@ -832,7 +917,18 @@ export default class MyProcess extends Component {
     );
   }
   render() {
-    const { stateTab, selectCard, param, visible, filter, isLoading, isResetFilter, approveType } = this.state;
+    const {
+      stateTab,
+      selectCard,
+      param,
+      visible,
+      filter,
+      isLoading,
+      isResetFilter,
+      approveType,
+      encryptType,
+      rejectVisible
+    } = this.state;
 
     return (
       <div className="myProcessWrapper">
@@ -853,6 +949,7 @@ export default class MyProcess extends Component {
                   loading: false,
                   isResetFilter: false,
                   list: [],
+                  approveCards: [],
                   filter: isSampleFilter
                     ? data
                     : {
@@ -887,8 +984,7 @@ export default class MyProcess extends Component {
                 this.handleRead(this.state.selectCard);
               }
             }}
-            onSave={(isStash) => {
-              if (isStash) return;
+            onSave={() => {
               if ([TABS.WAITING_APPROVE, TABS.WAITING_FILL].includes(stateTab)) {
                 this.handleSave(this.state.selectCard);
               }
@@ -902,7 +998,7 @@ export default class MyProcess extends Component {
               }
               if (stateTab === TABS.MY_SPONSOR || stateTab === TABS.COMPLETE) {
                 const { list } = this.state;
-                const newList = list.filter(n => n.id !== selectCard.id);
+                const newList = list.filter(n => n.workId !== selectCard.workId);
                 this.setState({
                   list: newList,
                 });
@@ -915,10 +1011,12 @@ export default class MyProcess extends Component {
                   });
                 }
               }
+              this.setState({ selectCard: null });
             }}
           />
         ) : null}
-        {approveType && this.renderSignatureDialog()}
+        {(approveType || encryptType) && this.renderSignatureDialog()}
+        {rejectVisible && this.renderRejectDialog()}
       </div>
     );
   }

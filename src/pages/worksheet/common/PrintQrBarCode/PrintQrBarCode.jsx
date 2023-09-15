@@ -26,6 +26,7 @@ import {
 } from './util';
 import { generatePdf } from '.';
 import _ from 'lodash';
+import { addBehaviorLog } from 'src/util';
 
 const Con = styled.div`
   height: 100vh
@@ -94,6 +95,7 @@ function getDefaultConfig(printType) {
 
 export default function PrintQrBarCode(props) {
   const {
+    isCharge,
     mode,
     printType = 1,
     appId,
@@ -103,6 +105,11 @@ export default function PrintQrBarCode(props) {
     worksheetName,
     selectedRows = [],
     controls,
+    count,
+    allowLoadMore,
+    filterControls,
+    fastFilters,
+    navGroupFilters,
     onClose = () => {},
   } = props;
   const [base, setBase] = useState({
@@ -141,6 +148,7 @@ export default function PrintQrBarCode(props) {
         printType: config.printType,
         sourceType: config.sourceType,
         sourceControlId: config.sourceControlId,
+        fontSize: config.fontSize,
         row: previewRow,
         controls,
         urls: [
@@ -191,6 +199,9 @@ export default function PrintQrBarCode(props) {
   }
   const maxLineNumber = (labelObject || {}).maxLineNumber || 0;
   function handlePrint() {
+    const printTypeObj = { 1: 'printQRCode', 3: 'printBarCode' };
+    addBehaviorLog(printTypeObj[config.printType], worksheetId, { msg: [allowLoadMore ? count : selectedRows.length] }); // 埋点
+
     generatePdf({
       config,
       name: base.name,
@@ -200,6 +211,11 @@ export default function PrintQrBarCode(props) {
       projectId,
       selectedRows,
       controls,
+      count,
+      allowLoadMore,
+      filterControls,
+      fastFilters,
+      navGroupFilters,
     });
   }
   function handleKeyDown(e) {
@@ -219,6 +235,8 @@ export default function PrintQrBarCode(props) {
         .then(data => {
           setPreviewRowPublicUrl(data[recordId]);
         });
+    } else {
+      setPreviewRowPublicUrl('https://mingdao.com');
     }
   }
   useEffect(() => {
@@ -282,58 +300,60 @@ export default function PrintQrBarCode(props) {
           )}
         </TemplateName>
         <div className="spacer"></div>
-        <Button
-          size="mdnormal"
-          type={mode === 'editTemplate' || mode === 'newTemplate' ? 'primary' : 'ghostgray'}
-          onClick={() => {
-            let args = {
-              id: id || '',
-              projectId,
-              worksheetId,
-              type: printType === PRINT_TYPE.BAR ? 4 : 3,
-              config: {
-                ...config,
-                sourceControlId: config.sourceControlId || '',
-              },
-            };
-            function update(cb = () => {}) {
-              worksheetAjax.saveRecordCodePrintConfig(args).then(data => {
-                alert(_l('保存成功'));
-                setChanged(false);
-                if (!id) {
-                  setBase({ ...base, id: data });
-                }
-                cb();
-              });
-            }
-            if (id) {
-              args = Object.assign(args, base);
-              update();
-            } else {
-              saveTemplateConfirm({
-                className: 'doNotTriggerClickAway',
+        {isCharge && (
+          <Button
+            size="mdnormal"
+            type={mode === 'editTemplate' || mode === 'newTemplate' ? 'primary' : 'ghostgray'}
+            onClick={() => {
+              let args = {
+                id: id || '',
+                projectId,
                 worksheetId,
-                viewId,
-                printData: {
-                  name: base.name,
-                  range: 1,
-                  views: [],
+                type: printType === PRINT_TYPE.BAR ? 4 : 3,
+                config: {
+                  ...config,
+                  sourceControlId: config.sourceControlId || '',
                 },
-                setValue: data => {
-                  args = Object.assign(args, {
-                    name: data.name,
-                    range: data.range,
-                    views: data.views.map(v => v.viewId),
-                  });
-                  update(onClose);
-                },
-              });
-            }
-          }}
-        >
-          {mode === 'editTemplate' || mode === 'newTemplate' ? _l('保存') : _l('保存为打印模板')}
-        </Button>
-        {!_.isEmpty(selectedRows) && (
+              };
+              function update(cb = () => {}) {
+                worksheetAjax.saveRecordCodePrintConfig(args).then(data => {
+                  alert(_l('保存成功'));
+                  setChanged(false);
+                  if (!id) {
+                    setBase({ ...base, id: data });
+                  }
+                  cb();
+                });
+              }
+              if (id) {
+                args = Object.assign(args, base);
+                update();
+              } else {
+                saveTemplateConfirm({
+                  className: 'doNotTriggerClickAway',
+                  worksheetId,
+                  viewId,
+                  printData: {
+                    name: base.name,
+                    range: 1,
+                    views: [],
+                  },
+                  setValue: data => {
+                    args = Object.assign(args, {
+                      name: data.name,
+                      range: data.range,
+                      views: data.views.map(v => v.viewId),
+                    });
+                    update(onClose);
+                  },
+                });
+              }
+            }}
+          >
+            {mode === 'editTemplate' || mode === 'newTemplate' ? _l('保存') : _l('保存为打印模板')}
+          </Button>
+        )}
+        {!_.includes(['newTemplate', 'editTemplate', 'preview'], mode) && (
           <Button size="mdnormal" type="primary" className="mLeft10" onClick={handlePrint}>
             {_l('打印')}
           </Button>
@@ -355,7 +375,10 @@ export default function PrintQrBarCode(props) {
             <Sider
               config={config}
               maxLineNumber={maxLineNumber}
-              controls={controls.filter(FILTER[2])}
+              controls={controls.filter(
+                c =>
+                  FILTER[2]({ ...c, type: c.type === 30 ? c.sourceControlType : c.type }) || _.includes([37], c.type),
+              )}
               onUpdate={changes => {
                 setChanged(true);
                 setConfig(oldConfig => ({ ...oldConfig, ...changes }));

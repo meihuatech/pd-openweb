@@ -65,12 +65,16 @@ export default function WidgetIntro(props) {
     if (type === 6 || type === 8) {
       // 转金额或数值保留前后缀
       if (_.includes(['MONEY', 'NUMBER'], info.type)) {
-        newData = handleAdvancedSettingChange(newData, _.pick(advancedSetting, ['prefix', 'suffix']));
+        newData = handleAdvancedSettingChange(newData, _.pick(advancedSetting, ['prefix', 'suffix', 'dot']));
       }
       onChange(newData);
       return;
     }
 
+    if (type === 9) {
+      onChange({ type: newData.type });
+      return;
+    }
     // 多选转单选 需要将默认选中设为一个
     if (type === 10) {
       const defaultChecked = JSON.parse(data.default || '[]');
@@ -95,6 +99,13 @@ export default function WidgetIntro(props) {
           onChange({
             type: 34,
             size: WHOLE_SIZE,
+            advancedSetting: {
+              allowadd: '1',
+              allowcancel: '1',
+              allowedit: '1',
+              allowsingle: '1',
+              allowexport: '1',
+            },
           });
         },
       });

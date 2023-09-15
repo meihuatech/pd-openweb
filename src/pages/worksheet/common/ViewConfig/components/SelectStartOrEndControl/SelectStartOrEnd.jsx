@@ -7,8 +7,10 @@ import { getIconByType } from 'src/pages/widgetConfig/util';
 import { isTimeStyle, isIllegal } from 'src/pages/worksheet/views/CalendarView/util';
 import AddControlDiaLog from './AddControlDiaLog';
 import { SYS } from '../../../../../widgetConfig/config/widget';
+import { setSysWorkflowTimeControlFormat } from 'src/pages/worksheet/views/CalendarView/util.js';
+
 export default function SelectStartOrEnd(props) {
-  const {
+  let {
     handleChange,
     timeControls = [],
     canAddTimeControl, //能否添加新的时间控件
@@ -19,16 +21,19 @@ export default function SelectStartOrEnd(props) {
     updateWorksheetControls,
     allowClear,
     i,
+    sheetSwitchPermit = [],
   } = props;
+
   const getData = () => {
+    let timeControlsList = setSysWorkflowTimeControlFormat(timeControls, sheetSwitchPermit);
     let begindate = props.begindate;
     let enddate = props.enddate;
-    let startData = begindate ? timeControls.find((it, i) => it.controlId === begindate) || {} : [];
-    let endData = enddate ? timeControls.find(it => it.controlId === enddate) || {} : {};
+    let startData = begindate ? timeControlsList.find((it, i) => it.controlId === begindate) || {} : [];
+    let endData = enddate ? timeControlsList.find(it => it.controlId === enddate) || {} : {};
     return {
       begindate,
       startData,
-      startControls: timeControls.filter(
+      startControls: timeControlsList.filter(
         it =>
           it.controlId !== enddate &&
           it.controlId !== begindate &&
@@ -36,7 +41,7 @@ export default function SelectStartOrEnd(props) {
       ),
       enddate,
       endData,
-      endControls: timeControls.filter(
+      endControls: timeControlsList.filter(
         it =>
           it.controlId !== begindate &&
           it.controlId !== enddate &&
@@ -60,7 +65,7 @@ export default function SelectStartOrEnd(props) {
           <div className="startCom flexRow">
             <span className="tag"></span>
             <span className="txt">{_l('开始')}</span>
-            <div className="con Relative flex">
+            <div className="con Relative flex flexRow">
               <Select
                 className={cx('dropCon', { isDelete: props.beginIsDel || isIllegal(startData) })}
                 allowClear={false}
@@ -123,7 +128,7 @@ export default function SelectStartOrEnd(props) {
           <div className="startCom end mTop16 flexRow">
             <span className={cx('tag', { has: enddate })}></span>
             <span className="txt">{_l('结束')}</span>
-            <div className="con Relative flex">
+            <div className="con Relative flex flexRow">
               <Select
                 className={cx('dropCon', { isDelete: props.endIsDel || isIllegal(endData) })}
                 allowClear={allowClear}

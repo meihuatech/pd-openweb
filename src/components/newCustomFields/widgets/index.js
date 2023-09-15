@@ -31,6 +31,8 @@ import Time from './Time';
 import BarCode from './BarCode';
 import OrgRole from './OrgRole';
 import Search from './Search';
+import RelationSearch from './RelationSearch';
+import Section from './Section';
 
 export default {
   RADIO: Radio,
@@ -66,4 +68,6 @@ export default {
   BarCode: BarCode,
   OrgRole: OrgRole,
   Search: Search,
+  RelationSearch: RelationSearch,
+  Section: Section,
 };

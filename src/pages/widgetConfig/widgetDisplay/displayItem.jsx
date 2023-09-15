@@ -1,15 +1,15 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import { useDrop, useDrag } from 'react-dnd-latest';
 import update from 'immutability-helper';
 import styled from 'styled-components';
 import cx from 'classnames';
-import { includes, head, isEmpty, some, pick, get, last, flatten } from 'lodash';
-import { v4 as uuidv4 } from 'uuid';
+import { includes, head, some, pick, get, last, isEmpty, find, uniqBy } from 'lodash';
 import { DRAG_ITEMS, WHOLE_SIZE, DRAG_MODE, DRAG_DISTANCE } from '../config/Drag';
 import { resetWidgets, getDefaultSizeByData } from '../util';
 import { insertNewLine, insertToCol, insertToRowEnd, isFullLineDragItem } from '../util/drag';
 import { getPathById, isFullLineControl } from '../util/widgets';
-import { getVerifyInfo, isExceedMaxControlLimit } from '../util/setting';
+import { getVerifyInfo } from '../util/setting';
+import { batchCopyWidgets } from '../util/data';
 import Components from './components';
 import WidgetDisplay from './widgetDisplay';
 
@@ -18,26 +18,31 @@ const DisplayItemWrap = styled.div`
   position: relative;
   box-sizing: border-box;
   list-style: none;
-  padding: 12px;
+  padding: 8px 12px;
   min-height: 48px;
   cursor: grab;
   transition: all 0.25s ease-in-out;
   transform: translate3d(0, 0, 0);
+  border: 2px solid transparent;
+  margin-top: ${props => (props.row ? '4px' : '')};
+  margin-left: ${props => (props.col ? '4px' : '')};
   &.isInvalid {
     background-color: rgba(253, 154, 39, 0.12);
   }
   &.isActive,
   &:hover {
-    background-color: #f7f7f7;
+    border: 2px solid rgba(33, 150, 243, 0.15);
+    background-color: #fff;
+    border-radius: 5px;
     .operationWrap {
       visibility: visible;
     }
   }
   &.isActive {
-    background-color: rgba(33, 150, 243, 0.15);
+    border: 2px solid rgba(33, 150, 243, 1);
   }
   &.isDragging {
-    opacity: 0.3;
+    opacity: 0.4;
     background-color: #fff;
   }
   .verticalDragDir {
@@ -45,7 +50,8 @@ const DisplayItemWrap = styled.div`
     height: 4px;
     background: #2196f3;
   }
-  .drag-top {
+  .drag-top,
+  .drag-view_top {
     top: -2px;
   }
   .drag-bottom {
@@ -63,45 +69,6 @@ const DisplayItemWrap = styled.div`
   }
   .drag-right {
     right: -2px;
-  }
-
-  .contentWrap {
-    position: relative;
-    border-radius: 3px;
-    .nameAndStatus {
-      display: flex;
-      align-items: center;
-      line-height: 18px;
-      margin-bottom: 8px;
-      .required {
-        position: absolute;
-        top: 4px;
-        left: -8px;
-        color: #f44336;
-        transition: all 0.25s;
-      }
-      .iconWrap {
-      }
-      .typeIcon {
-        color: #9e9e9e;
-        font-size: 16px;
-      }
-      .controlName {
-        margin-left: 6px;
-      }
-      .isSplitLine {
-        font-size: 15px;
-        font-weight: bold;
-      }
-      &.minHeight18 {
-        min-height: 18px;
-      }
-    }
-    .desc {
-      color: #9e9e9e;
-      margin-top: 8px;
-      line-height: 13px;
-    }
   }
   .verifyInfo {
     margin-top: 8px;
@@ -125,6 +92,10 @@ export default function DisplayItem(props) {
     handleHide,
     queryConfigs = [],
     updateQueryConfigs,
+    displayItemType,
+    batchActive = [],
+    setBatchActive = () => {},
+    setStyleInfo = () => {},
   } = props;
   const { type, controlId, dataSource, sourceControlId } = data;
   const { worksheetId: globalSheetId } = globalSheetInfo;
@@ -159,69 +130,119 @@ export default function DisplayItem(props) {
   };
 
   const [dragCollectProps, drag] = useDrag({
-    item: { type: DRAG_ITEMS.DISPLAY_ITEM, id: controlId, path, data },
+    item: {
+      type: displayItemType === 'relate' ? DRAG_ITEMS.DISPLAY_ITEM_RELATE : DRAG_ITEMS.DISPLAY_ITEM,
+      id: controlId,
+      path,
+      data,
+      widgetType: data.type,
+    },
     end(item, monitor) {
       if (!monitor.didDrop()) return;
       const dropResult = monitor.getDropResult();
       if (!dropResult) return;
-      const { mode, rowIndex, path: dropPath, location } = dropResult;
+      const { mode, rowIndex, path: dropPath, location, sectionId } = dropResult;
+      const newData = { ...data, sectionId };
       // 插入新行
       if (mode === DRAG_MODE.INSERT_NEW_LINE) {
-        setWidgets(insertNewLine({ widgets, srcItem: data, srcPath: path, targetIndex: rowIndex }));
-        setActiveWidget({ ...data, size: getDefaultSizeByData(data) });
+        setWidgets(insertNewLine({ widgets, srcItem: newData, srcPath: path, targetIndex: rowIndex }));
+        setActiveWidget(newData);
       }
 
       // 拖到行的末尾
       if (mode === DRAG_MODE.INSERT_TO_ROW_END) {
-        setWidgets(insertToRowEnd({ widgets, srcItem: data, srcPath: path, targetIndex: rowIndex }));
-        setActiveWidget({ ...data, size: WHOLE_SIZE / (widgets[rowIndex].length + 1) });
+        setWidgets(insertToRowEnd({ widgets, srcItem: newData, srcPath: path, targetIndex: rowIndex }));
+        setActiveWidget({ ...newData, size: WHOLE_SIZE / (widgets[rowIndex].length + 1) });
       }
 
       // 行内拖拽
       if (mode === DRAG_MODE.INSERT_TO_COL) {
-        setWidgets(insertToCol({ widgets, dropPath, location, srcPath: path, srcItem: data }));
-        setActiveWidget({ ...data, size: WHOLE_SIZE / (widgets[dropPath[0]].length + 1) });
+        setWidgets(insertToCol({ widgets, dropPath, location, srcPath: path, srcItem: newData }));
+        setActiveWidget({ ...newData, size: WHOLE_SIZE / (widgets[dropPath[0]].length + 1) });
       }
     },
     collect(monitor) {
       return { isDragging: monitor.isDragging() };
     },
   });
-  const [{ isOver }, drop] = useDrop({
-    accept: [DRAG_ITEMS.DISPLAY_ITEM, DRAG_ITEMS.LIST_ITEM],
+  const [{ isOver, canDrop }, drop] = useDrop({
+    accept:
+      displayItemType === 'relate' ? [DRAG_ITEMS.DISPLAY_ITEM_RELATE] : [DRAG_ITEMS.DISPLAY_ITEM, DRAG_ITEMS.LIST_ITEM],
     hover(item, monitor) {
       if (item.id === controlId || !$ref.current) return;
       const { left, width, height, top, bottom } = $ref.current.getBoundingClientRect() || {};
       const { x: clientX, y: clientY } = monitor.getClientOffset();
       let nextLocation = '';
 
-      // 整行控件 或者同级无位置可放的 只能放在当前行的前后
-      if (!isCanDragSameRow(item) || isFullLineDragItem(item)) {
-        if (clientY - top < height / 2) nextLocation = 'top';
-        if (clientY - top > height / 2) nextLocation = 'bottom';
+      const $contentWrap = document.getElementById('widgetDisplayWrap');
+      const $scrollWrap = $contentWrap && $contentWrap.querySelector('.nano-content');
+
+      if ($scrollWrap) {
+        if (clientY - height <= 0) {
+          if ($scrollWrap.scrollTop <= height / 2) return;
+          $scrollWrap.scrollTo({
+            top: clientY - height <= -30 ? 0 : $scrollWrap.scrollTop - 5 * height,
+            behavior: 'smooth',
+          });
+        } else if (clientY >= $scrollWrap.clientHeight - DRAG_DISTANCE.VERTICAL) {
+          if ($scrollWrap.scrollHeight - $scrollWrap.scrollTop - $scrollWrap.clientHeight <= height / 2) return;
+          $scrollWrap.scrollTo({
+            top:
+              clientY - $scrollWrap.clientHeight > 30
+                ? $scrollWrap.scrollHeight - $scrollWrap.clientHeight
+                : $scrollWrap.scrollTop + 6 * height,
+            behavior: 'smooth',
+          });
+        }
+      }
+
+      if (canDrop) {
+        // 整行控件 或者同级无位置可放的 只能放在当前行的前后
+        if (!isCanDragSameRow(item) || isFullLineDragItem(item)) {
+          // 区分分段与分段内高亮线
+          if (type === 52) {
+            // 分段禁止多层嵌套
+            if (item.widgetType === 52) return;
+            if (clientY - top < DRAG_DISTANCE.MAX_VERTICAL) nextLocation = 'view_top';
+            if (location !== nextLocation) {
+              setLocation(nextLocation);
+            }
+            return;
+          }
+          if (clientY - top < height / 2) nextLocation = 'top';
+          if (clientY - top > height / 2) nextLocation = 'bottom';
+          if (location !== nextLocation) {
+            setLocation(nextLocation);
+          }
+          return;
+        }
+
+        // 判断拖拽的方向 垂直方向优先
+        if (clientX - left < width / 2) nextLocation = 'left';
+        if (clientX - left > width / 2) nextLocation = 'right';
+        if (clientY - top < DRAG_DISTANCE.VERTICAL) nextLocation = 'top';
+        if (clientY - bottom > DRAG_DISTANCE.VERTICAL) nextLocation = 'bottom';
         if (location !== nextLocation) {
           setLocation(nextLocation);
         }
-        return;
-      }
-      // 判断拖拽的方向 垂直方向优先
-      if (clientX - left < width / 2) nextLocation = 'left';
-      if (clientX - left > width / 2) nextLocation = 'right';
-      if (clientY - top < DRAG_DISTANCE.VERTICAL) nextLocation = 'top';
-      if (clientY - bottom > DRAG_DISTANCE.VERTICAL) nextLocation = 'bottom';
-      if (location !== nextLocation) {
-        setLocation(nextLocation);
       }
     },
     drop(item, monitor) {
       if (!location) return;
+      const sectionId = type === 52 && !_.includes(['view_top'], location) ? controlId : data.sectionId || '';
+
       if (includes(['left', 'right'], location)) {
-        return { mode: DRAG_MODE.INSERT_TO_COL, path, location };
+        return { mode: DRAG_MODE.INSERT_TO_COL, path, location, sectionId };
       }
-      return { mode: DRAG_MODE.INSERT_NEW_LINE, rowIndex: location === 'top' ? path[0] : path[0] + 1 };
+
+      return {
+        mode: DRAG_MODE.INSERT_NEW_LINE,
+        rowIndex: _.includes(['view_top', 'top'], location) ? path[0] : path[0] + 1,
+        sectionId,
+      };
     },
     collect(monitor) {
-      return { isOver: monitor.isOver() };
+      return { isOver: monitor.isOver({ shallow: true }), canDrop: monitor.isOver() && monitor.canDrop() };
     },
   });
 
@@ -229,7 +250,7 @@ export default function DisplayItem(props) {
 
   const width = `${(size * 100) / WHOLE_SIZE}%`;
 
-  const isActive = data.controlId === activeWidget.controlId;
+  const isActive = data.controlId === activeWidget.controlId || find(batchActive, i => i.controlId === data.controlId);
 
   const { isValid } = getVerifyInfo(data, { controls: allControls });
 
@@ -288,27 +309,18 @@ export default function DisplayItem(props) {
     };
 
     if (mode === 'copy') {
-      const newWidget = { ...data, attribute: 0, controlId: uuidv4(), alias: '' };
-      if (isExceedMaxControlLimit(allControls)) return;
-      setActiveWidget(newWidget);
-      setWidgets(update(widgets, { $splice: [[row + 1, 0, [newWidget]]] }));
-      const curentQuery = _.find(queryConfigs, item => item.controlId === data.controlId) || {};
-      updateQueryConfigs({ ...curentQuery, id: `${uuidv4()}_new`, controlId: newWidget.controlId });
+      batchCopyWidgets(props, [data]);
       return;
     }
     if (mode === 'setAsTitle') {
       // 将其他标题控件清空
       const newWidgets = resetWidgets(widgets, { attribute: 0 });
       setWidgets(update(newWidgets, { [row]: { [col]: { $apply: item => ({ ...item, attribute: 1 }) } } }));
-      setActiveWidget({ ...activeWidget, attribute: 1 });
+      setActiveWidget({ ...(_.isEmpty(activeWidget) ? data : activeWidget), attribute: 1 });
       return;
     }
 
     if (mode === 'delete') {
-      if (allControls.length < 2) {
-        alert(_l('最少需要保留一个控件'));
-        return;
-      }
       // 如果是关联本表 则要删除对应的控件
       if (type === 29 && dataSource === globalSheetId) {
         const nextWidgets = deleteWidgetById({ widgets, controlId, path });
@@ -336,28 +348,61 @@ export default function DisplayItem(props) {
     }
   };
 
+  const hasChild = type === 52 && !isEmpty(allControls.filter(i => i.sectionId === controlId));
+
   return (
     <DisplayItemWrap
       ref={$ref}
       id={`widget-${controlId}`}
       style={{ width }}
+      row={row}
+      col={col}
       className={cx({
         isActive,
         isDragging,
         isInvalid,
       })}
-      onClick={() => setActiveWidget(data)}
+      onClick={e => {
+        e.stopPropagation();
+
+        const { metaKey, ctrlKey } = e;
+        const isMacOs = navigator.userAgent.toLocaleLowerCase().includes('mac os');
+        if (isMacOs ? metaKey : ctrlKey) {
+          // 批量操作连选暂不支持选分段本身
+          if (data.type === 52) return;
+          let newBatchData = batchActive || [];
+          if (!isEmpty(activeWidget)) {
+            if (activeWidget !== 52) newBatchData.push(activeWidget);
+            setActiveWidget({});
+          }
+          newBatchData = find(newBatchData, b => b.controlId === controlId)
+            ? newBatchData.filter(b => b.controlId !== controlId)
+            : newBatchData.concat(data);
+          // 批量操作选中字段只剩一个，按单个字段选中处理
+          if (newBatchData.length === 1) {
+            setActiveWidget(head(newBatchData));
+            setBatchActive([]);
+          } else {
+            setBatchActive(newBatchData);
+          }
+          setStyleInfo({ activeStatus: false });
+          return;
+        }
+
+        setActiveWidget(data);
+      }}
     >
-      {!isDragging && (
+      {!isDragging && batchActive.length <= 1 && (
         <Components.WidgetOperation
           {...pick(props, ['fromType', 'data', 'globalSheetInfo'])}
           parentRef={$ref}
           isActive={isActive}
           handleOperate={handleOperate}
           onChange={onChange}
+          hasChild={hasChild}
         />
       )}
-      {['top', 'bottom'].includes(dirLocation) && (
+      {['top', 'bottom', 'view_top'].includes(dirLocation) && (
         <div className={`verticalDragDir drag-${dirLocation}`} style={getDirStyle()}></div>
       )}
       {['left', 'right'].includes(dirLocation) && <div className={`horizonDragDir drag-${dirLocation}`}></div>}

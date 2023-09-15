@@ -6,6 +6,7 @@ import './index.less';
 import { getRandomString, getClassNameByExt, getToken } from 'src/util';
 import { checkFileAvailable } from 'src/components/UploadFiles/utils.js';
 import previewAttachments from 'src/components/previewAttachments/previewAttachments';
+import { formatFileSize } from 'src/util';
 
 const formatResponseData = (file, response) => {
   const item = {};
@@ -49,11 +50,12 @@ export class UploadFileWrapper extends Component {
   }
   uploadFile() {
     const self = this;
-    const { advancedSetting } = self.props;
+    const { advancedSetting, projectId, appId, worksheetId } = self.props;
+
     const method = {
       FilesAdded(uploader, files) {
         if (parseFloat(files.reduce((total, file) => total + (file.size || 0), 0) / 1024 / 1024) > md.global.SysSettings.fileUploadLimitSize) {
-          Toast.info('附件总大小超过 ' + utils.formatFileSize(md.global.SysSettings.fileUploadLimitSize * 1024 * 1024) + '，请您分批次上传');
+          Toast.info('附件总大小超过 ' + formatFileSize(md.global.SysSettings.fileUploadLimitSize * 1024 * 1024) + '，请您分批次上传');
           uploader.stop();
           uploader.splice(uploader.files.length - files.length, uploader.files.length);
           return false;
@@ -92,7 +94,9 @@ export class UploadFileWrapper extends Component {
             tokenFiles.push({ bucket: isPic ? 4 : 3, ext: fileExt });
             self.props.onChange(newFiles);
           });
-        getToken(tokenFiles).then(res => {
+        getToken(tokenFiles, 0, {
+          projectId, appId, worksheetId
+        }).then(res => {
           files.forEach((item, i) => {
             item.token = res[i].uptoken;
             item.key = res[i].key;
@@ -100,7 +104,6 @@ export class UploadFileWrapper extends Component {
             item.fileName = res[i].fileName;
             item.url = res[i].url;
           });
-
           uploader.start();
         });
       },
@@ -156,7 +159,7 @@ export class UploadFileWrapper extends Component {
       },
       Error(uploader, error) {
         if (error.code === window.plupload.FILE_SIZE_ERROR) {
-          Toast.info(_l('单个文件大小超过%0，无法支持上传', utils.formatFileSize(md.global.SysSettings.fileUploadLimitSize * 1024 * 1024)));
+          Toast.info(_l('单个文件大小超过%0，无法支持上传', formatFileSize(md.global.SysSettings.fileUploadLimitSize * 1024 * 1024)));
         } else {
           Toast.info(_l('上传失败，请稍后再试。'));
         }
@@ -166,20 +169,30 @@ export class UploadFileWrapper extends Component {
         const { inputType, disabledGallery, advancedSetting = {} } = self.props;
         const { filetype } = advancedSetting;
         let type = filetype && JSON.parse(filetype).type;
-        const accept = { 1: 'image/*', 2: 'video/*', 0: 'image/*,video/*' };
-        const fileTypeObj = { 1: 'image/*', 2: 'image/*,video/*', 3: 'video/*', 4: 'video/*' };
+        const accept = {
+          1: 'image/*',
+          2: 'video/*',
+          3: 'image/*,video/*',
+          0: !isAndroid ? '' : 'image/*,video/*,audio/*,application/*',
+        };
+        const fileTypeObj = { 1: 'image/*', 2: !isAndroid ? '' : 'application/*', 3: 'audio/*', 4: 'video/*' };
         const ua = window.navigator.userAgent.toLowerCase();
         const isAndroid = ua.includes('android');
         const isMiniprogram = ua.includes('miniprogram');
         const isFeishu = ua.includes('feishu');
-        const equipment = type === 3 ? 'microphone' : type === 4 ? 'camcorder' : 'camera';
+        const equipment = type === 3 ? 'microphone' : type === 4 || inputType === 2 ? 'camcorder' : 'camera';
         if (ele) {
-          if (isAndroid && isMiniprogram) {
-            ele.removeAttribute('multiple');
+          if (isAndroid) {
+            if (isMiniprogram) {
+              ele.removeAttribute('multiple');
+            }
+            if (isFeishu) return;
             if (disabledGallery) {
               ele.setAttribute('accept', accept[inputType]);
               ele.setAttribute('capture', 'camera');
-            } else if (type || inputType) {
+            } else if (type) {
+              ele.setAttribute('accept', fileTypeObj[type]);
+            } else if (inputType) {
               ele.setAttribute('accept', accept[inputType]);
               ele.setAttribute('capture', equipment);
             } else {
@@ -192,7 +205,7 @@ export class UploadFileWrapper extends Component {
             ele.setAttribute('capture', 'camera');
           } else if (type) {
             ele.setAttribute('accept', fileTypeObj[type]);
-          } else if (!(isFeishu && isAndroid)) {
+          } else {
             ele.setAttribute('accept', accept[inputType]);
           }
         }
@@ -203,6 +216,10 @@ export class UploadFileWrapper extends Component {
       file_data_name: 'file',
       multi_selection: true,
       method,
+      resize: _.get(advancedSetting, 'webcompress') !== '0' ? {
+        quality: 60,
+        preserve_headers: false
+      } : {},
       autoUpload: false,
     });
   }

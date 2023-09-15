@@ -4,13 +4,11 @@ import { bindActionCreators } from 'redux';
 import { LoadDiv, Checkbox, Icon } from 'ming-ui';
 import * as entitiesActions from '../../actions/entities';
 import * as currentActions from '../../actions/current';
-import dialogInviteUser from '../../modules/dialogInviteUser';
 import DialogBatchEdit from '../../modules/dialogBatchEdit';
 import UserTable from '../userList/userTable';
 import RoleController from 'src/api/role';
-import { encrypt } from 'src/util';
 import cx from 'classnames';
-import { Pagination, Drawer } from 'antd';
+import PaginationWrap from 'src/pages/Admin/components/PaginationWrap';
 import addFriends from 'src/components/addFriends/addFriends';
 import AddUser from '../AddUser';
 
@@ -26,6 +24,9 @@ class StructureContent extends Component {
   componentDidMount() {
     this.loadData(1);
     md.global.Config.IsLocal && this.getPermission();
+  }
+  componentWillUnmount() {
+    localStorage.removeItem('columnsInfoData');
   }
   getPermission = () => {
     const { projectId } = this.props;
@@ -89,16 +90,6 @@ class StructureContent extends Component {
     this.setState({ batchEditVisible: true });
   };
 
-  itemRender(current, type, originalElement) {
-    if (type === 'prev') {
-      return <a className="page">{_l('上一页')}</a>;
-    }
-    if (type === 'next') {
-      return <a className="page">{_l('下一页')}</a>;
-    }
-    return originalElement;
-  }
-
   // 分页
   changPage = page => {
     this.loadData(page);
@@ -125,7 +116,7 @@ class StructureContent extends Component {
     return (
       <Fragment>
         {!isSearch ? (
-          <div className="Font15 departmentTitle">
+          <div className="Font17 departmentTitle">
             <span className="departmentNameValue" title={!!departmentId && departmentName}>
               {!!departmentId && departmentName}
             </span>
@@ -148,7 +139,7 @@ class StructureContent extends Component {
                   }
                 }}
               >
-                {_l('仅看无部门人员')}
+                <span className="Font12">{_l('仅看无部门人员')}</span>
               </Checkbox>
             )}
           </div>
@@ -182,17 +173,7 @@ class StructureContent extends Component {
           ) : (
             <UserTable projectId={projectId} />
           )}
-          {allCount > pageSize && (
-            <div className="pagination">
-              <Pagination
-                total={allCount}
-                itemRender={this.itemRender}
-                onChange={this.changPage}
-                current={pageIndex}
-                pageSize={pageSize || 50}
-              />
-            </div>
-          )}
+          <PaginationWrap total={allCount} pageIndex={pageIndex} pageSize={pageSize || 50} onChange={this.changPage} />
         </div>
 
         {batchEditVisible && (
@@ -219,6 +200,11 @@ class StructureContent extends Component {
               this.setState({ openChangeUserInfoDrawer: false });
             }}
             getData={this.props.fetchApproval}
+            cancelInviteRemove={() => this.props.loadInactiveUsers(projectId, pageIndex)}
+            departmentId={departmentId}
+            refreshData={this.loadData}
+            fetchInActive={() => this.props.fetchInActive(projectId)}
+            fetchApproval={() => this.props.fetchApproval(projectId)}
           />
         )}
       </Fragment>
@@ -272,6 +258,8 @@ export default connect(
           'updateShowExport',
           'emptyUserSet',
           'removeUserFromSet',
+          'fetchInActive',
+          'fetchApproval',
         ]),
       },
       dispatch,

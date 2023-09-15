@@ -17,8 +17,10 @@ export function error(state = false, action) {
   switch (action.type) {
     case 'WORKSHEET_INIT_FAIL':
       return true;
-    default:
+    case 'WORKSHEET_FETCH_START':
       return false;
+    default:
+      return state;
   }
 }
 
@@ -29,6 +31,8 @@ export function worksheetInfo(state = {}, action) {
       return action.value;
     case 'WORKSHEET_UPDATE_WORKSHEETINFO':
       return { ...state, ...action.info };
+    case 'WORKSHEET_UPDATE_IS_REQUESTING_RELATION_CONTROLS':
+      return { ...state, isRequestingRelationControls: action.value };
     case 'WORKSHEET_UPDATE_SOME_CONTROLS':
       try {
         newState = {

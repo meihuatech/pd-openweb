@@ -2,6 +2,9 @@ import React, { useState, useRef } from 'react';
 import { string } from 'prop-types';
 import styled from 'styled-components';
 import appManagementAjax from 'src/api/appManagement';
+import { updateSheetListAppItem } from 'worksheet/redux/actions/sheetList';
+import { getAppSectionRef } from 'src/pages/PageHeader/AppPkgHeader/LeftAppGroup';
+import store from 'redux/configureStore';
 import { Button, Dialog } from 'ming-ui';
 import cx from 'classnames';
 import { FlexCenter } from './util';
@@ -89,31 +92,40 @@ const ConfigHeader = styled(FlexCenter)`
     cursor: pointer;
   }
 `;
-export default ({
-  appId,
-  groupId,
-  pageId,
-  pageName,
-  displayType,
-  updateSheetList,
-  saveLoading = false,
-  cancelModified = _.noop,
-  modified,
-  updatePageInfo = _.noop,
-  onBack = _.noop,
-  onSave = _.noop,
-  switchType = _.noop,
-}) => {
+export default (props) => {
+  const {
+    appId,
+    groupId,
+    pageId,
+    pageName,
+    displayType,
+    saveLoading = false,
+    cancelModified = _.noop,
+    modified,
+    updatePageInfo = _.noop,
+    onBack = _.noop,
+    onSave = _.noop,
+    switchType = _.noop,
+  } = props;
   const [isEdit, setEdit] = useState(false);
   const [name, setName] = useState(pageName);
   const { current: originName } = useRef(pageName);
   const save = () => {
     onSave();
-    if (originName !== name) {
-      appManagementAjax.editWorkSheetInfoForApp({ appId, appSectionId: groupId, workSheetId: pageId, workSheetName: name }).then(res => {
+    const newName = name.trim();
+    if (originName !== newName) {
+      appManagementAjax.editWorkSheetInfoForApp({ appId, appSectionId: groupId, workSheetId: pageId, workSheetName: newName }).then(res => {
         if (res) {
-          updatePageInfo({ pageName: name });
-          updateSheetList(pageId, { workSheetName: name });
+          updatePageInfo({ pageName: newName });
+          const { currentPcNaviStyle } = store.getState().appPkg;
+          if (currentPcNaviStyle === 1) {
+            const singleRef = getAppSectionRef(groupId);
+            singleRef.dispatch(updateSheetListAppItem(pageId, {
+              workSheetName: newName,
+            }));
+          } else {
+            props.updateSheetListAppItem(pageId, { workSheetName: newName });
+          }
         }
       });
     }
@@ -147,8 +159,9 @@ export default ({
             autoFocus
             value={name}
             onChange={e => {
-              const newName = e.target.value.trim();
+              const newName = e.target.value;
               setName(newName);
+              updatePageInfo({ modified: true });
             }}
             onBlur={() => {
               if (!name) {

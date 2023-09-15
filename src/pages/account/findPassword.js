@@ -48,7 +48,7 @@ class FindPassword extends React.Component {
     const { emailOrTel, password, verifyCode, dialCode } = loginData;
     let $this = this;
     RegisterController.updatePassword({
-      account: dialCode + emailOrTel,
+      account: encrypt(dialCode + emailOrTel),
       password: encrypt(password),
       verifyCode: verifyCode,
     }).then(data => {
@@ -67,6 +67,20 @@ class FindPassword extends React.Component {
             }
           });
         } else {
+          if (data.accountResult === actionResult.userInfoNotFound) {
+            this.setState({
+              loginData: {
+                ...this.state.loginData,
+                warnningData: [
+                  {
+                    tipDom: '#txtMobilePhone',
+                    warnningText: _l('账号未注册'),
+                  },
+                ],
+              },
+            });
+            return;
+          }
           if (data.actionResult == actionResult.failInvalidVerifyCode) {
             // this.setWarnningText(_l('验证码错误'), '.warnningDiv', true)
             this.setState({
@@ -105,7 +119,8 @@ class FindPassword extends React.Component {
   };
 
   renderCon = () => {
-    const { loginDisabled, warnningText, tipDom, isError } = this.state;
+    const { loginDisabled } = this.state;
+    const isMingdaoApp = navigator.userAgent.toLowerCase().indexOf('mingdao application') >= 0;
     return (
       <React.Fragment>
         <div className="titleHeader">
@@ -164,33 +179,42 @@ class FindPassword extends React.Component {
             );
           }}
         />
-        <span className="line" style={{ marginTop: '125px' }}></span>
-        <span
-          className="btnUseOldAccount Hand"
-          onClick={() => {
-            let request = getRequest();
-            let returnUrl = request.ReturnUrl;
+        {!isMingdaoApp ? (
+          <React.Fragment>
+            <span className="line" style={{ marginTop: '125px' }}></span>
+            <span
+              className="btnUseOldAccount Hand"
+              onClick={() => {
+                let request = getRequest();
+                let returnUrl = request.ReturnUrl;
 
-            if (returnUrl) {
-              location.href = '/login?ReturnUrl=' + encodeURIComponent(returnUrl);
-            } else {
-              location.href = '/login';
-            }
-          }}
-        >
-          {_l('返回登录页面')}
-        </span>
+                if (returnUrl) {
+                  location.href = '/login?ReturnUrl=' + encodeURIComponent(returnUrl);
+                } else {
+                  location.href = '/login';
+                }
+              }}
+            >
+              {_l('返回登录页面')}
+            </span>
+          </React.Fragment>
+        ) : (
+          <div style={{ marginTop: '125px' }}></div>
+        )}
       </React.Fragment>
     );
   };
 
   render() {
+    const { SysSettings } = md.global;
     return (
       <div className="loginBox">
         <div className="loginContainer">
-          <div className="titleHeader">
-            <img src={md.global.SysSettings.brandLogoUrl} height={40} />
-          </div>
+          {!SysSettings.hideBrandLogo && (
+            <div className="titleHeader">
+              <img src={SysSettings.brandLogoUrl} height={SysSettings.brandLogoHeight || 40} />
+            </div>
+          )}
           {this.renderCon()}
         </div>
         <ChangeLang />

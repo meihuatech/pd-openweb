@@ -1,7 +1,7 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import classNames from 'classnames';
-import 'src/components/dialogSelectUser/dialogSelectUser';
+import dialogSelectUser from 'src/components/dialogSelectUser/dialogSelectUser';
 import { Dialog } from 'ming-ui';
 // import RoleAuthCommon from '../common/common';
 import RoleController from 'src/api/role';
@@ -37,7 +37,7 @@ class RoleItem extends React.Component {
       if (type === 'addmember') {
         return e => {
           e.stopPropagation();
-          $({}).dialogSelectUser({
+          dialogSelectUser({
             sourceId: 0,
             fromType: 0,
             fromAdmin: true,

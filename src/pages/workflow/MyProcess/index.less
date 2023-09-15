@@ -5,7 +5,7 @@
   top: 0;
   width: 100%;
   height: 100%;
-  z-index: 999;
+  z-index: 98;
   background-color: #F5F5F5;
   display: flex;
   flex-direction: column;
@@ -69,6 +69,9 @@
       cursor: pointer;
       position: relative;
       line-height: 50px;
+      display: flex;
+      align-items: center;
+      font-weight: normal;
       &:before {
         content: '';
         width: 100%;
@@ -91,15 +94,22 @@
         }
       }
     }
-    .count {
+    .processCount {
       color: #757575;
       margin-left: 8px;
     }
     .red {
       color: #F44336;
-      padding: 1px 8px;
       border-radius: 20px;
+      min-width: 20px;
+      height: 20px;
       background-color: #fce4e3;
+      width: auto;
+      padding: 0 6px;
+      display: flex;
+      line-height: normal;
+      align-items: center;
+      justify-content: center;
     }
   }
   .cuttingLine {
@@ -150,19 +160,31 @@
       }
     }
     .passApprove, .rejectApprove {
+      color: #999;
+      padding: 3px 15px;
       border-radius: 24px;
-      &:hover, &.active {
-        background-color: #ebebeb;
-      }
+      border: 1px solid #DDDDDD;
+      background-color: #fff;
     }
     .passApprove {
-      color: #4caf50;
-      padding: 5px 13px;
-      margin-right: 2px;
+      margin-right: 5px;
+      &.all {
+        color: #fff;
+        border-color: #4CAF50;
+        background-color: #4CAF50;
+      }
     }
     .rejectApprove {
-      padding: 5px 13px;
-      color: #f44336;
+      &.select {
+        color: #F44336;
+        border-color: #F44336;
+        background-color: rgba(244, 67, 54, 0.12);
+      }
+      &.all {
+        color: #fff;
+        border-color: #F44336;
+        background-color: #F44336;
+      }
     }
     .ant-checkbox-input {
       position: absolute !important;

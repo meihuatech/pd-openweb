@@ -1,16 +1,35 @@
 import React from 'react';
 import { CAN_NOT_AS_TEXT_GROUP } from '../config';
+import { DRAG_MODE, WHOLE_SIZE } from '../config/Drag';
 import { navigateTo } from 'src/router/navigateTo';
 import sheetAjax from 'src/api/worksheet';
 import cx from 'classnames';
-import { formatValuesOfCondition } from 'worksheet/common/WorkSheetFilter/util';
 import renderCellText from 'src/pages/worksheet/components/CellControls/renderText';
 import update from 'immutability-helper';
-import _, { includes, get, isEmpty, omit, findIndex, filter, find } from 'lodash';
-import { getAdvanceSetting, handleAdvancedSettingChange } from './setting';
-import { getControlByControlId } from '.';
+import _, {
+  includes,
+  get,
+  isEmpty,
+  omit,
+  findIndex,
+  filter,
+  find,
+  head,
+  last,
+  flatten,
+  isUndefined,
+  cloneDeep,
+} from 'lodash';
+import { getAdvanceSetting, handleAdvancedSettingChange, isExceedMaxControlLimit } from './setting';
+import { insertControlInSameLine } from './drag';
+import { getControlByControlId, adjustControlSize, putControlByOrder } from '.';
+import { getPathById, isHaveGap } from './widgets';
+import { getFeatureStatus, buriedUpgradeVersionDialog } from 'src/util';
 import { ControlTag } from '../styled';
 import { Tooltip } from 'ming-ui';
+import { v4 as uuidv4 } from 'uuid';
+import { ALL_SYS } from '../config/widget';
+import { isRelateRecordTableControl } from 'worksheet/util';
 
 // 获取动态默认值
 export const getDynamicDefaultValue = data => {
@@ -48,7 +67,7 @@ export const getMsgByCode = ({ code, data }) => {
     default:
       break;
   }
-  alert(errorText);
+  alert(errorText, 2);
   return errorText;
 };
 
@@ -123,7 +142,7 @@ export function dealUserId(data, dataType) {
           const { staticValue } = item;
           if (staticValue && typeof staticValue === 'string') {
             const accountId = safeParse(staticValue || '{}')[dataType];
-            return { ...item, staticValue: accountId };
+            return { ...item, staticValue: accountId || staticValue };
           }
           if (staticValue[dataType]) return { ...item, staticValue: staticValue[dataType] };
           return item;
@@ -144,7 +163,11 @@ export function dealUserId(data, dataType) {
 /**
  * 处理 成员 部门 地区 他表字段 级联 组织角色 这几个类型的字段 values 处理成 [id, id]
  */
-export function handleCondition(condition) {
+export function handleCondition(condition, isRelate) {
+  // 关联记录(动态值只能选择当前记录字段)特殊处理 rcid置空
+  if (isRelate && !isEmpty(condition.dynamicSource)) {
+    condition.dynamicSource.forEach(item => (item.rcid = ''));
+  }
   if (_.includes([19, 23, 24, 26, 27, 29, 35, 48], condition.dataType) && condition.values) {
     return {
       ...condition,
@@ -168,22 +191,23 @@ export function handleCondition(condition) {
 /**
  * 处理关联表叠加筛选条件里的 成员 部门 地区 他表字段 级联 这几个类型的字段 values 处理成 [id, id]
  */
-export function handleFilters(data) {
-  const filters = getAdvanceSetting(data, 'filters');
+export function handleFilters(data, isRelate = false, filterKey) {
+  const keyName = filterKey ? filterKey : 'filters';
+  const filters = getAdvanceSetting(data, [keyName]);
   try {
     let filtersValue = [];
     if (filters.some(item => item.groupFilters)) {
       filtersValue = filters.map(f => {
         return {
           ...f,
-          groupFilters: (f.groupFilters || []).map(handleCondition),
+          groupFilters: (f.groupFilters || []).map(i => handleCondition(i, isRelate)),
         };
       });
     } else {
-      filtersValue = filters.map(handleCondition);
+      filtersValue = filters.map(i => handleCondition(i, isRelate));
     }
 
-    return handleAdvancedSettingChange(data, { filters: JSON.stringify(filtersValue) });
+    return handleAdvancedSettingChange(data, { [keyName]: JSON.stringify(filtersValue) });
   } catch (err) {
     return data;
   }
@@ -346,7 +370,7 @@ export function navigateToApp(worksheetId) {
     const viewId =
       (
         _.find(
-          storage.worksheets || [],
+          _.get(storage, 'worksheets') || [],
           item => item.groupId === data.groupId && item.worksheetId === data.worksheetId,
         ) || {}
       ).viewId || '';
@@ -391,10 +415,14 @@ export const formatControlsData = (controls = [], fromSub = false) => {
       return dealUserId(data, 'organizeId');
     }
 
-    if (type === 29) {
+    if (type === 29 || type === 51) {
       // 处理关联表叠加筛选条件里的 成员 部门 地区 他表字段 这几个类型的字段 values 处理成 [id, id]
+      // 子表里关联筛选，不清配置rcid
       if (!isEmpty(getAdvanceSetting(data, 'filters'))) {
-        data = handleFilters(data);
+        data = handleFilters(data, fromSub ? false : true);
+      }
+      if (!isEmpty(getAdvanceSetting(data, 'resultfilters'))) {
+        data = handleFilters(data, true, 'resultfilters');
       }
       // 关联表sid处理
       return fromSub
@@ -454,6 +482,14 @@ export const formatControlsData = (controls = [], fromSub = false) => {
       return handleAdvancedSettingChange(data, { increase: JSON.stringify(nextIncrease) });
     }
 
+    /**
+     * 分组icon只保存fileName,接口补全对象返回
+     * */
+    if (type === 52) {
+      const { icon = '' } = getAdvanceSetting(data, 'icon') || {};
+      return handleAdvancedSettingChange(data, { icon });
+    }
+
     return data;
   });
 };
@@ -494,4 +530,263 @@ export const dealRequestControls = (controls, needChild) => {
   }
 
   return needChild ? newControls : filterControls;
+};
+
+// 如果新增控件在可视区外则滚动至可视区内
+export const scrollToVisibleRange = (data, widgetProps) => {
+  const { activeWidget } = widgetProps;
+  const $contentWrap = document.getElementById('widgetDisplayWrap');
+  const $activeWidget = document.getElementById(`widget-${(activeWidget || {}).controlId}`);
+  if (!$contentWrap || !$activeWidget) return;
+  const rect = $activeWidget.getBoundingClientRect();
+  // 如果在可视区外
+  if (rect.top < 0 || rect.top > $contentWrap.offsetHeight) {
+    const $scrollWrap = $contentWrap.querySelector('.nano-content');
+    if ($scrollWrap) {
+      setTimeout(() => {
+        const $widget = document.getElementById(`widget-${data.controlId}`);
+        if (!$widget) return;
+        const { top, height } = $widget.getBoundingClientRect();
+        $scrollWrap.scrollTop = $scrollWrap.scrollTop + top - height;
+      }, 0);
+    }
+  }
+};
+
+// 批量添加
+export const handleAddWidgets = (data, para = {}, widgetProps, callback) => {
+  const { widgets, activeWidget, allControls, setWidgets, setActiveWidget, globalSheetInfo = {} } = widgetProps;
+  const { mode, path, location, rowIndex } = para;
+  const tempData = head(data);
+  const featureType = getFeatureStatus(globalSheetInfo.projectId, tempData.featureId);
+  if (_.includes([49, 50], tempData.type) && featureType === '2') {
+    buriedUpgradeVersionDialog(globalSheetInfo.projectId, tempData.featureId);
+    return;
+  }
+
+  if (isExceedMaxControlLimit(allControls, data.length)) {
+    alert(_l('当前表存在的控件已达到最大值，无法添加继续添加新控件!'), 3);
+    return;
+  }
+
+  // 如果当前控件列表为空 直接添加
+  if (isEmpty(widgets)) {
+    setWidgets(update(widgets, { $push: [data] }));
+    setActiveWidget(data[0]);
+    return;
+  }
+
+  // 拖拽添加的情况
+  if (mode) {
+    // 拖到单独的行
+    if (mode === DRAG_MODE.INSERT_NEW_LINE) {
+      setWidgets(update(widgets, { $splice: [[rowIndex, 0, data]] }));
+      setActiveWidget(data[0]);
+      return;
+    }
+    // 拖到行的末尾
+    if (mode === DRAG_MODE.INSERT_TO_ROW_END) {
+      setWidgets(
+        update(widgets, {
+          [rowIndex]: {
+            $apply: item => {
+              const nextRow = item.concat(data);
+              return nextRow.map(value => ({ ...value, size: WHOLE_SIZE / nextRow.length }));
+            },
+          },
+        }),
+      );
+      setActiveWidget(adjustControlSize(widgets[rowIndex], data[0]));
+      return;
+    }
+
+    if (mode === DRAG_MODE.INSERT_TO_COL) {
+      setWidgets(insertControlInSameLine({ widgets, location, dropPath: path, srcItem: data[0] }));
+      setActiveWidget(adjustControlSize(widgets[path[0]], data[0]));
+      return;
+    }
+  }
+
+  let newWidgets = widgets;
+
+  data.map((item, index) => {
+    let currentRowIndex = 0;
+
+    // 没有激活控件或者激活的控件不存在 则直接添加在最后一行
+    if (isEmpty(activeWidget) || allControls.findIndex(item => item.controlId === activeWidget.controlId) < 0) {
+      currentRowIndex = newWidgets.length - 1;
+    } else {
+      currentRowIndex = head(
+        getPathById(newWidgets, index ? _.get(data[index - 1], 'controlId') : activeWidget.controlId),
+      );
+
+      // 如果当前控件是分段控件，则添加在当前控件内
+      if (activeWidget.type === 52) {
+        const childrenList = getChildWidgetsBySection(allControls, activeWidget.controlId);
+        currentRowIndex = currentRowIndex + childrenList.length;
+      }
+    }
+
+    // 如果当前激活控件所在行没有空位则另起下一行，否则放到当前行后面
+    if (isHaveGap(newWidgets[currentRowIndex], item)) {
+      newWidgets = update(newWidgets, { [currentRowIndex]: { $push: [item] } });
+    } else {
+      newWidgets = update(newWidgets, {
+        $splice: [[currentRowIndex + 1, 0, [item]]],
+      });
+    }
+
+    if (index === data.length - 1) {
+      setWidgets(newWidgets);
+      setActiveWidget(item);
+      setTimeout(() => {
+        scrollToVisibleRange(item, { ...widgetProps, activeWidget: item });
+      }, 50);
+    }
+  });
+
+  if (_.isFunction(callback)) {
+    callback();
+  }
+};
+
+// 批量移动
+export const handleMoveWidgets = (data, widgetProps) => {
+  const { widgets, activeWidget, allControls, setWidgets, setActiveWidget } = widgetProps;
+
+  if (isExceedMaxControlLimit(allControls, data.length)) {
+    alert(_l('当前表存在的控件已达到最大值，无法添加继续添加新控件!'), 3);
+    return;
+  }
+
+  let newWidgets = widgets;
+
+  let currentRowIndex = head(getPathById(newWidgets, activeWidget.controlId));
+  const childrenList = getChildWidgetsBySection(allControls, activeWidget.controlId);
+  currentRowIndex = currentRowIndex + childrenList.length;
+
+  data.map((item, index) => {
+    // 如果当前激活控件所在行没有空位则另起下一行，否则放到当前行后面
+    if (isHaveGap(newWidgets[currentRowIndex], item)) {
+      newWidgets = update(newWidgets, { [currentRowIndex]: { $push: [item] } });
+    } else {
+      currentRowIndex = currentRowIndex + 1;
+      newWidgets = update(newWidgets, { $splice: [[currentRowIndex, 0, [item]]] });
+    }
+
+    if (index === data.length - 1) {
+      setWidgets(newWidgets);
+      setActiveWidget(item);
+      setTimeout(() => {
+        scrollToVisibleRange(item, { ...widgetProps, activeWidget: item });
+      }, 50);
+    }
+  });
+};
+
+export const dealCopyWidgetId = (data = {}) => {
+  const newData = {
+    ...data,
+    attribute: 0,
+    controlId: uuidv4(),
+    alias: '',
+    controlName: _l('%0-复制', data.controlName),
+  };
+
+  let ids = {};
+  if (data.type === 34 && _.get(window.subListSheetConfig[data.controlId], 'mode') === 'new') {
+    const relationControls = (newData.relationControls || []).map(item => {
+      if (_.includes(ALL_SYS, item.controlId)) return item;
+      const newItem = { ...item, controlId: uuidv4() };
+      ids[item.controlId] = newItem.controlId;
+      return newItem;
+    });
+
+    let newWidget = JSON.stringify({ ...newData, dataSource: uuidv4(), relationControls });
+    Object.keys(ids).forEach(id => {
+      newWidget = newWidget.replaceAll(id, ids[id]);
+    });
+    newWidget = safeParse(newWidget);
+    window.subListSheetConfig[newData.controlId] = {
+      ...window.subListSheetConfig[data.controlId],
+      sheetInfo: newWidget,
+    };
+    return newWidget;
+  }
+  return newData;
+};
+
+// 获取当前分段控件子布局控件
+export const getChildWidgetsBySection = (controls = [], id) => {
+  const childControls = controls.filter(i => i.sectionId === id);
+  return putControlByOrder(childControls);
+};
+
+// 批量复制控件数据处理
+export const batchCopyWidgets = (props, selectWidgets = []) => {
+  const { widgets, allControls, queryConfigs, setActiveWidget, setWidgets, updateQueryConfigs } = props;
+
+  const copyWidgets = [];
+  let childCount = 0;
+  let newWidgets = widgets;
+  let sectionIds = {};
+  let newQueries = [];
+  let newActiveWidget = {};
+
+  selectWidgets.map(item => {
+    copyWidgets.push(item);
+    if (item.type === 52) {
+      copyWidgets.push(...allControls.filter(i => i.sectionId === item.controlId));
+    }
+  });
+
+  const orderCopyWidgets = putControlByOrder(copyWidgets);
+
+  orderCopyWidgets.forEach(row => {
+    const currentRow = head(getPathById(newWidgets, get(last(row), 'controlId')));
+    const dealRow = row.map(data => {
+      let dealItem = dealCopyWidgetId(data);
+      // 替换分段内字段sectionId
+      if (sectionIds[dealItem.sectionId]) {
+        dealItem.sectionId = sectionIds[dealItem.sectionId];
+      } else {
+        // 没有sectionId,清空childCount,防止插入位置不对
+        childCount = 0;
+      }
+      // 工作表查询配置复制
+      const currentQuery = find(queryConfigs, queryItem => queryItem.controlId === data.controlId);
+      currentQuery && newQueries.push({ ...currentQuery, id: `${uuidv4()}_new`, controlId: dealItem.controlId });
+
+      if (data.type === 52) {
+        // 缓存sectionId
+        sectionIds[data.controlId] = dealItem.controlId;
+        const childControls = getChildWidgetsBySection(allControls, data.controlId);
+        childCount = childControls.length;
+      }
+
+      return dealItem;
+    });
+    newActiveWidget = last(dealRow);
+    newWidgets = update(newWidgets, {
+      $splice: [[currentRow + childCount + 1, 0, dealRow]],
+    });
+  });
+
+  if (isExceedMaxControlLimit(flatten(newWidgets))) return;
+
+  setActiveWidget(newActiveWidget);
+  setWidgets(newWidgets);
+  updateQueryConfigs(queryConfigs.concat(newQueries), 'cover');
+  return;
+};
+
+// 批量设置属性
+export const batchResetWidgets = (props, selectWidgets = [], fieldPermission) => {
+  let { widgets, setWidgets } = props;
+  selectWidgets.forEach(item => {
+    const [row, col] = getPathById(widgets, item.controlId);
+    widgets = update(widgets, { [row]: { [col]: { $set: item } } });
+  });
+
+  setWidgets(widgets);
 };

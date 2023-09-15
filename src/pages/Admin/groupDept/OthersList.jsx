@@ -1,6 +1,6 @@
 import React, { Component, Fragment } from 'react';
 import { Input, Table, Spin, ConfigProvider } from 'antd';
-import { LoadDiv } from 'ming-ui'
+import { LoadDiv } from 'ming-ui';
 import cx from 'classnames';
 import './index.less';
 import transferController from 'src/api/transfer';
@@ -8,13 +8,14 @@ import Config from '../config';
 import DetailDialog from './DetailDialog';
 import DialogLayer from 'src/components/mdDialog/dialog';
 import ReactDom from 'react-dom';
-import Empty from '../common/TableEmpty'
+import Empty from '../common/TableEmpty';
+import PaginationWrap from '../components/PaginationWrap';
 
 const { Search } = Input;
 
 export default class OthersList extends Component {
-  constructor() {
-    super();
+  constructor(props) {
+    super(props);
     this.state = {
       count: 0,
       list: [],
@@ -53,7 +54,8 @@ export default class OthersList extends Component {
           return (
             <div
               className={cx(text ? 'adminHoverGreenColor' : 'color_b')}
-              onClick={this.handleView.bind(this, text, 3, record.accountId)}>
+              onClick={this.handleView.bind(this, text, 3, record.accountId)}
+            >
               {text}
             </div>
           );
@@ -66,7 +68,8 @@ export default class OthersList extends Component {
           return (
             <div
               className={cx(text ? 'adminHoverGreenColor' : 'color_b')}
-              onClick={this.handleView.bind(this, text, 2, record.accountId)}>
+              onClick={this.handleView.bind(this, text, 2, record.accountId)}
+            >
               {text}
             </div>
           );
@@ -79,7 +82,8 @@ export default class OthersList extends Component {
           return (
             <div
               className={cx(text ? 'adminHoverGreenColor' : 'color_b')}
-              onClick={this.handleView.bind(this, text, 1, record.accountId)}>
+              onClick={this.handleView.bind(this, text, 1, record.accountId)}
+            >
               {text}
             </div>
           );
@@ -92,7 +96,8 @@ export default class OthersList extends Component {
           return (
             <div
               className={cx(text ? 'adminHoverGreenColor' : 'color_b')}
-              onClick={this.handleView.bind(this, text, 4, record.accountId)}>
+              onClick={this.handleView.bind(this, text, 4, record.accountId)}
+            >
               {text}
             </div>
           );
@@ -103,7 +108,7 @@ export default class OthersList extends Component {
         dataIndex: 'option',
         render: (text, record) => {
           return (
-            <div className="adminHoverDeleteColor" onClick={this.handleDelete.bind(this, record.accountId)}>
+            <div className="adminHoverDeleteColor" onClick={() => this.handleDelete(record.accountId)}>
               {_l('移除')}
             </div>
           );
@@ -116,27 +121,9 @@ export default class OthersList extends Component {
     this.getGroupsList();
   }
 
-  setPager() {
-    const _this = this;
-    $('#divPager')
-      .show()
-      .Pager({
-        pageIndex: _this.state.pageIndex,
-        pageSize: _this.state.pageSize,
-        count: _this.state.count,
-        changePage: function(pIndex) {
-          _this.setState(
-            {
-              pageIndex: pIndex,
-              selectKeys: [],
-            },
-            () => {
-              _this.getGroupsList();
-            },
-          );
-        },
-      });
-  }
+  changePage = page => {
+    this.setState({ pageIndex: page, selectKeys: [] }, () => this.getGroupsList());
+  };
 
   getGroupsList() {
     this.setState({ loading: true });
@@ -148,29 +135,22 @@ export default class OthersList extends Component {
         keyWords: this.state.keywords,
       })
       .then(res => {
-        this.setState(
-          {
-            list: res.list,
-            count: res.allCount,
-            loading: false,
-          },
-          () => {
-            if (this.state.count > this.state.pageSize) {
-              this.setPager();
-            } else {
-              $('#divPager').hide();
-            }
-          },
-        );
+        this.setState({
+          list: res.list,
+          count: res.allCount,
+          loading: false,
+        });
       });
   }
 
   //移除成员
-  handleDelete(accountId) {
+  handleDelete = accountId => {
     const _this = this;
     const options = {
       container: {
-        content: _l('您选择的成员可能有任务负责人/群组管理员，移除后相关负责人将替换为企业小秘书（企业小秘书作为暂时接管相关模块的负责人，后续成员可根据自己的需求随时进行替换）'),
+        content: _l(
+          '您选择的成员可能有任务负责人/群组管理员，移除后相关负责人将替换为企业小秘书（企业小秘书作为暂时接管相关模块的负责人，后续成员可根据自己的需求随时进行替换）',
+        ),
         yesText: _l('确认'),
         noText: _l('取消'),
         header: _l('您确定要将成员从各个模块移除吗?'),
@@ -178,9 +158,9 @@ export default class OthersList extends Component {
           transferController
             .exitAllRelation({
               projectId: Config.projectId,
-              accountIds: [accountId] || _this.state.selectKeys,
+              accountIds: accountId ? [accountId] : _this.state.selectKeys,
             })
-            .then(function(data) {
+            .then(function (data) {
               if (data.length > 0) {
                 _this.setState(
                   {
@@ -202,7 +182,7 @@ export default class OthersList extends Component {
       height: '150',
     };
     ReactDom.render(<DialogLayer {...options} />, document.createElement('div'));
-  }
+  };
 
   handleView(text, type, accountId) {
     if (Number(text) <= 0) {
@@ -274,16 +254,16 @@ export default class OthersList extends Component {
   }
 
   render() {
-    const { selectKeys, count, pageSize, loading, list } = this.state;
+    const { selectKeys, count, pageSize, pageIndex, loading, list } = this.state;
     const rowSelection = {
       selectKeys,
       onChange: this.onSelectChange,
     };
     const detail = {
       icon: 'icon-myUpload',
-      desc: _l('无外协人员')
-    }
-    const OtherEmpty = () => <Empty detail={detail} />
+      desc: _l('无外协人员'),
+    };
+    const OtherEmpty = () => <Empty detail={detail} />;
     return (
       <div className="groupsList">
         <div className="groupTool">
@@ -291,7 +271,7 @@ export default class OthersList extends Component {
             {selectKeys.length ? (
               <Fragment>
                 <span className="Font16 color_b Bold">{_l(`已选择%0条`, selectKeys.length)}</span>
-                <div className="ThemeColor3 mLeft30 Hand pTop3" onClick={this.handleDelete.bind(this)}>
+                <div className="ThemeColor3 mLeft30 Hand pTop3" onClick={() => this.handleDelete()}>
                   <span className="icon icon-sp_filter_none_white"></span>
                   <span>{_l('移除')}</span>
                 </div>
@@ -304,10 +284,14 @@ export default class OthersList extends Component {
             )}
           </div>
           <div className="groupItem">
-            <Search allowClear placeholder={_l('搜索姓名/职位/组织')} onSearch={value => this.handleInputChange(value)} />
+            <Search
+              allowClear
+              placeholder={_l('搜索姓名/职位/组织')}
+              onSearch={value => this.handleInputChange(value)}
+            />
           </div>
         </div>
-        <div className="tableList Relative">
+        <div className="tableList">
           <ConfigProvider renderEmpty={OtherEmpty}>
             <Spin indicator={<LoadDiv />} spinning={loading}>
               <Table
@@ -316,9 +300,11 @@ export default class OthersList extends Component {
                 columns={this.columns}
                 dataSource={list}
                 pagination={false}
-                scroll={{ y: count > pageSize ? 'calc(100vh - 330px)' : 'calc(100vh - 280px)' }}
+                scroll={count == 0 ? {} : { y: count > pageSize ? 'calc(100vh - 300px)' : 'calc(100vh - 260px)' }}
               />
-              <div id="divPager"></div>
+              {count > pageSize && (
+                <PaginationWrap total={count} pageIndex={pageIndex} pageSize={pageSize} onChange={this.changePage} />
+              )}
             </Spin>
           </ConfigProvider>
         </div>

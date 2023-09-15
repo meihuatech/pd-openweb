@@ -13,6 +13,8 @@ import UnNormal from 'worksheet/views/components/UnNormal';
 import { VIEW_DISPLAY_TYPE } from 'worksheet/constants/enum';
 import styled from 'styled-components';
 import _ from 'lodash';
+import HierarchyVerticalView from './HierarchyVerticalView';
+import HierarchyMixView from './HierarchyMixView';
 
 const { board, sheet, calendar, gallery, structure, gunter } = VIEW_DISPLAY_TYPE;
 
@@ -29,12 +31,16 @@ const TYPE_TO_COMP = {
   [board]: BoardView,
   [sheet]: SheetView,
   [gallery]: GalleryView,
-  [calendar]: CalendarView,
+  [calendar]: props => <CalendarView watchHeight {...props} />,
   [structure]: HierarchyView,
   [gunter]: GunterView,
+  structureVertical: HierarchyVerticalView,
+  structureMix: HierarchyMixView,
 };
 function View(props) {
   const { loading, error, view, showAsSheetView } = props;
+  const { advancedSetting = {} } = view;
+
   let activeViewStatus = props.activeViewStatus;
   if (loading) {
     return (
@@ -79,17 +85,31 @@ function View(props) {
     'openNewRecord',
     'setViewConfigVisible',
     'groupFilterWidth',
+    'sheetSwitchPermit',
   ]);
 
   if (_.isEmpty(view) && !props.chartId && !_.get(window, 'shareState.isPublicView')) {
     // 图表引用视图允许不存在 viewId
-    if (window.redirected && viewProps.appId && viewProps.groupId && viewProps.worksheetId) {
-      navigateTo(`/app/${viewProps.appId}/${viewProps.groupId}/${viewProps.worksheetId}`, true);
+    if (window.redirected && viewProps.appId && viewProps.groupId && viewProps.worksheetId && !error) {
+      if (/^\/app\/[0-9a-z-]{36}(\/[0-9a-z-]{24}){2}$/.test(location.pathname)) {
+        navigateTo(`/app/${viewProps.appId}/`, true);
+      } else {
+        navigateTo(`/app/${viewProps.appId}/${viewProps.groupId}/${viewProps.worksheetId}`, true);
+      }
     }
     activeViewStatus = -10000;
   }
 
-  const Component = TYPE_TO_COMP[String(showAsSheetView ? sheet : view.viewType)];
+  let viewType = String(showAsSheetView ? sheet : view.viewType);
+
+  if(!showAsSheetView && view.viewType===2 && advancedSetting.hierarchyViewType === '1') {
+    viewType = 'structureVertical';
+  } else if(!showAsSheetView && view.viewType===2 && advancedSetting.hierarchyViewType === '2') {
+    viewType = 'structureMix';
+  }
+
+  const Component = TYPE_TO_COMP[viewType];
+
   return (
     <Con>
       {!Component || activeViewStatus !== 1 ? (

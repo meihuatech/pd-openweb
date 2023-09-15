@@ -2,6 +2,7 @@ import React, { Fragment, useState, useRef, useEffect } from 'react';
 import { useSetState, useTitle } from 'react-use';
 import worksheetAjax from 'src/api/worksheet';
 import externalPortalAjax from 'src/api/externalPortal';
+import projectEncryptAjax from 'src/api/projectEncrypt';
 import update from 'immutability-helper';
 import styled from 'styled-components';
 import { Dialog } from 'ming-ui';
@@ -12,8 +13,15 @@ import Header from './Header';
 import Content from './content';
 import { getCurrentRowSize, getPathById } from './util/widgets';
 import { formatControlsData, getMsgByCode } from './util/data';
-import { getUrlPara, genWidgetsByControls, genControlsByWidgets, returnMasterPage, formatSearchConfigs } from './util';
+import {
+  getUrlPara,
+  genWidgetsByControls,
+  genControlsByWidgets,
+  returnMasterPage,
+  formatSearchConfigs,
+} from './util';
 import Components from './widgetSetting/components';
+import { verifyModifyDialog } from './widgetSetting/components/VerifyModifyDialog';
 import './index.less';
 import { WHOLE_SIZE } from './config/Drag';
 import ErrorState from 'src/components/errorPage/errorState';
@@ -39,12 +47,24 @@ export default function Container(props) {
   const [widgets, setWidgets] = useState([]);
   // 选中的控件
   const [activeWidget, setActiveWidget] = useState({});
+  // 批量选中
+  const [batchActive, setBatchActive] = useState([]);
   // 查询工作表配置
   const [queryConfigs, setQueryConfigs] = useState([]);
   // 外部门户开启状态
   const [enableState, setEnableState] = useState(false);
+  // 加密数据源
+  const [encryData, setEncryData] = useState([]);
+  // 表单样式
+  const [styleInfo, setStyle] = useState({
+    activeStatus: true,
+    info: {},
+  });
+
+  const setStyleInfo = obj => setStyle(Object.assign({}, styleInfo, obj));
 
   const $switchArgs = useRef(null);
+  const $contentRef = useRef(null);
 
   const [status, setStatus] = useSetState({ saved: false, saveIndex: 0, modify: false, noTitleControl: false });
 
@@ -52,6 +72,7 @@ export default function Container(props) {
   const [{ getLoading, saveLoading }, setLoading] = useSetState({ getLoading: false, saveLoading: false });
 
   let $originControls = useRef([]);
+  let $originStyle = useRef({});
 
   const {
     data: { info: globalInfo, noAuth },
@@ -84,7 +105,7 @@ export default function Container(props) {
   };
 
   const handleDataChange = (id, data, callback) => {
-    const nextWidgets = handleSizeChange(id, data);
+    let nextWidgets = handleSizeChange(id, data);
     setWidgets(nextWidgets);
 
     try {
@@ -110,6 +131,7 @@ export default function Container(props) {
     if (targetControlId) {
       const activeControl = flattenControls.find(item => item.controlId === targetControlId) || {};
       setActiveWidget(activeControl);
+      setStyleInfo({ activeStatus: false });
       // 滚动到激活控件
       setTimeout(() => {
         const $ele = document.getElementById(`widget-${targetControlId}`);
@@ -119,8 +141,6 @@ export default function Container(props) {
       }, 0);
       return;
     }
-    // 取第一个控件作为激活控件
-    setActiveWidget(head(head(widgets)));
   };
 
   const getQueryConfigs = (hasSearchQuery = false) => {
@@ -132,20 +152,31 @@ export default function Container(props) {
   };
 
   useEffect(() => {
+    setStyleInfo({ info: _.get(globalInfo, 'advancedSetting') || {} });
+    $originStyle.current = _.get(globalInfo, 'advancedSetting') || {};
     getQueryConfigs(globalInfo && globalInfo.isWorksheetQuery);
     if (globalInfo && globalInfo.appId) {
       externalPortalAjax.getPortalEnableState({ appId: globalInfo.appId }).then(res => {
         setEnableState(res.isEnable);
       });
     }
+    if (globalInfo && globalInfo.projectId) {
+      // 加密规则
+      projectEncryptAjax.getProjectEncryptRules({ projectId: globalInfo.projectId }).then(res => {
+        setEncryData(res.encryptRules);
+      });
+    }
   }, [globalInfo]);
 
   useEffect(() => {
+    // 子表配置,防止激活子表掉接口冲掉临时变更
     window.subListSheetConfig = {};
     setLoading({ getLoading: true });
-    worksheetAjax.getWorksheetControls({
-      worksheetId: sourceId,
-    })
+    worksheetAjax
+      .getWorksheetControls({
+        worksheetId: sourceId,
+        getRelationSearch: true,
+      })
       .then(({ code, data }) => {
         if (code === 1) {
           const { version, controls } = data;
@@ -192,11 +223,12 @@ export default function Container(props) {
     let activeWidgetPath = getPathById(widgets, (activeWidget || {}).controlId);
 
     setLoading({ saveLoading: true });
-    worksheetAjax.saveWorksheetControls({
-      version,
-      sourceId,
-      controls: formatControlsData(controls),
-    })
+    worksheetAjax
+      .saveWorksheetControls({
+        version,
+        sourceId,
+        controls: formatControlsData(controls),
+      })
       .then(({ data, code }) => {
         let error = getMsgByCode({ code, data });
         if (error) return;
@@ -217,6 +249,7 @@ export default function Container(props) {
           : head(flattenControls);
 
         setActiveWidget(nextActiveWidget);
+        setBatchActive([]);
         //初始isWorksheetQuery为false, 新控件保存时手动判断是否要拉取配置
         const newQueryConfigs = (controls || []).reduce((total, cur) => {
           if (cur.advancedSetting && cur.advancedSetting.dynamicsrc) {
@@ -232,6 +265,23 @@ export default function Container(props) {
       });
   };
 
+  const saveStyleInfo = () => {
+    if (!isEqual($originStyle.current, styleInfo.info)) {
+      worksheetAjax
+        .editWorksheetSetting({
+          worksheetId: globalInfo.worksheetId,
+          appId: globalInfo.appId,
+          advancedSetting: styleInfo.info,
+        })
+        .then(res => {
+          if (res) {
+            setStyleInfo({ info: styleInfo.info });
+            $originStyle.current = styleInfo.info;
+          }
+        });
+    }
+  };
+
   const deleteWidget = controlId => {
     const [row, col] = getPathById(widgets, controlId);
     setWidgets(update(widgets, { [row]: { $splice: [[col, 1]] } }));
@@ -245,11 +295,18 @@ export default function Container(props) {
     if (currentControls.length !== prevControls.length) return true;
     return currentControls.some(item => {
       const prevItem = find(prevControls, ({ controlId }) => item.controlId === controlId);
-      return !isEqual(_.omit(prevItem, ['half', 'relationControls']), _.omit(item, ['half', 'relationControls']));
+      return !isEqual(
+        _.omit(prevItem, ['half', 'relationControls', 'sourceEntityName', 'deleteAccount']),
+        _.omit(item, ['half', 'relationControls', 'sourceEntityName', 'deleteAccount']),
+      );
     });
   };
 
   const updateQueryConfigs = (value = {}, mode) => {
+    if (mode === 'cover') {
+      setQueryConfigs(value);
+    }
+
     const index = findIndex(queryConfigs, item => item.controlId === value.controlId);
     let newQueryConfigs = queryConfigs.slice();
     if (mode) {
@@ -260,9 +317,32 @@ export default function Container(props) {
     setQueryConfigs(newQueryConfigs);
   };
 
+  const handleActiveSet = newWidgets => {
+    setActiveWidget(newWidgets);
+    // 单独激活时取消批量激活
+    setBatchActive([]);
+    if (!_.isEmpty(newWidgets)) {
+      setStyleInfo({ activeStatus: false });
+    }
+  };
+
+  const relateToNewPage = toPage => {
+    if (isControlsModified()) {
+      verifyModifyDialog({
+        desc: _l('当前有尚未保存的更改，您在打开新页面前是否需要先保存这些更改'),
+        cancelText: _l('否，暂不打开'),
+        okText: _l('是，保存更改'),
+        handleSave,
+        toPage,
+      });
+    } else {
+      toPage();
+    }
+  };
+
   const widgetProps = {
     activeWidget,
-    setActiveWidget,
+    setActiveWidget: handleActiveSet,
     widgets,
     setWidgets,
     handleDataChange,
@@ -271,9 +351,15 @@ export default function Container(props) {
     status,
     getLoading,
     queryConfigs,
+    encryData,
     updateQueryConfigs,
     allControls: genControlsByWidgets(widgets),
     enableState,
+    styleInfo,
+    setStyleInfo,
+    relateToNewPage,
+    batchActive,
+    setBatchActive,
     // 全局表信息
     globalSheetInfo: pick(globalInfo, ['appId', 'projectId', 'worksheetId', 'name', 'groupId', 'roleType']),
   };
@@ -297,14 +383,12 @@ export default function Container(props) {
   };
 
   const handleSave = () => {
-    if (isEmpty(widgets)) {
-      alert(_l('当前表没有配置字段，无法保存'));
-      return;
-    }
     if (!activeWidget) {
+      saveStyleInfo();
       saveControls();
       return;
     }
+    saveStyleInfo();
     saveControls();
   };
 
@@ -322,6 +406,7 @@ export default function Container(props) {
       ) : (
         <WidgetConfig>
           <Header
+            {...widgetProps}
             {...globalInfo}
             worksheetId={sourceId}
             showSaveButton={!getLoading}
@@ -330,7 +415,7 @@ export default function Container(props) {
             onBack={handleClose}
             onSave={handleSave}
           />
-          <Content {...widgetProps} />
+          <Content {...widgetProps} onRef={$contentRef} />
           {status.noTitleControl && (
             <Components.NoTitleControlDialog onClose={() => setStatus({ noTitleControl: false })} />
           )}

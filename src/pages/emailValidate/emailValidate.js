@@ -1,7 +1,7 @@
 import accountController from 'src/api/account';
 import { getRequest } from 'src/util';
 var token = getRequest()['token'];
-import doT from '@mdfe/dot';
+import doT from 'dot';
 import './style.css';
 import tpl from './template.html';
 
@@ -12,7 +12,7 @@ var ACTIONRESULTS = {
 };
 
 var render = function (result) {
-  $('#app').after(`
+  $('#app').append(`
     <div class="staticPageForm">
     <div class="header">
         <div class="content">

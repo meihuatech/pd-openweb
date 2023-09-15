@@ -85,8 +85,6 @@ function MobileDraftList(props) {
     worksheetId,
     controls = [],
     draftData = [],
-    viewId,
-    worksheetInfo = {},
     getDraftData = () => {},
     sheetSwitchPermit,
   } = props;
@@ -130,7 +128,7 @@ function MobileDraftList(props) {
         }}
       >
         <div className="flexRow valignWrapper mBottom5">
-          <div className="Gray Blod Font16 ellipsis">{titleText}</div>
+          <div className="Gray Blod Font14 ellipsis">{titleText}</div>
         </div>
         {showControls.map(control => {
           return (
@@ -141,6 +139,7 @@ function MobileDraftList(props) {
                   <CellControl
                     rowHeight={34}
                     cell={Object.assign({}, control, { value: data[control.controlId] })}
+                    sheetSwitchPermit={sheetSwitchPermit}
                     from={21}
                     className={'w100'}
                   />
@@ -202,12 +201,11 @@ function MobileDraftList(props) {
           visible={!!currentRowId}
           appId={appId}
           worksheetId={worksheetId}
-          viewId={viewId}
           rowId={currentRowId}
           sheetSwitchPermit={sheetSwitchPermit}
           draftFormControls={controls.filter(
             item =>
-              !_.includes(SHEET_VIEW_HIDDEN_TYPES, item.type) &&
+              !_.includes([...SHEET_VIEW_HIDDEN_TYPES, 33], item.type) &&
               !_.includes(
                 [
                   'wfname',
@@ -240,7 +238,7 @@ function MobileDraftList(props) {
 }
 
 export default function MobileDraft(props) {
-  const { appId, controls = [], worksheetInfo, showDraft, sheetSwitchPermit } = props;
+  const { appId, controls = [], worksheetInfo, worksheetId, sheetSwitchPermit } = props;
   const [visible, setVisible] = useState(false);
   const [draftData, setDraftData] = useState([]);
 
@@ -252,7 +250,7 @@ export default function MobileDraft(props) {
     worksheetAjax
       .getFilterRows({
         appId,
-        worksheetId: worksheetInfo.worksheetId,
+        worksheetId: worksheetId || worksheetInfo.worksheetId,
         getType: 21,
       })
       .then(res => {
@@ -279,7 +277,6 @@ export default function MobileDraft(props) {
         controls={controls}
         draftData={draftData}
         worksheetInfo={worksheetInfo}
-        showDraft={showDraft}
         getDraftData={getDraftData}
         onCancel={() => setVisible(false)}
         sheetSwitchPermit={sheetSwitchPermit}

@@ -1,10 +1,8 @@
 import React, { useRef } from 'react';
-import { Dialog } from 'ming-ui';
+import { Dialog, Checkbox, Tooltip } from 'ming-ui';
 import { Input } from 'antd';
 import styled from 'styled-components';
-import { encrypt } from 'src/util';
-import captcha from 'src/components/captcha';
-import accountAjax from 'src/api/account';
+import { verifyPassword } from 'src/util';
 import functionWrap from 'ming-ui/components/FunctionWrap';
 import { func, number, string } from 'prop-types';
 
@@ -20,58 +18,62 @@ const Password = styled(Input.Password)`
 `;
 
 export default function VerifyPasswordConfirm(props) {
-  const { width = 480, title, description, passwordPlaceHolder = _l('请输入密码'), onOk = () => {}, onCancel } = props;
+  const {
+    confirmType = 'primary',
+    width = 480,
+    title,
+    description,
+    allowNoVerify = false,
+    inputName = _l('当前用户密码'),
+    passwordPlaceHolder = _l('请输入密码'),
+    onOk = () => {},
+    onCancel,
+  } = props;
   const passwordRef = useRef();
   function handleConfirm() {
     const password = passwordRef.current.input.value;
-    if (!password) {
-      alert(_l('请输入密码'), 3);
-      return;
-    }
-    let cb = function (res) {
-      if (res.ret !== 0) {
-        return;
-      }
-      accountAjax.checkAccount({
-        ticket: res.ticket,
-        randStr: res.randstr,
-        captchaType: md.staticglobal.getCaptchaType(),
-        password: encrypt(password),
-      }).then(statusCode => {
-        if (statusCode === 1) {
-          onCancel();
-          onOk();
-        } else {
-          alert(
-            {
-              6: _l('密码不正确'),
-              8: _l('验证码错误'),
-            }[statusCode] || _l('操作失败'),
-            2,
-          );
-        }
-      });
-    };
-
-    if (md.staticglobal.getCaptchaType() === 1) {
-      new captcha(cb);
-    } else {
-      new TencentCaptcha(md.global.Config.CaptchaAppId.toString(), cb).show();
-    }
+    let isNoneVerification;
+    try {
+      isNoneVerification =
+        allowNoVerify && !!passwordRef.current.input.closest('.con').querySelector('.verifyCheckbox .icon-ok');
+    } catch (err) {}
+    verifyPassword({
+      password,
+      isNoneVerification,
+      closeImageValidation: allowNoVerify,
+      success: () => {
+        onCancel();
+        onOk();
+      },
+    });
   }
   return (
     <Dialog
       visible
+      className="verifyPasswordConfirm"
       width={width}
       overlayClosable={false}
       title={title}
       description={description}
       onOk={handleConfirm}
       onCancel={onCancel}
-      confirm="danger"
+      confirm={confirmType}
     >
-      <div className="Font14 mBottom12">{_l('当前用户密码')}</div>
-      <Password ref={passwordRef} autoComplete="new-password" placeholder={passwordPlaceHolder} />
+      <div className="con">
+        <div className="Font13 mBottom10 Bold">{inputName}</div>
+        <div style={{ height: '0px', overflow: 'hidden' }}>
+          // 用来避免浏览器将用户名塞到其它input里
+          <input type="text" />
+        </div>
+        <Password autoFocus ref={passwordRef} autoComplete="new-password" placeholder={passwordPlaceHolder} />
+        {allowNoVerify && (
+          <Tooltip popupPlacement="bottom" text={_l('此后1小时内在当前设备上应用和审批操作无需再次验证')}>
+            <div className="InlineBlock">
+              <Checkbox className="verifyCheckbox" text={_l('1小时内免验证')} />
+            </div>
+          </Tooltip>
+        )}
+      </div>
     </Dialog>
   );
 }
@@ -80,6 +82,7 @@ VerifyPasswordConfirm.propTypes = {
   width: number,
   title: string,
   description: string,
+  inputName: string,
   passwordPlaceHolder: string,
   onOk: func,
   onCancel: func,

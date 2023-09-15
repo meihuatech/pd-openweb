@@ -14,7 +14,7 @@ import WorksheetRecordLogThumbnail from './component/WorksheetRecordLogThumbnail
 import WorksheetRecordLogDiffText from './component/WorksheetRecordLogDiffText';
 import WorksheetRecordLogSubList from './component/WorksheetRecordLogSubList';
 import { createLinksForMessage } from 'src/components/common/function';
-import 'src/components/quickSelectUser/quickSelectUser';
+import quickSelectUser from 'ming-ui/functions/quickSelectUser';
 import TriggerSelect from './component/TriggerSelect';
 import DatePickSelect from '../DatePickerSelect';
 import sheetAjax from 'src/api/worksheet';
@@ -52,21 +52,41 @@ function renderContent(data, recordInfo, extendParam) {
     if (RETURN_OBJECT_CONTROL_TYPE.includes(type)) {
       oldList = safeParse(oldValue, 'array');
       newList = safeParse(newValue, 'array');
+    } else if (type === 36) {
+      oldList = [String(oldValue) === '1' ? '☑' : '☐'];
+      newList = [String(newValue) === '1' ? '☑' : '☐'];
     } else if (type === 40) {
-      oldList = [safeParse(oldValue).address].filter(l => l);
-      newList = [safeParse(newValue).address].filter(l => l);
-    } else if (id.startsWith('wf') && [16, 38].includes(type)) {
+      let oldObj = safeParse(oldValue);
+      let newObj = safeParse(newValue);
+
+      oldList = [oldObj.address].filter(l => l);
+      newList = [newObj.address].filter(l => l);
+
+      if (oldList.length === 0 && oldObj.x && oldObj.y) {
+        oldList = [`${_l('经度')}：${_.round(oldObj.x, 6)} ${_l('纬度')}：${_.round(oldObj.y, 6)}`];
+      }
+      if (newList.length === 0 && newObj.x && newObj.y) {
+        newList = [`${_l('经度')}：${_.round(newObj.x, 6)} ${_l('纬度')}：${_.round(newObj.y, 6)}`];
+      }
+    } else if (id.startsWith('wf') && [16].includes(type)) {
       oldList = oldValue ? [moment(oldValue).format('YYYY-MM-DD HH:mm:ss')] : [];
       newList = newValue ? [moment(newValue).format('YYYY-MM-DD HH:mm:ss')] : [];
-    } else if (type === 16 || type === 38) {
-      oldList = oldValue ? [renderText({...control, value: oldValue})] : [];
-      newList = newValue ? [renderText({...control, value: newValue})] : [];
+    } else if (type === 38) {
+      oldList = oldValue ? [oldValue] : [];
+      newList = newValue ? [newValue] : [];
+    } else if (type === 16) {
+      oldList = oldValue ? [renderText({ ...control, value: oldValue })] : [];
+      newList = newValue ? [renderText({ ...control, value: newValue })] : [];
     } else if (type === 46 || type === 15) {
       oldList = oldValue ? [renderText({ ...control, value: oldValue })] : [];
       newList = newValue ? [renderText({ ...control, value: newValue })] : [];
     } else if (type === 29) {
       const { advancedSetting = {} } = control || {};
-      if (requestType === 8 || advancedSetting.showtype === '2') {
+      if (
+        ([8, 2].includes(requestType) || advancedSetting.showtype === '2') &&
+        !oldValue &&
+        [1, 2].includes(editType)
+      ) {
         let _data = safeParse(safeParse(newValue).rows, 'array');
         oldList = editType === 2 ? _data : [];
         newList = editType === 1 ? _data : [];
@@ -210,52 +230,78 @@ function renderContent(data, recordInfo, extendParam) {
 
 const WorksheetRocordLogItem = (prop, recordInfo, callback, extendParam) => {
   const { selectField, moreList = [], setMoreList, lastMark, showFilter } = extendParam;
+  const { operatContent } = prop;
   const isMobile = browserIsMobile();
-  let logData = prop.operatContent.logData;
-  let uniqueId = moreList.find(l => l === prop.operatContent.uniqueId);
+
+  let logData = operatContent.logData;
+  let remarkContent = null;
+
+  let btnRemarkName = operatContent.extendParams.find(l => _.startsWith(l, 'btnRemarkName:'));
+  let btnremark = (operatContent.extendParams.find(l => _.startsWith(l, 'btnremark:')) || '').replace('btnremark:', '');
+  if (btnremark) {
+    remarkContent = (
+      <div>
+        {(btnRemarkName || '').replace('btnRemarkName:', '')}：{btnremark}
+      </div>
+    );
+  }
+
+  let uniqueId = moreList.find(l => l === operatContent.uniqueId);
   if (selectField && !uniqueId) {
     logData = logData.filter(l => l.id === selectField.controlId);
   }
 
   return (
     <React.Fragment>
+      {remarkContent}
       {logData.map(item => {
         if (item.newValue === '' && item.oldValue === '') {
           return null;
         }
-        let widgetInfo = DEFAULT_CONFIG[_.findKey(WIDGETS_TO_API_TYPE_ENUM, l => l === item.type)];
-        const control = _.find(recordInfo.controls, it => item.id === it.controlId) || {};
+        let widgetInfo = DEFAULT_CONFIG[_.findKey(WIDGETS_TO_API_TYPE_ENUM, l => l === item.type)] || {};
+        const control = _.find(recordInfo.controls || recordInfo.formdata, it => item.id === it.controlId) || {};
         let _controlPermissions = (control && control.controlPermissions) || '111';
         const visible = _controlPermissions[0] === '1';
         let extendText = '';
         let showDelete = true;
+
         if (!visible) return;
         if (item.type === 29) {
           const { advancedSetting = {} } = control || {};
-          if (prop.operatContent.requestType === 8 || advancedSetting.showtype === '2') {
+          if (operatContent.requestType === 8 || advancedSetting.showtype === '2') {
             let object = item.newValue
               ? safeParse(item.newValue)
               : item.oldValue
               ? safeParse(item.oldValue)
               : undefined;
             if (object && object.rows) {
-              extendText = `${item.editType === 1 ? ' ' + _l('添加了') : ' ' + _l('取消了')}${_l(
+              let newValue = safeParse(item.newValue, 'object');
+              let oldValue = safeParse(item.oldValue, 'object');
+              let _text = ' ';
+              if (item.editType === 1) {
+                _text = ' ' + _l('添加了');
+              } else if (item.editType === 2) {
+                _text = ' ' + _l('取消了');
+              } else {
+                _text = ' ' + (item.newValue ? _l('添加了') : _l('取消了'));
+              }
+              extendText = `${_text}${_l(
                 '%0条',
-                safeParse(object.rows, 'array').length || 1,
+                safeParse(item.newValue ? newValue.rows : oldValue.rows, 'array').length || 1,
               )}`;
             } else if (object) {
               showDelete = false;
-              extendText = `${item.editType === 1 ? ' ' + _l('添加了') : ' ' + _l('取消了')}${_l(
+              extendText = `${item.editType !== 2 ? ' ' + _l('添加了') : ' ' + _l('取消了')}${_l(
                 '%0条',
                 object.length || 1,
               )}关联记录`;
             }
           }
-          if (prop.operatContent.requestType === 8) {
+          if (operatContent.requestType === 8) {
             extendText += _l('（被动）');
           }
         }
-        if(["transf_task", "del_discussion"].indexOf(item.id) > -1) {
+        if (['transf_task', 'del_discussion'].indexOf(item.id) > -1) {
           showDelete = false;
         }
         if (item.isDeleted && showDelete) {
@@ -268,7 +314,10 @@ const WorksheetRocordLogItem = (prop, recordInfo, callback, extendParam) => {
             key={`worksheet-rocord-log-item-${item.id}`}
           >
             <div className="widgetTitle">
-              {item.isDeleted || isMobile || !showFilter || WORKFLOW_SYSTEM_CONTROL.find(l => l.controlId === item.id) ? (
+              {item.isDeleted ||
+              isMobile ||
+              !showFilter ||
+              WORKFLOW_SYSTEM_CONTROL.find(l => l.controlId === item.id) ? (
                 <span className="selectTriggerChild">
                   <Icon className="Font16 Gray_9e" icon={widgetInfo.icon} />
                   <span>{item.name}</span>
@@ -291,25 +340,25 @@ const WorksheetRocordLogItem = (prop, recordInfo, callback, extendParam) => {
 
               <span className="extendText">{extendText}</span>
             </div>
-            {(!item.isDeleted || ["transf_task", "del_discussion"].indexOf(item.id) > -1) &&
+            {(!item.isDeleted || ['transf_task', 'del_discussion'].indexOf(item.id) > -1) &&
               renderContent(item, recordInfo, {
-                createTime: prop.operatContent.createTime,
-                uniqueId: prop.operatContent.uniqueId,
+                createTime: operatContent.createTime,
+                uniqueId: operatContent.uniqueId,
                 lastMark: lastMark,
-                requestType: prop.operatContent.requestType,
-                objectType: prop.operatContent.objectType,
+                requestType: operatContent.requestType,
+                objectType: operatContent.objectType,
               })}
           </div>
         );
       })}
-      {selectField && logData.length !== prop.operatContent.logData.length && !uniqueId && (
+      {selectField && logData.length !== operatContent.logData.length && !uniqueId && (
         <span
           onClick={() => {
-            setMoreList(moreList.concat(prop.operatContent.uniqueId));
+            setMoreList(moreList.concat(operatContent.uniqueId));
           }}
           className="moreLogData Gray_9e"
         >
-          {_l('查看其他字段')} {prop.operatContent.logData.length - logData.length}
+          {_l('查看其他字段')} {operatContent.logData.length - logData.length}
         </span>
       )}
     </React.Fragment>
@@ -321,7 +370,7 @@ const renderTitleName = data => {
   if (accountId === 'user-workflow') {
     return (
       <span className="titleAvatarText workflow Gray_9e">
-        <span className={cx('accountName', { mobileAccountName: isMobile })}>{_l('工作流')} </span>{' '}
+        <span className={cx('accountName', { mobileAccountName: isMobile })}>{_l('工作流')} </span>
       </span>
     );
   } else if (child[0].operatContent.requestType === 3) {
@@ -330,55 +379,47 @@ const renderTitleName = data => {
         <span className="accountName">{accountName} </span>
       </span>
     );
-  } else if (child[0].operatContent.requestType === 2) {
-    let extendParam = child[0].operatContent.extendParams.find(l => _.startsWith(l, 'workflow:'));
-    let _html = extendParam ? extendParam.replace('workflow', '') : undefined;
-    return _html ? (
-      <span className="titleAvatarText workflow Gray_9e">
-        <span className={cx('accountName', { mobileAccountName: isMobile })}>{_l('工作流')} </span>
-      </span>
-    ) : (
-      <span className="titleAvatarText accountName">{fullname}</span>
-    );
   } else {
     return <span className="titleAvatarText accountName">{fullname}</span>;
   }
 };
 const renderTitleAvatar = data => {
-  const { accountId, child, fullname } = data;
+  const { accountId, child, type } = data;
   const isMobile = browserIsMobile();
-
+  if (type === 7) {
+    return null;
+  }
   if (accountId === 'user-workflow') {
-    let _fullname = fullname;
-    if (!reg.test(fullname) && child[0].operatContent.extendParams.find(l => _.startsWith(l, 'workflow:'))) {
-      _fullname =
-        child[0].operatContent.extendParams.find(l => _.startsWith(l, 'workflow:')).replace('workflow:', '') ||
-        fullname;
+    let _fullname = '';
+    if (child[0].operatContent.extendParams.find(l => _.startsWith(l, 'workflow:'))) {
+      _fullname = child[0].operatContent.extendParams.find(l => _.startsWith(l, 'workflow:')).replace('workflow:', '');
     }
-    return (
-      <span className="titleAvatarText workflow Gray_9e">
+
+    return _fullname ? (
+      <span className="titleAvatarText workflow Gray_9e mRight5">
         {isMobile ? (
-          <span className="ThemeColor">{_fullname.replace(reg, '')}</span>
+          <span className="Gray">{_fullname.replace(reg, '')}</span>
         ) : (
           <span dangerouslySetInnerHTML={{ __html: filterXSS(_fullname) }}></span>
         )}
       </span>
-    );
+    ) : null;
   } else if (child[0].operatContent.requestType === 3) {
     let btn = child[0].operatContent.extendParams.find(l => _.startsWith(l, 'btn:'));
     return (
-      <span className="titleAvatarText">
+      <span className="titleAvatarText mRight5">
         <span className="Gray_9e">{_l('通过自定义动作')}</span>
         <span className="Gray"> {btn ? btn.replace('btn:', '') : ''}</span>
       </span>
     );
   } else if (child[0].operatContent.requestType === 2) {
     let extendParam = child[0].operatContent.extendParams.find(l => _.startsWith(l, 'workflow:'));
-    let _html = extendParam ? extendParam.replace('workflow', '') : undefined;
+    let _html = extendParam ? extendParam.replace('workflow:', '') : undefined;
     return _html ? (
-      <span className="titleAvatarText workflow Gray_9e">
+      <span className="titleAvatarText workflow Gray_9e mRight5">
+        <span className="mRight5">{_l('触发工作流')}</span>
         {isMobile ? (
-          <span>{_html.replace(reg, '')}</span>
+          <span className="Gray">{_html.replace(reg, '')}</span>
         ) : (
           <span dangerouslySetInnerHTML={{ __html: filterXSS(_html) }}></span>
         )}
@@ -400,37 +441,53 @@ const renderTitleText = (data, extendParam) => {
       showTooltips = true;
     }
   });
-  const { type } = data;
+  const { type, accountId } = data;
   let content = null;
-  switch (type) {
-    case 1:
-      content = <span className="createRecord mLeft2">{_l('创建了记录')}</span>;
-      break;
-    case 2:
-      content = <span className="mLeft2">{_l('更新%0个字段', count)}</span>;
-      break;
-    case 3:
-      content = <span className="mLeft2">{_l('删除了记录')}</span>;
-      break;
-    case 4:
-      content = (
-        <span className="mLeft2">
-          {_l('通过')}
-          <span className="Gray">{_l('导入Excel文件')}</span>
-          {_l('创建了记录')}
-        </span>
-      );
-      break;
-    case 5:
-      content = <span className="mLeft2">{_l('导出了记录')}</span>;
-      break;
-    case 6:
-      content = <span className="mLeft2">{_l('恢复了记录')}</span>;
-      break;
-    default:
-      content = <span className="mLeft2">{_l('更新了记录')}</span>;
-      break;
+
+  if (accountId === 'user-integration' && type === 4) {
+    content = <span className="createRecord mLeft2">{_l('创建了记录')}</span>;
+  } else {
+    switch (type) {
+      case 1:
+        content = <span className="createRecord mLeft2">{_l('创建了记录')}</span>;
+        break;
+      case 2:
+        content = <span className="mLeft2">{_l('更新%0个字段', count)}</span>;
+        break;
+      case 3:
+        content = <span className="mLeft2">{_l('删除了记录')}</span>;
+        break;
+      case 4:
+        let triggerWorkflow =
+          data.child[0].operatContent.extendParams.find(l => _.startsWith(l, 'triggerWorkflow:')) ||
+          'triggerWorkflow:0';
+        content = (
+          <span className="mLeft2">
+            {_l('通过')}
+            <span className="Gray mLeft5 mRight5">
+              {_l('导入Excel文件')}
+              {triggerWorkflow.replace('triggerWorkflow:', '') === '1' ? _l('(触发工作流)') : null}
+            </span>
+            {_l('创建了记录')}
+          </span>
+        );
+        break;
+      case 5:
+        content = <span className="mLeft2">{_l('导出了记录')}</span>;
+        break;
+      case 6:
+        content = <span className="mLeft2">{_l('恢复了记录')}</span>;
+        break;
+      case 7:
+        let btn = data.child[0].operatContent.extendParams.find(l => _.startsWith(l, 'btn:'));
+        content = <span className="mLeft2">{_l('操作按钮 %0', btn ? btn.replace('btn:', '') : '')}</span>;
+        break;
+      default:
+        content = <span className="mLeft2">{_l('更新了记录')}</span>;
+        break;
+    }
   }
+
   return (
     <React.Fragment>
       {content}
@@ -444,7 +501,7 @@ const renderTitleText = (data, extendParam) => {
 };
 
 function WorksheetRocordLog(props, ref) {
-  const { controls, worksheetId, formdata, showFilter = true, filterUniqueIds = undefined} = props;
+  const { controls, worksheetId, formdata, showFilter = true, filterUniqueIds = undefined } = props;
   const selectUserRef = useRef();
   const [{ loading, showAddCondition, loadouted, sign, showDivider, lastMark }, setMark] = useSetState({
     loading: false,
@@ -495,6 +552,7 @@ function WorksheetRocordLog(props, ref) {
         .getWorksheetInfo({
           worksheetId: worksheetId,
           getViews: true,
+          getSwitchPermit: true,
           getTemplate: true,
           getRules: true,
         })
@@ -547,12 +605,13 @@ function WorksheetRocordLog(props, ref) {
         showLodOldButton: false,
       },
       lastMark: undefined,
+      loadouted: false,
     });
     loadNewEdition({ lastMark: undefined });
   }
 
   function loadNewEdition(prop) {
-    const { worksheetId, rowId, pageSize = PAGE_SIZE, filterUniqueIds } = props;
+    const { worksheetId, rowId, pageSize = PAGE_SIZE, filterUniqueIds, isGlobaLog } = props;
     const { pageIndex, filedId, opeartorId, startDateTime, endDateTime } = prop;
     let _opeartorId = prop.hasOwnProperty('opeartorId') ? opeartorId : selectUser && selectUser[0].accountId;
     let _filterId = prop.hasOwnProperty('filedId') ? filedId : selectField && selectField.controlId;
@@ -573,9 +632,15 @@ function WorksheetRocordLog(props, ref) {
       lastMark: _lastMark,
       rowId: rowId,
     };
-    let promise = filterUniqueIds
-      ? sheetAjax.batchGetWorksheetOpeationLogs({ ...param, filterUniqueIds: filterUniqueIds })
-      : sheetAjax.getWorksheetOpeationLogs(param);
+    if (isGlobaLog) {
+      // 全局日志
+      param.filterUniqueIds = filterUniqueIds;
+      param.isGlobaLog = true;
+    }
+    let promise =
+      filterUniqueIds && !isGlobaLog
+        ? sheetAjax.batchGetWorksheetOperationLogs({ ...param, filterUniqueIds: filterUniqueIds })
+        : sheetAjax.getWorksheetOperationLogs(param);
     promise.then(res => {
       setMark({ loading: false, lastMark: res.lastMark });
       let data = res.logs;
@@ -590,8 +655,7 @@ function WorksheetRocordLog(props, ref) {
             sign: {
               ...sign,
               newDataEnd: true,
-              showLodOldButton:
-                data[data.length - 1].operatContent.type !== 1 && data[data.length - 1].operatContent.type !== 4,
+              showLodOldButton: !data.find(l => l.operatContent.type === 1 || l.operatContent.type === 4),
             },
           });
         } else {
@@ -632,8 +696,10 @@ function WorksheetRocordLog(props, ref) {
 
   function loadLog() {
     const { worksheetId, rowId, pageSize = PAGE_SIZE, filterUniqueIds } = props;
+
     if (filterUniqueIds) return;
     if (loadouted || selectUser || selectField || selectDate.range) return;
+
     setMark({ loading: true });
     sheetAjax
       .getLogs({
@@ -726,7 +792,7 @@ function WorksheetRocordLog(props, ref) {
         },
       });
     }
-  }, 500)
+  }, 500);
 
   const selectUserCallback = value => {
     setMark({ lastMark: undefined });
@@ -743,22 +809,20 @@ function WorksheetRocordLog(props, ref) {
   function pickUser() {
     const { worksheetId, projectId = '', appId } = props;
     const filterIds = ['user-sub', 'user-undefined'];
-    $(selectUserRef.current).quickSelectUser({
+    quickSelectUser(selectUserRef.current, {
       hidePortalCurrentUser: true,
-      isRangeData: false,
-      filterWorksheetId: worksheetId,
+      selectRangeOptions: false,
       includeSystemField: true,
       prefixOnlySystemField: true,
       rect: selectUserRef.current.getBoundingClientRect(),
-      showQuickInvite: false,
+
       tabType: 3,
       appId: appId || worksheetInfo.appId,
       showMoreInvite: false,
       isTask: false,
       filterAccountIds: selectUser ? selectUser.map(item => item.accountId).concat(filterIds) : [].concat(filterIds),
       offset: {
-        top: 0,
-        left: 94,
+        top: 2,
       },
       zIndex: 10001,
       SelectUserSettings: {
@@ -801,7 +865,7 @@ function WorksheetRocordLog(props, ref) {
                   _.filter(
                     controls || formdata,
                     it =>
-                      !_.includes([33, 47, 30, 22, 10010, 45, 43, 25], it.type) &&
+                      !_.includes([33, 47, 30, 22, 10010, 45, 43, 25, 51], it.type) &&
                       !_.includes(['caid', 'ctime', 'utime', 'daid', 'rowid', 'uaid'], it.controlId),
                   ),
                 )}
@@ -872,6 +936,11 @@ function WorksheetRocordLog(props, ref) {
             </Trigger>
           </div>
         )}
+        {!loading && filterUniqueIds && filterUniqueIds.length > 0 && newEditionList.length === 0 && (
+          <div className="Gray_75 pBottom10 noneContent Font13" style={{ paddingTop: '120px', textAlign: 'center' }}>
+            {_l('无数据或无权限查看')}
+          </div>
+        )}
         {newEditionList.length === 0 && (selectUser || selectField || selectDate.range) && (
           <div className="Gray_c pBottom10 noneContent" style={{ paddingTop: '120px', textAlign: 'center' }}>
             {_l('暂无数据')}
@@ -882,7 +951,7 @@ function WorksheetRocordLog(props, ref) {
             <div className="worksheetRocordLogCard" key={`worksheetRocordLogCard-${item.time}-${index}`}>
               <div className={cx('worksheetRocordLogCardTopBox', { mBottom0: item.type === 1 })}>
                 <div className="worksheetRocordLogCardTitle">
-                  {(isMobile || !showFilter) ? (
+                  {isMobile || !showFilter ? (
                     <span className="selectTriggerChildAvatar">
                       <Avatar size={20} className="worksheetRocordLogCardTitleAvatar" src={item.avatar} />
                       {renderTitleName(item)}
@@ -918,6 +987,7 @@ function WorksheetRocordLog(props, ref) {
                   {createTimeSpan(moment(item.time).format('YYYY-MM-DD HH:mm:ss'))}
                 </div>
               </div>
+
               {item.child.map((childData, index) => {
                 let extendParam = {
                   selectField: selectField,
@@ -983,16 +1053,21 @@ function WorksheetRocordLog(props, ref) {
             </span>
           </p>
         )}
-        {!filterUniqueIds && !selectUser && !selectField && !selectDate.range && showDivider && discussList.length > 0 && (
-          <Divider className="logDivider">
-            {_l('以下是旧版日志')}
-            <Tooltip
-              text={<span>{_l('旧版日志不支持进行筛选。因为新旧版本的升级，可能会产生一段时间重复记录的日志')}</span>}
-            >
-              <Icon className="Font12" icon="Import-failure" />
-            </Tooltip>
-          </Divider>
-        )}
+        {!filterUniqueIds &&
+          !selectUser &&
+          !selectField &&
+          !selectDate.range &&
+          showDivider &&
+          discussList.length > 0 && (
+            <Divider className="logDivider">
+              {_l('以下是旧版日志')}
+              <Tooltip
+                text={<span>{_l('旧版日志不支持进行筛选。因为新旧版本的升级，可能会产生一段时间重复记录的日志')}</span>}
+              >
+                <Icon className="Font12" icon="Import-failure" />
+              </Tooltip>
+            </Divider>
+          )}
         {!selectUser &&
           !selectField &&
           !selectDate.range &&
@@ -1029,7 +1104,7 @@ function WorksheetRocordLog(props, ref) {
                       >
                         <span>
                           {childData.accountId === 'user-workflow' ? _l('工作流') : ''}
-                          <span className="ThemeColor mRight5">{userOrFlow}</span>
+                          <span className="Gray mRight5">{userOrFlow}</span>
                           {actTxt}
                         </span>
                       </div>

@@ -12,15 +12,20 @@ import MsgTemplate from './components/MsgTemplate';
 import Search from '../components/Search';
 import UserHead from 'src/pages/feed/components/userHead/userHead';
 import PublishBtn from './components/PublishBtn';
-import { START_APP_TYPE } from './config/index';
+import { START_APP_TYPE } from './utils/index';
 import appManagement from 'src/api/appManagement';
 import projectSetting from 'src/api/projectSetting';
 import { Select } from 'antd';
 import WorkflowMonitor from './components/WorkflowMonitor';
+import PaginationWrap from 'src/pages/Admin/components/PaginationWrap';
+import { purchaseMethodFunc } from 'src/components/upgrade/choose/PurchaseMethodModal';
 import _ from 'lodash';
 import moment from 'moment';
 
-const tablist = [{ tab: 'workflowList', tabName: _l('工作流') }, { tab: 'monitorTab', tabName: _l('监控') }];
+const tablist = [
+  { tab: 'workflowList', tabName: _l('工作流') },
+  { tab: 'monitorTab', tabName: _l('监控') },
+];
 
 const typeList = [
   { label: _l('全部类型'), value: '' },
@@ -53,7 +58,6 @@ export default class AdminWorkflowList extends Component {
       sortId: 'createdDate',
 
       msgVisible: false,
-      isMore: true,
       loading: false,
       checkAdmin: {
         appId: '',
@@ -66,7 +70,11 @@ export default class AdminWorkflowList extends Component {
       autoPurchaseWorkflowExtPack: false,
       autoOrderVisible: false,
 
-      activeTab: localStorage.getItem('workflowTab') ? localStorage.getItem('workflowTab') : 'workflowList',
+      activeTab: location.href.includes('monitor')
+        ? 'monitorTab'
+        : localStorage.getItem('workflowTab')
+        ? localStorage.getItem('workflowTab')
+        : 'workflowList',
     });
   }
 
@@ -75,7 +83,7 @@ export default class AdminWorkflowList extends Component {
   componentDidMount() {
     const { projectId } = this.props.match.params;
 
-    this.getList(projectId);
+    this.getList();
     this.getWorkflowCount(projectId);
     this.getAutoOrderStatus(projectId);
   }
@@ -93,13 +101,12 @@ export default class AdminWorkflowList extends Component {
           keyWords: '',
           pageIndex: 1,
           sortId: 'createdDate',
-          isMore: true,
           loading: false,
         }),
       );
 
       const { projectId } = nextProps.match.params;
-      this.getList(projectId);
+      this.getList();
       this.getWorkflowCount(projectId);
     }
   }
@@ -111,13 +118,9 @@ export default class AdminWorkflowList extends Component {
   /**
    * 获取list
    */
-  getList(projectId) {
-    const { list, apkId, enabled, processListType, isAsc, keyWords, pageIndex, sortId, loading, isMore } = this.state;
-
-    // 加载更多
-    if (pageIndex > 1 && ((loading && isMore) || !isMore)) {
-      return;
-    }
+  getList() {
+    const { list, apkId, enabled, processListType, isAsc, keyWords, pageIndex, sortId } = this.state;
+    const { projectId } = this.props.match.params;
 
     this.setState({ loading: true });
 
@@ -133,7 +136,7 @@ export default class AdminWorkflowList extends Component {
       isAsc,
       keyWords,
       pageIndex,
-      pageSize: 30,
+      pageSize: 50,
       sortId,
     });
 
@@ -141,9 +144,7 @@ export default class AdminWorkflowList extends Component {
       this.setState({
         list: pageIndex === 1 ? result.processes : list.concat(result.processes),
         count: result.count,
-        pageIndex: pageIndex + 1,
         loading: false,
-        isMore: result.processes.length === 30,
       });
     });
   }
@@ -212,7 +213,7 @@ export default class AdminWorkflowList extends Component {
             },
             () => {
               if (this.state.autoPurchaseWorkflowExtPack && this.state.balance < 100) {
-                alert('当前账户余额不足100元，该功能可能无法正常运行');
+                alert('当前账户余额不足100元，该功能可能无法正常运行', 3);
               }
             },
           );
@@ -241,9 +242,8 @@ export default class AdminWorkflowList extends Component {
     }
 
     return (
-      <ScrollView className="flex" onScrollEnd={this.searchDataList}>
-        {list.map(item => this.renderListItem(item))}
-        {loading && pageIndex > 1 && <LoadDiv className="mTop15" size="small" />}
+      <ScrollView className="flex">
+        {loading ? <LoadDiv className="mTop15" size="small" /> : list.map(item => this.renderListItem(item))}
       </ScrollView>
     );
   }
@@ -267,8 +267,12 @@ export default class AdminWorkflowList extends Component {
             className={cx('flexColumn nameBox ThemeColor3 pointer', { unable: !item.enabled })}
             onClick={() => this.checkIsAppAdmin(item.apkId, item.id, item.processName)}
           >
-            <div className="ellipsis Font14">{item.processName}</div>
-            <div className="ellipsis Font12 Gray_bd">{item.apkName}</div>
+            <div className="ellipsis Font14" title={item.processName}>
+              {item.processName}
+            </div>
+            <div className="ellipsis Font12 Gray_bd" title={item.apkName}>
+              {item.apkName}
+            </div>
           </div>
         </div>
         <div className="columnWidth">{loading ? '-' : item.count.toString().replace(/(\d)(?=(\d{3})+$)/g, '$1,')}</div>
@@ -355,8 +359,7 @@ export default class AdminWorkflowList extends Component {
    * 搜索数据
    */
   searchDataList = _.throttle(() => {
-    const { projectId } = this.props.match.params;
-    this.getList(projectId);
+    this.getList();
   }, 200);
 
   changeTab = tab => {
@@ -368,7 +371,7 @@ export default class AdminWorkflowList extends Component {
     const { projectId } = this.props.match.params;
     const { apkId, enabled, processListType, isAsc, keyWords, pageIndex, sortId, activeTab } = this.state;
     if (activeTab !== 'workflowList') {
-      this.setState({ dateNow: Date.now() });
+      this.workflowMonotor && this.workflowMonotor.refreshWorkflowMonitor();
     } else {
       this.setState({ loading: true });
       processVersion
@@ -426,6 +429,12 @@ export default class AdminWorkflowList extends Component {
       activeTab,
     } = this.state;
     const { limitExecCount, useExecCount, quantity } = useCount;
+
+    const overage =
+      useExecCount / limitExecCount < 0.01 && useExecCount / limitExecCount > 0
+        ? 99.99
+        : ((limitExecCount - useExecCount) / limitExecCount) * 100;
+
     const enabledList = [
       { label: _l('全部状态'), value: 0 },
       { label: _l('开启'), value: 1 },
@@ -433,8 +442,8 @@ export default class AdminWorkflowList extends Component {
     ];
     const licenseType = md.global.Account.projects.find(o => o.projectId === params.projectId).licenseType;
     return (
-      <div className="adminWorkflowList flex flexColumn">
-        <div className="wokflowInfoHeader flexRow">
+      <div className="adminWorkflowList flex flexColumn orgManagementWrap">
+        <div className="flexRow orgManagementHeader">
           <div className="tabBox flexRow">
             {tablist.map(item => (
               <div
@@ -449,14 +458,14 @@ export default class AdminWorkflowList extends Component {
           </div>
           <div className="pre">
             <div
-              className={cx('refresh Hand Font20', { mRight24: activeTab === 'workflowList' })}
+              className={cx('refresh Hand Font20 Normal', { mRight24: activeTab === 'workflowList' })}
               onClick={this.refresh}
             >
               <Icon icon="task-later" />
             </div>
 
             {activeTab === 'workflowList' && (
-              <div className="pointer ThemeHoverColor3 Gray_9e" onClick={() => this.setState({ msgVisible: true })}>
+              <div className="pointer ThemeHoverColor3 Gray_9e Font13 Normal" onClick={() => this.setState({ msgVisible: true })}>
                 <Icon icon="workflow_sms" />
                 <span className="mLeft5">{_l('短信模版')}</span>
               </div>
@@ -465,7 +474,6 @@ export default class AdminWorkflowList extends Component {
         </div>
         {activeTab === 'workflowList' ? (
           <Fragment>
-            <AdminTitle prefix={_l('工作流')} />
             <div className="adminWorkflowCount flexRow">
               {useCount ? (
                 <Fragment>
@@ -494,24 +502,27 @@ export default class AdminWorkflowList extends Component {
                     className="bold"
                     style={{ color: (limitExecCount - useExecCount) / limitExecCount > 0.1 ? '#333' : '#f44336' }}
                   >
-                    {(((limitExecCount - useExecCount) / limitExecCount) * 100 || 0).toFixed(2)}%
+                    {(overage || 0).toFixed(2)}%
                   </span>
 
-                  {/* {licenseType === 1 ? (
+                  {/* licenseType === 1 ? (
                     <Link
                       className="ThemeColor3 ThemeHoverColor2 mLeft20 NoUnderline"
-                      to={`/admin/expansionservice/${params.projectId}/workflow`}
+                      to={`/admin/expansionserviceWorkflow/${params.projectId}/workflow`}
                     >
                       {_l('购买升级包')}
                     </Link>
                   ) : (
-                    <Link
+                    <a
+                      href="javascript:void(0);"
                       className="ThemeColor3 ThemeHoverColor2 mLeft20 NoUnderline"
-                      to={`/upgrade/choose?projectId=${params.projectId}`}
+                      onClick={() => {
+                        purchaseMethodFunc({ projectId: params.projectId });
+                      }}
                     >
                       {_l('购买付费版')}
-                    </Link>
-                  )} */}
+                    </a>
+                  ) */}
                 </Fragment>
               ) : (
                 _l('加载中...')
@@ -533,7 +544,7 @@ export default class AdminWorkflowList extends Component {
             </div>
             <div className="manageListSearch flexRow">
               <Select
-                className="w180 manageListSelect"
+                className="w180 mdAntSelect"
                 showSearch
                 defaultValue={apkId}
                 options={appList}
@@ -549,14 +560,14 @@ export default class AdminWorkflowList extends Component {
                 onChange={value => this.updateState({ apkId: value })}
               />
               <Select
-                className="w180 manageListSelect mLeft15"
+                className="w180 mdAntSelect mLeft15"
                 defaultValue={enabled}
                 options={enabledList}
                 suffixIcon={<Icon icon="arrow-down-border Font14" />}
                 onChange={value => this.updateState({ enabled: value })}
               />
               <Select
-                className="w180 manageListSelect mLeft15"
+                className="w180 mdAntSelect mLeft15"
                 defaultValue={processListType}
                 options={typeList}
                 suffixIcon={<Icon icon="arrow-down-border Font14" />}
@@ -565,7 +576,7 @@ export default class AdminWorkflowList extends Component {
 
               <div className="flex" />
               <Search
-                placeholder={_l('流程名称 / 创建者')}
+                placeholder={_l('流程名称 / 创建人')}
                 handleChange={keyWords => this.updateState({ keyWords: keyWords.trim() })}
               />
             </div>
@@ -601,16 +612,21 @@ export default class AdminWorkflowList extends Component {
                   <Icon icon="arrow-down" className={cx({ ThemeColor3: !isAsc && sortId === 'createdDate' })} />
                 </div>
               </div>
-              <div className="columnWidth">{_l('创建者')}</div>
+              <div className="columnWidth">{_l('创建人')}</div>
               <div className="w20 mRight20" />
             </div>
             {loading && pageIndex === 1 && <LoadDiv className="mTop15" />}
             <div className="flex flexColumn mTop16">{this.renderList()}</div>
+            <PaginationWrap
+              total={count}
+              pageIndex={pageIndex}
+              pageSize={50}
+              onChange={pageIndex => this.setState({ pageIndex }, this.getList)}
+            />
           </Fragment>
         ) : (
           <Fragment>
-            <AdminTitle prefix={_l('工作流')} />
-            <WorkflowMonitor match={this.props.match} dateNow={this.state.dateNow} />
+            <WorkflowMonitor match={this.props.match} ref={ele => (this.workflowMonotor = ele)} />
           </Fragment>
         )}
 
@@ -629,7 +645,7 @@ export default class AdminWorkflowList extends Component {
           title={_l('管理工作流“%0”', checkAdmin.title)}
           description={_l('如果你不是工作流所在应用的管理员，需要将自己加为管理员以获得权限')}
           cancelText=""
-          okText={checkAdmin.post ? _l('验证权限...') : _l('加为应用管理员')}
+          okText={checkAdmin.post ? _l('验证权限...') : _l('加为此应用管理员')}
           onOk={checkAdmin.post ? () => {} : this.addRoleMemberForAppAdmin}
           onCancel={() => this.setState({ checkAdmin: Object.assign({}, this.state.checkAdmin, { visible: false }) })}
         />

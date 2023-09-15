@@ -1,7 +1,7 @@
 import React, { Component } from 'react';
 import PropTypes from 'prop-types';
 import { autobind } from 'core-decorators';
-import { formatRecordToRelateRecord } from 'worksheet/util';
+import { formatRecordToRelateRecord, getRelateRecordCountFromValue } from 'worksheet/util';
 import { controlState } from 'src/components/newCustomFields/tools/utils';
 import { RELATE_RECORD_SHOW_TYPE } from 'worksheet/constants/enum';
 import RelateRecordDropdown from 'worksheet/components/RelateRecordDropdown';
@@ -33,12 +33,51 @@ export default class Widgets extends Component {
     this.state = {};
   }
 
+  cardsComp = React.createRef();
+
+  get count() {
+    const { value } = this.props;
+    let { count } = this.props;
+    const recordsCount = getRelateRecordCountFromValue(value);
+    return _.isUndefined(recordsCount) ? count : recordsCount;
+  }
+
+  get isCard() {
+    let { showtype = RELATE_RECORD_SHOW_TYPE.LIST } = this.props.advancedSetting; // 1 卡片 2 列表 3 下拉
+    return parseInt(showtype, 10) === RELATE_RECORD_SHOW_TYPE.CARD;
+  }
+
+  componentWillReceiveProps(nextProps) {
+    if (!this.isCard) {
+      return;
+    }
+    try {
+      if (nextProps.value === 'deleteRowIds: all') {
+        this.cardsComp.current.table.deleteAllRecord();
+        return;
+      }
+      const nextData = this.parseValue(nextProps.value);
+      if (_.get(nextData, '0.isWorksheetQueryFill')) {
+        const newRecords = nextData.map(item => JSON.parse(item.sourcevalue));
+        this.cardsComp.current.table.clearAndAdd(newRecords);
+      }
+    } catch (err) {}
+  }
+
+  shouldComponentUpdate(nextProps) {
+    const nextData = this.parseValue(nextProps.value);
+    return (nextProps.value !== 'deleteRowIds: all' && !_.get(nextData, '0.isWorksheetQueryFill')) || !this.isCard;
+  }
+
   parseValue(value) {
     if (!value) return [];
     let data = [];
     try {
       data = JSON.parse(value);
     } catch (err) {
+      return [];
+    }
+    if (!_.isObject(data)) {
       return [];
     }
     return _.isArray(data) ? data : [data];
@@ -54,13 +93,25 @@ export default class Widgets extends Component {
   }
 
   @autobind
-  handleChange(records) {
+  handleChange(args, type) {
     const { relationControls, onChange } = this.props;
-    onChange(JSON.stringify(formatRecordToRelateRecord(relationControls, records)));
+    if (type === 'array') {
+      onChange(JSON.stringify(formatRecordToRelateRecord(relationControls, args)));
+    } else {
+      const { count, records, deletedIds, addedIds } = args;
+      if (records.length) {
+        onChange(
+          JSON.stringify(formatRecordToRelateRecord(relationControls, records, { addedIds, deletedIds, count })),
+        );
+      } else {
+        onChange(`deleteRowIds: ${deletedIds.join(',')}`);
+      }
+    }
   }
 
   render() {
     const {
+      flag,
       viewId,
       worksheetId,
       from,
@@ -85,16 +136,22 @@ export default class Widgets extends Component {
       <React.Fragment>
         {showtype !== RELATE_RECORD_SHOW_TYPE.DROPDOWN || browserIsMobile() ? (
           <RelateRecordCards
+            ref={this.cardsComp}
+            flag={flag}
+            recordId={recordId}
             allowOpenRecord={advancedSetting.allowlink === '1'}
             editable={controlPermission.editable}
             control={{ ...this.props }}
+            count={this.count || 0}
             records={
               enumDefault === 1 && browserIsMobile() && showtype === RELATE_RECORD_SHOW_TYPE.DROPDOWN
                 ? records.filter((_, index) => !index)
                 : records
             }
             multiple={enumDefault === 2}
+            showCoverAndControls={advancedSetting.ddset === '1'}
             onChange={this.handleChange}
+            from={from}
           />
         ) : (
           <RelateRecordDropdown
@@ -114,9 +171,9 @@ export default class Widgets extends Component {
             multiple={enumDefault === 2}
             coverCid={coverCid}
             showControls={showControls}
-            allowOpenRecord={advancedSetting.allowlink === '1' && !_.get(window, 'shareState.shareId')}
+            allowOpenRecord={advancedSetting.allowlink === '1'}
             showCoverAndControls={advancedSetting.ddset === '1'}
-            onChange={this.handleChange}
+            onChange={records => this.handleChange(records, 'array')}
           />
         )}
       </React.Fragment>

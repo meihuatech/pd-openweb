@@ -7,7 +7,8 @@ import sheetAjax from 'src/api/worksheet';
 import RadioGroup from 'ming-ui/components/RadioGroup';
 import CustomFields from 'src/components/newCustomFields';
 import { SYSTEM_CONTROL_WITH_UAID, WORKFLOW_SYSTEM_CONTROL } from 'src/pages/widgetConfig/config/widget';
-import { CONTROL_EDITABLE_BLACKLIST } from 'worksheet/constants/enum';
+import quickSelectUser from 'ming-ui/functions/quickSelectUser';
+import { CONTROL_EDITABLE_WHITELIST } from 'worksheet/constants/enum';
 import { controlState } from 'src/components/newCustomFields/tools/utils';
 import { formatControlToServer } from 'src/components/newCustomFields/tools/utils.js';
 import { SYS } from 'src/pages/widgetConfig/config/widget.js';
@@ -34,6 +35,7 @@ export default class EditRecord extends Component {
   constructor(props) {
     super(props);
     this.state = {
+      isUpdating: false,
       worksheetId: props.worksheetId,
       controlsForSelect: [],
       selectedControlId: undefined, // 选中的要修改数据的字段id
@@ -57,7 +59,8 @@ export default class EditRecord extends Component {
       const controlsForSelect = data.template.controls.filter(
         control =>
           ((control.type < 10000 &&
-            !_.includes(CONTROL_EDITABLE_BLACKLIST, control.type) &&
+            _.includes(CONTROL_EDITABLE_WHITELIST, control.type) &&
+            !(control.type === 29 && _.get(control, 'advancedSetting.showtype') === '2') &&
             !_.find(SYSTEM_CONTROL_WITH_UAID.concat(WORKFLOW_SYSTEM_CONTROL), { controlId: control.controlId }) &&
             !_.find(view.controls, id => control.controlId === id)) ||
             control.controlId === 'ownerid') &&
@@ -93,32 +96,30 @@ export default class EditRecord extends Component {
   selectOwner(e) {
     const _this = this;
     const { appId, projectId } = this.props;
-    $(e.target)
-      .closest('.selectOwner')
-      .quickSelectUser({
+    quickSelectUser($(e.target).closest('.selectOwner')[0], {
+      projectId: projectId,
+
+      showMoreInvite: false,
+      isTask: false,
+      tabType: 3,
+      appId,
+      includeUndefinedAndMySelf: true,
+      offset: {
+        top: 2,
+        left: 0,
+      },
+      zIndex: 10001,
+      SelectUserSettings: {
+        unique: true,
         projectId: projectId,
-        showQuickInvite: false,
-        showMoreInvite: false,
-        isTask: false,
-        tabType: 3,
-        appId,
-        includeUndefinedAndMySelf: true,
-        offset: {
-          top: 2,
-          left: -68,
-        },
-        zIndex: 10001,
-        SelectUserSettings: {
-          unique: true,
-          projectId: projectId,
-          callback(users) {
-            _this.setState({ ownerAccount: users[0], hasError: false });
-          },
-        },
-        selectCb(users) {
+        callback(users) {
           _this.setState({ ownerAccount: users[0], hasError: false });
         },
-      });
+      },
+      selectCb(users) {
+        _this.setState({ ownerAccount: users[0], hasError: false });
+      },
+    });
   }
 
   @autobind
@@ -128,6 +129,7 @@ export default class EditRecord extends Component {
       appId,
       viewId,
       worksheetId,
+      recordId,
       selectedRows,
       worksheetInfo,
       searchArgs,
@@ -172,7 +174,7 @@ export default class EditRecord extends Component {
     }
     const hasAuthRowIds = selectedRows.filter(row => row.allowedit || row.allowEdit).map(row => row.rowid);
     if (!allWorksheetIsSelected && hasAuthRowIds.length === 0) {
-      alert(_l('无权限修改选择的%0', worksheetInfo.entityName));
+      alert(_l('无权限修改选择的%0', worksheetInfo.entityName), 2);
       return false;
     }
     if (hasError) {
@@ -197,7 +199,7 @@ export default class EditRecord extends Component {
     if (!selectedControl) {
       return;
     }
-    const needUpdateControl = formatControlToServer(selectedControl);
+    const needUpdateControl = formatControlToServer(selectedControl, { needFullUpdate: !recordId });
     if ((needUpdateControl.type === 29 || needUpdateControl.type === 35) && needUpdateControl.value) {
       try {
         needUpdateControl.relationValues = JSON.parse(needUpdateControl.value);
@@ -235,12 +237,11 @@ export default class EditRecord extends Component {
       args.keyWords = searchArgs.keyWords;
       args.searchType = searchArgs.searchType;
     }
-
-    this.updating = true;
+    this.setState({ isUpdating: true });
 
     sheetAjax.updateWorksheetRows(args).then(data => {
-      this.updating = false;
       if (data.isSuccess) {
+        this.setState({ isUpdating: false });
         clearSelect();
         hideEditRecord();
         if (data.successCount === selectedRows.length) {
@@ -309,6 +310,7 @@ export default class EditRecord extends Component {
 
   render() {
     const {
+      isUpdating,
       updateType,
       selectedControlId,
       formData = [],
@@ -327,8 +329,12 @@ export default class EditRecord extends Component {
         overlayClosable={false}
         width="560"
         anim={false}
-        okDisabled={selectedControl && selectedControl.required && selectedControl.unique}
+        okText={isUpdating ? _l('操作中...') : undefined}
+        okDisabled={(selectedControl && selectedControl.required && selectedControl.unique) || isUpdating}
         onCancel={() => {
+          if (isUpdating) {
+            return;
+          }
           hideEditRecord();
         }}
         onOk={this.updateRecords}

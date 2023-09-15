@@ -10,8 +10,8 @@ import FixedContent from './FixedContent';
 import { getIds } from '../../pages/PageHeader/util';
 import { connect } from 'react-redux';
 import { setAppStatus } from '../../pages/PageHeader/redux/action';
-import { ADVANCE_AUTHORITY } from 'src/pages/PageHeader/AppPkgHeader/config';
 import _ from 'lodash';
+import { canEditApp } from 'src/pages/worksheet/redux/actions/util';
 
 @connect(state => ({ appPkg: state.appPkg }), dispatch => ({ setAppStatus: status => dispatch(setAppStatus(status)) }))
 export default class Application extends Component {
@@ -39,7 +39,10 @@ export default class Application extends Component {
   }
 
   componentWillReceiveProps(nextProps) {
-    if (nextProps.match.params.appId !== this.props.match.params.appId) {
+    if (
+      nextProps.match.params.appId !== this.props.match.params.appId ||
+      (window.redirected && location.href.indexOf('from=system') > -1)
+    ) {
       this.checkApp(nextProps.match.params.appId);
     }
   }
@@ -92,16 +95,16 @@ export default class Application extends Component {
       appId = md.global.Account.appId;
     }
     const { permissionType, fixed, pcDisplay } = appPkg;
-    const isAuthorityApp = permissionType >= ADVANCE_AUTHORITY;
+    const isAuthorityApp = canEditApp(permissionType);
     if (status === 0) {
       return <LoadDiv />;
     }
-    if ((pcDisplay || fixed) && !isAuthorityApp) {
+    if ((pcDisplay || fixed) && !isAuthorityApp && !_.includes(pathname, 'role')) {
       return <FixedContent appPkg={appPkg} isNoPublish={pcDisplay} />;
     }
     if (_.includes([1], status) || (status === 5 && _.includes(pathname, 'role'))) {
       return <Switch>{this.genRouteComponent(md.global.Account.isPortal ? PORTAL_ROUTE_CONFIG : ROUTE_CONFIG)}</Switch>;
     }
-    return <UnusualContent status={status} appId={appId} />;
+    return <UnusualContent appPkg={appPkg} status={status} appId={appId} />;
   }
 }

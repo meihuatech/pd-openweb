@@ -6,7 +6,7 @@ import _ from 'lodash';
 export const getMembersList = (appId, roleId) => (dispatch, getState) => {
   dispatch({ type: 'MOBILE_LIST_FETCH_START' });
   Promise.all([
-    homeAppAjax.getAppDetail({ appId }).then(),
+    homeAppAjax.getApp({ appId }).then(),
     // ajaxRequest.getRoleDetail({ appId, roleId }).then(),
     ajaxRequest.getRolesWithUsers({ appId }).then(),
   ]).then(res => {
@@ -73,7 +73,7 @@ export const exitRole =
           if (res.isRoleDepartment) {
             callback();
           } else {
-            Modal.alert(_l('无法退出通过部门加入的角色'), _l('您所在的部门被加入了此角色，只能由应用管理员进行操作'), [
+            Modal.alert(_l('无法退出非“人员”类型成员加入的角色'), _l('非“人员”类型的成员，只能由管理员或运营者操作'), [
               {
                 text: _l('确定'),
                 onPress: () => {},

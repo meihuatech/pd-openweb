@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { Dialog, Icon } from 'ming-ui';
-import 'src/components/uploadAttachment/uploadAttachment';
 import cx from 'classnames';
 import { Select } from 'antd';
 const { Option } = Select;
@@ -76,15 +75,11 @@ export default function BatchDialog(props) {
             width: '100%',
           }}
           notFoundContent={_l('无相关角色')}
-        >
-          {roleInfos.map((o, i) => {
-            return (
-              <Option key={o.roleId} value={o.roleId}>
-                {o.name}
-              </Option>
-            );
+          filterOption={(input, option) => option.label.includes(input)}
+          options={roleInfos.map((o, i) => {
+            return { label: o.name, value: o.roleId };
           })}
-        </Select>
+        ></Select>
       </Wrap>
     </Dialog>
   );

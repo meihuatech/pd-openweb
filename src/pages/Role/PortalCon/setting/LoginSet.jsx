@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { Icon, LoadDiv, Dialog } from 'ming-ui';
+import { Icon, LoadDiv } from 'ming-ui';
 import cx from 'classnames';
 import 'src/components/uploadAttachment/uploadAttachment';
-import color from 'color';
 import { COLORS, BGTYPE } from 'src/pages/Role/PortalCon/tabCon/util';
 import cbg from './img/center.png';
 import cCbg from './img/centerC.png';
@@ -137,8 +136,8 @@ const Wrap = styled.div`
   }
   .bgTypeUl {
     .bgTypeUlLi {
-      width: 100px;
       height: 36px;
+      padding: 0 20px;
       background: #ffffff;
       border: 1px solid #f5f5f5;
       border-radius: 0px 3px 3px 0px;
@@ -292,7 +291,10 @@ const WrapCon = styled.div`
 export default function LoginSet(props) {
   const { appId, appPkg, onChangePortalSet } = props;
   const [portalSetModel, setPortalSetModel] = useState({});
-  const { iconColor = '#00bcd4', iconUrl = 'https://fp1.mingdaoyun.cn/customIcon/0_lego.svg' } = appPkg;
+  const {
+    iconColor = '#00bcd4',
+    iconUrl = md.global.FileStoreConfig.pubHost.replace(/\/$/, '') + '/customIcon/0_lego.svg',
+  } = appPkg;
   const [uploadLoading, setUploadLoading] = useState(false);
   const [uploadBgLoading, setUploadBgLoading] = useState(false);
 
@@ -517,7 +519,7 @@ export default function LoginSet(props) {
                     return (
                       <li
                         className={cx('colorLi InlineBlock Hand', { current: portalSetModel.backColor === item })}
-                        style={{ backgroundColor: color(item) }}
+                        style={{ backgroundColor: item }}
                         onClick={() => {
                           onChangePortalSet({
                             portalSetModel: {

@@ -20,7 +20,7 @@ export const GROUPFILTER_CONDITION_TYPE = [
   // 23, // 地区 19'省23'省-市'24'省-市-县'
   // 24, // 地区 19'省23'省-市'24'省-市-县'
   // 21, // 自由连接
-  // 22, // 分段
+  // 22, // 分割线
   // 25, // 大写金额
   // 26, // 成员
   // 27, // 部门
@@ -139,3 +139,71 @@ export const getSetHtmlData = type => {
     });
   return data;
 };
+
+export const HIERARCHY_VIEW_TYPE = [
+  {
+    text: _l('横向显示'),
+    value: '0',
+    icon: 'icon-horizontal',
+  },
+  {
+    text: _l('竖向显示'),
+    value: '1',
+    icon: 'icon-vertically',
+  },
+  {
+    text: _l('混合显示'),
+    value: '2',
+    icon: 'icon-mix',
+  },
+];
+
+export const CONNECT_LINE_TYPE = [
+  {
+    text: _l('曲线'),
+    value: '0',
+  },
+  {
+    text: _l('直线'),
+    value: '1',
+  },
+];
+
+export const HIERARCHY_MIX_LEVEL = [
+  {
+    text: _l('2级'),
+    value: '2',
+  },
+  {
+    text: _l('3级'),
+    value: '3',
+  },
+  {
+    text: _l('4级'),
+    value: '4',
+  },
+  {
+    text: _l('5级'),
+    value: '5',
+  },
+  {
+    text: _l('6级'),
+    value: '6',
+  },
+  {
+    text: _l('7级'),
+    value: '7',
+  },
+  {
+    text: _l('8级'),
+    value: '8',
+  },
+  {
+    text: _l('9级'),
+    value: '9',
+  },
+  {
+    text: _l('10级'),
+    value: '10',
+  },
+]

@@ -28,6 +28,7 @@ import { DEFAULT_SETTING_OPTIONS } from '../../config/setting';
 import DynamicDefaultValue from '../components/DynamicDefaultValue';
 import WidgetVerify from '../components/WidgetVerify';
 import { SYSTEM_CONTROLS } from 'worksheet/constants/enum';
+import WidgetRowHeight from '../components/WidgetRowHeight';
 const { AddSubList, ConfigureControls, Sort } = subListComponents;
 
 const SettingModelWrap = styled.div`
@@ -52,13 +53,14 @@ export default function SubListSetting(props) {
   const { widgetName, icon, intro, moreIntroLink } = info;
   const { worksheetId: currentWorksheetId } = globalSheetInfo;
   const { controlId, dataSource, relationControls = [], showControls = [], advancedSetting = {} } = data;
-  const { allowadd, allowsingle } = advancedSetting;
+  const { allowadd, allowsingle, allowexport = '1', hidenumber } = advancedSetting;
   const batchcids = getAdvanceSetting(data, 'batchcids') || [];
   const [sheetInfo, setInfo] = useState({});
   const [subQueryConfigs, setSubQueryConfigs] = useState([]);
   const [subListMode, setMode] = useState('new');
   const [loading, setLoading] = useState(false);
   const [visible, setVisible] = useState(batchcids.length > 0);
+  const [needUpdate, setUpdate] = useState(false);
 
   const [{ setTitleVisible, switchVisible, sortVisible }, setConfig] = useSetState({
     setTitleVisible: false,
@@ -94,7 +96,7 @@ export default function SubListSetting(props) {
     if (saveIndex && dataSource && !dataSource.includes('-')) {
       setLoading(true);
       worksheetAjax
-        .getWorksheetInfo({ worksheetId: dataSource, getTemplate: true })
+        .getWorksheetInfo({ worksheetId: dataSource, getTemplate: true, getControlType: 11 })
         .then(res => {
           const controls = _.get(res, ['template', 'controls']);
           const saveData = _.find(allControls, i => i.controlId === data.controlId);
@@ -148,7 +150,22 @@ export default function SubListSetting(props) {
   };
 
   const filterRelationControls = info => {
-    return (_.get(info, ['template', 'controls']) || []).filter(item => !_.includes([45, 47, 49], item.type));
+    const reControls = _.get(info, ['template', 'controls']) || _.get(info, 'relationControls') || [];
+    const needShow = (showControls || []).some(i => {
+      const c = _.find(reControls || [], a => a.controlId === i) || {};
+      return (
+        c.type === 34 ||
+        (c.type === 29 && String(c.enumDefault) === '2' && _.get(c, 'advancedSetting.showtype') === '2')
+      );
+    });
+    return reControls.filter(item =>
+      needShow
+        ? !_.includes([45, 47, 49, 51], item.type)
+        : !(
+            _.includes([34, 45, 47, 49, 51], item.type) ||
+            (item.type === 29 && String(item.enumDefault) === '2' && _.get(item, 'advancedSetting.showtype') === '2')
+          ),
+    );
   };
 
   useEffect(() => {
@@ -158,13 +175,13 @@ export default function SubListSetting(props) {
       setMode('new');
       return;
     }
-    if ((window.subListSheetConfig[controlId] || {}).status) {
+    if ((window.subListSheetConfig[controlId] || {}).status && !needUpdate) {
       setMode(_.get(window.subListSheetConfig[controlId], 'mode'));
       return;
     }
     setLoading(true);
     worksheetAjax
-      .getWorksheetInfo({ worksheetId: dataSource, getTemplate: true })
+      .getWorksheetInfo({ worksheetId: dataSource, getTemplate: true, getControlType: 11 })
       .then(res => {
         const controls = filterRelationControls(res);
         const defaultShowControls = getDefaultShowControls(controls);
@@ -176,7 +193,12 @@ export default function SubListSetting(props) {
           sheetInfo: res,
         };
         setMode(res.type === 2 ? 'new' : 'relate');
-        let oriShowControls = isEmpty(showControls) ? defaultShowControls : showControls;
+        setUpdate(false);
+        let oriShowControls = isEmpty(showControls)
+          ? defaultShowControls
+          : _.isEmpty(showControls.filter(s => find(controls, c => c.controlId === s)))
+          ? defaultShowControls.slice(0, (showControls || []).length)
+          : showControls;
         let nextData = {
           showControls:
             res.type === 2 ? oriShowControls.filter(i => !_.includes(['caid', 'utime', 'ctime'], i)) : oriShowControls,
@@ -191,7 +213,7 @@ export default function SubListSetting(props) {
       .always(() => {
         setLoading(false);
       });
-  }, [dataSource]);
+  }, [dataSource, needUpdate]);
 
   const onOk = ({ createType, sheetId, appId, controlName }) => {
     // 从空白创建时,创建一个占位dataSource
@@ -209,9 +231,7 @@ export default function SubListSetting(props) {
         description: _l('将子表字段转为关联记录字段'),
         okText: _l('确定'),
         onOk: () => {
-          onChange({
-            type: 29,
-          });
+          onChange({ ...handleAdvancedSettingChange(data, { searchrange: '1' }), type: 29 });
         },
       });
       return;
@@ -225,10 +245,6 @@ export default function SubListSetting(props) {
         ),
         okText: _l('确定'),
         onOk: () => {
-          setMode('relate');
-          if (window.subListSheetConfig[controlId]) {
-            window.subListSheetConfig[controlId].mode = 'relate';
-          }
           appManagementAjax
             .changeSheet({
               sourceWorksheetId: currentWorksheetId,
@@ -237,7 +253,14 @@ export default function SubListSetting(props) {
             })
             .then(res => {
               if (res) {
+                setMode('relate');
+                setUpdate(true);
+                if (window.subListSheetConfig[controlId]) {
+                  window.subListSheetConfig[controlId].mode = 'relate';
+                }
                 alert(_l('转换成功'));
+              } else {
+                alert(_l('转换失败'));
               }
             });
         },
@@ -266,6 +289,7 @@ export default function SubListSetting(props) {
           ) : (
             <LoadDiv />
           )}
+          <WidgetRowHeight {...props} />
         </Fragment>
       );
     }
@@ -290,6 +314,7 @@ export default function SubListSetting(props) {
             }}
           />
         )}
+        <WidgetRowHeight {...props} />
       </Fragment>
     );
   };
@@ -311,9 +336,11 @@ export default function SubListSetting(props) {
                 <i className="icon-help Gray_9e Font16"></i>
               </span>
             </Tooltip>
-            <div className="transferToSheet" onClick={() => switchType('new')}>
-              {_l('转为工作表')}
-            </div>
+            {dataSource && dataSource.includes('-') ? null : (
+              <div className="transferToSheet" onClick={() => switchType('new')}>
+                {_l('转为工作表')}
+              </div>
+            )}
           </div>
         ) : (
           <div className="title relative">
@@ -376,7 +403,7 @@ export default function SubListSetting(props) {
           )}
         </SettingItem>
       )}
-      <DynamicDefaultValue {...props} />
+      <DynamicDefaultValue {...props} appId={sheetInfo.appId} />
       <SettingItem>
         <div className="settingItemTitle">{_l('操作')}</div>
         {DEFAULT_SETTING_OPTIONS.map(item => {
@@ -462,6 +489,37 @@ export default function SubListSetting(props) {
           )}
         </SettingItem>
       )}
+      <SettingItem>
+        <div className="settingItemTitle">{_l('设置')}</div>
+        <div className="labelWrap">
+          <Checkbox
+            size="small"
+            checked={hidenumber === '1'}
+            text={_l('隐藏序号')}
+            onClick={checked => {
+              onChange(
+                handleAdvancedSettingChange(data, {
+                  hidenumber: checked ? '0' : '1',
+                }),
+              );
+            }}
+          />
+        </div>
+        <div className="labelWrap">
+          <Checkbox
+            size="small"
+            checked={allowexport === '1'}
+            text={_l('允许导出')}
+            onClick={checked => {
+              onChange(
+                handleAdvancedSettingChange(data, {
+                  allowexport: checked ? '0' : '1',
+                }),
+              );
+            }}
+          />
+        </div>
+      </SettingItem>
       {subListMode !== 'new' && dataSource !== currentWorksheetId && (
         <SheetComponents.BothWayRelate
           worksheetInfo={sheetInfo}

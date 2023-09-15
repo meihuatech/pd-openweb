@@ -74,13 +74,17 @@ export default class XAxis extends Component {
     );
   }
   handleVerification = (data, isAlert = false) => {
-    const { reportType } = this.props.currentReport;
+    const { reportType, split, yaxisList } = this.props.currentReport;
     if ([reportTypes.CountryLayer].includes(reportType) && !isAreaControl(data.type)) {
       isAlert && alert(_l('行政区域图仅支持地区字段可作为x轴维度'), 2);
       return false;
     }
-    if ([reportTypes.RadarChart, reportTypes.FunnelChart].includes(reportType) && isTimeControl(data.type)) {
+    if ([reportTypes.FunnelChart].includes(reportType) && isTimeControl(data.type)) {
       isAlert && alert(_l('时间类型不能作为x轴维度'), 2);
+      return false;
+    }
+    if ([reportTypes.BarChart, reportTypes.RadarChart].includes(reportType) && split.controlId && yaxisList.length > 1) {
+      isAlert && alert(_l('多数值时不能同时配置维度和分组'), 2);
       return false;
     }
     if (isXAxisControl(data.type)) {
@@ -302,7 +306,7 @@ export default class XAxis extends Component {
             </Tooltip>
           )
         )}
-        <Dropdown overlay={this.renderOverlay(axis)} trigger={['click']} placement="bottomRight">
+        <Dropdown overlay={this.renderOverlay(axis || {})} trigger={['click']} placement="bottomRight">
           <Icon className="Gray_9e Font18 pointer" icon="arrow-down-border" />
         </Dropdown>
         <Icon className="Gray_9e Font18 pointer mLeft10" icon="close" onClick={this.props.removeXaxes} />

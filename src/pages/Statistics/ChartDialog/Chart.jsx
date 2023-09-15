@@ -86,21 +86,23 @@ export default class Chart extends Component {
     });
   }
   renderChart() {
-    const { reportData, currentReport, base, getReportSingleCacheId, requestOriginalData, changeCurrentReport } = this.props;
-    const { settingVisible, report = {} } = base;
+    const { reportData, currentReport, base, direction, getReportSingleCacheId, requestOriginalData, changeCurrentReport } = this.props;
+    const { settingVisible, report = {}, sourceType } = base;
     const reportId = report.id;
-    const { reportType } = reportData;
+    const { reportType, valueMap } = reportData;
     const Chart = charts[reportType];
     const isPublicShareChart = location.href.includes('public/chart');
-    const isPublicSharePage = location.href.includes('public/page') || window.shareAuthor;
+    const isPublicSharePage = location.href.includes('public/page') || window.shareAuthor || window.share;
 
     const props = {
+      sourceType,
       isViewOriginalData: !settingVisible && !isMobile && !isPublicShareChart && !isPublicSharePage,
       requestOriginalData,
+      direction,
     };
 
     if ([reportTypes.PivotTable].includes(reportType)) {
-      const { data, columns, ylist, lines, valueMap } = reportData;
+      const { data, columns, ylist, lines } = reportData;
       return _.isEmpty(data.data) ? (
         <WithoutData />
       ) : (
@@ -136,6 +138,22 @@ export default class Chart extends Component {
         <WithoutData />
       );
     }
+    if ([reportTypes.GaugeChart, reportTypes.ProgressChart].includes(reportType)) {
+      const { map } = reportData;
+      if (_.isEmpty(map)) {
+        return <WithoutData />
+      } else {
+        return (
+          <Chart
+            {...props}
+            reportData={{
+              ...currentReport,
+              map,
+            }}
+          />
+        );
+      }
+    }
     if (
       [
         reportTypes.BarChart,
@@ -143,6 +161,10 @@ export default class Chart extends Component {
         reportTypes.RadarChart,
         reportTypes.FunnelChart,
         reportTypes.DualAxes,
+        reportTypes.BidirectionalBarChart,
+        reportTypes.ScatterChart,
+        reportTypes.WordCloudChart,
+        reportTypes.TopChart,
       ].includes(reportType)
     ) {
       const { map, contrastMap, summary, rightY = {} } = reportData;
@@ -153,6 +175,7 @@ export default class Chart extends Component {
             ...currentReport,
             map,
             contrastMap,
+            valueMap,
             summary: settingVisible ? currentReport.summary : summary,
             rightY: settingVisible ? currentReport.rightY : rightY,
             reportId,
@@ -186,11 +209,7 @@ export default class Chart extends Component {
         contrast,
         contrastMap
       };
-      if (map.length || contrast.length || contrastMap.length) {
-        return <Chart {...props} reportData={params} />;
-      } else {
-        return <WithoutData />;
-      }
+      return <Chart {...props} reportData={params} />;
     }
   }
   render() {
@@ -218,13 +237,13 @@ export default class Chart extends Component {
         ref={this.$chartRef}
       >
         <div className={cx('chart flexColumn', direction)}>
-          {reportData.status ? renderHeaderDisplaySetup() : null}
+          {reportData.status > 0 ? renderHeaderDisplaySetup() : null}
           {loading ? (
             <Loading />
-          ) : reportData.status ? (
+          ) : reportData.status > 0 ? (
             <Fragment>{this.renderChart()}</Fragment>
           ) : (
-            <Abnormal isEdit={settingVisible ? !(viewId && _.isEmpty(view)) : false} />
+            <Abnormal isEdit={settingVisible ? !(viewId && _.isEmpty(view)) : false} status={reportData.status} />
           )}
         </div>
         {sheetVisible && (
@@ -243,6 +262,16 @@ export default class Chart extends Component {
                     dragMaskVisible: false,
                     dragValue,
                     sheetSize,
+                  }, () => {
+                    const { style } = reportData;
+                    if (
+                      direction === 'vertical' &&
+                      reportData.reportType === reportTypes.PivotTable &&
+                      (style.pivotTableColumnFreeze || style.pivotTableLineFreeze) &&
+                      style.paginationVisible
+                    ) {
+                      this.props.getReportData();
+                    }
                   });
                   safeLocalStorageSetItem(`${direction}ChartSheetDragValue`, dragValue);
                   safeLocalStorageSetItem(`${direction}ChartSheetSheetSize`, sheetSize);

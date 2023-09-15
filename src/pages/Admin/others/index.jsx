@@ -8,9 +8,8 @@ import projectSettingController from 'src/api/projectSetting';
 import Config from '../config';
 import ViewKeyDialog from './ViewKey';
 import { getFeatureStatus, buriedUpgradeVersionDialog, encrypt, upgradeVersionDialog } from 'src/util';
+import { VersionProductType } from 'src/util/enum';
 import _ from 'lodash';
-
-const API_PROXY_FEATURE_ID = 22;
 
 const headerTitle = {
   index: _l('其他'),
@@ -24,7 +23,7 @@ const DATA_INFO = [
     label: _l('LDAP用户目录'),
     showSetting: true,
     description: _l('在付费版下，您可以集成LDAP用户目录，实现统一身份认证管理 （需确保员工的账号已和邮箱绑定）'),
-    featureId: 15,
+    featureId: VersionProductType.LDAPIntergration,
   },
   {
     key: 'orgKey',
@@ -37,9 +36,9 @@ const DATA_INFO = [
     key: 'webProxy',
     label: _l('API网络代理'),
     showSetting: true,
-    docLink: 'https://help.mingdao.com/apiproxy.html',
+    docLink: 'https://help.mingdao.com/apiproxy',
     description: _l('启用后，您可以在发送API请求时选择通过设置的代理服务器发送'),
-    featureId: 22,
+    featureId: VersionProductType.apiRequestProxy,
   },
   {
     key: 'sso',
@@ -47,6 +46,12 @@ const DATA_INFO = [
     showSetting: true,
     description: _l('您可以通过组织的二级域名，以SSO登录方式登录到平台'),
   },
+  // {
+  //   key: 'integrationAuthority',
+  //   label: _l('只允许管理员访问集成中心'),
+  //   showSetting: false,
+  //   description: _l('启用后，只有组织的应用管理员可以访问集成中心。关闭时，所有人都可以访问'),
+  // },
 ];
 const ipRegExp = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$|^(([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]*[a-zA-Z0-9])\.)+([A-Za-z]|[A-Za-z][A-Za-z0-9\-]*[A-Za-z0-9])$/;
 const portRegExp = new RegExp(
@@ -127,7 +132,7 @@ export default class OtherTool extends Component {
   }
 
   getApiProxyState = () => {
-    const apiProxyFeatureType = getFeatureStatus(Config.projectId, API_PROXY_FEATURE_ID);
+    const apiProxyFeatureType = getFeatureStatus(Config.projectId, VersionProductType.apiRequestProxy);
     if (!apiProxyFeatureType) return;
     projectSettingController.getApiProxyState({ projectId: Config.projectId }).then(res => {
       this.setState({ webProxy: res });
@@ -695,7 +700,7 @@ export default class OtherTool extends Component {
               DNGroupList: searchRange === 1 ? DNGroupList : [{ dn: '', groupName: '' }],
             });
           } else {
-            alert(_l('连接失败，请确保系统能够正常访问您的服务器'), 3);
+            alert(_l('连接失败，请确保系统能够正常访问您的服务器'), 2);
             this.setState({ saveDisabled: false });
           }
         })
@@ -923,7 +928,7 @@ export default class OtherTool extends Component {
       return <LoadDiv />;
     }
     return (
-      <div className="otherToolBox">
+      <div className="otherToolBox orgManagementWrap">
         {keyVisible && (
           <ViewKeyDialog
             projectId={Config.projectId}
@@ -931,7 +936,7 @@ export default class OtherTool extends Component {
             handleChangeVisible={this.handleChangeVisible.bind(this)}
           />
         )}
-        <div className="otherHeader">
+        <div className="orgManagementHeader">
           <Icon
             icon="backspace"
             className={cx('Hand mRight18 TxtMiddle Font24 adminHeaderIconColor', { hidden: level === 'index' })}

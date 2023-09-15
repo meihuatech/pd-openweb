@@ -22,7 +22,7 @@ export default class Card extends Component {
     });
   }
   renderHeader() {
-    const { stateTab, item } = this.props;
+    const { stateTab, item, showApproveChecked = true } = this.props;
     const { flowNode, workItem, flowNodeType, currentWorkFlowNodes, completeDate, instanceLog, status } = item;
     const type =
       ACTION_TYPES[
@@ -44,7 +44,7 @@ export default class Card extends Component {
       RenderRightHander = (
         <div className="valignWrapper">
           {this.renderTime()}
-          {stateTab === TABS.WAITING_APPROVE && this.renderCheckBox()}
+          {stateTab === TABS.WAITING_APPROVE && showApproveChecked && this.renderCheckBox()}
         </div>
       );
     }
@@ -71,7 +71,9 @@ export default class Card extends Component {
       const currentWorkFlowNode = currentWorkFlowNodes[currentWorkFlowNodes.length - 1];
       RenderState = (
         <div className="state bold valignWrapper">
-          <div className="Font13 Gray_75">{currentWorkFlowNode ? currentWorkFlowNode.name : flowNode.name}</div>
+          <div className="Font13 Gray_75">
+            {currentWorkFlowNodes.length > 1 ? _l('%0个节点', currentWorkFlowNodes.length) : (currentWorkFlowNode ? currentWorkFlowNode.name : flowNode.name)}
+          </div>
           <div className="info mLeft5 Gray_75 Font13">{_l('处理中…')}</div>
         </div>
       );
@@ -264,8 +266,8 @@ export default class Card extends Component {
   }
   renderCheckBox() {
     const { item, approveChecked, onAddApproveRecord, onRemoveApproveRecord } = this.props;
-    const { batchType } = item.flowNode || {};
-    const disabled = [-1, -2].includes(batchType);
+    const { batch } = item.flowNode || {};
+    const disabled = !batch;
     return (
       <div
         className="mLeft10"
@@ -279,7 +281,7 @@ export default class Card extends Component {
             checked={approveChecked}
             onChange={() => {
               if (approveChecked) {
-                onRemoveApproveRecord(item.id);
+                onRemoveApproveRecord(item.workId);
               } else {
                 onAddApproveRecord(item);
               }

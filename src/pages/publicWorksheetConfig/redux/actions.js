@@ -19,25 +19,31 @@ function changeKeyToServer(value) {
   return value;
 }
 
-export const updateSettings = value => (dispatch, getState) => {
-  const {
-    publicWorksheet: {
-      worksheetInfo: { worksheetId, projectId },
-    },
-  } = getState();
-  publicWorksheetAjax.saveSetting({
-    projectId,
-    worksheetId,
-    ...value,
-  })
-    .then(data => {
-      console.log('save success');
-      dispatch({ type: 'PUBLICWORKSHEET_UPDATE_SETTINGS', value });
-    })
-    .fail(err => {
-      alert(_l('保存失败'), 3);
-    });
-};
+export const updateSettings =
+  (value, cb = isSuccess => {}) =>
+  (dispatch, getState) => {
+    const {
+      publicWorksheet: {
+        worksheetInfo: { worksheetId, projectId },
+      },
+    } = getState();
+    publicWorksheetAjax
+      .saveSetting({
+        projectId,
+        worksheetId,
+        ...value,
+      })
+      .then(data => {
+        if (data) {
+          cb(true);
+          console.log('save success');
+          dispatch({ type: 'PUBLICWORKSHEET_UPDATE_SETTINGS', value });
+        }
+      })
+      .fail(err => {
+        cb(false);
+      });
+  };
 
 function updateBaseConfig(dispatch, getState, value, cb) {
   const {
@@ -49,11 +55,12 @@ function updateBaseConfig(dispatch, getState, value, cb) {
   const params = {
     ...serverValue,
   };
-  publicWorksheetAjax.saveWorksheet({
-    projectId,
-    worksheetId,
-    ...params,
-  })
+  publicWorksheetAjax
+    .saveWorksheet({
+      projectId,
+      worksheetId,
+      ...params,
+    })
     .then(data => {
       if (_.isFunction(cb)) {
         cb(worksheetId);
@@ -90,13 +97,14 @@ export function addWorksheetControl(controlName, cb = () => {}) {
         worksheetInfo: { worksheetId },
       },
     } = state;
-    formAjax.addTextControl({
-      worksheetId,
-      name: controlName,
-    })
+    formAjax
+      .addTextControl({
+        worksheetId,
+        name: controlName,
+      })
       .then(data => {
         dispatch({ type: 'PUBLICWORKSHEET_ADD_CONTROL', control: data });
-        dispatch(showControl(data));
+        dispatch(hideControl(data.controlId));
         cb(data);
       })
       .fail(err => {
@@ -107,24 +115,29 @@ export function addWorksheetControl(controlName, cb = () => {}) {
 
 export function loadPublicWorksheet({ worksheetId }) {
   return (dispatch, getState) => {
-    publicWorksheetAjax.getPublicWorksheetInfo({ worksheetId })
+    publicWorksheetAjax
+      .getPublicWorksheetInfo({ worksheetId })
       .then(data => {
         dispatch({
           type: 'PUBLICWORKSHEET_LOAD_SUCCESS',
           controls: data.controls,
           originalControls: data.originalControls.filter(
             control =>
-              !(control.type === 29 && !_.includes([0, 1], control.enumDefault2)) &&
-              !_.includes(['caid', 'ownerid', 'ctime', 'utime'], control.controlId),
+              !(
+                (control.type === 29 && !_.includes([0, 1], control.enumDefault2)) ||
+                (control.type === 51 && _.get(control, 'advancedSetting.showtype') === '2')
+              ) && !_.includes(['caid', 'ownerid', 'ctime', 'utime'], control.controlId),
           ),
           shareId: data.shareId,
           url: data.url,
           worksheetInfo: {
             themeIndex: data.themeColor,
+            themeBgColor: data.themeBgColor,
             logoUrl: data.logo,
             coverUrl: data.cover,
             ..._.pick(data, [
               'worksheetName',
+              'advancedSetting',
               'name',
               'desc',
               'worksheetId',
@@ -147,6 +160,16 @@ export function loadPublicWorksheet({ worksheetId }) {
               'smsVerification',
               'smsVerificationFiled',
               'smsSignature',
+              'writeScope',
+              'linkSwitchTime',
+              'limitWriteTime',
+              'limitWriteCount',
+              'limitPasswordWrite',
+              'cacheDraft',
+              'cacheFieldData',
+              'weChatSetting',
+              'abilityExpand',
+              'completeNumber',
             ]),
           },
           hidedControlIds: data.hidedControlIds || [],
@@ -218,7 +241,8 @@ export function resetControls() {
         worksheetInfo: { worksheetId },
       },
     } = getState();
-    publicWorksheetAjax.reset({ worksheetId })
+    publicWorksheetAjax
+      .reset({ worksheetId })
       .then(data => {
         if (data && data.success) {
           data = data.info;
@@ -227,13 +251,16 @@ export function resetControls() {
             controls: data.controls,
             originalControls: data.originalControls.filter(
               control =>
-                !(control.type === 29 && !_.includes([0, 1], control.enumDefault2)) &&
-                !_.includes(['caid', 'ownerid', 'ctime', 'utime'], control.controlId),
+                !(
+                  (control.type === 29 && !_.includes([0, 1], control.enumDefault2)) ||
+                  (control.type === 51 && _.get(control, 'advancedSetting.showtype') === '2')
+                ) && !_.includes(['caid', 'ownerid', 'ctime', 'utime'], control.controlId),
             ),
             shareId: data.shareId,
             url: data.url,
             worksheetInfo: {
               themeIndex: data.themeColor,
+              themeBgColor: data.themeBgColor,
               logoUrl: data.logo,
               coverUrl: data.cover,
               ..._.pick(data, [
@@ -260,6 +287,16 @@ export function resetControls() {
                 'smsVerification',
                 'smsVerificationFiled',
                 'smsSignature',
+                'writeScope',
+                'linkSwitchTime',
+                'limitWriteTime',
+                'limitWriteCount',
+                'limitPasswordWrite',
+                'cacheDraft',
+                'cacheFieldData',
+                'weChatSetting',
+                'abilityExpand',
+                'completeNumber',
               ]),
             },
             hidedControlIds: data.hidedControlIds || [],
@@ -267,7 +304,7 @@ export function resetControls() {
         }
       })
       .fail(() => {
-        alert(_l('重置失败'));
+        alert(_l('重置失败'), 2);
       });
   };
 }

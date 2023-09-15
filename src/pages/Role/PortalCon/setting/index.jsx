@@ -199,7 +199,7 @@ class PortalSetting extends React.Component {
     let mdSign = getStrBytesLength(
       ((_.get(md, ['global', 'Account', 'projects']) || []).find(o => o.projectId === projectId) || {}).companyName,
     );
-    const {
+    let {
       pageTitle = '',
       smsSignature = mdSign,
       allowUserType,
@@ -212,6 +212,7 @@ class PortalSetting extends React.Component {
       appId,
       customizeName,
     } = portalSetModel;
+    smsSignature = smsSignature.replace(/\s*/g, ''); //去掉签名中的空格
     if (!customizeName) {
       return alert(_l('请输入外部门户名称'), 3);
     }
@@ -222,10 +223,10 @@ class PortalSetting extends React.Component {
       return alert(_l('请输入短信签名'), 3);
     }
     if (!/^[\u4E00-\u9FA5A-Za-z]+$/.test(smsSignature)) {
-      return alert(_l('短信签名只支持中英文'));
+      return alert(_l('短信签名只支持中英文'), 3);
     }
     if (getStringBytes(smsSignature) > 16) {
-      return alert(_l('短信签名最多只能16个字节'));
+      return alert(_l('短信签名最多只能16个字节'), 3);
     }
     if (!noClose) {
       this.setState({
@@ -246,10 +247,14 @@ class PortalSetting extends React.Component {
             'customizeName',
             'exAccountDiscussEnum',
             'allowExAccountDiscuss',
+            'approved',
             'loginMode',
             'registerMode',
             'subscribeWXOfficial',
             'emailSignature',
+            'approvedEmail',
+            'refusedEmail',
+            'inviteEmail',
           ]),
           epDiscussWorkFlow,
           appId,

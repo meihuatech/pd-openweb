@@ -84,7 +84,8 @@ export default class Search extends Component {
    */
   onSave = () => {
     const { data, saveRequest } = this.state;
-    const { name, appId, findFields, executeType, fields, selectNodeId, conditions, sorts, random, link } = data;
+    const { name, appId, findFields, executeType, fields, selectNodeId, conditions, sorts, random, link, filters } =
+      data;
 
     if (data.actionId === ACTION_ID.WORKSHEET_FIND && !appId) {
       alert(_l('必须先选择一个工作表'), 2);
@@ -111,6 +112,21 @@ export default class Search extends Component {
       return;
     }
 
+    if (filters.length) {
+      let hasError = false;
+
+      filters.forEach(item => {
+        if (checkConditionsIsNull(item.conditions)) {
+          hasError = true;
+        }
+      });
+
+      if (hasError) {
+        alert(_l('筛选条件的判断值不能为空'), 2);
+        return;
+      }
+    }
+
     if (saveRequest) {
       return;
     }
@@ -130,6 +146,7 @@ export default class Search extends Component {
         sorts,
         random,
         link,
+        filters,
       })
       .then(result => {
         this.props.updateNodeData(result);
@@ -180,6 +197,7 @@ export default class Search extends Component {
    * 渲染工作表
    */
   renderWorksheet() {
+    const { isApproval } = this.props;
     const { data, cacheKey } = this.state;
     const singleItem = (data.findFields || []).length ? data.findFields[0] : { fieldId: '' };
     const list = _.filter(
@@ -249,7 +267,7 @@ export default class Search extends Component {
           this.renderFieldAndRule()
         )}
 
-        {data.appId && (
+        {data.appId && !isApproval && (
           <FindResult executeType={data.executeType} allowAdd={true} switchExecuteType={this.switchExecuteType} />
         )}
 
@@ -286,6 +304,8 @@ export default class Search extends Component {
             })}
           </Fragment>
         )}
+
+        {isApproval && <div className="mTop20 bold">{_l('未获取到数据时：继续执行')}</div>}
       </Fragment>
     );
   }
@@ -443,13 +463,15 @@ export default class Search extends Component {
         companyId={this.props.companyId}
         processId={this.props.processId}
         selectNodeId={this.props.selectNodeId}
+        openNewFilter={!data.conditions.length}
         data={data}
         updateSource={this.updateSource}
-        showRandom={true}
+        showRandom
         filterText={_l(
           '设置筛选条件，查找满足条件的数据。如果未添加筛选条件则表示只通过排序规则从所有记录中获得唯一数据',
         )}
         sortText={_l('当查找到多个数据时，将按照以下排序规则获得第一条数据。如果未设置规则，返回最近更新的一条数据')}
+        filterEncryptCondition={data.actionId === ACTION_ID.WORKSHEET_FIND}
       />
     );
   }
@@ -504,7 +526,7 @@ export default class Search extends Component {
           bg="BGYellow"
           updateSource={this.updateSource}
         />
-        <div className="flex mTop20">
+        <div className="flex">
           <ScrollView>
             <div className="workflowDetailBox">{this.renderContent()}</div>
           </ScrollView>

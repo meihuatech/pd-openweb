@@ -120,7 +120,7 @@ export default function LoginContainer(props) {
     loginForTypeBack,
   } = props;
   let request = getRequest();
-  const [{ stateWX, scan, urlWX, isRegister, type, loading, sending, txt }, setState] = useSetState({
+  const [{ stateWX, scan, urlWX, isRegister, type, loading, sending, txt, hasCheck }, setState] = useSetState({
     stateWX: '',
     scan: true,
     urlWX: '', //微信二维码url
@@ -129,6 +129,7 @@ export default function LoginContainer(props) {
     loading: true, //二维码获取
     sending: false, //点击登录
     txt: '',
+    hasCheck: false,
   });
 
   useEffect(() => {
@@ -215,7 +216,7 @@ export default function LoginContainer(props) {
           } else if (accountResult === 30) {
             setState({ scan: true });
           } else if (accountResult === 32) {
-            //32用户已经扫码但是未关注公众号 暂时接着轮询 ????
+            //32用户已经扫码但是未关注公众号 暂时接着轮询
             setState({ scan: true });
           } else {
             if (accountResult === 1 || accountResult === 24) {
@@ -322,7 +323,7 @@ export default function LoginContainer(props) {
     externalPortalAjax
       .login({
         ...paramLogin,
-        account: dialCode + emailOrTel,
+        account: encrypt(dialCode + emailOrTel),
         verifyCode,
         captchaType: md.staticglobal.getCaptchaType(),
         ticket,
@@ -377,7 +378,7 @@ export default function LoginContainer(props) {
     const { ticket, randstr } = resRet;
     externalPortalAjax
       .pwdLogin({
-        account: dialCode + emailOrTel,
+        account: encrypt(dialCode + emailOrTel),
         password: encrypt(password),
         appId,
         verifyCode, //verifyCode不为空则代表是注册，为空则代表进行密码登录；
@@ -391,12 +392,19 @@ export default function LoginContainer(props) {
         const { accountResult, sessionId, accountId, projectId, state } = res;
         switch (accountResult) {
           case -1:
-            //-1代表用户不存在，则需要进入到密码注册流程；
-            setState({
-              isRegister: true,
-              sending: false,
-            });
-            alert(_l('请输入验证码'), 3);
+            if (allowUserType === 9) {
+              setState({
+                sending: false,
+              });
+              alert(_l('您未被邀请注册'), 3);
+            } else {
+              //-1代表用户不存在，则需要进入到密码注册流程；
+              setState({
+                isRegister: true,
+                sending: false,
+              });
+              alert(_l('请输入验证码'), 3);
+            }
             break;
           case -3:
             // -3代表密码不符合格式规范，后端会强行校验；
@@ -425,11 +433,19 @@ export default function LoginContainer(props) {
             });
             break;
           case -4:
-            //-4代表用户未设置密码不能以密码方式登录，需要使用其他模式登录
-            alert(_l('验证码登录后在个人信息页面完成密码设置!'), 2);
-            setState({
-              sending: false,
-            });
+            if (allowUserType === 9) {
+              //邀请注册，输入验证码
+              setState({
+                isRegister: true,
+                sending: false,
+              });
+            } else {
+              //-4代表用户未设置密码不能以密码方式登录，需要使用其他模式登录
+              alert(_l('未设置密码，请登录后完成密码设置!'), 2);
+              setState({
+                sending: false,
+              });
+            }
             break;
           default:
             loginCallback(res);
@@ -442,15 +458,6 @@ export default function LoginContainer(props) {
       <React.Fragment>
         {!paramForPcWx && (
           <div className="mTop16 flexRow alignItemsCenter">
-            <div
-              className="flexRow alignItemsCenter"
-              onClick={() => {
-                setAutoLogin(!isAutoLogin);
-              }}
-            >
-              <Checkbox checked={isAutoLogin} className="Hand" name="" />
-              <span className="Gray_9e Hand">{_l('7天内免登录')}</span>
-            </div>
             {findPassword && (
               <span
                 className="Hand ThemeHoverColor3 Gray_9e"
@@ -470,17 +477,30 @@ export default function LoginContainer(props) {
           })}
           onClick={() => {
             if (isValid()) {
+              if (termsAndAgreementEnable && !hasCheck) {
+                return alert(_l('请先勾选同意《用户协议》和《隐私政策》'), 3);
+              }
               sendCode();
             }
           }}
         >
-          {paramForPcWx ? _l('绑定并登录/注册') : allowUserType === 9 ? _l('登录') : _l('登录/注册')}
+          {paramForPcWx ? _l('绑定并登录/注册') : _l('登录/注册')}
           {sending ? '...' : ''}
         </div>
         {termsAndAgreementEnable && (
-          <div className=" mTop12">
-            <div className="InlineBlock Gray_9e mLeft5 TxtTop LineHeight22">
-              {_l('点登录即代表同意')}
+          <div className="mTop12 Gray_9e TxtTop LineHeight22 flexRow alignItemsCenter">
+            <Checkbox
+              checked={hasCheck}
+              onClick={() => {
+                setState({
+                  hasCheck: !hasCheck,
+                });
+              }}
+              className="Hand"
+              name=""
+            />
+            <div className="flex alignItemsCenter flexRow">
+              {_l('同意')}
               <span
                 className="ThemeColor3 Hand mRight5 mLeft5"
                 onClick={() => {
@@ -489,7 +509,7 @@ export default function LoginContainer(props) {
               >
                 《{_l('用户协议')}》
               </span>
-              {_l('和')}
+              {_l('与')}
               <span
                 className="ThemeColor3 Hand mLeft5"
                 onClick={() => {
@@ -501,7 +521,20 @@ export default function LoginContainer(props) {
             </div>
           </div>
         )}
-        <p className="txt mTop30 TxtCenter Gray">{allowUserType === 9 && _l('本应用不开放注册')}</p>
+        {!paramForPcWx && (
+          <div className="mTop12 flexRow alignItemsCenter">
+            <div
+              className="flexRow alignItemsCenter"
+              onClick={() => {
+                setAutoLogin(!isAutoLogin);
+              }}
+            >
+              <Checkbox checked={isAutoLogin} className="Hand" name="" />
+              <span className="Gray_9e Hand">{_l('7天内免登录')}</span>
+            </div>
+          </div>
+        )}
+        <p className="txt mTop30 TxtCenter Gray">{allowUserType === 9 && _l('仅受邀用户可以注册')}</p>
       </React.Fragment>
     );
   };

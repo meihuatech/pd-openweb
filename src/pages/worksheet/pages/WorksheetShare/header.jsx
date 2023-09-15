@@ -2,7 +2,6 @@ import PropTypes from 'prop-types';
 import React from 'react';
 import { navigateTo } from 'router/navigateTo';
 import { Icon } from 'ming-ui';
-import color from 'color';
 import mingdaoImg from './img/mingdao.png';
 import SvgIcon from 'src/components/SvgIcon';
 import { SHARE_TYPE } from './config';
@@ -55,7 +54,7 @@ class WorksheetShareHeader extends React.Component {
 
     pageSize: PropTypes.number,
     pageIndex: PropTypes.number,
-    filterControls: PropTypes.array
+    filterControls: PropTypes.array,
   };
 
   constructor(props) {
@@ -80,7 +79,7 @@ class WorksheetShareHeader extends React.Component {
         controlsId,
         pageIndex,
         pageSize,
-        filterControls
+        filterControls,
       } = this.props;
 
       const args = {
@@ -90,7 +89,7 @@ class WorksheetShareHeader extends React.Component {
         viewId,
         projectId,
         exportControlsId: (controlsId || []).concat(['rowid']),
-        filterControls: filterControls || [] ,
+        filterControls: filterControls || [],
         columnRpts: null,
         keyWords: '',
         searchType: 1,
@@ -130,7 +129,7 @@ class WorksheetShareHeader extends React.Component {
       a.remove();
       window.URL.revokeObjectURL(url);
     })().catch(() => {});
-  }
+  };
 
   render() {
     const {
@@ -174,10 +173,7 @@ class WorksheetShareHeader extends React.Component {
                   {_l('继续查询')}
                 </div>
                 {exported && (
-                  <div
-                    className="download"
-                    onClick={ () => this.exportExcel() }
-                  >
+                  <div className="download" onClick={() => this.exportExcel()}>
                     <Icon style={{ float: 'right', lineHeight: '100%' }} icon="file_download"></Icon>
                   </div>
                 )}
@@ -188,7 +184,7 @@ class WorksheetShareHeader extends React.Component {
                   <span
                     className="appIconWrapIcon"
                     style={{
-                      backgroundColor: color(iconColor),
+                      backgroundColor: iconColor,
                     }}
                   >
                     <SvgIcon url={iconUrl} fill="#fff" size={20} addClassName="mTop3" />
@@ -220,7 +216,9 @@ class WorksheetShareHeader extends React.Component {
               >
                 <Icon icon="backspace" className="backIcon" />
                 <div className="appName Gray Font17 overflow_ellipsis WordBreak">{relationRowsName}</div>
-                <div className="listNum Font17 Gray_75 mLeft8">({count})</div>
+                <div className="listNum Font17 Gray_75 mLeft8">{`(${
+                  count > 50 && isPublicquery ? _l('最多查询50条结果') : count
+                })`}</div>
               </div>
             
             </div>

@@ -5,7 +5,7 @@ import { Icon } from 'ming-ui';
 import { publishStatus2Text, formatDate } from 'src/pages/integration/config';
 import { Switch } from 'antd';
 import SvgIcon from 'src/components/SvgIcon';
-import { LogoWrap } from 'src/pages/integration/containers/style';
+import { LogoWrap } from 'src/pages/integration/apiIntegration/style';
 const Wrap = styled.div`
   z-index: 11111;
   p {
@@ -43,8 +43,10 @@ const Wrap = styled.div`
   .StatusTxt {
     opacity: 1;
     position: absolute;
+    max-width: 145px;
   }
   &:hover {
+    border: 1px solid #e8e8e8;
     .name {
       color: #2196f3;
     }
@@ -106,13 +108,14 @@ function APICard(props) {
         />
       </div>
       <div className="publishStatusCon">
-        <div className="StatusTxt">
-          {props.item.publishStatus === 1 && props.item.enabled && (
-            <span
-              className={cx('mLeft40 Font12', props.item.publishStatus === 1 ? 'ThemeColor3' : 'Gray_9e')}
-            >{`${formatDate(props.item.lastModifiedDate)} ${publishStatus2Text[props.item.publishStatus]}`}</span>
-          )}
-        </div>
+        {props.item.publishStatus === 1 && props.item.enabled && (
+          <span
+            className={cx(
+              'StatusTxt mLeft40 Font12 ellipsis',
+              props.item.publishStatus === 1 ? 'ThemeColor3' : 'Gray_9e',
+            )}
+          >{`${formatDate(props.item.lastModifiedDate)} ${publishStatus2Text[props.item.publishStatus]}`}</span>
+        )}
         <div className="optionCon mLeft40">
           <span data-tip={_l('日志')}>
             <Icon

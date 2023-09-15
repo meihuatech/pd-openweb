@@ -7,8 +7,8 @@ import groupController from 'src/api/group';
 import DialogLayer from 'src/components/mdDialog/dialog';
 import ReactDom from 'react-dom';
 import Empty from '../common/TableEmpty';
-import cx from 'classnames'
-import 'src/components/pager/pager';
+import cx from 'classnames';
+import PaginationWrap from '../components/PaginationWrap';
 import DialogSelectMapGroupDepart from 'src/components/dialogSelectMapGroupDepart/dialogSelectMapGroupDepart';
 import CreateGroup from 'src/components/group/create/creatGroup';
 import moment from 'moment';
@@ -31,7 +31,7 @@ export default class GroupsList extends Component {
       count: 0,
       list: [],
       pageIndex: 1, //页码
-      pageSize: 20, //条数
+      pageSize: 50, //条数
       selectKeys: [],
       keywords: '',
       status: undefined, //群组状态：open--1,close---0
@@ -64,7 +64,9 @@ export default class GroupsList extends Component {
           return (
             <div className="typeBox">
               <Tooltip popupPlacement="bottom" text={<span>{_l('关联部门：%0', record.mapDepartmentName)}</span>}>
-                <i className={cx('TxtMiddle mRight5 icon-official-group Font10', text ? 'color_y' : 'transparentColor')}></i>
+                <i
+                  className={cx('TxtMiddle mRight5 icon-official-group Font10', text ? 'color_y' : 'transparentColor')}
+                ></i>
               </Tooltip>
               {text ? _l('官方') : _l('普通')}
             </div>
@@ -152,27 +154,9 @@ export default class GroupsList extends Component {
     this.getGroupsList();
   }
 
-  setPager() {
-    const _this = this;
-    $('#divPager')
-      .show()
-      .Pager({
-        pageIndex: _this.state.pageIndex,
-        pageSize: _this.state.pageSize,
-        count: _this.state.count,
-        changePage: function(pIndex) {
-          _this.setState(
-            {
-              pageIndex: pIndex,
-              selectKeys: [],
-            },
-            () => {
-              _this.getGroupsList();
-            },
-          );
-        },
-      });
-  }
+  changPage = page => {
+    this.setState({ pageIndex: page, selectKeys: [] }, () => this.getGroupsList());
+  };
 
   getGroupsList() {
     this.setState({ loading: true, selectKeys: [] });
@@ -194,20 +178,12 @@ export default class GroupsList extends Component {
       reqData.groupType = this.state.types;
     }
     groupController.getGroups(reqData).then(data => {
-      this.setState(
-        {
-          count: data.allCount,
-          list: data.list,
-          loading: false,
-        },
-        () => {
-          if (this.state.count > this.state.pageSize) {
-            this.setPager();
-          } else {
-            $('#divPager').hide();
-          }
-        },
-      );
+      this.setState({
+        // count: data.allCount,
+        count: 49,
+        list: data.list,
+        loading: false,
+      });
     });
   }
 
@@ -231,7 +207,7 @@ export default class GroupsList extends Component {
     DialogSelectMapGroupDepart({
       projectId: Config.projectId,
       defaultSelectId: record.mapDepartmentId,
-      callback: function(data) {
+      callback: function (data) {
         _this.updateDeptMappingGroup(record.groupId, true, data.departmentId);
       },
     });
@@ -258,9 +234,9 @@ export default class GroupsList extends Component {
 
   handleSetDept(record) {
     const _this = this;
-    $('body').dialogSelectMapGroupDepart({
+    DialogSelectMapGroupDepart({
       projectId: Config.projectId,
-      callback: function(data) {
+      callback: function (data) {
         _this.updateDeptMappingGroup(record.groupId, true, data.departmentId);
       },
     });
@@ -277,7 +253,7 @@ export default class GroupsList extends Component {
       alert(_l('请选择关联部门'), 3);
       return;
     }
-    alert(_l('操作中，请稍候...'), 3, false);
+    alert(_l('操作中，请稍候...'), 3);
     groupController.updateGroupVerified(reqData).then(data => {
       if (data) {
         alert(_l('操作成功'), 1);
@@ -382,7 +358,7 @@ export default class GroupsList extends Component {
     const _this = this;
     CreateGroup.createInit({
       projectId: Config.projectId,
-      callback: function() {
+      callback: function () {
         _this.getGroupsList();
       },
     });
@@ -419,7 +395,7 @@ export default class GroupsList extends Component {
   };
 
   render() {
-    const { selectKeys, types, status, loading, list, count, pageSize } = this.state;
+    const { selectKeys, types, status, loading, list, count, pageSize, pageIndex } = this.state;
     const rowSelection = {
       selectedRowKeys: selectKeys,
       onChange: this.onSelectChange,
@@ -481,7 +457,7 @@ export default class GroupsList extends Component {
             </Select>
           </div>
         </div>
-        <div className="tableList Relative">
+        <div className="tableList">
           <ConfigProvider renderEmpty={GroupEmpty}>
             <Spin indicator={<LoadDiv />} spinning={loading}>
               <Table
@@ -492,9 +468,11 @@ export default class GroupsList extends Component {
                 pagination={false}
                 showSorterTooltip={false}
                 onChange={this.handleChangeSort.bind(this)}
-                scroll={{ y: count > pageSize ? 'calc(100vh - 330px)' : 'calc(100vh - 280px)' }}
+                scroll={count == 0 ? {} : { y: count > pageSize ? 'calc(100vh - 300px)' : 'calc(100vh - 260px)' }}
               />
-              <div id="divPager"></div>
+              {count > pageSize && (
+                <PaginationWrap total={count} pageIndex={pageIndex} pageSize={pageSize} onChange={this.changPage} />
+              )}
             </Spin>
           </ConfigProvider>
         </div>

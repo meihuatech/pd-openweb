@@ -9,6 +9,7 @@ import WithoutFidldItem from './WithoutFidldItem';
 import { WIDGETS_TO_API_TYPE_ENUM } from 'src/pages/widgetConfig/config/widget';
 import {
   normTypes,
+  textNormTypes,
   timeParticleSizeDropdownData,
   areaParticleSizeDropdownData,
   timeDataParticle,
@@ -18,7 +19,8 @@ import {
   isNumberControl,
   isTimeControl,
   isAreaControl,
-  filterDisableParticleSizeTypes
+  filterDisableParticleSizeTypes,
+  emptyShowTypes
 } from 'statistics/common';
 import { connect } from 'react-redux';
 import _ from 'lodash';
@@ -48,9 +50,11 @@ const renderOverlay = ({
   particleSizeType,
   disableParticleSizeTypes,
   xaxisEmpty,
+  emptyShowType,
   onNormType,
   onUpdateParticleSizeType,
   onUpdateXaxisEmpty,
+  onUpdateEmptyShowType,
   onSelectReNameId,
   onShowControl,
   verifyNumber
@@ -73,18 +77,45 @@ const renderOverlay = ({
       >
         {_l('重命名')}
       </Menu.Item>
-      <Menu.Item
-        className="flexRow valignWrapper"
-        onClick={() => {
-          onUpdateXaxisEmpty(axis.controlId, !xaxisEmpty);
-        }}
-      >
-        <div className="flex">{_l('统计空值')}</div>
-        {xaxisEmpty && <Icon icon="done" className="Font17"/>}
-      </Menu.Item>
+      {type ? (
+        <Menu.Item
+          className="flexRow valignWrapper"
+          onClick={() => {
+            onUpdateXaxisEmpty(axis.controlId, !xaxisEmpty);
+          }}
+        >
+          <div className="flex">{_l('统计空值')}</div>
+          {xaxisEmpty && <Icon icon="done" className="Font17"/>}
+        </Menu.Item>
+      ) : (
+        (isNumber || axis.type === 10000001) && (
+          <Menu.SubMenu
+            popupClassName="chartMenu"
+            title={(
+              <div className="flexRow valignWrapper w100">
+                <div className="flex">{_l('空值显示')}</div>
+                <div className="Font12 Gray_75 emptyTypeName">{_.find(emptyShowTypes, { value: emptyShowType }).text}</div>
+              </div>
+            )}
+            popupOffset={[0, -15]}
+          >
+            {emptyShowTypes.map(item => (
+              <Menu.Item
+                style={{ width: 120, color: item.value === emptyShowType ? '#1e88e5' : null }}
+                key={item.value}
+                onClick={() => {
+                  onUpdateEmptyShowType(axis.controlId, item.value);
+                }}
+              >
+                {item.text}
+              </Menu.Item>
+            ))}
+          </Menu.SubMenu>
+        )
+      )}
       {isNumber && verifyNumber && (
         <Menu.SubMenu popupClassName="chartMenu" title={_l('计算')} popupOffset={[0, -15]}>
-          {normTypes.map(item => (
+          {normTypes.filter(n => n.value !== 5).map(item => (
             <Menu.Item
               style={{ width: 120, color: item.value === normType ? '#1e88e5' : null }}
               key={item.value}
@@ -97,7 +128,28 @@ const renderOverlay = ({
           ))}
         </Menu.SubMenu>
       )}
-      {isTime && (
+      {!isNumberControl(axis.type) && verifyNumber && (
+        <Menu.SubMenu popupClassName="chartMenu" title={_l('计算')} popupOffset={[0, -15]}>
+          {textNormTypes.map(item => (
+            <Menu.Item
+              className="valignWrapper"
+              style={{ width: 120, color: item.value === normType ? '#1e88e5' : null }}
+              key={item.value}
+              onClick={() => {
+                onNormType(axis.controlId, item.value);
+              }}
+            >
+              <div className="flex">{item.text}</div>
+              {item.value === 7 && (
+                <Tooltip title={_l('仅显示一个')}>
+                  <Icon icon="info" className="Font16 pointer Gray_9e" />
+                </Tooltip>
+              )}
+            </Menu.Item>
+          ))}
+        </Menu.SubMenu>
+      )}
+      {type && isTime && (
         <Menu.SubMenu popupClassName="chartMenu" title={_l('归组')} popupOffset={[0, -15]}>
           <Menu.ItemGroup title={_l('时间')}>
             {timeDataList.map(item => (
@@ -144,7 +196,7 @@ const renderOverlay = ({
           )}
         </Menu.SubMenu>
       )}
-      {isArea && (
+      {type && isArea && (
         <Menu.SubMenu popupClassName="chartMenu" title={_l('归组')} popupOffset={[0, -15]}>
           {areaParticleSizeDropdownData.map(item => (
             <Menu.Item
@@ -174,10 +226,9 @@ const renderOverlay = ({
 };
 
 const SortableItem = SortableElement(props => {
-  const { type, item, axisControls, allControls, onClear, onNormType, verifyNumber, disableParticleSizeTypes, onUpdateParticleSizeType, onUpdateXaxisEmpty, onShowControl, onSelectReNameId } = props;
+  const { type, item, axisControls, allControls, onClear, onNormType, verifyNumber, disableParticleSizeTypes, onUpdateParticleSizeType, onUpdateXaxisEmpty, onUpdateEmptyShowType, onShowControl, onSelectReNameId } = props;
   const axis = _.find(axisControls, { controlId: item.controlId }) || {};
   const control = _.find(allControls, { controlId: item.controlId }) || {};
-  const isNumber = isNumberControl(axis.type, false);
   const isTime = isTimeControl(axis.type);
   const isArea = isAreaControl(axis.type);
   const overlayProps = {
@@ -186,10 +237,12 @@ const SortableItem = SortableElement(props => {
     normType: item.normType,
     particleSizeType: item.particleSizeType,
     xaxisEmpty: item.xaxisEmpty,
+    emptyShowType: item.emptyShowType,
     onNormType,
     disableParticleSizeTypes,
     onUpdateParticleSizeType,
     onUpdateXaxisEmpty,
+    onUpdateEmptyShowType,
     onShowControl,
     onSelectReNameId,
     verifyNumber
@@ -202,10 +255,14 @@ const SortableItem = SortableElement(props => {
         {axis.controlId ? (
           <Tooltip title={tip}>
             <span className="Gray flex ellipsis">
-              {(isNumber && verifyNumber) && `${_.find(normTypes, { value: item.normType }).text}: `}
+              {(verifyNumber && ![10000000, 10000001].includes(axis.type)) && `${_.find(normTypes.concat(textNormTypes), { value: item.normType }).text}: `}
               {item.rename || axis.controlName}
-              {isTime && ` (${_.find(timeParticleSizeDropdownData, { value: item.particleSizeType || 1 }).text})`}
-              {isArea && ` (${_.find(areaParticleSizeDropdownData, { value: item.particleSizeType || 1 }).text})`}
+              {!verifyNumber && (
+                <Fragment>
+                  {isTime && ` (${_.find(timeParticleSizeDropdownData, { value: item.particleSizeType || 1 }).text})`}
+                  {isArea && ` (${_.find(areaParticleSizeDropdownData, { value: item.particleSizeType || 1 }).text})`}
+                </Fragment>
+              )}
             </span>
           </Tooltip>
         ) : (
@@ -268,20 +325,9 @@ export default class PivotTableAxis extends Component {
       return false;
     }
 
-    if (verifyNumber) {
-      if (isNumberControl(data.type) || data.type === WIDGETS_TO_API_TYPE_ENUM.SCORE) {
-        return true;
-      } else {
-        isAlert && alert(_l('只允许添加数值和公式字段'), 2);
-        return false;
-      }
-    } else {
-      if ([10000000, 10000001].includes(data.type)) {
-        isAlert && alert(_l('不允许添加记录数量和计算字段'), 2);
-        return false;
-      } else {
-        return true;
-      }
+    if (!verifyNumber && [10000000, 10000001].includes(data.type)) {
+      isAlert && alert(_l('不允许添加计算字段'), 2);
+      return false;
     }
 
     return true;
@@ -359,6 +405,16 @@ export default class PivotTableAxis extends Component {
     });
     this.props.onUpdateList(newList);
   }
+  handleEmptyShowType = (controlId, value) => {
+    const { list } = this.props;
+    const newList = list.map(item => {
+      if (item.controlId === controlId) {
+        item.emptyShowType = value;
+      }
+      return item;
+    });
+    this.props.onUpdateList(newList);
+  }
   handleUpdateXaxisFields = (controlId, value) => {
     const { list } = this.props;
     const newList = list.map(item => {
@@ -423,6 +479,7 @@ export default class PivotTableAxis extends Component {
           onNormType={this.handleNormType}
           onUpdateParticleSizeType={this.handleUpdateParticleSizeType}
           onUpdateXaxisEmpty={this.handleUpdateXaxisEmpty}
+          onUpdateEmptyShowType={this.handleEmptyShowType}
           onSelectReNameId={this.handleSelectReNameId}
           onShowControl={this.handleShowControl}
           shouldCancelStart={({ target }) => !target.classList.contains('icon-drag_indicator')}

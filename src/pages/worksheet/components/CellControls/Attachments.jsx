@@ -3,6 +3,7 @@ import styled from 'styled-components';
 import Trigger from 'rc-trigger';
 import { useClickAway } from 'react-use';
 import { Tooltip } from 'ming-ui';
+import cx from 'classnames';
 import { isOpenPermit } from 'src/pages/FormSet/util.js';
 import { permitList } from 'src/pages/FormSet/config.js';
 import UploadFilesTrigger from 'src/components/UploadFilesTrigger';
@@ -18,6 +19,14 @@ const Con = styled.div`
     .CutCon {
       margin-right: 34px;
     }
+    ${({ tableType }) =>
+      tableType !== 'classic'
+        ? `.OperateIcon {
+      display: inline-block;
+    }`
+        : ''}
+  }
+  &.canedit.focusShowEditIcon.focus:not(.isediting) {
     .OperateIcon {
       display: inline-block;
     }
@@ -168,6 +177,34 @@ const Add = styled.div`
   }
 `;
 
+function addAttachmentIndex(submitData, enumDefault) {
+  // 补充 index
+  if ([2, 3].includes(enumDefault)) {
+    // 旧的在前
+    submitData.attachmentData.forEach((data, index) => {
+      data.index = index;
+    });
+    submitData.attachments.forEach((data, index) => {
+      data.index = submitData.attachmentData.length + index;
+    });
+    submitData.knowledgeAtts.forEach((data, index) => {
+      data.index = submitData.attachmentData.length + submitData.attachments.length + index;
+    });
+  } else {
+    // 新的在前
+    submitData.attachments.forEach((data, index) => {
+      data.index = index;
+    });
+    submitData.knowledgeAtts.forEach((data, index) => {
+      data.index = submitData.attachments.length + index;
+    });
+    submitData.attachmentData.forEach((data, index) => {
+      data.index = submitData.attachments.length + submitData.knowledgeAtts.length + index;
+    });
+  }
+  return submitData;
+}
+
 function parseValue(valueStr, errCb) {
   let value = [];
   try {
@@ -206,8 +243,10 @@ function previewAttachment(
   viewId = '',
   disableDownload,
   handleOpenControlAttachmentInNewTab,
+  worksheetId,
 ) {
-  const recordAttachmentSwitch = isOpenPermit(permitList.recordAttachmentSwitch, sheetSwitchPermit, viewId);
+  const recordAttachmentSwitch =
+    !!_.get(window, 'shareState.shareId') || isOpenPermit(permitList.recordAttachmentSwitch, sheetSwitchPermit, viewId);
   let hideFunctions = ['editFileName'];
   if (!recordAttachmentSwitch || disableDownload) {
     /* 是否不可下载 且 不可保存到知识和分享 */
@@ -218,7 +257,7 @@ function previewAttachment(
       index: index || 0,
       fromType: 4,
       attachments: attachments.map(attachment => {
-        if (attachment.fileID.slice(0, 2) === 'o_') {
+        if (attachment.fileID && attachment.fileID.slice(0, 2) === 'o_') {
           return Object.assign({}, attachment, {
             previewAttachmentType: 'QINIU',
             path: attachment.origin.url || attachment.previewUrl,
@@ -233,6 +272,7 @@ function previewAttachment(
       showThumbnail: true,
       hideFunctions: hideFunctions,
       disableNoPeimission: true,
+      worksheetId,
     },
     {
       openControlAttachmentInNewTab: handleOpenControlAttachmentInNewTab,
@@ -253,12 +293,12 @@ function HoverPreviewPanel(props, cb = () => {}) {
     deleteLocalAttachment,
     sheetSwitchPermit,
   } = props;
-  console.log(attachment);
   const { originalFilename, ext = '', filesize } = attachment;
   const { controlId } = cell;
   const { appId, viewId, worksheetId, recordId, disableDownload } = cellInfo;
   const [loading, setLoading] = useState(true);
-  const recordAttachmentSwitch = isOpenPermit(permitList.recordAttachmentSwitch, sheetSwitchPermit, viewId);
+  const recordAttachmentSwitch =
+    !!_.get(window, 'shareState.shareId') || isOpenPermit(permitList.recordAttachmentSwitch, sheetSwitchPermit, viewId);
   const downloadable =
     recordAttachmentSwitch && !disableDownload && attachment.fileID && attachment.fileID.length === 36;
   const imageUrl = attachment.previewUrl.replace(/imageView2\/\d\/w\/\d+\/h\/\d+(\/q\/\d+)?/, 'imageView2/2/h/160');
@@ -316,7 +356,9 @@ function HoverPreviewPanel(props, cb = () => {}) {
             <Tooltip text={<span>{_l('下载')}</span>} popupPlacement="top">
               <i
                 className="icon icon-download downloadBtn ThemeHoverColor3"
-                onClick={() => downloadAttachmentById({ fileId: attachment.fileID, refId: attachment.refId })}
+                onClick={() =>
+                  downloadAttachmentById({ fileId: attachment.fileID, refId: attachment.refId, worksheetId })
+                }
               ></i>
             </Tooltip>
           )}
@@ -328,6 +370,7 @@ function HoverPreviewPanel(props, cb = () => {}) {
 
 function Attachment(props) {
   const {
+    isTrash,
     isSubList,
     editable,
     index,
@@ -385,17 +428,27 @@ function Attachment(props) {
         className="AttachmentCon"
         style={{ maxWidth: cellWidth }}
         onClick={e => {
-          previewAttachment(attachments, index, sheetSwitchPermit, viewId, cellInfo.disableDownload, fileId => {
-            openControlAttachmentInNewTab({
-              appId,
-              recordId,
-              viewId,
-              worksheetId,
-              controlId: cell.controlId,
-              fileId,
-              getType: from === 21 ? from : undefined,
-            });
-          });
+          previewAttachment(
+            attachments,
+            index,
+            sheetSwitchPermit,
+            viewId,
+            cellInfo.disableDownload,
+            isTrash
+              ? undefined
+              : fileId => {
+                  openControlAttachmentInNewTab({
+                    appId,
+                    recordId,
+                    viewId,
+                    worksheetId,
+                    controlId: cell.controlId,
+                    fileId,
+                    getType: from === 21 ? from : undefined,
+                  });
+                },
+            worksheetId,
+          );
           e.stopPropagation();
         }}
       >
@@ -423,11 +476,15 @@ function Attachment(props) {
 
 function cellAttachments(props, sourceRef) {
   const {
+    isTrash,
     isSubList,
     from = 1,
+    tableType,
     className,
     style,
     projectId,
+    appId,
+    worksheetId,
     viewId,
     sheetSwitchPermit,
     isediting,
@@ -441,7 +498,7 @@ function cellAttachments(props, sourceRef) {
     ...rest
   } = props;
   let { editable } = props;
-  const { value, strDefault = '', advancedSetting } = cell;
+  const { value, strDefault = '', advancedSetting, enumDefault } = cell;
   const [, onlyAllowMobileInput] = strDefault.split('');
   if (cell.type === 14 && onlyAllowMobileInput === '1') {
     editable = false;
@@ -500,7 +557,7 @@ function cellAttachments(props, sourceRef) {
     updateCell(
       {
         editType: 1,
-        value: JSON.stringify(submitData),
+        value: JSON.stringify(addAttachmentIndex(submitData, enumDefault)),
       },
       {
         callback: data => {
@@ -526,6 +583,7 @@ function cellAttachments(props, sourceRef) {
   }
   const attachmentsComp = attachments.map((attachment, index) => (
     <Attachment
+      isTrash={isTrash}
       isSubList={isSubList}
       editable={editable}
       cell={cell}
@@ -550,6 +608,8 @@ function cellAttachments(props, sourceRef) {
   if (isediting) {
     const popContent = (
       <UploadFilesTrigger
+        appId={appId}
+        worksheetId={worksheetId}
         originCount={attachments.length}
         advancedSetting={advancedSetting}
         id={cell.controlId + rest.recordId}
@@ -610,7 +670,7 @@ function cellAttachments(props, sourceRef) {
     );
   }
   return (
-    <Con className={className} style={style} onClick={onClick}>
+    <Con className={cx(className, { canedit: editable })} tableType={tableType} style={style} onClick={onClick}>
       <CutCon className="CutCon">{attachmentsComp}</CutCon>
       {editable && (
         <OperateIcon className="OperateIcon">

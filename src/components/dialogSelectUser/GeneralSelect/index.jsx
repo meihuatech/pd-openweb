@@ -292,7 +292,7 @@ export default class GeneraSelect extends Component {
       filterResigned: true,
       unique: false, // 是否只可以选一个
       pageIndex: 1,
-      pageSize: 20,
+      pageSize: 50,
       isMore: true, // 当点击要过滤的用户时
     };
 
@@ -334,7 +334,7 @@ export default class GeneraSelect extends Component {
       /** 选择的用户筛选范围 */
       selectedUserTabId: userSettings.defaultTabs[0].id,
       /** 滚动分页 */
-      pageSize: 20,
+      pageSize: 50,
       pageIndex: 1,
       /** 联系人数据 */
       mainData: null,
@@ -383,6 +383,7 @@ export default class GeneraSelect extends Component {
         includeUndefinedAndMySelf:
           tabItem.type === RenderTypes.CONTACK_USER ? userSettings.includeUndefinedAndMySelf : undefined,
         includeSystemField: tabItem.type === RenderTypes.CONTACK_USER ? userSettings.includeSystemField : undefined,
+        includeMySelf: userSettings.includeMySelf,
       };
 
       if (tabItem.page) {
@@ -580,9 +581,10 @@ export default class GeneraSelect extends Component {
 
     this.handlePromise(resignedApi).then(data => {
       let newData = {
-        list: (mainData.renderType === RenderTypes.RESIGNED ? (mainData.data || {}).list || [] : []).concat(
-          data.list || [],
-        ),
+        list: (mainData.renderType === RenderTypes.RESIGNED && pageIndex > 1
+          ? (mainData.data || {}).list || []
+          : []
+        ).concat(data.list || []),
         allCount: data.allCount,
       };
       this.setState({
@@ -1038,7 +1040,7 @@ export default class GeneraSelect extends Component {
         selectedData,
       });
     };
-    if (group.users.length < group[COUNT]) {
+    if ((group.users || []).length < group[COUNT]) {
       let promiseObj = null;
       if (this.state.selectedUserTabId === UserTabsId.DEPARTMENT) {
         promiseObj = this.handlePromise(
@@ -1161,6 +1163,7 @@ export default class GeneraSelect extends Component {
           <DefaultUserList
             projectId={commonSettings.projectId}
             data={mainData.data}
+            includeMySelf={this.userSettings.includeMySelf}
             includeUndefinedAndMySelf={this.userSettings.includeUndefinedAndMySelf}
             onChange={this.toogleUserSelect}
             selectedUsers={this.selectedUsers}

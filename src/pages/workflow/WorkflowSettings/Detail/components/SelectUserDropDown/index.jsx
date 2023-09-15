@@ -1,7 +1,7 @@
 import React, { Component, Fragment } from 'react';
 import cx from 'classnames';
 import './index.less';
-import 'src/components/dialogSelectUser/dialogSelectUser';
+import dialogSelectUser from 'src/components/dialogSelectUser/dialogSelectUser';
 import DialogSelectDept from 'src/components/dialogSelectDept';
 import { MenuItem } from 'ming-ui';
 import ActionFields from '../ActionFields';
@@ -21,7 +21,7 @@ export default class SelectUserDropDown extends Component {
   }
 
   componentWillReceiveProps(nextProps, nextState) {
-    if (nextProps.nodeId !== this.props.nodeId) {
+    if (nextProps.nodeId !== this.props.nodeId || nextProps.specialType !== this.props.specialType) {
       this.setState({ fieldsData: [] });
     }
 
@@ -63,7 +63,7 @@ export default class SelectUserDropDown extends Component {
    * 头部
    */
   header() {
-    const { specialType, disabledNodeRole, onlyNodeRole } = this.props;
+    const { specialType, onlyNodeRole } = this.props;
 
     return (
       <ul className="flowDetailUserList">
@@ -150,7 +150,7 @@ export default class SelectUserDropDown extends Component {
     evt.stopPropagation();
     onClose();
 
-    $(evt.target).dialogSelectUser({
+    dialogSelectUser({
       title: _l('选择人员'),
       showMoreInvite: false,
       SelectUserSettings: {
@@ -193,21 +193,17 @@ export default class SelectUserDropDown extends Component {
       unique: unique,
       showCreateBtn: false,
       selectFn: departments => {
-        const ids = accounts.map(dept => dept.entityId);
-
-        departments = departments
-          .filter(o => ids.indexOf(o.departmentId) === -1)
-          .map(o => {
-            return {
-              type: USER_TYPE.DEPARTMENT,
-              entityId: o.departmentId,
-              entityName: o.departmentName,
-              roleId: '',
-              roleName: '',
-              avatar: '',
-              count: o.userCount,
-            };
-          });
+        departments = departments.map(o => {
+          return {
+            type: USER_TYPE.DEPARTMENT,
+            entityId: o.departmentId,
+            entityName: o.departmentName,
+            roleId: '',
+            roleName: '',
+            avatar: '',
+            count: o.userCount,
+          };
+        });
 
         if (departments.length) {
           updateSource({ accounts: unique ? departments : accounts.concat(departments) });
@@ -357,7 +353,7 @@ export default class SelectUserDropDown extends Component {
   };
 
   render() {
-    const { visible, appId, companyId, onClose, unique } = this.props;
+    const { visible, appId, companyId, onClose, unique, disabledNodeRole } = this.props;
     const { fieldsData, showSelectAppUserDialog } = this.state;
 
     if (!visible) {
@@ -384,7 +380,7 @@ export default class SelectUserDropDown extends Component {
       <ActionFields
         header={this.header()}
         className="actionFields"
-        openSearch
+        openSearch={!disabledNodeRole}
         noItemTips={_l('没有可用的字段')}
         condition={fieldsData}
         handleFieldClick={this.handleFieldClick}

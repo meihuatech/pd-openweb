@@ -71,7 +71,7 @@ export default class GetMoreRecord extends Component {
    */
   onSave = () => {
     const { data, saveRequest } = this.state;
-    const { name, actionId, appId, conditions, selectNodeId, fields, sorts, numberFieldValue, execute } = data;
+    const { name, actionId, appId, conditions, selectNodeId, fields, sorts, numberFieldValue, execute, filters } = data;
 
     if (actionId === ACTION_ID.FROM_WORKSHEET && !appId) {
       alert(_l('必须选择工作表'), 2);
@@ -116,6 +116,21 @@ export default class GetMoreRecord extends Component {
       return;
     }
 
+    if (filters.length) {
+      let hasError = false;
+
+      filters.forEach(item => {
+        if (checkConditionsIsNull(item.conditions)) {
+          hasError = true;
+        }
+      });
+
+      if (hasError) {
+        alert(_l('筛选条件的判断值不能为空'), 2);
+        return;
+      }
+    }
+
     if (saveRequest) {
       return;
     }
@@ -134,6 +149,7 @@ export default class GetMoreRecord extends Component {
         sorts,
         numberFieldValue,
         execute,
+        filters,
       })
       .then(result => {
         this.props.updateNodeData(result);
@@ -224,6 +240,7 @@ export default class GetMoreRecord extends Component {
    * 渲染内容
    */
   renderContent() {
+    const { isApproval } = this.props;
     const { data } = this.state;
     const actionTypes = {
       [ACTION_ID.FROM_WORKSHEET]: _l('从工作表获取记录'),
@@ -304,9 +321,10 @@ export default class GetMoreRecord extends Component {
           </Fragment>
         )}
 
-        {_.includes([ACTION_ID.FROM_WORKSHEET, ACTION_ID.FROM_RECORD, ACTION_ID.FROM_ADD], data.actionId) && (
-          <FindMode execute={data.execute} onChange={execute => this.updateSource({ execute })} />
-        )}
+        {_.includes([ACTION_ID.FROM_WORKSHEET, ACTION_ID.FROM_RECORD, ACTION_ID.FROM_ADD], data.actionId) &&
+          !isApproval && <FindMode execute={data.execute} onChange={execute => this.updateSource({ execute })} />}
+
+        {isApproval && <div className="mTop20 bold">{_l('未获取到数据时：继续执行')}</div>}
       </div>
     );
   }
@@ -360,9 +378,17 @@ export default class GetMoreRecord extends Component {
         companyId={this.props.companyId}
         processId={this.props.processId}
         selectNodeId={this.props.selectNodeId}
+        openNewFilter={
+          !data.conditions.length &&
+          _.includes([ACTION_ID.FROM_WORKSHEET, ACTION_ID.FROM_RECORD, ACTION_ID.FROM_ADD], data.actionId)
+        }
+        disabledNewFilter={
+          !_.includes([ACTION_ID.FROM_WORKSHEET, ACTION_ID.FROM_RECORD, ACTION_ID.FROM_ADD], data.actionId)
+        }
         data={data}
         updateSource={this.updateSource}
         filterText={_l('设置筛选条件，获得满足条件的数据。如果未设置筛选条件，则获得所有来自对象的数据')}
+        filterEncryptCondition={data.actionId === ACTION_ID.FROM_WORKSHEET}
       />
     );
   }
@@ -629,7 +655,7 @@ export default class GetMoreRecord extends Component {
       appList.push({ id: appId, name, otherApkId, otherApkName });
     }
 
-    this.updateSource({ appId, appList, conditions: [], fields: [], controls: [] }, () => {
+    this.updateSource({ appId, appList, conditions: [], filters: [], fields: [], controls: [] }, () => {
       this.getWorksheetFields(appId);
     });
   };
@@ -650,7 +676,7 @@ export default class GetMoreRecord extends Component {
           bg="BGYellow"
           updateSource={this.updateSource}
         />
-        <div className="flex mTop20">
+        <div className="flex">
           <ScrollView>{this.renderContent()}</ScrollView>
         </div>
         <DetailFooter

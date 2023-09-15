@@ -4,10 +4,7 @@ import { Icon } from 'ming-ui';
 import _ from 'lodash';
 import styled from 'styled-components';
 import { getAdvanceSetting } from 'src/util';
-import {
-  NORMAL_SYSTEM_FIELDS_SORT,
-  WORKFLOW_SYSTEM_FIELDS_SORT,
-} from 'src/pages/worksheet/common/ViewConfig/util';
+import { NORMAL_SYSTEM_FIELDS_SORT, WORKFLOW_SYSTEM_FIELDS_SORT } from 'src/pages/worksheet/common/ViewConfig/util';
 export const SwitchStyle = styled.div`
   display: inline-block;
   .switchText {
@@ -46,7 +43,7 @@ export default class DisplayControl extends React.Component {
       : worksheetControls.map(o => o.controlId).concat(NORMAL_SYSTEM_FIELDS_SORT);
     displayControls = displayControls.filter(c => controlIds.includes(c)); //排除已删除的控件
     const allCanDisplayControls = worksheetControls.filter(
-      c => c.attribute !== 1 && !!c.controlName && !_.includes([22, 10010, 43, 45, 47, 49], c.type),
+      c => c.attribute !== 1 && !!c.controlName && !_.includes([22, 10010, 43, 45, 47, 49, 51], c.type),
     );
     const { appshowtype = '0' } = getAdvanceSetting(view);
     return (
@@ -79,11 +76,12 @@ export default class DisplayControl extends React.Component {
             columns={allCanDisplayControls}
             viewType={view.viewType}
             onChange={({ newControlSorts, newShowControls }) => {
-              if (maxCount3 && newShowControls.length > 3) {
-                alert(_l('一行三列布局时，最多只能设置3个显示字段'));
+              let showList = newShowControls.filter(c => allCanDisplayControls.map(o => o.controlId).includes(c));
+              if (maxCount3 && showList.length > 3) {
+                alert(_l('一行三列布局时，最多只能设置3个显示字段'), 3);
                 return;
               } else {
-                handleChangeSort({ newControlSorts, newShowControls });
+                handleChangeSort({ newControlSorts, newShowControls: showList });
               }
             }}
           />

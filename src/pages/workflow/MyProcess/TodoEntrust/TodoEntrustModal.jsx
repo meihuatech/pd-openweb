@@ -4,7 +4,7 @@ import styled from 'styled-components';
 import { DatePicker } from 'antd';
 import zhCN from 'antd/es/date-picker/locale/zh_CN';
 import moment from 'moment';
-import 'src/components/dialogSelectUser/dialogSelectUser';
+import dialogSelectUser from 'src/components/dialogSelectUser/dialogSelectUser';
 import UserHead from 'src/pages/feed/components/userHead';
 import UserName from 'src/pages/feed/components/userName';
 import delegationApi from 'src/pages/workflow/api/delegation';
@@ -86,10 +86,11 @@ export default function TodoEntrustModal(props) {
   const disabledDateTime = date => {
     const hours = moment().hours();
     const minutes = moment().minutes();
-    if (date && moment(date).isSame(moment(), 'd')) {
+    if (!date || moment(date).isSame(moment(), 'd')) {
       return {
         disabledHours: () => Array.from(Array(hours), (_, k) => k),
-        disabledMinutes: () => Array.from(Array(minutes), (_, k) => k),
+        disabledMinutes: () =>
+          !date || moment(date).isSame(moment(), 'h') ? Array.from(Array(minutes), (_, k) => k) : [],
       };
     }
     return {
@@ -99,7 +100,7 @@ export default function TodoEntrustModal(props) {
   };
 
   const onAddOrChangeMember = () => {
-    $({}).dialogSelectUser({
+    dialogSelectUser({
       SelectUserSettings: {
         filterAccountIds: [md.global.Account.accountId].concat((formData.trustee || {}).accountId || []),
         projectId: formData.companyId,
@@ -207,14 +208,14 @@ export default function TodoEntrustModal(props) {
               <div className="Font13 mBottom5">{_l('开始')}</div>
               <DatePicker
                 style={{ width: '100%', borderRadius: '3px' }}
-                placeholder="此刻"
+                placeholder={_l('此刻')}
                 showTime
                 disabledDate={date => date < moment().subtract(1, 'd')}
                 disabledTime={disabledDateTime}
                 format="YYYY-MM-DD HH:mm"
                 locale={zhCN}
                 defaultValue={formData.startDate}
-                allowClear={false}
+                allowClear={true}
                 onChange={startDate => updateDataSource({ startDate })}
               />
             </div>
@@ -225,12 +226,13 @@ export default function TodoEntrustModal(props) {
               </div>
               <DatePicker
                 style={{ width: '100%', borderRadius: '3px' }}
+                placeholder={_l('请选择日期')}
                 showTime
                 disabledDate={date => date < moment().subtract(1, 'd')}
                 disabledTime={disabledDateTime}
                 format="YYYY-MM-DD HH:mm"
                 defaultValue={formData.endDate}
-                allowClear={false}
+                allowClear={true}
                 locale={zhCN}
                 onChange={endDate => updateDataSource({ endDate })}
               />

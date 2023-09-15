@@ -1,8 +1,8 @@
 import React, { Component, Fragment } from 'react';
 import { formatrChartValue, formatYaxisList } from './common';
 import { formatSummaryName } from 'statistics/common';
-import { Dropdown, Menu } from 'antd';
-import { LoadDiv } from 'ming-ui';
+import { Dropdown, Menu, Tooltip } from 'antd';
+import { LoadDiv, Icon } from 'ming-ui';
 import styled from 'styled-components';
 import { connect } from 'react-redux';
 import * as actions from 'statistics/redux/actions';
@@ -30,7 +30,22 @@ const PathWrapper = styled.div`
   }
 `;
 
-const url = `${location.origin}`;
+const ZoomWrapper = styled.div`
+  width: 40px;
+  height: 90px;
+  border-radius: 4px;
+  background-color: #fff;
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  z-index: 10;
+  .icon:hover {
+    color: #2196f3 !important;
+  }
+`;
+
+
+const municipality = ['110000', '310000', '120000', '500000'];
 const colors = ['#E3F2FD', '#BBDEFB', '#90CAF9', '#2196F3', '#1565C0', '#0D47A1'];
 
 const setColorLavel = data => {
@@ -92,7 +107,84 @@ export default class extends Component {
       ([l7, l7Maps, l7District]) => {
         const { Scene } = l7;
         const { Mapbox } = l7Maps;
-        const { CountryLayer, ProvinceLayer, CityLayer, DrillDownLayer } = l7District;
+        const { CountryLayer, ProvinceLayer, CityLayer, DrillDownLayer, setDataConfig } = l7District;
+        const url = md.global.Config.WebUrl;
+        setDataConfig({
+          country: {
+            CHN: {
+              1: {
+                fill: {
+                  type: 'pbf',
+                  url: `${url}districtDataConfigFile/71ac4de3-bb14-449d-a97d-2b98e25ec8df.bin`
+                },
+                line: {
+                  type: 'pbf',
+                  url: `${url}districtDataConfigFile/70ec087e-c48a-4b76-8825-6452f17bae7a.bin`
+                },
+                provinceLine: {
+                  type: 'pbf',
+                  url: `${url}districtDataConfigFile/0024caaf-86b2-4e75-a3d1-6d2146490b67.bin`
+                },
+                label: {
+                  type: 'json',
+                  url: `${url}districtDataConfigFile/36832a45-68f8-4b51-b006-9dec71f92a23.json`
+                }
+              },
+              2: {
+                fill: {
+                  type: 'pbf',
+                  url: `${url}districtDataConfigFile/522c6496-c711-4581-88db-c3741cd39abd.bin`
+                },
+                line: {
+                  type: 'pbf',
+                  url: `${url}districtDataConfigFile/f6a4e2b1-359b-43a6-921c-39d2088d1dab.bin`
+                },
+                cityLine: {
+                  type: 'pbf',
+                  url: `${url}districtDataConfigFile/f6a4e2b1-359b-43a6-921c-39d2088d1dab.bin`
+                },
+                provinceLine: {
+                  type: 'pbf',
+                  url: `${url}districtDataConfigFile/0024caaf-86b2-4e75-a3d1-6d2146490b67.bin`
+                }
+              },
+              3: {
+                fill: {
+                  type: 'pbf',
+                  url: `${url}districtDataConfigFile/516b2703-d692-44e6-80dd-b3f5df0186e7.bin`
+                },
+                line: {
+                  type: 'pbf',
+                  url: `${url}districtDataConfigFile/bc97875a-90f2-42c0-a62c-43d2efd7460d.bin`
+                },
+                countryLine: {
+                  type: 'pbf',
+                  url: `${url}districtDataConfigFile/bc97875a-90f2-42c0-a62c-43d2efd7460d.bin`
+                },
+                cityLine: {
+                  type: 'pbf',
+                  url: `${url}districtDataConfigFile/8bfbfe7e-bd0e-4bbe-84d8-629f4dc7abc4.bin`
+                },
+                provinceLine: {
+                  type: 'pbf',
+                  url: `${url}districtDataConfigFile/778ad7ba-5a3f-4ed6-a94a-b8ab8acae9d6.bin`
+                }
+              },
+              nationalBoundaries: {
+                type: 'json',
+                url: `${url}districtDataConfigFile/ee493a41-0558-4c0e-bee6-520276c4f1a8.json`
+              },
+              nationalBoundaries2: {
+                type: 'json',
+                url: `${url}districtDataConfigFile/f2189cc4-662b-4358-8573-36f0f918b7ca.json`
+              },
+              island: {
+                type: 'json',
+                url: `${url}districtDataConfigFile/fe49b393-1147-4769-94ed-70471f4ff15d.json`
+              }
+            }
+          }
+        });
 
         this.asyncComponents = { Scene, Mapbox, CountryLayer, ProvinceLayer, CityLayer, DrillDownLayer };
 
@@ -103,6 +195,7 @@ export default class extends Component {
 
         scene.on('loaded', () => {
           this.CountryLayerChart = new ChartComponent(scene, config);
+          if (country.municipality) return;
           if (displaySetup.showRowList && isViewOriginalData && !style.isDrillDownLayer) {
             this.CountryLayerChart.on('click', this.handleClick);
           }
@@ -136,6 +229,7 @@ export default class extends Component {
     const { displaySetup = {}, map } = nextProps.reportData;
     const { displaySetup: oldDisplaySetup = {} } = this.props.reportData;
     if (
+      !_.isEmpty(displaySetup) &&
       displaySetup.showChartType !== oldDisplaySetup.showChartType ||
       displaySetup.magnitudeUpdateFlag !== oldDisplaySetup.magnitudeUpdateFlag
     ) {
@@ -147,10 +241,11 @@ export default class extends Component {
       });
     }
     if (!nextProps.loading && this.props.loading) {
-      const { map } = nextProps.reportData;
+      const { map, yaxisList, summary } = nextProps.reportData;
       const data = setColorLavel(map);
       const { CountryLayerChart } = this;
       if (CountryLayerChart && typeof CountryLayerChart.updateData === 'function') {
+        this.setCount(formatYaxisList(data, yaxisList), summary);
         CountryLayerChart.updateData(data);
       }
     }
@@ -177,13 +272,16 @@ export default class extends Component {
     }
 
     this.setState({
-      dropdownVisible: true,
       offset: {
         x,
         y,
       },
       match: param,
     });
+
+    setTimeout(() => {
+      this.setState({ dropdownVisible: true });
+    }, 0);
   };
   handleRequestOriginalData = () => {
     const { isThumbnail, reportData } = this.props;
@@ -240,6 +338,17 @@ export default class extends Component {
         this.setState({ drillDownLoading: false, dropdownVisible: false });
         const data = setColorLavel(result.map);
 
+        if (municipality.includes(code)) {
+          const last = _.find(this.CountryLayerChart.provinceLayer.options.data, { code: code });
+          this.setState({ path: [_l('全国'), last.name] });
+          this.CountryLayerChart.depth = 3;
+          this.CountryLayerChart.drillState = 'Province';
+          this.CountryLayerChart.drillDown(code, data);
+          this.CountryLayerChart.drillState = 'City';
+          this.CountryLayerChart.drillDown(code, data);
+          return;
+        } 
+
         if (path.length) {
           const last = _.find(this.CountryLayerChart.cityLayer.options.data, { code: code });
           const city = last.name.split('/')[1];
@@ -270,7 +379,7 @@ export default class extends Component {
   };
   handleDrillUpTriggleData = index => {
     const { path } = this.state;
-    const { reportData, base } = this.props;
+    const { isThumbnail, reportData, base } = this.props;
     const { country } = reportData;
 
     if (path.length) {
@@ -286,13 +395,17 @@ export default class extends Component {
         path.pop();
         this.setState({ path });
       } else {
-        this.props.changeCurrentReport({
-          country: {
-            ...country,
-            drillFilterCode: '',
-            drillParticleSizeType: 1,
-          },
-        });
+        if (isThumbnail) {
+          this.props.closeCurrentReport();
+        } else {
+          this.props.changeCurrentReport({
+            country: {
+              ...country,
+              drillFilterCode: '',
+              drillParticleSizeType: 1,
+            },
+          });
+        }
         this.CountryLayerChart.drillUp('Province');
         this.CountryLayerChart.drillUp('Country');
         this.setState({ path: [] });
@@ -334,12 +447,12 @@ export default class extends Component {
     });
   };
   getChartConfig(props) {
-    const { country, displaySetup, map, yaxisList, style } = props.reportData;
+    const { country, displaySetup, map, yaxisList, style, summary } = props.reportData;
     const data = setColorLavel(map);
     const newYaxisList = formatYaxisList(data, yaxisList);
     const { Scene, Mapbox, CountryLayer, ProvinceLayer, CityLayer, DrillDownLayer } = this.asyncComponents;
 
-    this.setCount(newYaxisList);
+    this.setCount(newYaxisList, summary);
 
     if (!mapbox) {
       mapbox = new Mapbox({
@@ -400,7 +513,7 @@ export default class extends Component {
     }
 
     // 钻取地图
-    if (style && style.isDrillDownLayer && [1, 2].includes(country.particleSizeType)) {
+    if (style && style.isDrillDownLayer && [1, 2].includes(country.particleSizeType) && !country.municipality) {
       config.customTrigger = true;
       config.data = undefined;
       // 省
@@ -465,8 +578,7 @@ export default class extends Component {
       };
     }
   }
-  setCount(yaxisList) {
-    const { summary } = this.props.reportData;
+  setCount(yaxisList, summary) {
     const value = summary.sum;
     const count = formatrChartValue(value, false, yaxisList);
     this.setState({
@@ -555,6 +667,17 @@ export default class extends Component {
                 ))}
               </PathWrapper>
             )}
+            <ZoomWrapper className="flexColumn alignItemsCenter justifyContentCenter card">
+              <Tooltip title={_l('放大')}>
+                <Icon className="pointer Font20 Gray_75 mTop2" icon="add" onClick={() => this.scene.map.zoomIn()} />
+              </Tooltip>
+              <Tooltip title={_l('完整显示')}>
+                <Icon className="pointer Font17 Gray_75 mTop10 mBottom10" icon="gps_fixed" onClick={() => this.scene.map.zoomTo(2)} />
+              </Tooltip>
+              <Tooltip title={_l('缩小')}>
+                <Icon className="pointer Font20 Gray_75" icon="minus" onClick={() => this.scene.map.zoomOut()} />
+              </Tooltip>
+            </ZoomWrapper>
           </Fragment>
         )}
       </div>

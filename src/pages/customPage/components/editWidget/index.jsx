@@ -68,6 +68,7 @@ function EditWidget(props) {
     <RcDialog
       className="appIntroDialog editWidgetDialogWrap"
       wrapClassName="appIntroDialogWrapCenter"
+      maskClosable={false}
       visible={show}
       onClose={onClose}
       animation="zoom"
@@ -86,7 +87,7 @@ function EditWidget(props) {
           handleEdit({ value });
         }}
         onCancel={onClose}
-        cacheKey="appIntroDescription"
+        cacheKey="customPageEditWidget"
         title={widgets[type].name}
       />
     </RcDialog>

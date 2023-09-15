@@ -3,10 +3,9 @@ import PropTypes from 'prop-types';
 import { Toast } from 'antd-mobile';
 import { Icon } from 'ming-ui';
 import cx from 'classnames';
-import weixinAjax from 'src/api/weixin';
-import workWeiXinAjax from 'src/api/workWeiXin';
 import { Modal } from 'antd-mobile';
 import { browserIsMobile } from 'src/util';
+import { bindWeiXin, bindWxWork, bindFeishu, handleTriggerEvent } from '../tools/authentication';
 import styled from 'styled-components';
 import _ from 'lodash';
 
@@ -21,76 +20,31 @@ const ErrorWrap = styled.div`
   }
 `;
 
-const bindWeiXin = () => {
-  return new Promise((reslove, reject) => {
-    const entryUrl = sessionStorage.getItem('entryUrl');
-    const url = (entryUrl || location.href).split('#')[0];
-    weixinAjax.getWeiXinConfig({
-      url: encodeURI(url),
-    }).then(({ data, code }) => {
-      if (code === 1) {
-        wx.config({
-          debug: false,
-          appId: data.appId,
-          timestamp: data.timestamp,
-          nonceStr: data.nonceStr,
-          signature: data.signature,
-          jsApiList: ['scanQRCode'],
-        });
-        wx.ready(() => {
-          reslove();
-        });
-        wx.error((res) => {
-          res.mdurl = encodeURI(url);
-          _alert(JSON.stringify(res));
-          reject();
-        });
-      }
-    });
-  });
-}
-
-const bindWxWork = (projectId) => {
-  return new Promise((reslove, reject) => {
-    const url = location.href.split('#')[0];
-    const { IsLocal } = md.global.Config;
-    workWeiXinAjax.getSignatureInfo({
-      projectId,
-      url: encodeURI(url),
-      suiteType: 8,
-      tickettype: 1
-    }).then((data) => {
-      if (!data.corpId) {
-        _alert(IsLocal ? _l('请先集成企业微信') : _l('请使用待开发模式集成企业微信'));
-        reject();
-        return
-      }
-      wx.config({
-        beta: true,
-        debug: false,
-        appId: data.corpId,
-        timestamp: data.timestamp,
-        nonceStr: data.nonceStr,
-        signature: data.signature,
-        jsApiList: ['scanQRCode'],
-      });
-      wx.ready(() => {
-        reslove();
-      });
-      wx.error((res) => {
-        res.mdurl = encodeURI(url);
-        _alert(JSON.stringify(res));
-        reject();
-      });
-    });
-  });
-}
+const QrInputWrap = styled.div`
+  color: #fff;
+  width: auto;
+  height: 36px;
+  padding: 0 24px;
+  border-radius: 24px;
+  margin: 0 auto;
+  background-color: #0099f6;
+  input {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    z-index: 1;
+  }
+`;
 
 const { IsLocal } = md.global.Config;
 const isWxWork = window.navigator.userAgent.toLowerCase().includes('wxwork');
 const isWx = window.navigator.userAgent.toLowerCase().includes('micromessenger') && !IsLocal && !isWxWork;
 const isWeLink = window.navigator.userAgent.toLowerCase().includes('huawei-anyoffice');
 const isDing = window.navigator.userAgent.toLowerCase().includes('dingtalk');
+const isFeishu = window.navigator.userAgent.toLowerCase().includes('feishu');
 const isMobile = browserIsMobile();
 
 export const getIsScanQR = () => {
@@ -104,6 +58,7 @@ const formatScanQRCodeResult = (resultStr) => {
 export default class Widgets extends Component {
   static propTypes = {
     projectId: PropTypes.string,
+    disablePhoto: PropTypes.bool,
     onChange: PropTypes.func,
     onScanQRCodeResult: PropTypes.func,
     children: PropTypes.element,
@@ -116,26 +71,14 @@ export default class Widgets extends Component {
       devices: [],
       cameraId: null,
       resetCameraLoading: false,
-      scanShape: 'square'
+      scanShape: 'square',
+      uploadFile: false,
     }
     this.id = Date.now();
     this.html5QrCode = null;
   }
   componentDidMount() {
-    if (isDing && !window.dd) {
-      $.getScript('https://g.alicdn.com/dingding/dingtalk-jsapi/2.6.41/dingtalk.open.js');
-      return;
-    }
-    if (isWeLink && !window.HWH5) {
-      $.getScript('https://open-doc.welink.huaweicloud.com/docs/jsapi/2.0.4/hwh5-cloudonline.js');
-      return;
-    }
-    if (isWx && !window.wx) {
-      $.getScript('https://res2.wx.qq.com/open/js/jweixin-1.6.0.js');
-      return;
-    }
-    if (isWxWork && !window.wx) {
-      $.getScript('https://res.wx.qq.com/open/js/jweixin-1.2.0.js');
+    if (isDing || isWeLink || isWx || isWxWork || isFeishu) {
       return;
     }
     import('html5-qrcode').then(data => {
@@ -163,7 +106,7 @@ export default class Widgets extends Component {
     ];
   }
   handleWxScanQRCode = () => {
-    wx.scanQRCode({
+    window.wx.scanQRCode({
       needResult: 1,
       scanType: ['qrCode', 'barCode'],
       success: res => {
@@ -176,32 +119,47 @@ export default class Widgets extends Component {
       }
     });
   }
-  handleScanCode = () => {
-
-    if (isWx || isWxWork) {
-      const { projectId } = this.props;
-      if (window.currentUrl !== location.href) {
-        window.currentUrl = location.href;
-        window.configSuccess = false;
-        window.configLoading = false;
-      }
-      if (window.configSuccess) {
-        this.handleWxScanQRCode();
-      } else {
-        if (!window.configLoading) {
-          const bindFunction = isWx ? bindWeiXin() : bindWxWork(projectId);
-          bindFunction.then(() => {
-            window.configLoading = false;
-            window.configSuccess = true;
-            this.handleWxScanQRCode();
-          });
+  handleFeishuScanQRCode = () => {
+    window.tt.scanCode({
+      scanType: ['barCode', 'qrCode'],
+      success: res => {
+        this.props.onScanQRCodeResult(res.result);
+      },
+      fail: res => {
+        const { errMsg } = res;
+        if (!(errMsg.includes('cancel') || errMsg.includes('canceled'))) {
+          window.nativeAlert(JSON.stringify(res));
         }
       }
+    });
+  }
+  handleScanCode = () => {
+    const { projectId } = this.props;
+
+    if (isWx) {
+      handleTriggerEvent(this.handleWxScanQRCode, bindWeiXin());
       return;
     }
 
-    if (isWeLink && HWH5) {
-      HWH5.scanCode({ needResult: 1 }).then(data => {
+    if (isWxWork) {
+      handleTriggerEvent(this.handleWxScanQRCode, bindWxWork(projectId), (errType) => {
+        if (errType) {
+          import('html5-qrcode').then(data => {
+            this.qrCodeComponent = data;
+            this.handleScanQRCode();
+          });
+        }
+      });
+      return;
+    }
+
+    if (isFeishu) {
+      handleTriggerEvent(this.handleFeishuScanQRCode, bindFeishu(projectId));
+      return;
+    }
+
+    if (isWeLink && window.HWH5) {
+      window.HWH5.scanCode({ needResult: 1 }).then(data => {
         const { content } = data;
         this.props.onScanQRCodeResult(content);
       }).catch(error => {
@@ -223,6 +181,15 @@ export default class Widgets extends Component {
       return;
     }
 
+    this.handleScanQRCode();
+  }
+  handleScanQRCode = () => {
+    if (location.protocol === 'http:' && location.hostname !== 'localhost') {
+      Modal.alert(_l('浏览器平台仅https环境支持调用摄像头api'), '', [
+        { text: _l('确定') }
+      ]);
+      return;
+    }
     this.setState({
       visible: true
     }, () => {
@@ -252,9 +219,15 @@ export default class Widgets extends Component {
     }
   }
   handleChangeCamera = () => {
-    const { cameraId, devices, resetCameraLoading } = this.state;
+    const { cameraId, devices, resetCameraLoading, uploadFile } = this.state;
     const index = _.findIndex(devices, { id: cameraId });
     const nextCameraId = index === -1 ? _.get(devices[0], 'id') : (devices[index + 1] || devices[0]).id;
+
+    if (uploadFile) {
+      this.startQrcode();
+      this.setState({ uploadFile: false });
+      return;
+    }
 
     if (resetCameraLoading || !this.html5QrCode) return;
 
@@ -273,9 +246,9 @@ export default class Widgets extends Component {
     });
   }
   handleChangeSize = () => {
-    const { scanShape, resetCameraLoading } = this.state;
+    const { scanShape, resetCameraLoading, uploadFile } = this.state;
 
-    if (resetCameraLoading || !this.html5QrCode) return;
+    if (resetCameraLoading || !this.html5QrCode || uploadFile) return;
 
     this.setState({ resetCameraLoading: true });
     this.setState({
@@ -285,6 +258,23 @@ export default class Widgets extends Component {
         this.startQrcode();
         this.setState({ resetCameraLoading: false });
       });
+    });
+  }
+  handleOpenUploadFile = () => {
+    this.html5QrCode.stop().then((ignore) => {
+      this.html5QrCode.clear();
+      this.setState({ uploadFile: true });
+    }).catch((err) => {});
+  }
+  handleScanFile = (e) => {
+    if (e.target.files.length == 0) {
+      return;
+    }
+    const imageFile = e.target.files[0];
+    this.html5QrCode.scanFile(imageFile, true)
+    .then(this.handleScanSuccess)
+    .catch(err => {
+      alert(_l('未解析到二维码'), 3);
     });
   }
   getCameras() {
@@ -347,11 +337,11 @@ export default class Widgets extends Component {
       }
       this.setState({ cameraId: null });
     }
-    this.setState({ isError: false });
+    this.setState({ isError: false, uploadFile: false });
   }
   render() {
-    const { visible, isError, devices, scanShape } = this.state;
-    const { className, children } = this.props;
+    const { visible, isError, devices, scanShape, uploadFile } = this.state;
+    const { className, disablePhoto, children } = this.props;
     return (
       <Fragment>
         <div className={className} onClick={this.handleScanCode}>{children}</div>
@@ -372,7 +362,7 @@ export default class Widgets extends Component {
                   <div className="Font16 bold Gray">{_l('无法识别您的摄像头')}</div>
                 </ErrorWrap>
               ) : (
-                <div id={`qrcodeWrapper-${this.id}`} className="qrcodeWrapper flex"></div>
+                <div id={`qrcodeWrapper-${this.id}`} className={cx('qrcodeWrapper flex', { hide: uploadFile })}></div>
               )}
               {!isError && (
                 <Fragment>
@@ -380,13 +370,24 @@ export default class Widgets extends Component {
                     <Icon className="Font28 White" icon="switch_camera" />
                   </div>
                   <div className="Absolute" style={{ left: '15%', top: '5%' }} onClick={this.handleChangeSize}>
-                    <Icon className="Font28 White" icon={scanShape === 'square' ? 'get_bigger' : 'put_away'} />
+                    <Icon className={cx('Font28', uploadFile ? 'Gray_9e' : 'White')} icon={scanShape === 'square' ? 'get_bigger' : 'put_away'} />
                   </div>
+                  {!disablePhoto && (
+                    <div className="Absolute" style={{ left: '25%', top: '5.5%' }} onClick={this.handleOpenUploadFile}>
+                      <Icon className="Font26 White" icon="insert_photo_21" />
+                    </div>
+                  )}
                 </Fragment>
               )}
               <div className="Absolute" style={{ right: '5%', top: '5%' }} onClick={this.handleClose}>
                 <Icon className={cx('Font28', isError ? 'Gray_9e' : 'White')} icon="closeelement-bg-circle" />
               </div>
+              {uploadFile && (
+                <QrInputWrap className="valignWrapper justifyContentCenter Relative">
+                  {_l('上传图片进行识别')}
+                  <input type="file" accept="image/*" onChange={this.handleScanFile}/>
+                </QrInputWrap>
+              )}
             </div>
           </div>
         </Modal>

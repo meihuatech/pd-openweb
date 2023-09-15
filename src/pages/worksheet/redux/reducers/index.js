@@ -22,7 +22,14 @@ function base(state = {}, action) {
       // 自定义页面没有视图
       if (isEmpty(action.value.views)) return state;
       if (state.worksheetId === action.value.worksheetId) {
-        return { ...state, viewId: action.value.views[0].viewId };
+        const showViews = action.value.views.filter(view => {
+          const showhide = _.get(view, 'advancedSetting.showhide') || '';
+          return !showhide.includes('hpc') && !showhide.includes('hide');
+        });
+        return {
+          ...state,
+          viewId: _.get((showViews.length ? showViews : action.value.views)[0], 'viewId')
+        };
       }
       return state;
     default:
@@ -32,8 +39,17 @@ function base(state = {}, action) {
 
 function isCharge(state = false, action) {
   switch (action.type) {
-    case 'SHEET_LIST_UPDATE_IS_CHARGE':
+    case 'WORKSHEET_UPDATE_IS_CHARGE':
       return action.isCharge;
+    default:
+      return state;
+  }
+}
+
+function appPkgData(state = false, action) {
+  switch (action.type) {
+    case 'WORKSHEET_UPDATE_APPPKGDATA':
+      return action.appPkgData;
     default:
       return state;
   }
@@ -57,6 +73,7 @@ function activeViewStatus(state = 1, action) {
 export default combineReducers({
   base,
   isCharge,
+  appPkgData,
   activeViewStatus,
   ...worksheet,
   boardView,

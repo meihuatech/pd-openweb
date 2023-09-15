@@ -4,6 +4,7 @@ import { Icon, Menu, MenuItem } from 'ming-ui';
 import { VIEW_TYPE_ICON, VIEW_DISPLAY_TYPE } from 'worksheet/constants/enum';
 import HiddenMenu from './HiddenMenu';
 import _ from 'lodash';
+import cx from 'classnames';
 
 export default function HideItem(props) {
   const {
@@ -47,7 +48,7 @@ export default function HideItem(props) {
       <Menu className="viewItemMoreOperate">
         {isCharge && (
           <MenuItem icon={<Icon icon="workflow_write" className="Font18" />} onClick={clickEditName}>
-            <span className="text">{_l('重命名')}</span>
+            <span className="text">{_l('重命名%05004')}</span>
           </MenuItem>
         )}
         {isCharge && (
@@ -59,7 +60,7 @@ export default function HideItem(props) {
               setVisible(false);
             }}
           >
-            <span className="text">{_l('复制')}</span>
+            <span className="text">{_l('复制%05003')}</span>
           </MenuItem>
         )}
         {isCharge && <hr className="splitLine" />}
@@ -76,7 +77,7 @@ export default function HideItem(props) {
             onMouseLeave={() => setChangeHiddenTypeVisible(false)}
           >
             <span className="text">
-              {item.advancedSetting.showhide !== 'hide' ? _l('从导航栏中隐藏') : _l('取消隐藏')}
+              {item.advancedSetting.showhide !== 'hide' ? _l('从导航栏中隐藏%05001') : _l('取消隐藏%05002')}
             </span>
             <Icon icon="arrow-right-tip Font14" style={{ fontSize: '16px', right: '10px', left: 'initial' }} />
             {changeHiddenTypeVisible && (
@@ -107,15 +108,15 @@ export default function HideItem(props) {
               setVisible(false);
             }}
           >
-            <span className="text">{_l('删除视图')}</span>
+            <span className="text">{_l('删除视图%05000')}</span>
           </MenuItem>
         )}
       </Menu>
     );
   };
 
-  const handleSaveName = (event) => {
-    if(!focusFlag) return;
+  const handleSaveName = event => {
+    if (!focusFlag) return;
     const value = event.target.value.trim();
     const { name } = item;
     if (value && name !== value) {
@@ -125,14 +126,21 @@ export default function HideItem(props) {
     setEdit(false);
   };
 
-  const handleFocus = _.debounce((event) => {
-    focusFlag=true;
+  const handleFocus = _.debounce(event => {
+    focusFlag = true;
     nameRef && nameRef.current && nameRef.current.select();
   }, 500);
 
   const clickHandle = e => {
     if (!e.target.className.includes('icon')) {
       toView();
+      const elem = $(`.workSheetViewsWrapper .viewsScroll .workSheetViewItemViewId-${item.viewId}`);
+
+      if (elem[0]) {
+        setTimeout(() => {
+          elem[0].scrollIntoView();
+        }, 100)
+      }
     }
   };
 
@@ -141,14 +149,13 @@ export default function HideItem(props) {
   return (
     <li
       style={{ zIndex: 999999 }}
-      className={`${item.viewId === currentViewId ? 'active' : ''} drawerWorksheetShowListItem`}
+      className={cx('drawerWorksheetShowListItem', {
+        active: item.viewId === currentViewId,
+      })}
       onClick={clickHandle}
     >
-      <Icon icon="drag_indicator" className="Font16"/>
-      <Icon
-        style={{ color: viewInfo.color, fontSize: '20px' }}
-        icon={viewInfo.icon}
-      />
+      <Icon icon="drag_indicator" className="Font16" style={isCharge ? {} : { opacity: 0 }} />
+      <Icon style={{ color: viewInfo.color, fontSize: '20px' }} icon={viewInfo.icon} />
       {edit ? (
         <input
           autoFocus
@@ -166,7 +173,8 @@ export default function HideItem(props) {
       ) : (
         <span className="viewName ellipsis">{item.name}</span>
       )}
-      {type === 'drawerWorksheetShowList' &&
+      {isCharge &&
+        type === 'drawerWorksheetShowList' &&
         item.advancedSetting.showhide &&
         item.advancedSetting.showhide.search(/hpc|happ/g) > -1 && (
           <Icon

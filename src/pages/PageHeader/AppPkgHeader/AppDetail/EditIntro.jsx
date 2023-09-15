@@ -26,7 +26,7 @@ export default class AppIntro extends Component {
 
   componentWillReceiveProps(nextProps) {
     this.setState({
-      isEditing: nextProps.isEditing
+      isEditing: nextProps.isEditing,
     });
   }
 
@@ -38,14 +38,25 @@ export default class AppIntro extends Component {
 
   handleSave = val => {
     this.props.onSave(val);
-    this.setState({ isEditing: false });
+    // this.setState({ isEditing: false });
   };
 
   render() {
-    const { description: summary, permissionType, onCancel, changeSetting, cacheKey, changeEditState = _.noop } = this.props;
+    const {
+      description: summary,
+      permissionType,
+      onCancel,
+      changeSetting,
+      cacheKey,
+      changeEditState = _.noop,
+      minHeight,
+      maxHeight,
+      data,
+    } = this.props;
     const { isEditing } = this.state;
     return (
       <Editor
+        data={data}
         className="appIntroDescriptionEditor "
         summary={summary}
         isEditing={isEditing}
@@ -62,6 +73,8 @@ export default class AppIntro extends Component {
         }}
         cacheKey={cacheKey}
         title={this.props.title}
+        minHeight={minHeight}
+        maxHeight={maxHeight}
       />
     );
   }

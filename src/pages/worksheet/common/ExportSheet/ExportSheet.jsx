@@ -1,13 +1,13 @@
 ﻿import React, { Component, Fragment } from 'react';
 import PropTypes from 'prop-types';
-import { Dialog, Checkbox, Radio } from 'ming-ui';
+import { Dialog, Checkbox, Radio, Icon, RadioGroup, LoadDiv } from 'ming-ui';
 import appManagement from 'src/api/appManagement';
 import './ExportSheet.less';
 import { isRelateRecordTableControl } from 'worksheet/util';
-import RadioGroup from 'ming-ui/components/RadioGroup2';
 import { permitList } from 'src/pages/FormSet/config.js';
 import { isOpenPermit } from 'src/pages/FormSet/util.js';
 import _ from 'lodash';
+import worksheetAjax from 'src/api/worksheet';
 
 export default class ExportSheet extends Component {
   static propTypes = {
@@ -25,7 +25,7 @@ export default class ExportSheet extends Component {
     worksheetSummaryTypes: PropTypes.shape({}),
     quickFilter: PropTypes.object,
     navGroupFilters: PropTypes.object,
-
+    isCharge: PropTypes.bool,
     hideStatistics: PropTypes.bool,
   };
 
@@ -38,21 +38,23 @@ export default class ExportSheet extends Component {
     props.columns.unshift({ type: 2, controlId: 'rowid', controlName: _l('记录ID') });
     if (!isShowWorkflowSys) {
       _.remove(props.columns, o =>
-        _.includes(['uaid', 'wfname', 'wfstatus', 'wfcuaids', 'wfrtime', 'wfftime', 'wfcaid', 'wfctime'], o.controlId),
+        _.includes(['wfname', 'wfstatus', 'wfcuaids', 'wfrtime', 'wfftime', 'wfcaid', 'wfctime'], o.controlId),
       );
     }
 
-    // 成员字段和关联表字段支持映射
+    // 成员、部门、关联表支持映射
     props.columns
-      .filter(column => column.type == 26 || column.type == 29)
+      .filter(column => _.includes([26, 27, 29], column.type))
       .map(column => {
         const { controlId } = column;
         const userId = false;
         const jobId = false;
+        const depId = false;
         const relaRowId = false;
         exportExtIds[controlId] = {
           userId,
           jobId,
+          depId,
           relaRowId,
         };
       });
@@ -62,7 +64,11 @@ export default class ExportSheet extends Component {
     const showTabs =
       exportShowColumns &&
       (props.exportView.advancedSetting.customdisplay === '1' || (props.exportView.showControls || []).length);
+
     this.state = {
+      loading: true,
+      edited: true,
+      initEdited: false,
       type: 0,
       showTabs,
 
@@ -80,6 +86,64 @@ export default class ExportSheet extends Component {
 
       columnSearchWord: '', // 字段实时搜索
     };
+  }
+
+  componentDidMount() {
+    const {
+      columns,
+      worksheetId,
+      exportView: { viewId },
+      isCharge,
+    } = this.props;
+    let { columnsSelected } = this.state;
+    const { showTabs, exportExtIds } = this.state;
+
+    worksheetAjax.getExportConfig({ worksheetId, viewId }).then(res => {
+      if (res.status === 0) {
+        this.setState({ loading: false, edited: res.edited });
+        return;
+      }
+
+      // 导出所有字段的时候默认值处理
+      if (showTabs && res.exportFieldType === 0) {
+        columnsSelected = this.getDefaultColumnsSelected();
+      }
+
+      let exportRelationalSheet = false;
+
+      Object.keys(columnsSelected).forEach(key => {
+        columnsSelected[key] = _.includes(res.controlIds, key);
+      });
+
+      res.exportExtIds.forEach(item => {
+        if (exportExtIds[item.controlId]) {
+          item.extIds.forEach(key => {
+            exportExtIds[item.controlId][key] = true;
+          });
+        }
+      });
+
+      columns
+        .filter(item => (isRelateRecordTableControl(item) && item.type !== 51) || item.type === 34)
+        .forEach(({ controlId }) => {
+          if (_.includes(res.controlIds, controlId)) {
+            columnsSelected[controlId] = true;
+            exportRelationalSheet = true;
+          }
+        });
+
+      this.setState({
+        loading: false,
+        edited: res.edited && !isCharge,
+        initEdited: res.edited,
+        isStatistics: res.getColumnRpt,
+        type: res.type,
+        exportShowColumns: showTabs ? res.exportFieldType : 0,
+        columnsSelected,
+        exportExtIds,
+        exportRelationalSheet,
+      });
+    });
   }
 
   getColumnRpts(exportControlsId = []) {
@@ -105,13 +169,19 @@ export default class ExportSheet extends Component {
 
   getDefaultColumnsSelected(exportShowColumns, showTabs) {
     const selected = {};
-    const { sheetHiddenColumns, exportView, columns, sheetSwitchPermit } = this.props;
+    const { sheetHiddenColumns, exportView, columns, isCharge } = this.props;
     const { showControls } = exportView;
 
     // 选择导出表格显示列字段
     if (exportShowColumns && showTabs) {
       showControls
-        .filter(id => this.checkControlVisible(columns.find(obj => obj.controlId === id)))
+        .filter(id => {
+          const currentObj = columns.find(obj => obj.controlId === id);
+
+          return (
+            this.checkControlVisible(currentObj) && !(isRelateRecordTableControl(currentObj) || currentObj.type === 34)
+          );
+        })
         .forEach(controlId => {
           selected[controlId] = !_.includes(sheetHiddenColumns, controlId);
         });
@@ -121,10 +191,14 @@ export default class ExportSheet extends Component {
     else {
       this.sortControls(
         columns
-          .filter(item => this.checkControlVisible(item))
+          .filter(item => isCharge || this.checkControlVisible(item))
           .filter(item => !(isRelateRecordTableControl(item) || item.type === 34 || item.type === 43)),
       ).forEach(column => {
-        selected[column.controlId] = true;
+        if (isCharge && !this.checkControlVisible(column)) {
+          selected[column.controlId] = false;
+        } else {
+          selected[column.controlId] = true;
+        }
       });
 
       // 增加记录id
@@ -143,6 +217,7 @@ export default class ExportSheet extends Component {
     for (const key in exportExtIds) {
       exportExtIds[key].userId = false;
       exportExtIds[key].jobId = false;
+      exportExtIds[key].depId = false;
       exportExtIds[key].relaRowId = false;
     }
 
@@ -173,7 +248,9 @@ export default class ExportSheet extends Component {
    * 全选 / 取消全选
    */
   selectAllColumnId() {
-    let oldColumns = this.props.columns.filter(item => isRelateRecordTableControl(item) || item.type === 34);
+    let oldColumns = this.props.columns.filter(
+      item => (isRelateRecordTableControl(item) && item.type !== 51) || item.type === 34,
+    );
     const { exportExtIds, columnsSelected } = this.state;
 
     // 判断当前状态是否全选
@@ -191,6 +268,7 @@ export default class ExportSheet extends Component {
     for (const key in exportExtIds) {
       exportExtIds[key].userId = false;
       exportExtIds[key].jobId = false;
+      exportExtIds[key].depId = false;
       exportExtIds[key].relaRowId = false;
     }
 
@@ -212,11 +290,13 @@ export default class ExportSheet extends Component {
         worksheetId,
         exportView: { viewId },
         projectId,
+        chartId,
         selectRowIds,
         appId,
         searchArgs: { filterControls, keyWords, searchType },
         quickFilter = [],
         navGroupFilters,
+        filtersGroup = [],
       } = this.props;
       const { columnsSelected, isStatistics, exportShowColumns, exportExtIds, type } = this.state;
 
@@ -234,6 +314,7 @@ export default class ExportSheet extends Component {
         appId,
         viewId,
         projectId,
+        reportId: chartId,
         type,
         exportControlsId,
         filterControls,
@@ -241,29 +322,31 @@ export default class ExportSheet extends Component {
         searchType,
         rowIds: selectRowIds,
         isSort: exportShowColumns,
-        fastFilters: (quickFilter || []).map(f =>
-          _.pick(f, [
-            'controlId',
-            'dataType',
-            'spliceType',
-            'filterType',
-            'dateRange',
-            'value',
-            'values',
-            'minValue',
-            'maxValue',
-          ]),
-        ),
+        fastFilters: (quickFilter || [])
+          .concat(filtersGroup)
+          .map(f =>
+            _.pick(f, [
+              'controlId',
+              'dataType',
+              'spliceType',
+              'filterType',
+              'dateRange',
+              'value',
+              'values',
+              'minValue',
+              'maxValue',
+            ]),
+          ),
         navGroupFilters,
 
-        // 成员字段，关联表字段
+        // 成员字段、部门字段、关联表字段
         exportExtIds: columns
           .filter(column => {
-            return (column.type == 26 || column.type == 29) && columnsSelected[column.controlId];
+            return _.includes([26, 27, 29], column.type) && columnsSelected[column.controlId];
           })
           .map(column => {
             const { controlId } = column;
-            const { userId, jobId, relaRowId } = exportExtIds[controlId];
+            const { userId, jobId, depId, relaRowId } = exportExtIds[controlId];
             const extIds = [];
 
             // 成员ID
@@ -271,6 +354,9 @@ export default class ExportSheet extends Component {
 
             // 工号
             if (jobId) extIds.push('jobId');
+
+            // 部门系统ID
+            if (depId) extIds.push('depId');
 
             // 关联表记录ID
             if (relaRowId) extIds.push('relaRowId');
@@ -322,8 +408,92 @@ export default class ExportSheet extends Component {
     });
   }
 
+  /**
+   * 保存配置
+   */
+  saveConfig = () => {
+    const { columnsSelected } = this.state;
+    const exportControlsId = [];
+    _.forEach(columnsSelected, (value, key) => {
+      columnsSelected[key] && exportControlsId.push(key);
+    });
+
+    // 未选择字段
+    if (!exportControlsId.length) {
+      alert(_l('至少选择一个字段'), 3);
+      return;
+    }
+
+    Dialog.confirm({
+      title: _l('保存导出配置'),
+      description: (
+        <div className="Font14">
+          <div className="Gray_75">
+            {_l('将当前导出配置保存为默认导出方式供所有用户使用，会保存已选字段（导出所有字段）、其他、以及导出格式')}
+          </div>
+          <Checkbox
+            className="mTop20 Gray"
+            text={_l('不允许用户修改默认配置')}
+            defaultChecked={this.state.initEdited}
+            onClick={checked => this.setState({ initEdited: checked })}
+          />
+        </div>
+      ),
+      onOk: () => {
+        const {
+          columns,
+          worksheetId,
+          exportView: { viewId },
+        } = this.props;
+        const { columnsSelected, exportShowColumns, exportExtIds, type, showTabs, isStatistics, initEdited } =
+          this.state;
+        const controlIds = [];
+        _.forEach(columnsSelected, (value, key) => {
+          columnsSelected[key] && controlIds.push(key);
+        });
+        const args = {
+          type,
+          // 成员字段、部门字段、关联表字段
+          exportExtIds: columns
+            .filter(column => {
+              return _.includes([26, 27, 29], column.type) && columnsSelected[column.controlId];
+            })
+            .map(column => {
+              const { controlId } = column;
+              const { userId, jobId, depId, relaRowId } = exportExtIds[controlId];
+              const extIds = [];
+
+              // 成员ID
+              if (userId) extIds.push('userId');
+
+              // 工号
+              if (jobId) extIds.push('jobId');
+
+              // 部门系统ID
+              if (depId) extIds.push('depId');
+
+              // 关联表记录ID
+              if (relaRowId) extIds.push('relaRowId');
+              return { extIds, controlId };
+            })
+            .filter(item => item.extIds.length),
+          controlIds,
+          getColumnRpt: isStatistics,
+          exportFieldType: showTabs && exportShowColumns ? 1 : 0,
+          edited: initEdited,
+          worksheetId,
+          viewId,
+        };
+
+        worksheetAjax.saveExportConfig(args).then(res => {
+          alert(_l('保存成功'));
+        });
+      },
+    });
+  };
+
   render() {
-    const { onHide, allWorksheetIsSelected, selectRowIds, exportView, hideStatistics } = this.props;
+    const { onHide, allWorksheetIsSelected, selectRowIds, exportView, hideStatistics, isCharge } = this.props;
     let columns = [].concat(this.props.columns);
     const { advancedSetting, showControls } = exportView;
     const {
@@ -335,6 +505,8 @@ export default class ExportSheet extends Component {
       exportRelationalSheet,
       exportExtIds,
       columnSearchWord,
+      loading,
+      edited,
     } = this.state;
 
     if (
@@ -348,17 +520,19 @@ export default class ExportSheet extends Component {
     }
 
     // 过滤掉不支持导出的字段、无权限字段
-    const notSupportableTtpe = [22, 34, 43, 45, 47, 10010];
+    const notSupportableTtpe = [22, 34, 42, 43, 45, 47, 49, 50, 51, 10010];
     const exportColumns = columns.filter(
       item =>
         !isRelateRecordTableControl(item) &&
         !notSupportableTtpe.includes(item.type) &&
-        this.checkControlVisible(item) &&
+        (isCharge || this.checkControlVisible(item)) &&
         item.controlName.indexOf(columnSearchWord) >= 0,
     );
 
     // 关联、字表字段列表
-    const exportMoreRecord = columns.filter(item => isRelateRecordTableControl(item) || item.type === 34);
+    const exportMoreRecord = columns.filter(
+      item => (isRelateRecordTableControl(item) && item.type !== 51) || item.type === 34,
+    );
 
     // 判断当前状态是否全选
     const columnsShow = Object.keys(columnsSelected).filter(id => exportColumns.find(column => column.controlId == id));
@@ -379,183 +553,255 @@ export default class ExportSheet extends Component {
         }
         width={470}
         okText={_l('导出')}
+        footerLeftElement={() =>
+          isCharge ? (
+            <span className="ThemeColor3 ThemeHoverColor2 pointer" onClick={this.saveConfig}>
+              {_l('保存导出配置')}
+            </span>
+          ) : null
+        }
         onCancel={onHide}
         onOk={() => this.exportExcel()}
       >
-        {/** 是否选择导出所有字段 */}
-        {!!showTabs && (
+        {loading ? (
+          <LoadDiv />
+        ) : (
           <Fragment>
-            <Radio
-              size="small"
-              text={_l('导出当前表格显示列的字段')}
-              checked={exportShowColumns}
-              onClick={() => this.switchColumnType(true)}
-            />
-            <Radio
-              size="small"
-              text={_l('导出所有字段')}
-              checked={!exportShowColumns}
-              onClick={() => this.switchColumnType(false)}
-            />
-          </Fragment>
-        )}
-
-        {/** 表格的字段列表 */}
-        <div className="title" />
-        {(!exportShowColumns || !showTabs) && (
-          <Fragment>
-            {/** 字段搜索框 */}
-            <div className="search_container">
-              {/** 是否全选 */}
-              <Checkbox
-                text={_l('全选')}
-                size="small"
-                checked={selectAllColumnIds}
-                onClick={() => this.selectAllColumnId()}
-              >
-                {/** 字段数量统计 */}
-                <span style={{ marginLeft: '6px', color: '#9E9E9E' }}>
-                  ({columnsSelectedNum.length}/{columnsShow.length})
-                </span>
-              </Checkbox>
-
-              {/** 字段搜索框 */}
-              <div className="search_input">
-                <i className="icon icon-search Gray_9e" />
-                <input
-                  placeholder={_l('搜索字段名称')}
-                  onInput={e => this.setState({ columnSearchWord: e.target.value || '' })}
+            {/** 是否选择导出所有字段 */}
+            {!!showTabs && (
+              <div className="exportSheetTabs">
+                <Radio
+                  size="small"
+                  text={_l('导出当前表格显示列的字段')}
+                  disabled={edited}
+                  checked={exportShowColumns}
+                  onClick={() => this.switchColumnType(true)}
+                />
+                <Radio
+                  size="small"
+                  text={_l('导出所有字段')}
+                  disabled={edited}
+                  checked={!exportShowColumns}
+                  onClick={() => this.switchColumnType(false)}
                 />
               </div>
-            </div>
+            )}
 
-            {/** 未搜索到数据 */}
-            {!exportColumns.length && <div className="no_data">{_l('未搜索到相关字段')}</div>}
-
-            {/** 字段列表 */}
-            {exportColumns.map(column => (
+            {/** 表格的字段列表 */}
+            <div className="title" />
+            {(!exportShowColumns || !showTabs) && (
               <Fragment>
-                {/** 字段选择 */}
+                {/** 字段搜索框 */}
+                <div className="search_container">
+                  {/** 是否全选 */}
+                  <Checkbox
+                    text={_l('全选')}
+                    size="small"
+                    disabled={edited}
+                    checked={selectAllColumnIds}
+                    onClick={() => this.selectAllColumnId()}
+                  >
+                    {/** 字段数量统计 */}
+                    <span style={{ marginLeft: '6px', color: '#9E9E9E' }}>
+                      ({columnsSelectedNum.length}/{columnsShow.length})
+                    </span>
+                  </Checkbox>
+
+                  {/** 字段搜索框 */}
+                  <div className="search_input">
+                    <i className="icon icon-search Gray_9e" />
+                    <input
+                      placeholder={_l('搜索字段名称')}
+                      onInput={e => this.setState({ columnSearchWord: e.target.value || '' })}
+                    />
+                  </div>
+                </div>
+
+                {/** 未搜索到数据 */}
+                {!exportColumns.length && <div className="no_data">{_l('未搜索到相关字段')}</div>}
+
+                {/** 字段列表 */}
+                {exportColumns.map(column => (
+                  <Fragment>
+                    {/** 字段选择 */}
+                    <Checkbox
+                      style={{ left: '20px' }}
+                      key={column.controlId}
+                      size="small"
+                      text={
+                        <Fragment>
+                          {column.controlName || ''}
+                          {isCharge && !this.checkControlVisible(column) && (
+                            <Icon type="workflow_hide" className="Font14 Gray_9e mLeft5" />
+                          )}
+                        </Fragment>
+                      }
+                      disabled={edited}
+                      checked={!!columnsSelected[column.controlId]}
+                      onClick={() => this.chooseColumnId(column)}
+                    />
+
+                    {/** 关联字段列表 */}
+                    {column.type == 29 && !!columnsSelected[column.controlId] && (
+                      <Fragment>
+                        {/** 标题 */}
+                        <Checkbox
+                          disabled={true}
+                          style={{ left: '40px' }}
+                          size="small"
+                          checked={true}
+                          onClick={() => {}}
+                        >
+                          <span>{_l('标题')}</span>
+                        </Checkbox>
+
+                        {/** 记录ID */}
+                        <Checkbox
+                          style={{ left: '40px' }}
+                          size="small"
+                          disabled={edited}
+                          checked={exportExtIds[column.controlId].relaRowId}
+                          text={_l('记录ID')}
+                          onClick={() => {
+                            exportExtIds[column.controlId].relaRowId = !exportExtIds[column.controlId].relaRowId;
+                            this.setState({ exportExtIds });
+                          }}
+                        />
+                      </Fragment>
+                    )}
+
+                    {/** 成员字段 */}
+                    {column.type == 26 &&
+                      (!column.advancedSetting || column.advancedSetting.usertype != '2') &&
+                      !!columnsSelected[column.controlId] &&
+                      !['wfcuaids', 'wfcaid'].includes(column.controlId) && (
+                        <Fragment>
+                          {/** 姓名 */}
+                          <Checkbox
+                            disabled={true}
+                            style={{ left: '40px' }}
+                            size="small"
+                            checked={true}
+                            onClick={() => {}}
+                          >
+                            <span>{_l('姓名')}</span>
+                          </Checkbox>
+
+                          {/** 工号 */}
+                          <Checkbox
+                            style={{ left: '40px' }}
+                            size="small"
+                            disabled={edited}
+                            checked={exportExtIds[column.controlId].jobId}
+                            text={_l('工号')}
+                            onClick={() => {
+                              exportExtIds[column.controlId].jobId = !exportExtIds[column.controlId].jobId;
+                              this.setState({ exportExtIds });
+                            }}
+                          />
+
+                          {/** 人员ID */}
+                          <Checkbox
+                            style={{ left: '40px' }}
+                            size="small"
+                            disabled={edited}
+                            checked={exportExtIds[column.controlId].userId}
+                            text={_l('人员ID')}
+                            onClick={() => {
+                              exportExtIds[column.controlId].userId = !exportExtIds[column.controlId].userId;
+                              this.setState({ exportExtIds });
+                            }}
+                          />
+                        </Fragment>
+                      )}
+
+                    {/** 部门字段 */}
+                    {column.type == 27 && !!columnsSelected[column.controlId] && (
+                      <Fragment>
+                        {/** 名称 */}
+                        <Checkbox
+                          disabled={true}
+                          style={{ left: '40px' }}
+                          size="small"
+                          checked={true}
+                          onClick={() => {}}
+                        >
+                          <span>{_l('名称')}</span>
+                        </Checkbox>
+
+                        {/** 部门系统ID */}
+                        <Checkbox
+                          style={{ left: '40px' }}
+                          size="small"
+                          disabled={edited}
+                          checked={exportExtIds[column.controlId].depId}
+                          text={_l('部门系统ID')}
+                          onClick={() => {
+                            exportExtIds[column.controlId].depId = !exportExtIds[column.controlId].depId;
+                            this.setState({ exportExtIds });
+                          }}
+                        />
+                      </Fragment>
+                    )}
+                  </Fragment>
+                ))}
+              </Fragment>
+            )}
+
+            <div className="title">{_l('其他')}</div>
+
+            {/** 列统计结果 */}
+            {!hideStatistics && (
+              <Checkbox
+                text={_l('列统计结果')}
+                disabled={edited}
+                checked={isStatistics}
+                size="small"
+                onClick={() => this.setState({ isStatistics: !isStatistics })}
+              />
+            )}
+
+            {/** 在其他sheet导出关联表 */}
+            <Checkbox
+              text={_l('在其他sheet导出关联表')}
+              checked={exportRelationalSheet && type !== 1}
+              disabled={type === 1 || edited}
+              size="small"
+              onClick={() => {
+                // 默认全选导出所有关联表
+                const { columnsSelected, exportRelationalSheet } = this.state;
+                exportMoreRecord.forEach(column => (columnsSelected[column.controlId] = !exportRelationalSheet));
+                this.setState({ exportRelationalSheet: !exportRelationalSheet, columnsSelected });
+              }}
+            />
+
+            {/** 在其他sheet导出关联表 */}
+            {exportRelationalSheet &&
+              exportMoreRecord.map(column => (
                 <Checkbox
                   style={{ left: '20px' }}
                   key={column.controlId}
                   size="small"
+                  disabled={type === 1 || edited}
                   text={column.controlName || ''}
-                  checked={!!columnsSelected[column.controlId]}
+                  checked={!!columnsSelected[column.controlId] && type !== 1}
                   onClick={() => this.chooseColumnId(column)}
                 />
+              ))}
 
-                {/** 关联字段列表 */}
-                {column.type == 29 && !!columnsSelected[column.controlId] && (
-                  <Fragment>
-                    {/** 标题 */}
-                    <Checkbox disabled={true} style={{ left: '40px' }} size="small" checked={true} onClick={() => {}}>
-                      <span style={{ color: '#333333' }}>{_l('标题')}</span>
-                    </Checkbox>
-
-                    {/** 记录ID */}
-                    <Checkbox
-                      style={{ left: '40px' }}
-                      size="small"
-                      checked={exportExtIds[column.controlId].relaRowId}
-                      text={_l('记录ID')}
-                      onClick={() => {
-                        exportExtIds[column.controlId].relaRowId = !exportExtIds[column.controlId].relaRowId;
-                        this.setState({ exportExtIds });
-                      }}
-                    />
-                  </Fragment>
-                )}
-
-                {/** 成员字段 */}
-                {column.type == 26 &&
-                  (!column.advancedSetting || column.advancedSetting.usertype != '2') &&
-                  !!columnsSelected[column.controlId] &&
-                  !['caid', 'ownerid', 'uaid', 'wfcuaids', 'wfcaid'].includes(column.controlId) && (
-                    <Fragment>
-                      {/** 姓名 */}
-                      <Checkbox disabled={true} style={{ left: '40px' }} size="small" checked={true} onClick={() => {}}>
-                        <span style={{ color: '#333333' }}>{_l('姓名')}</span>
-                      </Checkbox>
-
-                      {/** 工号 */}
-                      <Checkbox
-                        style={{ left: '40px' }}
-                        size="small"
-                        checked={exportExtIds[column.controlId].jobId}
-                        text={_l('工号')}
-                        onClick={() => {
-                          exportExtIds[column.controlId].jobId = !exportExtIds[column.controlId].jobId;
-                          this.setState({ exportExtIds });
-                        }}
-                      />
-
-                      {/** 人员ID */}
-                      <Checkbox
-                        style={{ left: '40px' }}
-                        size="small"
-                        checked={exportExtIds[column.controlId].userId}
-                        text={_l('人员ID')}
-                        onClick={() => {
-                          exportExtIds[column.controlId].userId = !exportExtIds[column.controlId].userId;
-                          this.setState({ exportExtIds });
-                        }}
-                      />
-                    </Fragment>
-                  )}
-              </Fragment>
-            ))}
+            <div className="title">{_l('导出格式')}</div>
+            <RadioGroup
+              data={[
+                { text: _l('Excel 文件（.xlsx）'), value: 0 },
+                { text: _l('CSV 文件（.csv）'), value: 1 },
+              ]}
+              size="small"
+              checkedValue={type}
+              disabled={edited}
+              onChange={type => this.setState({ type })}
+            />
           </Fragment>
         )}
-
-        <div className="title">{_l('其他')}</div>
-
-        {/** 列统计结果 */}
-        {!hideStatistics && (
-          <Checkbox
-            text={_l('列统计结果')}
-            checked={isStatistics}
-            size="small"
-            onClick={() => this.setState({ isStatistics: !isStatistics })}
-          />
-        )}
-
-        {/** 在其他sheet导出关联表 */}
-        <Checkbox
-          text={_l('在其他sheet导出关联表')}
-          checked={exportRelationalSheet && type !== 1}
-          disabled={type === 1}
-          size="small"
-          onClick={() => {
-            // 默认全选导出所有关联表
-            const { columnsSelected, exportRelationalSheet } = this.state;
-            exportMoreRecord.forEach(column => (columnsSelected[column.controlId] = !exportRelationalSheet));
-            this.setState({ exportRelationalSheet: !exportRelationalSheet, columnsSelected });
-          }}
-        />
-
-        {/** 在其他sheet导出关联表 */}
-        {exportRelationalSheet &&
-          exportMoreRecord.map(column => (
-            <Checkbox
-              style={{ left: '20px' }}
-              key={column.controlId}
-              size="small"
-              disabled={type === 1}
-              text={column.controlName || ''}
-              checked={!!columnsSelected[column.controlId] && type !== 1}
-              onClick={() => this.chooseColumnId(column)}
-            />
-          ))}
-
-        <div className="title">{_l('导出格式')}</div>
-        <RadioGroup
-          data={[
-            { text: _l('Excel 文件（.xlsx）'), value: 0, checked: type === 0 },
-            { text: _l('CSV 文件（.csv）'), value: 1, checked: type === 1 },
-          ]}
-          onChange={type => this.setState({ type })}
-        />
       </Dialog>
     );
   }

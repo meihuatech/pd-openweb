@@ -3,20 +3,22 @@ import cx from 'classnames';
 import Trigger from 'rc-trigger';
 import 'rc-trigger/assets/index.css';
 import { string, func, oneOf, bool } from 'prop-types';
-import { Icon, Dialog, MdLink } from 'ming-ui';
-import { navigateTo } from 'src/router/navigateTo';
+import { Icon, MdLink } from 'ming-ui';
 import withClickAway from 'ming-ui/decorators/withClickAway';
 import AppOperator from './AppOperator';
 import SelectIcon from 'src/pages/AppHomepage/components/SelectIcon';
 import VerifyDel from 'src/pages/AppHomepage/components/VerifyDel';
 import CopyApp from 'src/pages/AppHomepage/components/CopyApp';
 import LineClampTextBox from 'src/pages/AppHomepage/components/LineClampTextBox';
-import { compareProps, isCanEdit } from 'src/pages/PageHeader/util';
-import { ADVANCE_AUTHORITY } from 'src/pages/PageHeader/AppPkgHeader/config';
+import { compareProps } from 'src/pages/PageHeader/util';
 import AppStatusComp from './AppStatus';
 import SvgIcon from 'src/components/SvgIcon';
 import _ from 'lodash';
-
+import { canEditApp, canEditData } from 'src/pages/worksheet/redux/actions/util.js';
+import { getAppNavigateUrl, transferExternalLinkUrl } from '../utils';
+import ExternalLinkDialog from './ExternalLinkDialog';
+import ManageUserDialog from 'src/pages/Role/AppRoleCon/ManageUserDialog.jsx';
+import { addBehaviorLog } from 'src/util';
 @withClickAway
 export default class MyAppItem extends Component {
   static propTypes = {
@@ -47,8 +49,9 @@ export default class MyAppItem extends Component {
     editAppVisible: false,
     selectIconVisible: false,
     delAppConfirmVisible: false,
-    quitAppConfirmVisible: false,
     copyAppVisible: false,
+    externalLinkVisible: false,
+    showRoleDialog: false,
   };
 
   shouldComponentUpdate(nextProps, nextState) {
@@ -61,8 +64,15 @@ export default class MyAppItem extends Component {
         'permissionType',
         'name',
         'iconColor',
+        'navColor',
+        'lightColor',
         'icon',
         'groupIds',
+        'urlTemplate',
+        'pcDisplay',
+        'webMobileDisplay',
+        'appDisplay',
+        'isNew',
       ]) ||
       compareProps(nextState, this.state) ||
       id === this.props.newAppItemId ||
@@ -79,7 +89,15 @@ export default class MyAppItem extends Component {
   dataCache = _.pick(this.props, ['icon', 'iconColor', 'name']);
 
   handleAppChange = obj => {
-    const para = _.pick(this.props, ['projectId', 'icon', 'iconColor', 'name', 'description']);
+    const para = _.pick(this.props, [
+      'projectId',
+      'icon',
+      'iconColor',
+      'navColor',
+      'lightColor',
+      'name',
+      'description',
+    ]);
     this.props.onAppChange({ ...para, ...obj, appId: this.props.id });
   };
 
@@ -103,48 +121,40 @@ export default class MyAppItem extends Component {
       case 'del':
         this.switchVisible({ delAppConfirmVisible: true });
         break;
-      case 'quit':
-        this.switchVisible({ quitAppConfirmVisible: true });
-        break;
       case 'copy':
         this.switchVisible({ copyAppVisible: true });
+        break;
+      case 'setExternalLink':
+        this.switchVisible({ externalLinkVisible: true });
+        break;
+      case 'manageUser':
+        this.switchVisible({ showRoleDialog: true });
         break;
       default:
         break;
     }
   };
 
-  getNavigateUrl = id => {
-    const storage = JSON.parse(localStorage.getItem(`mdAppCache_${md.global.Account.accountId}_${id}`));
-    if (storage) {
-      const { lastGroupId, lastWorksheetId, lastViewId } = storage;
-      if (lastGroupId && lastWorksheetId && lastViewId) {
-        return `/app/${id}/${[lastGroupId, lastWorksheetId, lastViewId].join('/')}?from=insite`;
-      } else if (lastGroupId && lastWorksheetId) {
-        return `/app/${id}/${[lastGroupId, lastWorksheetId].join('/')}?from=insite`;
-      } else if (lastGroupId) {
-        return `/app/${id}/${lastGroupId}?from=insite`;
-      } else {
-        return `/app/${id}`;
-      }
-    } else {
-      return `/app/${id}`;
-    }
-  };
   handleApp = mode => {
     const { id: appId, projectId } = this.props;
     this.props.handleApp({ appId, projectId, mode });
   };
 
   render() {
-    const { editAppVisible, selectIconVisible, delAppConfirmVisible, quitAppConfirmVisible, copyAppVisible } =
-      this.state;
+    const {
+      editAppVisible,
+      selectIconVisible,
+      delAppConfirmVisible,
+      copyAppVisible,
+      externalLinkVisible,
+      showRoleDialog,
+    } = this.state;
     const {
       groupId,
       groupType,
       isAdmin,
       type,
-      iconColor,
+      lightColor,
       iconUrl,
       name,
       permissionType,
@@ -161,19 +171,45 @@ export default class MyAppItem extends Component {
       clearNewAppItemId,
       onCopy,
       onUpdateAppBelongGroups,
+      pcNaviStyle,
+      selectAppItmeType,
+      createType,
+      urlTemplate,
+      pcDisplay,
+      webMobileDisplay,
+      appDisplay,
     } = this.props;
     const isShowSelectIcon = selectIconVisible || newAppItemId === id;
     const offsetLeft = _.get(this, '$myAppItem.current.offsetLeft');
-    const selectIconLeft = !_.isUndefined(offsetLeft) && offsetLeft < (300 - 132) / 2 && 0;
+    const selectIconLeft = !_.isUndefined(offsetLeft) && offsetLeft < 414 && 0;
+    const iconColor = this.props.iconColor || '#2196f3';
+    const navColor = this.props.navColor || iconColor;
+    const black = '#1b2025' === navColor;
+    const light = [lightColor, '#ffffff', '#f5f6f7'].includes(navColor);
+
     return (
       <div
         ref={this.$myAppItem}
         className={cx('sortableMyAppItemWrap', { active: editAppVisible, isSelectingIcon: isShowSelectIcon })}
       >
         <div className={cx('myAppItemWrap')}>
-          <MdLink className="myAppItem" to={this.getNavigateUrl(id)}>
-            <div className="myAppItemDetail" style={{ backgroundColor: iconColor || '#2196f3' }}>
-              <SvgIcon url={iconUrl} fill="#fff" size={48} />
+          <MdLink
+            className="myAppItem stopPropagation"
+            to={getAppNavigateUrl(id, pcNaviStyle, selectAppItmeType)}
+            onClick={e => {
+              addBehaviorLog('app', id); // 浏览应用埋点
+
+              if (createType === 1) {
+                //是外部链接应用
+                e.stopPropagation();
+                e.preventDefault();
+                this.props.isNew && this.handleModify({ isNew: false });
+                window.open(transferExternalLinkUrl(urlTemplate, projectId, id));
+              }
+            }}
+          >
+            <div className="myAppItemDetail" style={{ backgroundColor: light ? lightColor : navColor || iconColor }}>
+              <SvgIcon url={iconUrl} fill={black || light ? iconColor : '#fff'} size={48} />
               <AppStatusComp {..._.pick(this.props, ['isGoodsStatus', 'isNew', 'fixed'])} />
             </div>
             {type === 'external' ? (
@@ -191,7 +227,6 @@ export default class MyAppItem extends Component {
               <LineClampTextBox className="appExplain" text={name} title={name} />
             )}
           </MdLink>
-
           <div
             className="star appItemIcon"
             data-tip={isMarked ? _l('取消标星') : _l('标星')}
@@ -199,7 +234,9 @@ export default class MyAppItem extends Component {
           >
             <Icon className="Font16" icon={isMarked ? 'task-star' : 'star-hollow'} />
           </div>
-          {(isCanEdit(permissionType, isLock) || !_.includes(['external', 'star', 'personal'], type)) && (
+          {(canEditApp(permissionType, isLock) ||
+            canEditData(permissionType) ||
+            !_.includes(['external', 'star', 'personal'], type)) && (
             <Trigger
               popupVisible={editAppVisible}
               popupClassName="myAppItemOperatorTriggerWrap"
@@ -213,6 +250,7 @@ export default class MyAppItem extends Component {
                   selectedGroupIds={groupIds}
                   role={permissionType}
                   isLock={isLock}
+                  createType={createType}
                   onUpdateAppBelongGroups={args => onUpdateAppBelongGroups({ ...args, appId: id })}
                   onClick={id => this.switchVisible({ editAppVisible: false }, () => this.handleMoreClick(id))}
                   onClickAway={() => this.switchVisible({ editAppVisible: false })}
@@ -241,17 +279,6 @@ export default class MyAppItem extends Component {
               onCancel={() => this.switchVisible({ delAppConfirmVisible: false })}
             />
           )}
-          {quitAppConfirmVisible && (
-            <Dialog
-              visible
-              title={<span style={{ color: '#f44336' }}>{_l('您确认退出此应用吗?')}</span>}
-              buttonType="danger"
-              onOk={() => this.switchVisible({ quitAppConfirmVisible: false }, this.handleApp('quit'))}
-              onCancel={() => this.switchVisible({ quitAppConfirmVisible: false })}
-            >
-              <div className="Gray_75">{_l('退出此应用后，您将无法访问此应用')}</div>
-            </Dialog>
-          )}
           {copyAppVisible && (
             <CopyApp
               title={name}
@@ -261,17 +288,38 @@ export default class MyAppItem extends Component {
             />
           )}
           {isShowSelectIcon && (
-            <SelectIcon
+            <div style={{ height: 400 }}>
+              <SelectIcon
+                projectId={projectId}
+                className="myAppItemSelectIconWrap"
+                style={{
+                  left: selectIconLeft,
+                }}
+                {..._.pick(this.props, ['icon', 'name', 'iconColor', 'navColor', 'lightColor'])}
+                onModify={this.handleModify}
+                onChange={this.handleAppChange}
+                onClose={() => this.switchVisible({ selectIconVisible: false })}
+                onClickAway={() => this.switchVisible({ selectIconVisible: false }, clearNewAppItemId)}
+                onClickAwayExceptions={['.mui-dialog-container']}
+              />
+            </div>
+          )}
+          {externalLinkVisible && (
+            <ExternalLinkDialog
               projectId={projectId}
-              className="myAppItemSelectIconWrap"
-              style={{
-                left: selectIconLeft,
+              isEdit={true}
+              record={{ id, name, urlTemplate, pcDisplay, webMobileDisplay, appDisplay }}
+              onCancel={() => this.switchVisible({ externalLinkVisible: false })}
+              onAppChange={this.props.onAppChange}
+            />
+          )}
+          {showRoleDialog && (
+            <ManageUserDialog
+              appId={id}
+              projectId={projectId}
+              onCancel={() => {
+                this.switchVisible({ showRoleDialog: false });
               }}
-              {..._.pick(this.props, ['icon', 'name', 'iconColor'])}
-              onModify={this.handleModify}
-              onChange={this.handleAppChange}
-              onClose={() => this.switchVisible({ selectIconVisible: false })}
-              onClickAway={() => this.switchVisible({ selectIconVisible: false }, clearNewAppItemId)}
             />
           )}
         </div>
