@@ -945,12 +945,12 @@ export default class extends Component {
       // let valueView = isNaN(txt) ? txt : `${!txtNum ? txtNum : txt}%`
       let tagClass = ''
       // let valueView = isNaN(txt) ? txt : (!txtNum ? '--' : `${txt}%`)
-      let valueView = isNaN(txt) ? txt : (isNaN(txtNum) ? '--' : `${txt}%`)
+      let valueView = isNaN(txt) ? txt : ((isNaN(txtNum) || txtNum == 0) ? '--' : `${txt}%`)
 
       if (name === 'Value') {
         // console.log('record', item.controlId,record)
         // tagClass = isNaN(txtNum) ? '' : txtNum > 0 ? 'v-blue' : txtNum < 0 ? 'v-red' : ''
-        valueView = isNaN(txt) ? txt : (isNaN(txtNum) ? '--' : parseFloat(txt))
+        valueView = isNaN(txt) ? txt : ((isNaN(txtNum) || txtNum == 0) ? '--' : parseFloat(txt))
         // console.log('value view', txt, valueView)
         if (txtNum > 0) {
           switch (record['6362a77a1d176488ea6c1a81']) {
