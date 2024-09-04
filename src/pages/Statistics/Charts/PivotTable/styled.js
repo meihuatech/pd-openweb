@@ -204,6 +204,9 @@ const PivotTableContent = styled.div`
       &.green {
         background-color: #BCD197;
       }
+      &.blue-light {
+        background-color: rgb(165, 209, 230);
+      }
       &.v-red {
         background-color: #F5B5B2;
       }
