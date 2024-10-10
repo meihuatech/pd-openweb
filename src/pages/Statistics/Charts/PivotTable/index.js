@@ -411,11 +411,11 @@ export default class extends Component {
               return <span className={cx(['cell-tag',tagClass])}>{valueView}</span>
             }
 
-            if (name === 'Net Sales') {
-              const txtNum = parseFloat(txt)
-              let tagClass = tagClass = txtNum > 0 ? 'blue-light' : ''
-              return <span className={cx(['cell-tag',tagClass])}>{txt}</span>
-            }
+            // if (name === 'Net Sales') {
+            //   const txtNum = parseFloat(txt)
+            //   let tagClass = tagClass = txtNum > 0 ? 'blue-light' : ''
+            //   return <span className={cx(['cell-tag',tagClass])}>{txt}</span>
+            // }
             
             return txt
           },
@@ -987,12 +987,12 @@ export default class extends Component {
       value = <span className={cx(['cell-tag',tagClass])}>{valueView}</span>
     }
 
-    if (name === 'Net Sales') {
-      const txt =  value
-      const txtNum = parseFloat(txt)
-      let tagClass = tagClass = txtNum > 0 ? 'blue-light' : ''
-      value = <span className={cx(['cell-tag',tagClass])}>{txt}</span>
-    }
+    // if (name === 'Net Sales') {
+    //   const txt =  value
+    //   const txtNum = parseFloat(txt)
+    //   let tagClass = tagClass = txtNum > 0 ? 'blue-light' : ''
+    //   value = <span className={cx(['cell-tag',tagClass])}>{txt}</span>
+    // }
     
     return (
       <Fragment>
