@@ -305,6 +305,7 @@ const withoutHeaderPathList = [
   'dataMirrorPreview',
 ];
 const withoutChatPathList = [
+  'app',
   'demo',
   'apps/kcupload',
   'apps/kcshare',

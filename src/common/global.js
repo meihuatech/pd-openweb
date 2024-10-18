@@ -261,6 +261,21 @@ window.md = {
       enableFooterInfo: false, //登录页底部信息
       footerThemeColor: '', //登录页底部颜色
     },
+
+    CookieKeys: {
+      LOREAL_SSO: 'lor_sso',
+      LOREAL_SSO_SOURCE: 'lor_sso_source',
+      LOREAL_SSO_FROM: 'lor_sso_from',
+    },
+  
+    StorageKeys: {
+      LOREAL_SSO_INFO: 'loreal_sso_info',
+    },
+  
+    SourceUrls: {
+      LOREAL_SSO_URL: 'https://data-report-cn.loreal.wans/index#/one-access',
+      TOOL_SSO_URL: 'https://tool.mohodata.com'
+    },
   },
 };
 

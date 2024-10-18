@@ -23,6 +23,10 @@ const isMobile = browserIsMobile();
 const isPrintPivotTable = location.href.includes('printPivotTable');
 import { generate } from '@ant-design/colors';
 import RegExpValidator from 'src/util/expression';
+
+const newImgBase = 'data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz4KPHN2ZyB3aWR0aD0iMzRweCIgaGVpZ2h0PSIxMnB4IiB2aWV3Qm94PSIwIDAgMzQgMTIiIHZlcnNpb249IjEuMSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIiB4bWxuczp4bGluaz0iaHR0cDovL3d3dy53My5vcmcvMTk5OS94bGluayI+CiAgICA8IS0tIEdlbmVyYXRvcjogU2tldGNoIDU5LjEgKDg2MTQ0KSAtIGh0dHBzOi8vc2tldGNoLmNvbSAtLT4KICAgIDx0aXRsZT5OZXcgMjwvdGl0bGU+CiAgICA8ZGVzYz5DcmVhdGVkIHdpdGggU2tldGNoLjwvZGVzYz4KICAgIDxnIGlkPSLpobXpnaItMSIgc3Ryb2tlPSJub25lIiBzdHJva2Utd2lkdGg9IjEiIGZpbGw9Im5vbmUiIGZpbGwtcnVsZT0iZXZlbm9kZCI+CiAgICAgICAgPGcgaWQ9Im5ldyIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoLTY3OC4wMDAwMDAsIC00MzEuMDAwMDAwKSIgZmlsbD0iI0Y4QTk0MiIgZmlsbC1ydWxlPSJub256ZXJvIj4KICAgICAgICAgICAgPGcgaWQ9Ik5ldy0yIiB0cmFuc2Zvcm09InRyYW5zbGF0ZSg2NzguNjI4MDY4LCA0MzEuODk2MDAwKSI+CiAgICAgICAgICAgICAgICA8cGF0aCBkPSJNMi40NzUzNDg3MSwwIEw1LjYxNTk3MzcxLDAgTDcuNjg4MDQ1MjEsOC4xNzE4NzUgTDcuNzgxNzk1MjEsOC4xNzE4NzUgTDkuNjQ3MjIzNzEsMCBMMTEuNjQ3MjIzNywwIEw5LjE3MTg3NSwxMC44NDM3NSBMNi4zOTA2MjUsMTAuODQzNzUgTDQuMDkyNTA3MzksMi4xNTYyNSBMMy45OTg3NTczOSwyLjE1NjI1IEwyLjAxNTYyNSwxMC44NDM3NSBMMS40MjEwODU0N2UtMTMsMTAuODQzNzUgTDIuNDc1MzQ4NzEsMCBaIE0xOS4wNzUxMTUzLDUuODkwNjI1IEMxOS4wMjc1NTc5LDYuMDk4OTU5MzcgMTguOTczOTcyMiw2LjI5OTQ3ODIgMTguOTE0MzU2NSw2LjQ5MjE4NzUgQzE4Ljg1NDc0MDksNi42ODQ4OTY4IDE4Ljc5Nzg3MjEsNi44NTQxNjU5NCAxOC43NDM3NDg1LDcgTDEzLjEzMDQ2MjUsNy4zNTkzNzUgQzEyLjk4OTYwMDksOC4wNjc3MTE4OCAxMy4wNjg2MjM5LDguNTg4NTQgMTMuMzY3NTM0LDguOTIxODc1IEMxMy42NjY0NDQxLDkuMjU1MjEgMTQuMjM3NzY3Niw5LjQyMTg3NSAxNS4wODE1MjE5LDkuNDIxODc1IEMxNS4zMzE1MjMxLDkuNDIxODc1IDE1LjU5Mjg5OTgsOS40MDYyNTAxNiAxNS44NjU2NTk3LDkuMzc1IEMxNi4xMzg0MTk3LDkuMzQzNzQ5ODQgMTYuNDAzNzMxMiw5LjI5OTQ3OTQ1IDE2LjY2MTYwMjQsOS4yNDIxODc1IEMxNi45MTk0NzM2LDkuMTg0ODk1NTUgMTcuMTYwMzAwOCw5LjEyMjM5NjE3IDE3LjM4NDA5MTMsOS4wNTQ2ODc1IEMxNy42MDc4ODE4LDguOTg2OTc4ODMgMTcuODAxMDEzOCw4LjkxNjY2NzAzIDE3Ljk2MzQ5MjksOC44NDM3NSBMMTcuNTk5NjgwOSwxMC40Mzc1IEMxNy4zMTYzODk0LDEwLjU4MzMzNDEgMTYuODgwNDIwNiwxMC43MTM1NDExIDE2LjI5MTc2MTIsMTAuODI4MTI1IEMxNS43MDMxMDE5LDEwLjk0MjcwODkgMTUuMDY1MDMsMTEgMTQuMzc3NTI2NiwxMSBDMTMuNzMxNjksMTEgMTMuMTc0MjM1LDEwLjkzMjI5MjMgMTIuNzA1MTQ0OCwxMC43OTY4NzUgQzEyLjIzNjA1NDYsMTAuNjYxNDU3NyAxMS44Njc2ODUsMTAuNDI3MDg1IDExLjYwMDAyNTEsMTAuMDkzNzUgQzExLjMzMjM2NTIsOS43NjA0MTUgMTEuMTcxNTkzOCw5LjMxMjUwMjgxIDExLjExNzcwNjEsOC43NSBDMTEuMDYzODE4NCw4LjE4NzQ5NzE5IDExLjEzNDM2NjEsNy40NzkxNzA5NCAxMS4zMjkzNTE0LDYuNjI1IEMxMS41MjQzMzY2LDUuNzcwODI5MDYgMTEuNzc3MTc0MSw1LjA2MjUwMjgxIDEyLjA4Nzg3MTYsNC41IEMxMi4zOTg1NjkxLDMuOTM3NDk3MTkgMTIuNzYzODM0MSwzLjQ4OTU4NSAxMy4xODM2Nzc2LDMuMTU2MjUgQzEzLjYwMzUyMTEsMi44MjI5MTUgMTQuMDc4ODkzMSwyLjU4ODU0MjM0IDE0LjYwOTgwNzksMi40NTMxMjUgQzE1LjE0MDcyMjcsMi4zMTc3MDc2NiAxNS43MjkwODk2LDIuMjUgMTYuMzc0OTI2MSwyLjI1IEMxNy4xMDQwOTY0LDIuMjUgMTcuNjc1ODQ1NiwyLjM0NjM1MzIgMTguMDkwMTkwNiwyLjUzOTA2MjUgQzE4LjUwNDUzNTcsMi43MzE3NzE4IDE4LjgwMzg2NjgsMi45OTQ3OSAxOC45ODgxOTMsMy4zMjgxMjUgQzE5LjE3MjUxOTEsMy42NjE0NiAxOS4yNjE2MjA5LDQuMDQ2ODcyODEgMTkuMjU1NTAwOSw0LjQ4NDM3NSBDMTkuMjQ5MzgwOSw0LjkyMTg3NzE5IDE5LjE4OTI1MjksNS4zOTA2MjI1IDE5LjA3NTExNTMsNS44OTA2MjUgWiBNMTcuMzA4OTgzNSw1LjY4NzUgQzE3LjM2ODQzMDIsNS40MjcwODIwMyAxNy40MDY2NzQ3LDUuMTc5Njg4NjcgMTcuNDIzNzE4Miw0Ljk0NTMxMjUgQzE3LjQ0MDc2MTgsNC43MTA5MzYzMyAxNy40MDY5OTU2LDQuNTA1MjA5MjIgMTcuMzIyNDE4Nyw0LjMyODEyNSBDMTcuMjM3ODQxOSw0LjE1MTA0MDc4IDE3LjA5NTQ2NTIsNC4wMTA0MTcxOSAxNi44OTUyODQ0LDMuOTA2MjUgQzE2LjY5NTEwMzcsMy44MDIwODI4MSAxNi40MDc1MTY3LDMuNzUgMTYuMDMyNTE0OCwzLjc1IEMxNS42MzY2Nzk1LDMuNzUgMTUuMjk3ODU3NSwzLjc5Njg3NDUzIDE1LjAxNjAzODcsMy44OTA2MjUgQzE0LjczNDIxOTksMy45ODQzNzU0NyAxNC40OTM3ODc5LDQuMTI0OTk5MDYgMTQuMjk0NzM1NSw0LjMxMjUgQzE0LjA5NTY4MzEsNC41MDAwMDA5NCAxMy45MjgxOTQxLDQuNzMxNzY5NDUgMTMuNzkyMjYzNiw1LjAwNzgxMjUgQzEzLjY1NjMzMzEsNS4yODM4NTU1NSAxMy41NDE1NDg0LDUuNjA0MTY0ODQgMTMuNDQ3OTA2Myw1Ljk2ODc1IEwxNy4zMDg5ODM1LDUuNjg3NSBaIE0yMC4wMzM3MDI3LDIuNDA2MjUgTDIyLjA5NjIwMjcsMi40MDYyNSBMMjIuMDk5MDA0MSw4LjgyODEyNSBMMjIuMTkyNzU0MSw4LjgyODEyNSBMMjUuMzQ2MjAyNywyLjQwNjI1IEwyNy41ODA1Nzc3LDIuNDA2MjUgTDI3LjgzMzM3OTEsOC44MjgxMjUgTDI3LjkyNzEyOTEsOC44MjgxMjUgTDMwLjg3NzQ1MjcsMi40MDYyNSBMMzIuODkzMDc3NywyLjQwNjI1IEwyOC42Mzg4ODg5LDEwLjg0Mzc1IEwyNi4yMDEzODg5LDEwLjg0Mzc1IEwyNS45ODE3MDIxLDQuNjg3NSBMMjUuODg3OTUyMSw0LjY4NzUgTDIyLjg0MjAxMzksMTAuODQzNzUgTDIwLjM4ODg4ODksMTAuODQzNzUgTDIwLjAzMzcwMjcsMi40MDYyNSBaIiBpZD0iTmV3Ij48L3BhdGg+CiAgICAgICAgICAgIDwvZz4KICAgICAgICA8L2c+CiAgICA8L2c+Cjwvc3ZnPg=='
+const fullYears = Array(200).fill(0).map((_, idx) => `${1970 + idx}`)
+const isFullYear = (val) => fullYears.includes(val)
 export const replaceColor = ({ pivotTableStyle, customPageConfig, themeColor, sourceType, linkageMatch = {} }) => {
   const data = _.clone(pivotTableStyle);
   const { columnBgColor, lineBgColor } = data;
@@ -501,6 +505,14 @@ export default class extends Component {
     const controlMinAndMax = getControlMinAndMax(yaxisList, result);
     const isHideHeaderLastTr = columns.length && !lines.length && yaxisList.length === 1;
 
+    const maxYearQuarter = result.reduce((max, item) => {
+      let nextQuarter = item.y[0] || ''
+      if (typeof nextQuarter !== 'string' && typeof nextQuarter.value === 'string') {
+        nextQuarter = nextQuarter.value
+      }
+      return nextQuarter.includes('H') ? max : max > nextQuarter ? max : nextQuarter
+    }, '')
+
     const getTitle = (id, data) => {
       if (_.isNull(data)) return;
       const control = _.find(columns, { cid: id }) || {};
@@ -523,6 +535,12 @@ export default class extends Component {
         const { rename, controlName, showNumber = true, percent = {} } = item;
         const name = rename || controlName;
         const dragIndex = index + i + lines.length;
+
+        let className = cx('cell-content', displaySetup.showRowList && isViewOriginalData ? 'contentValue' : undefined)
+        if (isFullYear(data.data[index].y[0])) {
+          className = className ? className + ' column-head' : 'column-head'
+        }
+        
         return {
           title: () => {
             return (
@@ -534,7 +552,8 @@ export default class extends Component {
           },
           dataIndex: `${item.controlId}-${index + i}`,
           colSpan: 1,
-          className: cx('cell-content', displaySetup.showRowList && isViewOriginalData ? 'contentValue' : undefined),
+          // className: cx('cell-content', displaySetup.showRowList && isViewOriginalData ? 'contentValue' : undefined),
+          className,
           width: this.getColumnWidth(isHideHeaderLastTr ? dragIndex + 1 : dragIndex),
           onCell: record => {
             return {
@@ -555,7 +574,7 @@ export default class extends Component {
               record.lineSubTotal = Number((yvalueMap[item.controlId])[subTotal]);
             }
             record.sumCount = columnData.sum;
-            return this.renderBodyTd(value, record, item.controlId, controlMinAndMax);
+            return this.renderBodyTd(value, record, item.controlId, controlMinAndMax, name);
           },
         };
       });
@@ -602,11 +621,13 @@ export default class extends Component {
           const colSpan = isObject ? firstItem.length : 1;
           const id = columns[0].cid;
           const children = item.y.length > 1 ? getChildren(1, index, colSpan) : getYaxisList(index);
+          const title = getTitle(id, firstItem)
           const obj = {
             title: () => {
               return (
                 <Fragment>
-                  {getTitle(id, firstItem)}
+                  {/* {getTitle(id, firstItem)} */}
+                  {title === maxYearQuarter ? <div className='column-title-wrap'>{title}<img src={newImgBase} alt="" /></div> : title}
                   {columns.length === 1 && yaxisList.length === 1 && this.renderDrag(index + lines.length)}
                 </Fragment>
               );
@@ -1030,7 +1051,7 @@ export default class extends Component {
 
     return <div style={{ wordWrap: 'break-word', wordBreak: 'break-word' }}>{data}</div>;
   }
-  renderBodyTd(value, record, controlId, controlMinAndMax) {
+  renderBodyTd(value, record, controlId, controlMinAndMax, name='') {
     const { yaxisList, displaySetup } = this.props.reportData;
     const { colorRules = [] } = displaySetup;
     const style = {};
@@ -1119,12 +1140,50 @@ export default class extends Component {
       }
     }
 
+    let tagClassName = ''
+    // 对Evol列加标签显示处理
+    if (['Evol','Evol%','%','Value'].includes(name)) {
+      let txt = value
+      const txtNum = parseFloat(txt)
+      let tagClass = ''
+      // let valueView = isNaN(txt) ? txt : ((isNaN(txtNum) || txtNum == 0) ? '--' : `${txt}%`)
+
+      if (name === 'Value') {
+        // valueView = isNaN(txt) ? txt : ((isNaN(txtNum) || txtNum == 0) ? '--' : parseFloat(txt))
+        // console.log('value view', txt, valueView)
+        if (txtNum > 0) {
+          switch (record['6362a77a1d176488ea6c1a81']) {
+            case 'AAU':
+              tagClass = 'v-red'
+              break;
+            case 'MAU':
+              tagClass = 'v-cyan'
+              break
+            case 'DAU':
+              tagClass = 'v-blue'
+              break
+          }
+        } else {
+          tagClass = ''
+        }
+        
+      } else {
+        tagClass = isNaN(txtNum) ? '' : txtNum > 0 ? 'green' : txtNum < 0 ? 'red' : ''
+      }
+      
+      // value = <span className={cx(['cell-tag',tagClass])}>{txt}</span>
+      const tmpTxt = isNumberValue ? record.showNumber && value : value
+      tagClassName = tmpTxt === '' ? '' : cx(['cell-tag',tagClass])
+    }
+
     return (
       <Fragment>
         {!onlyShowBar && (
           <div className="cell-value" style={{ color: style.color }}>
+            <span className={tagClassName}>
             {isNumberValue ? record.showNumber && value : value}
             {percent}
+            </span>
           </div>
         )}
         {style.backgroundColor && <div className="data-bg" style={{ backgroundColor: style.backgroundColor }}></div>}

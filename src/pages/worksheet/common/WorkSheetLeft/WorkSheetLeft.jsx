@@ -29,6 +29,31 @@ function getProjectfoldedFromStorage() {
   return result;
 }
 
+const getIndentationBrandConfig = () => {
+  return new Promise((resolve, reject) => {
+    $.ajax({
+      url: `https://app.mohodata.com/api/v2/open/worksheet/getRowByIdPost`,
+      type: 'POST',
+      dataType: 'json',
+      timeout: 3000,
+      contentType: 'application/json',
+      data: JSON.stringify({
+        "appKey": "80b065391c247505",
+        "sign": "ZGFlODY5ODgxYjk2YmFkMjljZWI5MTA4ZjgzYmI3NWI5Zjk0ODY5ODI2NmFlMzY0MTU4Y2U1YWI4Nzk2MDU0Yg==",
+        "worksheetId": "config",
+        "rowId": "036815e9-64d8-43b1-9903-15a02d67574f",
+        "getSystemControl": true
+      }),
+      success: function(payload) {
+        resolve(payload);
+      },
+      error: function (error) {
+        reject(error);
+      },
+    });
+  })
+}
+
 class WorkSheetLeft extends Component {
   static propTypes = {
     worksheetId: PropTypes.string,
@@ -40,10 +65,20 @@ class WorkSheetLeft extends Component {
     super(props);
     this.state = {
       projectFolded: getProjectfoldedFromStorage(),
+
+      indentationBrands: [],
     };
   }
   componentWillMount = function () {
     this.getSheetList(this.props);
+
+    getIndentationBrandConfig().then(res => {
+      if (res.success) {
+        const resData = res.data || {}
+        const indentationBrands = JSON.parse(resData.value || '[]')
+        this.setState({indentationBrands})
+      }
+    })
   };
   componentWillUnmount() {
     this.props.sheetListActions.updateSheetListLoading(true);
@@ -90,6 +125,7 @@ class WorkSheetLeft extends Component {
     return <Wrap key={item.workSheetId} appItem={item} {...workSheetItemProps} />;
   }
   renderContent(data) {
+    const { indentationBrands } = this.state;
     const { worksheetId, isCharge, appPkg, secondLevelGroup = false } = this.props;
     const { appId, projectId, groupId, sheetListActions } = this.props;
     const Wrap = secondLevelGroup ? Fragment : ScrollView;
@@ -104,6 +140,7 @@ class WorkSheetLeft extends Component {
       sheetListVisible: isUnfold,
       appPkg,
       projectId,
+      indentationBrands,
     };
     return (
       <Fragment>

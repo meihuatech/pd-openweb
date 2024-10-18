@@ -79,6 +79,7 @@ rewrite (?i)^/auth/feishu /auth-feishu.html break;
 rewrite (?i)^/sso/dingding  /sso-dingding.html break;
 rewrite (?i)^/sso/sso  /sso-sso.html break;
 rewrite (?i)^/sso/workweixin  /sso-workweixin.html break;
+rewrite (?i)^/sso/loreal  /sso-loreal.html break;
 rewrite (?i)^/legalportal /legalportal.html break;
 
 # 主站

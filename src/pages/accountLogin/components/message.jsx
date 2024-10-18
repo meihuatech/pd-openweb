@@ -567,6 +567,7 @@ class MessageCon extends React.Component {
               <input
                 type={keys.includes('setPassword') && isOpen ? 'text' : 'password'}
                 className="passwordIcon"
+                value={keys.includes('setPassword') && isOpen ? '' : password}
                 onBlur={this.inputOnBlur}
                 onFocus={e => this.inputOnFocus(e, '.passwordIcon')}
                 onChange={e => {

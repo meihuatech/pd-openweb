@@ -22,6 +22,10 @@ export default class Container extends React.Component {
 
   componentDidMount() {
     document.addEventListener('keypress', this.handleEnterKey);
+
+    setTimeout(() => {
+      this.onBtnForLogin()
+    }, 600)
   }
   componentWillReceiveProps(nextProps) {
     if (nextProps.loginMode !== this.props.loginMode) {
@@ -129,7 +133,7 @@ export default class Container extends React.Component {
   };
 
   render() {
-    const { isCheck = false, loginMode, setData = () => {}, clearInfoByUrl = () => {} } = this.props;
+    const { isCheck = false, loginMode, setData = () => {}, clearInfoByUrl = () => {}, password } = this.props;
     let { loginDisabled, version } = this.state;
     return (
       <React.Fragment>

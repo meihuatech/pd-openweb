@@ -192,6 +192,50 @@ const PivotTableContent = styled.div`
   }
   th, td {
     min-width: ${props => props.isMobile ? '60px' : '100px'};
+    text-align: left !important;
+
+    .cell-tag {
+      padding: 2px 10px;
+      display: inline-block;
+      min-width: 60px;
+      font-size: 12px;
+      color: #333333;
+      border-radius: 14px;
+      background-color: #DDDDDD;
+
+      &.red {
+        background-color: #E6A7A5;
+      }
+      &.green {
+        background-color: #BCD197;
+      }
+      &.blue-light {
+        background-color: rgb(165, 209, 230);
+      }
+      &.v-red {
+        background-color: #F5B5B2;
+      }
+      &.v-blue {
+        background-color: #CBDBEB;
+      }
+      &.v-cyan {
+        background-color: #BBD3CB;
+      }
+
+    }
+
+    &.ant-table-cell.column-head {
+      background-color: #e2e7ee;
+    }
+    &.ant-table-cell .column-title-wrap {
+      position: relative;
+
+      img {
+        position: absolute;
+        top: -5px;
+        max-width: 28px;
+      }
+    }
   }
   .ant-table-cell-scrollbar {
     display: none;
