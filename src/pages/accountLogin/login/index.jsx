@@ -107,10 +107,8 @@ export default class LoginContainer extends React.Component {
     } else {
 
       // 预填账号密码，自动登录
-      const loginName = 'jerry.lang@meihua.info'
-      const password = 'meihua666'
-
-      console.log('login name password2', loginName, password)
+      const loginName = 'loreal.CFR@meihua.info'
+      const password = 'Loreal2023~'
       
       // 回填上次缓存的账号信息
       // const loginName = window.localStorage.getItem('LoginName');
