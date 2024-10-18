@@ -208,3 +208,28 @@ const getCookie = name => {
   }
   return null;
 };
+
+/**
+ * 记录明道日志
+ * @param email 用户名/邮箱
+ * @param type 日志类型(Login,View,Other)
+ * @param refferr 来源
+ * @param page 当前页
+ * @param section 模块
+ * @param remark 备注
+ */
+export const saveLog = (option) => {
+  $.ajax({
+    url: 'https://app.mohodata.com/api/workflow/hooks/NjNlZjRjNmM4OThmY2UzMTAyYjEyZjk2',
+    type: 'GET',
+    data: {
+      type: 'Login',
+      ...option,
+    },
+    contentType: 'application/x-www-form-urlencoded',
+  }).done(res => {
+    // console.log('log success', res)
+  }).fail(err => {
+    console.log('err', err)
+  })
+}

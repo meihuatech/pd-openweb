@@ -53,6 +53,20 @@ export default class LoginContainer extends React.Component {
 
   componentDidMount() {
     const { loginCallback = () => {}, setData = () => {}, setLoading = () => {} } = this.props;
+
+    const lorSSO = getCookie(md.global.CookieKeys.LOREAL_SSO)
+    // console.log('login sso', lorSSO)
+    if (!lorSSO) {
+      // location.href = '/404'
+      const lorSource = getCookie(md.global.CookieKeys.LOREAL_SSO_SOURCE)
+      if (lorSource === 'tool') {
+        location.href = md.global.SourceUrls.TOOL_SSO_URL
+      } else {
+        location.href = md.global.SourceUrls.LOREAL_SSO_URL
+      }
+      return
+    }
+    
     if (checkLogin()) {
       if (request.ReturnUrl) {
         checkReturnUrl(request.ReturnUrl);
@@ -91,8 +105,15 @@ export default class LoginContainer extends React.Component {
         }),
       );
     } else {
+
+      // 预填账号密码，自动登录
+      const loginName = 'jerry.lang@meihua.info'
+      const password = 'meihua666'
+
+      console.log('login name password2', loginName, password)
+      
       // 回填上次缓存的账号信息
-      const loginName = window.localStorage.getItem('LoginName');
+      // const loginName = window.localStorage.getItem('LoginName');
       const loginLDAPName = window.localStorage.getItem('LoginLDAPName');
       if (loginName || loginLDAPName) {
         let dialCode = '';
@@ -100,7 +121,7 @@ export default class LoginContainer extends React.Component {
           const iti = initIntlTelInput();
           dialCode = `+${iti.getSelectedCountryData().dialCode}`;
         }
-        setData({ emailOrTel: loginName || '', fullName: loginLDAPName || '', dialCode });
+        setData({ emailOrTel: loginName || '', fullName: loginLDAPName || '', dialCode, password });
       }
       if (!this.state.isNetwork) {
         setLoading(false);

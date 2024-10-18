@@ -75,6 +75,7 @@ export default class WorkSheetItem extends Component {
       appPkg,
       sheetListVisible,
       disableTooltip,
+      indentationBrands=[],
     } = this.props;
     const {
       workSheetId,
@@ -138,6 +139,8 @@ export default class WorkSheetItem extends Component {
         )
       );
     };
+    const pLeft = indentationBrands.includes(workSheetName) ? 'pLeft20' : ''
+
     const Content = (
       <Fragment>
         {showIcon && (
@@ -182,12 +185,12 @@ export default class WorkSheetItem extends Component {
             data-id={workSheetId}
           >
             {isNewOpen ? (
-              <div className="NoUnderline valignWrapper h100 nameWrap" onClick={handleNewOpen}>
+              <div className={`NoUnderline valignWrapper ${pLeft} h100 nameWrap`} onClick={handleNewOpen}>
                 {Content}
               </div>
             ) : (
               <MdLink
-                className="NoUnderline valignWrapper h100 nameWrap stopPropagation"
+                className={`NoUnderline valignWrapper ${pLeft} h100 nameWrap stopPropagation`}
                 to={url}
                 onClick={() => {
                   if (type == 0) {

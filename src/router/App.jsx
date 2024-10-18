@@ -41,8 +41,23 @@ export default class App extends Component {
   }
 
   componentDidMount() {
+    // // LOREAL SSO 判断是否是专有渠道登录，如不是则禁入
+    const lorSSO = getCookie(md.global.CookieKeys.LOREAL_SSO)
+    console.log('sso', lorSSO)
+    if (!lorSSO) {
+      // location.href = '/404'
+      const lorSource = getCookie(md.global.CookieKeys.LOREAL_SSO_SOURCE)
+      if (lorSource === 'tool') {
+        location.href = md.global.SourceUrls.TOOL_SSO_URL
+      } else {
+        location.href = md.global.SourceUrls.LOREAL_SSO_URL
+      }
+      return
+    }
+
     // 全局注入事件
     globalEvents();
+
 
     // 绑定快捷操作
     !md.global.Account.isPortal && this.bindShortcut();
