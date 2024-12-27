@@ -505,13 +505,15 @@ export default class extends Component {
     const controlMinAndMax = getControlMinAndMax(yaxisList, result);
     const isHideHeaderLastTr = columns.length && !lines.length && yaxisList.length === 1;
 
+
     const maxYearQuarter = result.reduce((max, item) => {
       let nextQuarter = item.y[0] || ''
       if (typeof nextQuarter !== 'string' && typeof nextQuarter.value === 'string') {
         nextQuarter = nextQuarter.value
       }
-      return nextQuarter.includes('H') ? max : max > nextQuarter ? max : nextQuarter
+      return nextQuarter.includes('S') ? max : max > nextQuarter ? max : nextQuarter
     }, '')
+    const showMaxYearQuarter = maxYearQuarter && ['L’Oreal Group'].includes(reportData.name)
 
     const getTitle = (id, data) => {
       if (_.isNull(data)) return;
@@ -627,7 +629,7 @@ export default class extends Component {
               return (
                 <Fragment>
                   {/* {getTitle(id, firstItem)} */}
-                  {title === maxYearQuarter ? <div className='column-title-wrap'>{title}<img src={newImgBase} alt="" /></div> : title}
+                  {title === showMaxYearQuarter ? <div className='column-title-wrap'>{title}<img src={newImgBase} alt="" /></div> : title}
                   {columns.length === 1 && yaxisList.length === 1 && this.renderDrag(index + lines.length)}
                 </Fragment>
               );
