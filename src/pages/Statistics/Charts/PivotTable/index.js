@@ -18,7 +18,7 @@ import {
 } from './util';
 import PivotTableContent from './styled';
 import { isLightColor } from 'src/pages/customPage/util';
-import _ from 'lodash';
+import _, { max } from 'lodash';
 const isMobile = browserIsMobile();
 const isPrintPivotTable = location.href.includes('printPivotTable');
 import { generate } from '@ant-design/colors';
@@ -512,8 +512,9 @@ export default class extends Component {
         nextQuarter = nextQuarter.value
       }
       return nextQuarter.includes('S') ? max : max > nextQuarter ? max : nextQuarter
-    }, '')
-    const showMaxYearQuarter = maxYearQuarter && ['L’Oreal Group'].includes(reportData.name)
+    }, '');
+    const reportName = (reportData.name || '').trim();
+    const showMaxYearQuarter = reportName === 'L’Oreal Group';
 
     const getTitle = (id, data) => {
       if (_.isNull(data)) return;
@@ -629,7 +630,7 @@ export default class extends Component {
               return (
                 <Fragment>
                   {/* {getTitle(id, firstItem)} */}
-                  {title === showMaxYearQuarter ? <div className='column-title-wrap'>{title}<img src={newImgBase} alt="" /></div> : title}
+                  {title === maxYearQuarter && showMaxYearQuarter ? <div className='column-title-wrap'>{title}<img src={newImgBase} alt="" /></div> : title}
                   {columns.length === 1 && yaxisList.length === 1 && this.renderDrag(index + lines.length)}
                 </Fragment>
               );
