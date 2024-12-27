@@ -511,7 +511,7 @@ export default class extends Component {
       if (typeof nextQuarter !== 'string' && typeof nextQuarter.value === 'string') {
         nextQuarter = nextQuarter.value
       }
-      return nextQuarter.includes('S') ? max : max > nextQuarter ? max : nextQuarter
+      return ['S','H'].some(v => nextQuarter.includes(v)) ? max : max > nextQuarter ? max : nextQuarter
     }, '');
     const reportName = (reportData.name || '').trim();
     const showMaxYearQuarter = reportName === 'L’Oreal Group';
